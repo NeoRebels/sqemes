@@ -1,15 +1,17 @@
 # Sqemes
 
-**Open-source, self-hostable prompt-template management and distribution.**
+**Sqemes is where your team's AI know-how lives.**
 
-Sqemes is a template management platform: build, organise, and version reusable
-**templates** — prompts, assistants, and skills (one `Template` model, distinguished by
-`kind`) — and use them wherever you work, through three distribution channels:
+Build and organize reusable **prompts, assistants, and skills** once — then use them everywhere you
+work, through three channels:
 
-- **Chrome extension** — insert templates and AI-enhance prompts directly inside ChatGPT,
-  Claude, Gemini, and other AI chats (plus any site you add).
-- **In-app Chat** — run your templates against your configured models.
-- **MCP server** — expose your templates to any MCP-compatible AI client.
+- 🧩 **Browser extension** — drop them into ChatGPT, Claude, Gemini, or any chat site
+- 💬 **Sqemes chat** — run them against your own model keys (bring-your-own-key)
+- 🔌 **MCP** — expose them to Claude Desktop, Cursor, or any MCP client
+
+Self-hostable and open-source — own your data. Under the hood everything is one `Template` model
+distinguished by `kind` (prompt / assistant / skill), so what you author once works across all three
+channels.
 
 This repository is the **open core**: the full app + backend you can run on your own
 infrastructure. Sqemes Cloud adds hosted convenience and a few proprietary pieces — none of
@@ -23,9 +25,14 @@ project needed:
 
 ```bash
 cd selfhost
-cp .env.example .env          # then edit the secrets (see the file's header)
+cp .env.example .env
 docker compose up --build     # add -d to run detached
 ```
+
+> ⚠️ **Before exposing this to the internet, change the secrets in `.env`.** It ships with public
+> **demo** keys so it boots on the first try — leaving them is insecure (the demo JWT keys are
+> well-known, so anyone could mint admin tokens). See
+> **[SELF_HOSTING.md → Secrets you must change](./SELF_HOSTING.md#secrets-you-must-change)**.
 
 Open the app, sign up, and add a provider key (bring-your-own-key). Full instructions — a
 bring-your-own-Supabase alternative, TLS/reverse-proxy setup, and connecting the Chrome

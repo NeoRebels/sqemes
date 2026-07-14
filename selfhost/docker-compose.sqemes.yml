@@ -120,6 +120,17 @@ services:
       # Optional transactional email (falls back to copyable invite links when unset):
       RESEND_API_KEY: ${RESEND_API_KEY:-}
 
+  # -------------------------------------------------------------------------
+  # storage — the vendored healthcheck (start_period 10s + 3×5s ≈ 25s) is too
+  # tight for a cold first boot (fresh DB init + image builds competing for I/O),
+  # so storage can be marked unhealthy and init/app (which depend on it) never
+  # start. Widen the grace window. (SQEM-124)
+  # -------------------------------------------------------------------------
+  storage:
+    healthcheck:
+      start_period: 60s
+      retries: 12
+
 volumes:
   db-config:
   deno-cache:

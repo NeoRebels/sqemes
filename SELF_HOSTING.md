@@ -27,6 +27,29 @@ and there is no subscription model at all.
 
 ---
 
+## Secrets you must change
+
+> Applies to the **Docker bundle (Path B)**. The bundled [`selfhost/.env.example`](selfhost/.env.example)
+> ships with **public demo values** so the stack boots on the first try. They are **not** safe for an
+> internet-facing instance — the demo JWT keys are well-known, so anyone could mint admin
+> (`service_role`) tokens. Regenerate these in your `.env` **before** exposing the instance:
+
+| Variable | How to generate |
+|---|---|
+| `POSTGRES_PASSWORD` | `openssl rand -hex 16` |
+| `JWT_SECRET` | `openssl rand -hex 32` — then regenerate the two keys below to match it |
+| `ANON_KEY`, `SERVICE_ROLE_KEY` | JWTs signed with your new `JWT_SECRET`, via Supabase's key generator (see the [self-hosting docs](https://supabase.com/docs/guides/self-hosting/docker#securing-your-services)). **They must be signed with the same `JWT_SECRET` or all auth fails.** |
+| `DASHBOARD_PASSWORD` | a strong password (Supabase Studio login) |
+| `SECRET_KEY_BASE` | `openssl rand -hex 32` |
+| `VAULT_ENC_KEY`, `PG_META_CRYPTO_KEY` | `openssl rand -hex 16` (32 chars each) |
+| `API_KEY_ENCRYPTION_KEY` | `openssl rand -hex 32` — **set once and never change it**; it decrypts stored provider keys |
+| `S3_PROTOCOL_ACCESS_KEY_ID` / `S3_PROTOCOL_ACCESS_KEY_SECRET`, `MINIO_ROOT_PASSWORD` | random strings (`openssl rand -hex 16`) |
+
+Also set `SUPABASE_PUBLIC_URL`, `SITE_URL`, and `API_EXTERNAL_URL` to your real `https://` domain
+(and `PROXY_DOMAIN` if you use the bundled Caddy TLS overlay).
+
+---
+
 ## Prerequisites
 
 - A **Supabase project** — Supabase Cloud (free tier is fine) or a self-hosted Supabase.
@@ -155,6 +178,37 @@ points itself at your instance — no rebuild or side-load. Cloud users keep the
 (e.g. a self-hosted Copilot): add the site URL under options → **Custom sites**, grant access, and
 reload that tab. Best-effort — the widget and template insertion work on standard text/contenteditable
 composers; deeply site-specific behaviour (and exotic editors) may vary.
+
+---
+
+## Behind an existing reverse proxy (Traefik / nginx)
+
+The bundled **Caddy overlay** (`docker-compose.caddy.yml`) publishes ports **80/443** and fetches its
+own Let's Encrypt certificate — ideal on a fresh box, but it **collides** if you already run Traefik,
+nginx, or another proxy on those ports.
+
+To sit behind an existing proxy, **don't** add the Caddy overlay — keep just:
+
+```
+COMPOSE_FILE=docker-compose.yml:docker-compose.sqemes.yml
+```
+
+That publishes the app on `${SQEMES_APP_PORT:-3000}`, Kong on `${KONG_HTTP_PORT:-8000}`, and the
+api-sidecar on `${SQEMES_API_PORT:-8787}`. Point your proxy for your domain at these backends (the
+same routing the bundled Caddy uses — services reachable as `app`, `kong`, `api-sidecar` on the
+compose network, or via those host ports):
+
+| Path(s) | → backend |
+|---|---|
+| `/auth/v1/*`, `/rest/v1/*`, `/graphql/v1`, `/realtime/v1/*`, `/storage/v1/*`, `/functions/v1/*`, `/mcp`, `/sso/*` | Kong (`:8000`) |
+| `/.well-known/sqemes-extension-config`, `/.well-known/oauth-authorization-server`, `/oauth/authorize` | api-sidecar (`:8787`) |
+| everything else (`/`, `/assets/*`) | app (`:80`, published on `:3000`) |
+
+Then set `SUPABASE_PUBLIC_URL`, `SITE_URL`, and `API_EXTERNAL_URL` to your `https://` domain.
+
+> **Keep your proxy config in your own file.** Put Traefik labels / a custom overlay in a file *you*
+> create (e.g. `docker-compose.override.yml`, which Compose auto-loads) and add it to `COMPOSE_FILE` —
+> **don't edit the shipped `docker-compose.caddy.yml`**, or every `git pull` will conflict.
 
 ---
 
