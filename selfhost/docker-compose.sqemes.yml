@@ -1,0 +1,125 @@
+# Sqemes self-host overlay — layered ON TOP of the vendored upstream Supabase
+# docker-compose.yml via COMPOSE_FILE (see .env: COMPOSE_FILE=docker-compose.yml:docker-compose.sqemes.yml).
+#
+# This file holds EVERYTHING Sqemes-specific so the vendored upstream stack stays
+# pristine and updatable. We never edit docker-compose.yml directly; we use compose's
+# `!override` / `!reset` tags to replace lists on the upstream services we touch.
+#
+# Increment 1 (SQEM-116) scope: bring the core up — Supabase stack + app + an init step
+# that applies the repo's migrations and creates the private workspace-files bucket, so a
+# fresh `docker compose up` lets you sign up and do template CRUD. The reverse-proxy/TLS
+# (Caddy) and the api/ Node sidecar (MCP/OAuth/extension-config) land in increment 2.
+
+name: sqemes
+
+services:
+  # -------------------------------------------------------------------------
+  # init — one-shot: apply the repo's SQL migrations to the bundled Postgres and
+  # ensure the private `workspace-files` storage bucket exists. Mirrors what
+  # `supabase db push` does against a linked project (schema_migrations tracking),
+  # so it is safe to re-run: already-applied migrations are skipped.
+  # -------------------------------------------------------------------------
+  init:
+    container_name: supabase-sqemes-init
+    image: postgres:17-alpine
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+      # Several migrations INSERT into storage.buckets, which the storage service
+      # creates on startup — wait for it so the schema exists before we migrate.
+      storage:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./init/apply.sh:/init/apply.sh:ro
+      - ../supabase/migrations:/migrations:ro
+    entrypoint: ["/bin/sh", "/init/apply.sh"]
+
+  # -------------------------------------------------------------------------
+  # app — build the Sqemes SPA from the repo (Vite inlines the Supabase URL/key at
+  # build time) and serve the static bundle. Waits for `init` so the schema exists
+  # before the app is reachable. In increment 2 this sits behind Caddy for TLS.
+  # -------------------------------------------------------------------------
+  app:
+    container_name: supabase-sqemes-app
+    build:
+      context: ..
+      dockerfile: selfhost/Dockerfile.app
+      args:
+        # Browser-facing values: the app calls Supabase through the public URL (Kong).
+        VITE_SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
+        VITE_SUPABASE_ANON_KEY: ${ANON_KEY}
+        VITE_SELF_HOSTED: "true"
+        # SQEM-118 — optional self-host update notifier (empty ⇒ shows version only, no check).
+        VITE_UPDATE_CHECK_URL: ${VITE_UPDATE_CHECK_URL:-}
+        VITE_UPDATE_DOCS_URL: ${VITE_UPDATE_DOCS_URL:-}
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      kong:
+        condition: service_healthy
+    ports:
+      - ${SQEMES_APP_PORT:-3000}:80
+
+  # -------------------------------------------------------------------------
+  # api-sidecar — serves the repo's /api handlers (extension-config, oauth-authorize,
+  # mcp-oauth-metadata) that run as Vercel functions on Cloud. Needed for MCP/OAuth + the
+  # extension config endpoint. Published locally for testing; behind Caddy on a real domain
+  # (docker-compose.caddy.yml routes /.well-known/* + /oauth/authorize here).
+  # -------------------------------------------------------------------------
+  api-sidecar:
+    container_name: supabase-sqemes-api
+    build:
+      context: ..
+      dockerfile: selfhost/api-sidecar/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 8787
+      # The handlers advertise these (extension config + OAuth metadata).
+      VITE_SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
+      VITE_SUPABASE_ANON_KEY: ${ANON_KEY}
+    ports:
+      - ${SQEMES_API_PORT:-8787}:8787
+
+  # -------------------------------------------------------------------------
+  # functions — repoint the upstream edge-runtime at the repo's own edge functions
+  # (supabase/functions) plus our copy of the dispatch router, and pass the Sqemes
+  # function secrets. `!override` REPLACES the upstream list rather than appending.
+  # -------------------------------------------------------------------------
+  functions:
+    volumes: !override
+      - ../supabase/functions:/home/deno/functions:z   # our functions + _shared → /home/deno/functions/<name>
+      - ./edge-main:/home/deno/edge-main:z             # dispatch router (upstream, unmodified)
+      - deno-cache:/root/.cache/deno
+    command: !override ["start", "--main-service", "/home/deno/edge-main"]
+    environment:
+      # Upstream-provided (kept so the merge doesn't drop them):
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT}"
+      # Sqemes function secrets (self-host):
+      API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY}
+      SELF_HOSTED: "true"
+      # App origin — some functions read APP_URL, others SITE_URL (e.g. send-invite-email builds
+      # the emailed invite link from SITE_URL). Pass both so links point at the real instance.
+      APP_URL: ${SITE_URL}
+      SITE_URL: ${SITE_URL}
+      PUBLIC_API_URL: ${SUPABASE_PUBLIC_URL}
+      # Optional platform "Sqemes AI" (BYOK works without it):
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      # Optional transactional email (falls back to copyable invite links when unset):
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+
+volumes:
+  db-config:
+  deno-cache:

@@ -1,0 +1,18 @@
+Sqemes
+Copyright 2026 NeoRebels GmbH
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+--------------------------------------------------------------------------------
+
+For self-hosting convenience, this distribution bundles components of the Supabase
+self-hosted stack under `selfhost/` — Postgres, GoTrue (Auth), PostgREST, Realtime,
+Storage, Kong, edge-runtime, and Studio. Those components are the property of their
+respective authors and are licensed under their own terms (Supabase's own components are
+largely Apache-2.0; bundled databases/services carry PostgreSQL, MIT, and similar licenses).
+
+`selfhost/docker-compose.yml`, `selfhost/volumes/`, and the Caddy TLS overlay
+(`selfhost/docker-compose.caddy.yml`, `selfhost/volumes/proxy/caddy/`) are adapted from the
+upstream `supabase/supabase` repository (Apache-2.0).
+
+No endorsement by Supabase, Inc. is implied.

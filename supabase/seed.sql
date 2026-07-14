@@ -1,0 +1,3 @@
+-- Local seed hook.
+-- Keep this file committed because supabase/config.toml enables db.seed.
+-- Project reference data is currently seeded through versioned migrations.

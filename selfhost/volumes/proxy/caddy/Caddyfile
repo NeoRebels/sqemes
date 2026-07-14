@@ -1,0 +1,34 @@
+# Sqemes self-host reverse proxy (SQEM-116 increment 2).
+#
+# Caddy terminates TLS for {$PROXY_DOMAIN} (automatic Let's Encrypt when the domain resolves to
+# this server and ports 80/443 are open) and routes a single domain to three backends:
+#   - Supabase API paths        → Kong  (auth / rest / storage / functions / realtime / …)
+#   - Sqemes /api handler paths  → api-sidecar  (extension config, MCP OAuth)
+#   - everything else            → the app (SPA, served by nginx)
+#
+# The app uses hash routing, so its only real paths are "/" and "/assets/*" — no collision with
+# the Supabase or api-sidecar path prefixes below.
+#
+# Local testing: set PROXY_DOMAIN=localhost to make Caddy use its internal CA (self-signed) instead
+# of Let's Encrypt, then `curl -k https://localhost/...`.
+
+{$PROXY_DOMAIN} {
+	# Supabase API → Kong gateway
+	@supabase_api path /auth/v1/* /rest/v1/* /graphql/v1 /realtime/v1/* /storage/v1/* /functions/v1/* /mcp /sso/*
+	handle @supabase_api {
+		reverse_proxy kong:8000
+	}
+
+	# Sqemes /api handlers → api-sidecar (extension config discovery + MCP OAuth metadata/consent)
+	@sqemes_api path /.well-known/sqemes-extension-config /.well-known/oauth-authorization-server /oauth/authorize
+	handle @sqemes_api {
+		reverse_proxy api-sidecar:8787
+	}
+
+	# Everything else → the SPA
+	handle {
+		reverse_proxy app:80
+	}
+
+	header -server
+}

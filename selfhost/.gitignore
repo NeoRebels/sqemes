@@ -1,0 +1,7 @@
+# Local secrets + runtime state — never commit
+.env
+.env.*
+!.env.example
+volumes/db/data/
+volumes/storage/
+volumes/functions/main/.deno/

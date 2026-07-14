@@ -1,0 +1,6 @@
+{
+  "name": "sqemes-api-sidecar",
+  "private": true,
+  "type": "module",
+  "description": "Serves the /api Vercel handlers (extension-config, oauth-authorize, mcp-oauth-metadata) on self-host. Zero dependencies."
+}

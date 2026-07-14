@@ -1,0 +1,52 @@
+# Sqemes self-host TLS reverse proxy overlay (SQEM-116 increment 2).
+#
+# Layer this on for a real domain over HTTPS. Enable by adding it to COMPOSE_FILE in .env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.sqemes.yml:docker-compose.caddy.yml
+# and set PROXY_DOMAIN + point SUPABASE_PUBLIC_URL / SITE_URL / API_EXTERNAL_URL at https://<domain>.
+#
+# Caddy publishes 80/443 and proxies to the app, api-sidecar, and Kong (see
+# volumes/proxy/caddy/Caddyfile). The other services stop publishing host ports — only Caddy is
+# exposed. Adapted from supabase/supabase docker/docker-compose.caddy.yml (Apache-2.0, see NOTICE).
+
+name: sqemes
+
+services:
+  # Kong no longer publishes host ports; Caddy terminates TLS in front of it.
+  kong:
+    ports: !reset []
+    environment:
+      KONG_PORT_MAPS: "443:8000,443:8443"
+
+  # App + sidecar are reached only through Caddy now.
+  app:
+    ports: !reset []
+
+  api-sidecar:
+    ports: !reset []
+
+  caddy:
+    container_name: supabase-caddy
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    depends_on:
+      kong:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+      api-sidecar:
+        condition: service_healthy
+    environment:
+      PROXY_DOMAIN: ${PROXY_DOMAIN}
+    volumes:
+      - ./volumes/proxy/caddy:/etc/caddy:ro,z
+      - caddy_data:/data
+      - caddy_config:/config
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+
+volumes:
+  caddy_data:
+  caddy_config:

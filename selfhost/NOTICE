@@ -1,0 +1,22 @@
+Sqemes self-host bundle
+=======================
+
+This directory bundles Sqemes (Apache-2.0) with configuration vendored from the
+Supabase self-hosting Docker setup.
+
+Vendored from supabase/supabase (https://github.com/supabase/supabase), directory
+`docker/`, licensed under the Apache License 2.0:
+
+  - docker-compose.yml
+  - volumes/api/kong.yml, volumes/api/kong-entrypoint.sh
+  - volumes/db/*.sql
+  - volumes/pooler/pooler.exs
+  - volumes/functions/main/index.ts   (also copied to edge-main/index.ts)
+  - utils/generate-keys.sh
+
+Retrieved from branch `master` on 2026-07-12. These files carry their original
+Apache-2.0 license; see https://github.com/supabase/supabase/blob/master/LICENSE.
+
+Sqemes-authored files in this directory (docker-compose.sqemes.yml, Dockerfile.app,
+nginx.conf, init/apply.sh, .env.example additions, README.md) are part of Sqemes and
+licensed under Apache-2.0 (see ../LICENSE).

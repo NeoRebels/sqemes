@@ -1,0 +1,21 @@
+node_modules
+dist
+.env
+.env.local
+.env.staging
+.env.production
+.env.*.local
+supabase/.temp/
+supabase/.branches/
+test-results/
+playwright-report/
+*.log
+.DS_Store
+.claude/settings.local.json
+.vercel
+*.sql
+!AGENTS.md
+!supabase/migrations/*.sql
+!supabase/seed.sql
+# Vendored Supabase self-host DB init scripts (SQEM-116)
+!selfhost/volumes/db/*.sql
