@@ -181,7 +181,7 @@ composers; deeply site-specific behaviour (and exotic editors) may vary.
 
 ---
 
-## Behind an existing reverse proxy (Traefik / nginx)
+## Behind an existing reverse proxy (Traefik, nginx)
 
 The bundled **Caddy overlay** (`docker-compose.caddy.yml`) publishes ports **80/443** and fetches its
 own Let's Encrypt certificate — ideal on a fresh box, but it **collides** if you already run Traefik,

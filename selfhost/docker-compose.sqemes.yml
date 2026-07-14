@@ -35,6 +35,7 @@ services:
       POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SQEMES_APP_PORT: ${SQEMES_APP_PORT:-3000}
     volumes:
       - ./init/apply.sh:/init/apply.sh:ro
       - ../supabase/migrations:/migrations:ro
