@@ -17,16 +17,25 @@ This repository is the **open core**: the full app + backend you can run on your
 infrastructure. Sqemes Cloud adds hosted convenience and a few proprietary pieces — none of
 them are required to self-host.
 
-## Quickstart (Docker, one command)
+## Quickstart (Docker)
 
 The bundled stack stands up a whole instance — the app plus a self-hosted Supabase
 (Postgres, Auth, Storage, PostgREST, Realtime, edge functions) — no separate Supabase
-project needed:
+project needed. On a fresh VPS:
 
 ```bash
-cd selfhost
+# 1. Install Docker (skip if you already have it) — official convenience script
+curl -fsSL https://get.docker.com | sh
+
+# 2. Clone the repo
+git clone https://github.com/NeoRebels/sqemes && cd sqemes/selfhost
+
+# 3. Configure — copy the template, then edit secrets
 cp .env.example .env
-docker compose up --build     # add -d to run detached
+nano .env      # ⚠️ change the secrets before going to production (see below)
+
+# 4. Bring it up (detached)
+docker compose up --build -d
 ```
 
 > ⚠️ **Before exposing this to the internet, change the secrets in `.env`.** It ships with public
