@@ -158,6 +158,26 @@ composers; deeply site-specific behaviour (and exotic editors) may vary.
 
 ---
 
+## Updating
+
+**Docker bundle (Path B):**
+
+```bash
+cd selfhost
+git pull                       # pull the new version
+docker compose up -d --build   # rebuild + restart (init re-applies migrations idempotently)
+```
+
+**Bring-your-own-Supabase (Path A):** `git pull`, re-run `supabase db push` + `supabase functions
+deploy`, then rebuild/redeploy the frontend.
+
+On a self-hosted instance, Settings → **About** shows your running version and, when the
+[release feed](https://github.com/NeoRebels/sqemes/releases) has a newer version, an "update
+available" notice (SQEM-118). It's driven by `VITE_UPDATE_CHECK_URL` in the bundle `.env`
+(defaults to the official Sqemes releases feed).
+
+---
+
 ## Test it locally
 
 The bundled local stack is a self-host sandbox — a fresh **isolated local Supabase** (all migrations
