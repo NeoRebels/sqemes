@@ -26,7 +26,9 @@ import { useUI, useWorkspace } from '../store';
 import { can } from '../lib/permissions';
 import { CHROME_STORE_URL } from '../lib/links';
 import { IS_SELF_HOSTED } from '../lib/env';
+import { CURRENT_VERSION } from '../lib/version';
 import { useExtensionInstalled } from '../hooks/useExtensionInstalled';
+import { useUpdateStatus } from '../hooks/useUpdateStatus';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 
@@ -44,6 +46,13 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [tooltip, setTooltip] = useState<{ label: string, top: number } | null>(null);
   const extensionInstalled = useExtensionInstalled(); // SQEM-079 — hide the Install link once detected
+  // SQEM-123 — self-host footer version indicator (shares the update check with the About panel)
+  const updateStatus = useUpdateStatus();
+  const updateAvailable = !!(updateStatus?.updateAvailable && updateStatus.latest);
+  const openAbout = () => {
+    navigate('/settings', { state: { initialTab: 'general', scrollTo: 'about' } });
+    if (setMobileOpen) setMobileOpen(false);
+  };
 
   // Workspace Management State
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
@@ -356,6 +365,30 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
               </span>
             </div>
           )}
+
+          {/* SQEM-123 — self-host version / update indicator; hidden on Cloud */}
+          {IS_SELF_HOSTED && (isCollapsed ? (
+            <button
+              onClick={openAbout}
+              onMouseEnter={(e) => showTooltip(e, updateAvailable ? `Update available (v${CURRENT_VERSION})` : `Version v${CURRENT_VERSION}`)}
+              onMouseLeave={hideTooltip}
+              className="w-full flex items-center justify-center gap-1 px-2 py-1 text-2xs font-mono text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+            >
+              {updateAvailable && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />}
+              <span>v{CURRENT_VERSION}</span>
+            </button>
+          ) : (
+            <button
+              onClick={openAbout}
+              title={updateAvailable ? 'A newer version is available — click for details' : 'About & version'}
+              className="w-full flex items-center gap-1.5 px-3 py-1 text-2xs text-left text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors whitespace-nowrap"
+            >
+              <span className="font-mono">v{CURRENT_VERSION}</span>
+              {updateAvailable && (
+                <span className="text-amber-600 dark:text-amber-400 font-semibold">· Update available</span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
 

@@ -1,27 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Info, ArrowUpCircle, CheckCircle2, ExternalLink } from 'lucide-react';
 import Card from './ui/Card';
 import { IS_SELF_HOSTED } from '../lib/env';
-import { CURRENT_VERSION, UPDATE_DOCS_URL, checkForUpdate, type UpdateStatus } from '../lib/version';
+import { CURRENT_VERSION, UPDATE_DOCS_URL } from '../lib/version';
+import { useUpdateStatus } from '../hooks/useUpdateStatus';
 
 // SQEM-118 — self-host "About" panel: shows the running Sqemes version and, when a newer
 // release is available, a link to the update docs. Renders nothing on Cloud.
+// SQEM-123 — shares the update check with the sidebar footer via useUpdateStatus(); the
+// `id="about"` anchor is the scroll target when the footer indicator links here.
 export function AboutSection() {
-  const [status, setStatus] = useState<UpdateStatus | null>(null);
-
-  useEffect(() => {
-    if (!IS_SELF_HOSTED) return;
-    const ctrl = new AbortController();
-    checkForUpdate(ctrl.signal).then(setStatus);
-    return () => ctrl.abort();
-  }, []);
+  const status = useUpdateStatus();
 
   if (!IS_SELF_HOSTED) return null;
 
   const updateAvailable = !!(status?.updateAvailable && status.latest);
 
   return (
-    <Card className="p-6 md:p-8">
+    <Card id="about" className="p-6 md:p-8 scroll-mt-6">
       <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-6">
         <Info className="w-5 h-5 text-brand-500" /> About
       </h2>

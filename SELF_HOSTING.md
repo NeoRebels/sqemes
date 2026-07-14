@@ -160,21 +160,69 @@ composers; deeply site-specific behaviour (and exotic editors) may vary.
 
 ## Updating
 
+New versions are published to the [releases feed](https://github.com/NeoRebels/sqemes/releases).
+On a self-hosted instance, **Settings → About** and the **sidebar footer** show your running version
+and an "update available" notice when the feed has a newer one (SQEM-118 / SQEM-123). It's driven by
+`VITE_UPDATE_CHECK_URL` in the bundle `.env` (defaults to the official Sqemes releases feed). So the
+loop is: a new release is tagged → your instance flags it → you pull + rebuild.
+
+### 1. Back up first
+
+Updates re-apply migrations idempotently, but a backup is your safety net — especially before a
+version that changes the schema.
+
+```bash
+# Docker bundle (Path B): dump the bundled Postgres
+cd selfhost
+docker compose exec -T db pg_dumpall -U postgres > backup-$(date +%F).sql
+# (or stop the stack and snapshot the volumes/ directory)
+```
+
+For Path A (your own Supabase), use your provider's backup/point-in-time-restore.
+
+### 2. Pin to a release (recommended)
+
+Track **tags**, not `main`, so upgrades are deliberate and reproducible:
+
+```bash
+git fetch --tags
+git checkout v1.1.0        # the version you want
+```
+
+### 3. Check for new env vars
+
+Between versions the `.env.example` may gain new keys. Diff it and add anything missing to your
+own `.env` **before** rebuilding:
+
+```bash
+git diff <old-tag> <new-tag> -- selfhost/.env.example
+```
+
+### 4. Apply the update
+
 **Docker bundle (Path B):**
 
 ```bash
 cd selfhost
-git pull                       # pull the new version
-docker compose up -d --build   # rebuild + restart (init re-applies migrations idempotently)
+docker compose up -d --build   # rebuild + restart; init re-applies migrations idempotently
 ```
 
-**Bring-your-own-Supabase (Path A):** `git pull`, re-run `supabase db push` + `supabase functions
-deploy`, then rebuild/redeploy the frontend.
+**Bring-your-own-Supabase (Path A):**
 
-On a self-hosted instance, Settings → **About** shows your running version and, when the
-[release feed](https://github.com/NeoRebels/sqemes/releases) has a newer version, an "update
-available" notice (SQEM-118). It's driven by `VITE_UPDATE_CHECK_URL` in the bundle `.env`
-(defaults to the official Sqemes releases feed).
+```bash
+supabase db push               # apply new migrations
+supabase functions deploy      # update edge functions
+npm ci && npm run build        # rebuild the frontend, then serve dist/ as before
+```
+
+**Downtime:** the rebuild/restart is a short interruption (seconds to a couple of minutes while
+containers recreate); migrations run on startup.
+
+### Rollback
+
+Check out the previous tag and rebuild (`docker compose up -d --build`). If the update ran a
+**schema-changing** migration, restore your pre-update database backup first — schema changes are
+not auto-reverted by checking out older code.
 
 ---
 

@@ -428,6 +428,17 @@ const Settings = () => {
     }
   }, [location, currentUser.role]); // Removed activeTab to fix navigation loop
 
+  // SQEM-123 — deep-link from the sidebar footer version indicator: once the General tab is
+  // active, scroll to the About card. No-op on Cloud (AboutSection renders nothing → no #about).
+  useEffect(() => {
+    if ((location.state as any)?.scrollTo === 'about' && activeTab === 'general') {
+      const t = setTimeout(() => {
+        document.getElementById('about')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+      return () => clearTimeout(t);
+    }
+  }, [location, activeTab]);
+
   // Load public API keys when api tab is first opened
   useEffect(() => {
     if (activeTab === 'api' && !sqemesApiKeysLoaded) {
