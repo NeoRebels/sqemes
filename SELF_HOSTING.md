@@ -27,36 +27,40 @@ and there is no subscription model at all.
 
 ---
 
-## Secrets you must change
+## Secrets
 
-> Applies to the **Docker bundle (Path B)**. The bundled [`selfhost/.env.example`](selfhost/.env.example)
-> ships with **public demo values** so the stack boots on the first try. They are **not** safe for an
-> internet-facing instance — the demo JWT keys are well-known, so anyone could mint admin
-> (`service_role`) tokens.
+Running **[`selfhost/generate-secrets.sh`](selfhost/generate-secrets.sh)** (in the Quickstart) replaces
+the demo placeholders in `.env` with **strong, unique random secrets** and a correctly-signed JWT trio
+(`JWT_SECRET` + matching `ANON_KEY` / `SERVICE_ROLE_KEY`). A fresh install is therefore secure by
+default — you don't set these by hand. (It's idempotent: re-running it does nothing once secrets exist.)
 
-**Where + when to edit.** All config (URLs *and* secrets) lives in **`.env` on the server** — edit it
-in your **terminal over SSH** (`nano selfhost/.env`, or `sed -i`), **not** in a hosting panel's
-YAML/compose editor (that editor doesn't touch `.env`, so your changes won't take). And set the
-secrets **before the very first `docker compose up`**: most bake into the database and services on
-first start, so changing them on an already-initialised instance won't apply cleanly. To change them
-afterwards, start fresh — `docker compose down -v` and delete `selfhost/volumes/`. *(For a private
-test on an IP you can keep the demo values; regenerate them before the instance is public.)*
+**View them** — all config lives in `.env` on the server; read it in your terminal:
+```bash
+grep -E '^(JWT_SECRET|ANON_KEY|SERVICE_ROLE_KEY|POSTGRES_PASSWORD|DASHBOARD_USERNAME|DASHBOARD_PASSWORD)=' selfhost/.env
+```
+The Supabase **Studio** dashboard (port 8000) login is `DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD`.
 
-Regenerate these before exposing the instance:
+**Change / rotate them** — edit `.env` in the **terminal** (`nano`/`sed`), **not** a hosting panel's
+YAML editor (it doesn't touch `.env`). Note: most secrets **bake into the database on the first
+`docker compose up`**, so a fresh install is the clean time to set them. To rotate on an existing
+instance, start fresh — `docker compose down -v`, delete `selfhost/volumes/`, then re-run
+`generate-secrets.sh` (after resetting `JWT_SECRET` to its demo value) or set your own. The
+`JWT_SECRET` / `ANON_KEY` / `SERVICE_ROLE_KEY` trio must stay consistent — if you change `JWT_SECRET`
+by hand, regenerate the pair with the
+[Supabase key generator](https://supabase.com/docs/guides/self-hosting/docker#securing-your-services).
+**Never change `API_KEY_ENCRYPTION_KEY`** once provider keys are stored — it decrypts them.
 
-| Variable | How to generate |
+What gets generated:
+
+| Variable | Value |
 |---|---|
-| `POSTGRES_PASSWORD` | `openssl rand -hex 16` |
-| `JWT_SECRET` | `openssl rand -hex 32` — then regenerate the two keys below to match it |
-| `ANON_KEY`, `SERVICE_ROLE_KEY` | JWTs signed with your new `JWT_SECRET`, via Supabase's key generator (see the [self-hosting docs](https://supabase.com/docs/guides/self-hosting/docker#securing-your-services)). **They must be signed with the same `JWT_SECRET` or all auth fails.** |
-| `DASHBOARD_PASSWORD` | a strong password (Supabase Studio login) |
-| `SECRET_KEY_BASE` | `openssl rand -hex 32` |
-| `VAULT_ENC_KEY`, `PG_META_CRYPTO_KEY` | `openssl rand -hex 16` (32 chars each) |
-| `API_KEY_ENCRYPTION_KEY` | `openssl rand -hex 32` — **set once and never change it**; it decrypts stored provider keys |
-| `S3_PROTOCOL_ACCESS_KEY_ID` / `S3_PROTOCOL_ACCESS_KEY_SECRET`, `MINIO_ROOT_PASSWORD` | random strings (`openssl rand -hex 16`) |
+| `POSTGRES_PASSWORD`, `SECRET_KEY_BASE`, `API_KEY_ENCRYPTION_KEY`, `DASHBOARD_PASSWORD`, `S3_PROTOCOL_ACCESS_KEY_ID` / `_SECRET`, `MINIO_ROOT_PASSWORD` | random, 64 hex chars |
+| `VAULT_ENC_KEY`, `PG_META_CRYPTO_KEY` | random, exactly 32 chars |
+| `JWT_SECRET` | random, 64 hex chars |
+| `ANON_KEY`, `SERVICE_ROLE_KEY` | HS256 JWTs signed with `JWT_SECRET` (`role` + `iss` + `iat` + `exp`) |
 
-Also set `SUPABASE_PUBLIC_URL`, `SITE_URL`, and `API_EXTERNAL_URL` to your real `https://` domain
-(and `PROXY_DOMAIN` if you use the bundled Caddy TLS overlay).
+Set your address (`SUPABASE_PUBLIC_URL`, `SITE_URL`, `API_EXTERNAL_URL`) via the Quickstart's `sed`
+lines, and `PROXY_DOMAIN` if you use the bundled Caddy TLS overlay.
 
 ---
 

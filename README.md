@@ -36,8 +36,11 @@ curl -fsSL https://get.docker.com | sh
 # 2. Clone the repo
 git clone https://github.com/NeoRebels/sqemes && cd sqemes/selfhost
 
-# 3. Create config + set your address — EDIT these 3 URLs (your domain, or http://<server-ip>:8000 / :3000)
+# 3. Create config, generate strong secrets, then set your address
 cp .env.example .env
+bash generate-secrets.sh   # writes random secrets + a valid JWT trio — nothing to edit here
+
+# EDIT only these 3 URLs (your domain, or http://<server-ip>:8000 / :3000):
 sed -i 's#^SUPABASE_PUBLIC_URL=.*#SUPABASE_PUBLIC_URL=https://sqemes.example.com#'   .env
 sed -i 's#^SITE_URL=.*#SITE_URL=https://sqemes.example.com#'                         .env
 sed -i 's#^API_EXTERNAL_URL=.*#API_EXTERNAL_URL=https://sqemes.example.com/auth/v1#' .env
@@ -57,14 +60,11 @@ first account creates your workspace), then add a provider key under **Settings 
 
 Changing the address later is just an edit + `docker compose up -d` (a **restart — no rebuild**).
 
-### Secrets — before you go public
+### Secrets
 
-`.env` ships with **public demo keys** — fine for a private test, but **regenerate them before the
-instance is internet-facing** (the demo JWT keys are well-known, so anyone could mint admin tokens).
-Most are random (`openssl rand -hex 32`); the `JWT_SECRET` + `ANON_KEY` + `SERVICE_ROLE_KEY` trio must
-match, so use the **[Supabase key generator](https://supabase.com/docs/guides/self-hosting/docker#securing-your-services)**.
-Set them **before the first start** (they bake into the database). Full list + commands:
-**[SELF_HOSTING.md → Secrets you must change](./SELF_HOSTING.md#secrets-you-must-change)**.
+`generate-secrets.sh` (step 3) already gave your instance **strong, unique secrets** and a correctly
+signed JWT trio — no demo keys, nothing to change. To **view** them (e.g. the Supabase dashboard
+login) or **rotate** them later, see **[SELF_HOSTING.md → Secrets](./SELF_HOSTING.md#secrets)**.
 
 ### Domain + HTTPS
 
