@@ -32,7 +32,9 @@ curl -fsSL https://get.docker.com | sh
 # 2. Clone the repo
 git clone https://github.com/NeoRebels/sqemes && cd sqemes/selfhost
 
-# 3. Create your config file, then edit it
+# 3. Create your config file, then edit it — set your SECRETS and your ADDRESS
+#    (SUPABASE_PUBLIC_URL / SITE_URL / API_EXTERNAL_URL); both are explained just below.
+#    Leaving the default localhost URLs means the app only works ON the server itself.
 cp .env.example .env
 nano .env      # an editor opens — save with Ctrl+O then Enter, exit with Ctrl+X
                # (or open .env in any editor you prefer)
