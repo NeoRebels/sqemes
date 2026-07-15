@@ -382,7 +382,8 @@ async function callGemini(
     return { role, parts };
   });
 
-  const generationConfig: any = { temperature };
+  // SQEM-125 — chat sends no temperature; let each model use its own default.
+  const generationConfig: any = {};
   if (isImageModel) {
     generationConfig.responseModalities = ['TEXT', 'IMAGE'];
   }
@@ -446,12 +447,9 @@ async function callOpenAI(
     }
   }
 
-  // GPT-5 and o-series (o1/o3/o4…) models reject a non-default temperature
-  // ("Only the default (1) value is supported") — only send it for models that accept it.
-  const mLower = modelId.toLowerCase();
-  const supportsTemperature = !(mLower.startsWith('gpt-5') || /^o\d/.test(mLower));
+  // SQEM-125 — chat sends no temperature. Some models (GPT-5, o-series) reject a non-default
+  // value and the chat has no temperature control, so every model uses its own default.
   const openaiBody: Record<string, unknown> = { model: modelId, messages: apiMessages };
-  if (supportsTemperature) openaiBody.temperature = temperature;
 
   const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -492,7 +490,7 @@ async function callClaude(
     return { role: msg.role, content };
   });
 
-  const body: any = { model: modelId, max_tokens: 8192, temperature, messages: apiMessages };
+  const body: any = { model: modelId, max_tokens: 8192, messages: apiMessages };  // SQEM-125 — no temperature
   if (systemInstruction) body.system = systemInstruction;
 
   const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
@@ -544,7 +542,7 @@ async function callOpenAICompatible(
   const response = await fetchWithTimeout(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({ model: modelId, messages: apiMessages, temperature }),
+    body: JSON.stringify({ model: modelId, messages: apiMessages }),  // SQEM-125 — no temperature
   });
 
   if (!response.ok) {

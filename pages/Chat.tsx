@@ -629,7 +629,7 @@ Output only the refined prompt text, with no surrounding explanation or commenta
       const jobId = crypto.randomUUID();
       // Funded (keyless) → send `funded` and omit modelId; the server picks the funded model.
       const funded = isFundedModel(selectedModel);
-      const chatPayloadBase = { workspaceId: workspace.id, modelId: funded ? undefined : selectedModel, funded, systemInstruction: activeSystemInstruction || undefined, temperature: 0.7 };
+      const chatPayloadBase = { workspaceId: workspace.id, modelId: funded ? undefined : selectedModel, funded, systemInstruction: activeSystemInstruction || undefined };
       const messagesToSend = truncateMessagesToPayloadLimit(allMessages, chatPayloadBase);
 
       // Show thinking bubble immediately — before the fetch even completes
