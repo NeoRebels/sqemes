@@ -31,9 +31,8 @@ Storage, PostgREST, Realtime, edge functions), no separate Supabase project need
   browser extension, OAuth, and MCP — depends on this (the reverse proxy can only fetch a certificate
   once the domain resolves to the server).
 
-Copy-paste the whole block. **The only thing to edit are the three URLs in step 3** — set them to your
-domain, or to your server's IP for a quick test (the default `localhost` only works *on the server
-itself*):
+Run the steps below. **Step 3 (`setup.sh`) asks how you'll reach the instance** — a domain, or your
+server's IP for a quick test — and writes the secrets and URLs for you, so there's nothing to hand-edit.
 
 ```bash
 # 1. Install Docker (skip if you already have it)
@@ -41,22 +40,24 @@ curl -fsSL https://get.docker.com | sh
 
 # 2. Clone the repo
 git clone https://github.com/NeoRebels/sqemes && cd sqemes/selfhost
+```
 
-# 3. Create config, generate strong secrets, then set your address
-cp .env.example .env
-bash generate-secrets.sh   # writes random secrets + a valid JWT trio — nothing to edit here
+```bash
+# 3. Set up — generates strong secrets, then asks for your domain (or server IP)
+bash setup.sh
+```
 
-# EDIT only these 3 URLs (your domain, or http://<server-ip>:8000 / :3000):
-sed -i 's#^SUPABASE_PUBLIC_URL=.*#SUPABASE_PUBLIC_URL=https://sqemes.example.com#'   .env
-sed -i 's#^SITE_URL=.*#SITE_URL=https://sqemes.example.com#'                         .env
-sed -i 's#^API_EXTERNAL_URL=.*#API_EXTERNAL_URL=https://sqemes.example.com/auth/v1#' .env
-
+```bash
 # 4. Build and start
 docker compose up --build -d
 ```
 
-No editor needed — the `sed` lines write the URLs for you. The first build takes a few minutes; then
-check it's up with `docker compose ps` (everything `healthy`/`running`).
+> **Prefer no prompts?** Pass the address to step 3 instead:
+> `bash setup.sh https://sqemes.example.com` (domain + automatic HTTPS) or
+> `bash setup.sh http://<server-ip>:8000` (quick IP test).
+
+The first build takes a few minutes; then check it's up with `docker compose ps` (everything
+`healthy`/`running`).
 
 ### Open your instance
 
@@ -68,9 +69,9 @@ Changing the address later is just an edit + `docker compose up -d` (a **restart
 
 ### Secrets
 
-`generate-secrets.sh` (step 3) already gave your instance **strong, unique secrets** and a correctly
-signed JWT trio — no demo keys, nothing to change. To **view** them (e.g. the Supabase dashboard
-login) or **rotate** them later, see **[SELF_HOSTING.md → Secrets](./SELF_HOSTING.md#secrets)**.
+`setup.sh` (step 3) already gave your instance **strong, unique secrets** and a correctly signed JWT
+trio — no demo keys, nothing to change. To **view** them (e.g. the Supabase dashboard login) or
+**rotate** them later, see **[SELF_HOSTING.md → Secrets](./SELF_HOSTING.md#secrets)**.
 
 ### Domain + HTTPS
 

@@ -29,10 +29,11 @@ and there is no subscription model at all.
 
 ## Secrets
 
-Running **[`selfhost/generate-secrets.sh`](selfhost/generate-secrets.sh)** (in the Quickstart) replaces
-the demo placeholders in `.env` with **strong, unique random secrets** and a correctly-signed JWT trio
-(`JWT_SECRET` + matching `ANON_KEY` / `SERVICE_ROLE_KEY`). A fresh install is therefore secure by
-default — you don't set these by hand. (It's idempotent: re-running it does nothing once secrets exist.)
+The Quickstart's **[`setup.sh`](selfhost/setup.sh)** runs
+**[`generate-secrets.sh`](selfhost/generate-secrets.sh)**, which replaces the demo placeholders in
+`.env` with **strong, unique random secrets** and a correctly-signed JWT trio (`JWT_SECRET` + matching
+`ANON_KEY` / `SERVICE_ROLE_KEY`). A fresh install is therefore secure by default — you don't set these
+by hand. (Both are idempotent: re-running does nothing once secrets exist.)
 
 **View them** — all config lives in `.env` on the server; read it in your terminal:
 ```bash
