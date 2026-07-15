@@ -22,8 +22,14 @@ them are required to self-host.
 The bundled stack stands up a whole instance — the app plus a self-hosted Supabase (Postgres, Auth,
 Storage, PostgREST, Realtime, edge functions), no separate Supabase project needed.
 
-**You'll need** a server with ~4 GB RAM and — for anything beyond local testing — a **domain pointed
-at it** (HTTPS is required for the browser extension, OAuth, and MCP).
+**You'll need:**
+
+- A server (VPS) with **~4 GB RAM** (the stack is ~15 containers).
+- For anything beyond a local IP test, a **domain pointed at the server**. At your DNS provider add an
+  **A record** for your (sub)domain → the server's **public IP**, then confirm it resolves *before* you
+  start: `dig +short sqemes.example.com` should print your server's IP. HTTPS — required for the
+  browser extension, OAuth, and MCP — depends on this (the reverse proxy can only fetch a certificate
+  once the domain resolves to the server).
 
 Copy-paste the whole block. **The only thing to edit are the three URLs in step 3** — set them to your
 domain, or to your server's IP for a quick test (the default `localhost` only works *on the server
