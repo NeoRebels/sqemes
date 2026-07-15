@@ -32,13 +32,43 @@ curl -fsSL https://get.docker.com | sh
 # 2. Clone the repo
 git clone https://github.com/NeoRebels/sqemes && cd sqemes/selfhost
 
-# 3. Create your config file, then edit it — set your SECRETS and your ADDRESS
-#    (SUPABASE_PUBLIC_URL / SITE_URL / API_EXTERNAL_URL); both are explained just below.
-#    Leaving the default localhost URLs means the app only works ON the server itself.
+# 3. Create your config file and open it to edit
 cp .env.example .env
-nano .env      # an editor opens — save with Ctrl+O then Enter, exit with Ctrl+X
-               # (or open .env in any editor you prefer)
+nano .env      # editor opens — save with Ctrl+O then Enter, exit with Ctrl+X
+```
 
+Now **edit `.env` right here in the terminal** (not a hosting panel's YAML editor) and set two things
+before saving:
+
+**a) Your address** — where you'll actually reach the instance. A **domain over HTTPS** is strongly
+recommended; for a quick test use your server's **IP** (the default `localhost` only works *on the
+server itself*):
+```
+SUPABASE_PUBLIC_URL=https://sqemes.example.com        # test: http://<server-ip>:8000
+SITE_URL=https://sqemes.example.com                   # test: http://<server-ip>:3000
+API_EXTERNAL_URL=https://sqemes.example.com/auth/v1   # test: http://<server-ip>:8000/auth/v1
+```
+For a domain + automatic HTTPS, add a reverse proxy — the bundled Caddy overlay, or your existing
+Traefik/nginx: **[SELF_HOSTING.md → Behind an existing reverse proxy](./SELF_HOSTING.md#behind-an-existing-reverse-proxy-traefik-nginx)**.
+Changing the address later is just an edit + `docker compose up -d` (**restart, no rebuild**).
+
+**b) Secrets** — the defaults are **public demo keys**, unsafe for a public instance (anyone could
+mint admin tokens). Replace them **before this first start** (they bake into the database):
+- Random values — `openssl rand -hex 32` each: `POSTGRES_PASSWORD`, `SECRET_KEY_BASE`, `VAULT_ENC_KEY`,
+  `PG_META_CRYPTO_KEY`, `API_KEY_ENCRYPTION_KEY`, `DASHBOARD_PASSWORD`, `S3_PROTOCOL_ACCESS_KEY_ID`,
+  `S3_PROTOCOL_ACCESS_KEY_SECRET`, `MINIO_ROOT_PASSWORD`.
+- `JWT_SECRET` + `ANON_KEY` + `SERVICE_ROLE_KEY` must **match** — generate them together with the
+  **[Supabase key generator](https://supabase.com/docs/guides/self-hosting/docker#securing-your-services)**.
+
+Full list + exact commands: **[SELF_HOSTING.md → Secrets you must change](./SELF_HOSTING.md#secrets-you-must-change)**.
+
+> 💡 For a quick **private test on an IP** you can keep the demo secrets for now and just set the
+> address — but change them before the instance is public (changing secrets after the first start
+> needs a fresh install).
+
+Save with `Ctrl+O`, Enter, `Ctrl+X`, then:
+
+```bash
 # 4. Build and start (detached)
 docker compose up --build -d
 ```
@@ -49,23 +79,6 @@ The first build takes a few minutes. When it finishes, confirm everything came u
 docker compose ps      # every container should read "healthy" or "running"
 ```
 
-### Before real use, set two things in `.env`
-
-1. **Secrets** — `.env` ships with public **demo** keys so it boots on the first try; they are **not
-   safe** for an internet-facing instance (anyone could mint admin tokens). Regenerate them:
-   **[SELF_HOSTING.md → Secrets you must change](./SELF_HOSTING.md#secrets-you-must-change)**.
-2. **Your address** — point these at how you'll actually reach the instance (a domain over HTTPS is
-   strongly recommended). Set them **before** step 4 on first run; to change them later, just edit
-   `.env` and `docker compose up -d` (a restart — **no rebuild**):
-   ```
-   SUPABASE_PUBLIC_URL=https://sqemes.example.com
-   SITE_URL=https://sqemes.example.com
-   API_EXTERNAL_URL=https://sqemes.example.com/auth/v1
-   ```
-   For a domain + automatic HTTPS, put a reverse proxy in front — the bundled Caddy overlay does it
-   on a fresh box, or slot it behind your existing Traefik/nginx:
-   **[SELF_HOSTING.md → Behind an existing reverse proxy](./SELF_HOSTING.md#behind-an-existing-reverse-proxy-traefik-nginx)**.
-
 ### Open your instance
 
 - **The Sqemes app** is on **port 3000** — `http://<your-server>:3000`, or your domain behind a
@@ -74,10 +87,6 @@ docker compose ps      # every container should read "healthy" or "running"
 - **Port 8000 is the Supabase dashboard (Studio), *not* the app.** If you open it you'll get a
   "Sign in" box — that's the admin dashboard (login = `DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD`
   from your `.env`). You don't need it for normal use.
-
-> ℹ️ With the **default** `.env` the URLs are `localhost`, so the app only works *from the server
-> itself*. To reach it from your own browser, set the three URLs above to your domain (or the
-> server's IP for a quick test) and `docker compose up -d` (restart — no rebuild).
 
 Full instructions — a bring-your-own-Supabase alternative, TLS/reverse-proxy setup, and connecting
 the Chrome extension — are in **[SELF_HOSTING.md](./SELF_HOSTING.md)**.
