@@ -52,8 +52,13 @@ bash setup.sh
 docker compose up --build -d
 ```
 
+`setup.sh` asks how you'll reach the instance: **a domain via the built-in Caddy** (needs ports 80/443
+free), **a domain behind your own reverse proxy** (if you already run Traefik/nginx), or **the server
+IP** for a quick test.
+
 > **Prefer no prompts?** Pass the address to step 3 instead:
-> `bash setup.sh https://sqemes.example.com` (domain + automatic HTTPS) or
+> `bash setup.sh https://sqemes.example.com` (built-in Caddy + HTTPS),
+> `bash setup.sh https://sqemes.example.com --proxy` (you route your own proxy), or
 > `bash setup.sh http://<server-ip>:8000` (quick IP test).
 
 The first build takes a few minutes; then check it's up with `docker compose ps` (everything
@@ -83,9 +88,9 @@ in **[SELF_HOSTING.md](./SELF_HOSTING.md)**.
 
 ## Use the Chrome extension with your instance
 
-The published Sqemes extension can point at your self-hosted instance at runtime — no
-rebuild. In the extension options → **Instance**, enter your instance URL → **Check** →
-**Grant access & connect**. See
+Install the extension from the **[Chrome Web Store](https://chromewebstore.google.com/detail/sqemes-%E2%80%93-prompt-templates/laaiobhchfmabhembnkpkhjfmnkbmbai)**.
+The published extension can point at your self-hosted instance at runtime — no rebuild. In its
+options → **Instance**, enter your instance URL → **Check** → **Grant access & connect**. See
 [SELF_HOSTING.md → Chrome extension](./SELF_HOSTING.md#chrome-extension-self-host).
 
 ## Tech
