@@ -52,13 +52,14 @@ bash setup.sh
 docker compose up --build -d
 ```
 
-`setup.sh` asks how you'll reach the instance: **a domain via the built-in Caddy** (needs ports 80/443
-free), **a domain behind your own reverse proxy** (if you already run Traefik/nginx), or **the server
-IP** for a quick test.
+`setup.sh` asks how you'll reach the instance: **built-in Caddy** (needs ports 80/443 free), **behind
+your existing Traefik** (auto-routed via a shipped overlay), **behind another proxy** (nginx/…, you
+route it), or **the server IP** for a quick test.
 
 > **Prefer no prompts?** Pass the address to step 3 instead:
-> `bash setup.sh https://sqemes.example.com` (built-in Caddy + HTTPS),
-> `bash setup.sh https://sqemes.example.com --proxy` (you route your own proxy), or
+> `bash setup.sh https://sqemes.example.com` (built-in Caddy),
+> `bash setup.sh https://sqemes.example.com --traefik` (your existing Traefik),
+> `bash setup.sh https://sqemes.example.com --proxy` (another proxy), or
 > `bash setup.sh http://<server-ip>:8000` (quick IP test).
 
 The first build takes a few minutes; then check it's up with `docker compose ps` (everything

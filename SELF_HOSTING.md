@@ -219,11 +219,28 @@ compose network, or via those host ports):
 | `/.well-known/sqemes-extension-config`, `/.well-known/oauth-authorization-server`, `/oauth/authorize` | api-sidecar (`:8787`) |
 | everything else (`/`, `/assets/*`) | app (`:80`, published on `:3000`) |
 
-Then set `SUPABASE_PUBLIC_URL`, `SITE_URL`, and `API_EXTERNAL_URL` to your `https://` domain.
+Then set `SUPABASE_PUBLIC_URL`, `SITE_URL`, `API_EXTERNAL_URL` (and `PROXY_DOMAIN`) to your domain.
 
-> **Keep your proxy config in your own file.** Put Traefik labels / a custom overlay in a file *you*
-> create (e.g. `docker-compose.override.yml`, which Compose auto-loads) and add it to `COMPOSE_FILE` —
-> **don't edit the shipped `docker-compose.caddy.yml`**, or every `git pull` will conflict.
+### Traefik (Docker provider) — use the ready-made overlay
+
+If your Traefik uses the Docker provider, don't hand-write labels — add the shipped overlay:
+
+```
+COMPOSE_FILE=docker-compose.yml:docker-compose.sqemes.yml:docker-compose.traefik.yml
+PROXY_DOMAIN=your.domain
+# optional, only if your Traefik differs from these defaults:
+# TRAEFIK_ENTRYPOINT=websecure
+# TRAEFIK_CERTRESOLVER=letsencrypt
+```
+
+then `docker compose up -d`. Traefik auto-discovers the labels and routes the three backends above,
+with TLS via your cert resolver. (`setup.sh` option 2 wires this for you.) Traefik reaches the
+containers over the compose network — with `network_mode: host` Traefik it uses their bridge IPs,
+which the host can route to.
+
+For **other proxies** (nginx, etc.), keep your routing in a file *you* create (e.g.
+`docker-compose.override.yml`, which Compose auto-loads) — **don't edit the shipped compose files**,
+or every `git pull` will conflict.
 
 ---
 

@@ -1,0 +1,45 @@
+# SQEM-128 — route an EXISTING Traefik (Docker provider) at the Sqemes stack.
+#
+# Use this instead of the Caddy overlay when you already run Traefik. Enable it in .env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.sqemes.yml:docker-compose.traefik.yml
+#   PROXY_DOMAIN=your.domain
+# Optional (defaults match a typical Traefik setup):
+#   TRAEFIK_ENTRYPOINT=websecure      # your HTTPS entrypoint
+#   TRAEFIK_CERTRESOLVER=letsencrypt  # your ACME cert resolver
+#
+# Requires Traefik started with the Docker provider (--providers.docker=true). Traefik reaches the
+# containers over their network — if Traefik runs on the host network it uses the bridge IPs, which
+# the host can route to. It routes ONE domain to three backends by path (same map as the Caddyfile):
+#   app (:80)          → everything else
+#   Kong (:8000)       → /auth /rest /realtime /storage /functions /graphql /mcp /sso
+#   api-sidecar (:8787)→ /.well-known/sqemes-extension-config, /.well-known/oauth-authorization-server,
+#                        /oauth/authorize
+name: sqemes
+
+services:
+  app:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sqemes-app.rule=Host(`${PROXY_DOMAIN}`)"
+      - "traefik.http.routers.sqemes-app.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.sqemes-app.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.routers.sqemes-app.priority=1"
+      - "traefik.http.services.sqemes-app.loadbalancer.server.port=80"
+
+  kong:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sqemes-kong.rule=Host(`${PROXY_DOMAIN}`) && (PathPrefix(`/auth/v1`) || PathPrefix(`/rest/v1`) || PathPrefix(`/realtime/v1`) || PathPrefix(`/storage/v1`) || PathPrefix(`/functions/v1`) || PathPrefix(`/graphql/v1`) || PathPrefix(`/mcp`) || PathPrefix(`/sso`))"
+      - "traefik.http.routers.sqemes-kong.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.sqemes-kong.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.routers.sqemes-kong.priority=10"
+      - "traefik.http.services.sqemes-kong.loadbalancer.server.port=8000"
+
+  api-sidecar:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sqemes-api.rule=Host(`${PROXY_DOMAIN}`) && (Path(`/.well-known/sqemes-extension-config`) || Path(`/.well-known/oauth-authorization-server`) || PathPrefix(`/oauth/authorize`))"
+      - "traefik.http.routers.sqemes-api.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.sqemes-api.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.routers.sqemes-api.priority=20"
+      - "traefik.http.services.sqemes-api.loadbalancer.server.port=8787"
