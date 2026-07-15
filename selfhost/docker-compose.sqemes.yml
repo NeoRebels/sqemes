@@ -59,6 +59,13 @@ services:
         # SQEM-118 — optional self-host update notifier (empty ⇒ shows version only, no check).
         VITE_UPDATE_CHECK_URL: ${VITE_UPDATE_CHECK_URL:-}
         VITE_UPDATE_DOCS_URL: ${VITE_UPDATE_DOCS_URL:-}
+    # SQEM-126 — runtime instance config: the container writes these into /config.js at startup
+    # (overriding the baked build args), so changing the instance URL is a restart, not a rebuild.
+    environment:
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
+      ANON_KEY: ${ANON_KEY}
+      VITE_UPDATE_CHECK_URL: ${VITE_UPDATE_CHECK_URL:-}
+      VITE_UPDATE_DOCS_URL: ${VITE_UPDATE_DOCS_URL:-}
     restart: unless-stopped
     depends_on:
       init:

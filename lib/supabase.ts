@@ -1,8 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
+import { runtimeConfig } from './runtimeConfig';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+// SQEM-126 — prefer runtime instance config (self-host /config.js), fall back to build-time VITE_*.
+const supabaseUrl = (runtimeConfig.supabaseUrl || import.meta.env.VITE_SUPABASE_URL)?.trim();
+const supabaseAnonKey = (runtimeConfig.supabaseAnonKey || import.meta.env.VITE_SUPABASE_ANON_KEY)?.trim();
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Check .env.local');

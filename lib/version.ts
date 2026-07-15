@@ -6,17 +6,19 @@
 // client-side GET — no data is sent, no server phone-home — and fails silent.
 
 import { IS_SELF_HOSTED } from './env';
+import { runtimeConfig } from './runtimeConfig';
 
 export const CURRENT_VERSION: string = import.meta.env.VITE_APP_VERSION || '0.0.0';
 
-// Releases API endpoint. Empty ⇒ no auto-check (just show the current version). Set at
-// go-public to the public repo's releases API, e.g.
-// https://api.github.com/repos/<org>/<repo>/releases/latest
-const CHECK_URL: string = import.meta.env.VITE_UPDATE_CHECK_URL?.trim() || '';
+// Releases API endpoint. Empty ⇒ no auto-check (just show the current version). SQEM-126 —
+// prefer the runtime instance config (self-host), fall back to the build-time VITE_* value.
+const CHECK_URL: string =
+  (runtimeConfig.updateCheckUrl || import.meta.env.VITE_UPDATE_CHECK_URL)?.trim() || '';
 
 // "How to update" docs/wiki, shown when an update is available.
 export const UPDATE_DOCS_URL: string =
-  import.meta.env.VITE_UPDATE_DOCS_URL?.trim() || 'https://github.com/NeoRebels/sqemes';
+  (runtimeConfig.updateDocsUrl || import.meta.env.VITE_UPDATE_DOCS_URL)?.trim() ||
+  'https://github.com/NeoRebels/sqemes';
 
 export interface UpdateStatus {
   current: string;

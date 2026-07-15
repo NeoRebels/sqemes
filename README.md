@@ -52,8 +52,9 @@ docker compose ps      # every container should read "healthy" or "running"
 1. **Secrets** — `.env` ships with public **demo** keys so it boots on the first try; they are **not
    safe** for an internet-facing instance (anyone could mint admin tokens). Regenerate them:
    **[SELF_HOSTING.md → Secrets you must change](./SELF_HOSTING.md#secrets-you-must-change)**.
-2. **Your address** — the app is compiled with the URL it will be served at, so point these at how
-   you'll actually reach it (a domain over HTTPS is strongly recommended), then re-run step 4:
+2. **Your address** — point these at how you'll actually reach the instance (a domain over HTTPS is
+   strongly recommended). Set them **before** step 4 on first run; to change them later, just edit
+   `.env` and `docker compose up -d` (a restart — **no rebuild**):
    ```
    SUPABASE_PUBLIC_URL=https://sqemes.example.com
    SITE_URL=https://sqemes.example.com
@@ -74,7 +75,7 @@ docker compose ps      # every container should read "healthy" or "running"
 
 > ℹ️ With the **default** `.env` the URLs are `localhost`, so the app only works *from the server
 > itself*. To reach it from your own browser, set the three URLs above to your domain (or the
-> server's IP for a quick test) and re-run `docker compose up --build -d`.
+> server's IP for a quick test) and `docker compose up -d` (restart — no rebuild).
 
 Full instructions — a bring-your-own-Supabase alternative, TLS/reverse-proxy setup, and connecting
 the Chrome extension — are in **[SELF_HOSTING.md](./SELF_HOSTING.md)**.
