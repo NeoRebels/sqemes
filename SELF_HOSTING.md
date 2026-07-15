@@ -32,7 +32,17 @@ and there is no subscription model at all.
 > Applies to the **Docker bundle (Path B)**. The bundled [`selfhost/.env.example`](selfhost/.env.example)
 > ships with **public demo values** so the stack boots on the first try. They are **not** safe for an
 > internet-facing instance — the demo JWT keys are well-known, so anyone could mint admin
-> (`service_role`) tokens. Regenerate these in your `.env` **before** exposing the instance:
+> (`service_role`) tokens.
+
+**Where + when to edit.** All config (URLs *and* secrets) lives in **`.env` on the server** — edit it
+in your **terminal over SSH** (`nano selfhost/.env`, or `sed -i`), **not** in a hosting panel's
+YAML/compose editor (that editor doesn't touch `.env`, so your changes won't take). And set the
+secrets **before the very first `docker compose up`**: most bake into the database and services on
+first start, so changing them on an already-initialised instance won't apply cleanly. To change them
+afterwards, start fresh — `docker compose down -v` and delete `selfhost/volumes/`. *(For a private
+test on an IP you can keep the demo values; regenerate them before the instance is public.)*
+
+Regenerate these before exposing the instance:
 
 | Variable | How to generate |
 |---|---|
