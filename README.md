@@ -17,75 +17,35 @@ This repository is the **open core**: the full app + backend you can run on your
 infrastructure. Sqemes Cloud adds hosted convenience and a few proprietary pieces — none of
 them are required to self-host.
 
-## Quickstart (Docker)
+## Quickstart — one command
 
-The bundled stack stands up a whole instance — the app plus a self-hosted Supabase (Postgres, Auth,
-Storage, PostgREST, Realtime, edge functions), no separate Supabase project needed.
-
-**You'll need:**
-
-- A server (VPS) with **~4 GB RAM** (the stack is ~15 containers).
-- For anything beyond a local IP test, a **domain pointed at the server**. At your DNS provider add an
-  **A record** for your (sub)domain → the server's **public IP**, then confirm it resolves *before* you
-  start: `dig +short sqemes.example.com` should print your server's IP. HTTPS — required for the
-  browser extension, OAuth, and MCP — depends on this (the reverse proxy can only fetch a certificate
-  once the domain resolves to the server).
-
-Run the steps below. **Step 3 (`setup.sh`) asks how you'll reach the instance** — a domain, or your
-server's IP for a quick test — and writes the secrets and URLs for you, so there's nothing to hand-edit.
+On a fresh Linux VPS:
 
 ```bash
-# 1. Install Docker (skip if you already have it)
-curl -fsSL https://get.docker.com | sh
-
-# 2. Clone the repo
-git clone https://github.com/NeoRebels/sqemes && cd sqemes/selfhost
+curl -fsSL https://raw.githubusercontent.com/NeoRebels/sqemes/main/install.sh | sh
 ```
 
-```bash
-# 3. Set up — generates strong secrets, then asks for your domain (or server IP)
-bash setup.sh
-```
+That's it. The installer sets up Docker if needed, generates strong secrets, configures HTTPS, starts
+the whole stack (the app + a self-hosted Supabase), and **asks only for your domain**. It even detects
+your setup: a fresh box uses the built-in HTTPS proxy, an existing **Traefik** is auto-wired, and
+pressing Enter with no domain runs a quick **IP-only test**.
 
-```bash
-# 4. Build and start
-docker compose up --build -d
-```
+> Prefer to read it first? `curl -fsSLO https://raw.githubusercontent.com/NeoRebels/sqemes/main/install.sh`,
+> look it over, then `sh install.sh`.
 
-`setup.sh` asks how you'll reach the instance: **built-in Caddy** (needs ports 80/443 free), **behind
-your existing Traefik** (auto-routed via a shipped overlay), **behind another proxy** (nginx/…, you
-route it), or **the server IP** for a quick test.
+**Before you run it:**
+- **~4 GB RAM** (the stack is ~15 containers).
+- **For HTTPS on a domain:** point the domain at the server first — an **A record** for your
+  (sub)domain → the server's public IP. Check with `dig +short sqemes.example.com` (it should print
+  the server IP). No domain? Just press Enter at the prompt for the IP-only test.
 
-> **Prefer no prompts?** Pass the address to step 3 instead:
-> `bash setup.sh https://sqemes.example.com` (built-in Caddy),
-> `bash setup.sh https://sqemes.example.com --traefik` (your existing Traefik),
-> `bash setup.sh https://sqemes.example.com --proxy` (another proxy), or
-> `bash setup.sh http://<server-ip>:8000` (quick IP test).
+**When it finishes:** open your domain (or `http://<server-ip>:3000` for the IP test) and **sign up** —
+the first account creates your workspace. Then add an AI provider key under **Settings → Integrations**
+(bring-your-own-key — OpenAI, Anthropic, Gemini, Mistral, …). *(Port 8000 is the Supabase admin
+dashboard, not the app.)*
 
-The first build takes a few minutes; then check it's up with `docker compose ps` (everything
-`healthy`/`running`).
-
-### Open your instance
-
-The app is on **port 3000** — open `http://<your-server>:3000` (or your domain) and **sign up** (the
-first account creates your workspace), then add a provider key under **Settings → Integrations**
-(bring-your-own-key). *Port 8000 is the Supabase dashboard (Studio), not the app.*
-
-Changing the address later is just an edit + `docker compose up -d` (a **restart — no rebuild**).
-
-### Secrets
-
-`setup.sh` (step 3) already gave your instance **strong, unique secrets** and a correctly signed JWT
-trio — no demo keys, nothing to change. To **view** them (e.g. the Supabase dashboard login) or
-**rotate** them later, see **[SELF_HOSTING.md → Secrets](./SELF_HOSTING.md#secrets)**.
-
-### Domain + HTTPS
-
-For a real domain with automatic HTTPS, add the bundled Caddy overlay, or route your existing
-Traefik/nginx to the stack: **[SELF_HOSTING.md → Behind an existing reverse proxy](./SELF_HOSTING.md#behind-an-existing-reverse-proxy-traefik-nginx)**.
-
-Full instructions — a bring-your-own-Supabase alternative and connecting the Chrome extension — are
-in **[SELF_HOSTING.md](./SELF_HOSTING.md)**.
+Prefer to install by hand, run behind nginx or your own Supabase, or view/rotate secrets and update
+later? It's all in **[SELF_HOSTING.md](./SELF_HOSTING.md)**.
 
 ## Use the Chrome extension with your instance
 

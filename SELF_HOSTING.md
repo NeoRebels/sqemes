@@ -27,9 +27,29 @@ and there is no subscription model at all.
 
 ---
 
+## Manual install (Docker, step by step)
+
+The one-command **[`install.sh`](install.sh)** is the easy path — it does everything below. To do it
+by hand instead:
+
+```bash
+git clone https://github.com/NeoRebels/sqemes && cd sqemes/selfhost
+bash setup.sh                 # generates strong secrets, then asks how you'll reach the instance
+docker compose up --build -d
+```
+
+`setup.sh` covers every setup: **built-in Caddy** (auto-HTTPS; needs ports 80/443 free) · **behind your
+existing Traefik** (auto-routed via the shipped `docker-compose.traefik.yml`) · **behind another proxy**
+(nginx/…, you route it) · **server IP** (quick HTTP test). Non-interactive forms:
+`bash setup.sh https://your.domain` (Caddy), `… --traefik`, `… --proxy`, or
+`bash setup.sh http://<server-ip>:8000`. Changing the address later is an edit + `docker compose up -d`
+(a restart, no rebuild).
+
+---
+
 ## Secrets
 
-The Quickstart's **[`setup.sh`](selfhost/setup.sh)** runs
+The installer's **[`setup.sh`](selfhost/setup.sh)** (called by `install.sh`) runs
 **[`generate-secrets.sh`](selfhost/generate-secrets.sh)**, which replaces the demo placeholders in
 `.env` with **strong, unique random secrets** and a correctly-signed JWT trio (`JWT_SECRET` + matching
 `ANON_KEY` / `SERVICE_ROLE_KEY`). A fresh install is therefore secure by default — you don't set these
