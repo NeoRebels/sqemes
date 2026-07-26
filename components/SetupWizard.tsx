@@ -6,6 +6,7 @@ import { PLANS } from '../constants';
 import { ProviderIcon } from './ProviderIcon';
 import WizardCreateStep, { type WizardAction } from './WizardCreateStep';
 import Modal from './ui/Modal';
+import { TemplateAccessControl, rolesToAccessValue, accessValueToRoles } from './TemplateAccessControl';
 import {
   Key, Server, Puzzle, Check, Copy, ExternalLink, Loader2, ArrowRight, ArrowLeft, Sparkles, Lock, ChevronDown,
 } from 'lucide-react';
@@ -45,7 +46,7 @@ const BROWSERS = [
   { label: 'Vivaldi', src: vivaldiSrc },
 ];
 
-const STEPS = ['Provider key', 'MCP', 'Extension', 'Create templates'];
+const STEPS = ['Provider key', 'MCP', 'Extension', 'Template access', 'Create templates'];
 
 interface SetupWizardProps {
   /** Called when the wizard is dismissed or completed. `completed` distinguishes the two. */
@@ -358,8 +359,29 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
           </div>
         )}
 
-        {/* ---- Step 4: Create templates ---- */}
-        {step === 3 && <WizardCreateStep onComplete={() => onClose(true)} onConnectKey={() => setStep(0)} onActionChange={setCreateAction} />}
+        {/* ---- Step 4: Template access default (SQEM-142) ---- */}
+        {step === 3 && (
+          <div>
+            <div className="flex items-start gap-3 mb-5">
+              <div className="p-2.5 rounded-xl bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 shrink-0">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Template access</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Choose who can use templates by default. You can change this any time in Settings, and override it per template.</p>
+              </div>
+            </div>
+            <div className="bg-slate-50 dark:bg-slate-700/40 rounded-2xl p-5">
+              <TemplateAccessControl
+                value={rolesToAccessValue(workspace.defaultTemplateAccess ?? [])}
+                onChange={v => updateWorkspace({ defaultTemplateAccess: accessValueToRoles(v) })}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ---- Step 5: Create templates ---- */}
+        {step === 4 && <WizardCreateStep onComplete={() => onClose(true)} onConnectKey={() => setStep(0)} onActionChange={setCreateAction} />}
       </div>
 
       {/* Footer */}

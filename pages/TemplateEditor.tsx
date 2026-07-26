@@ -15,6 +15,8 @@ import { ContextFilePicker } from '../components/ContextFilePicker';
 import { TagPicker } from '../components/TagPicker';
 import { UploadFileModal } from '../components/UploadFileModal';
 import { BrandVoiceForm } from '../components/BrandVoiceForm';
+import { TemplateAccessControl, rolesToAccessValue, accessValueToRoles, type TemplateAccessValue } from '../components/TemplateAccessControl';
+import { fetchTemplateAccessRoles, setTemplateAccessRoles } from '../lib/api/templateAccess';
 import { compileAssistantInstruction, defaultBrandConfig } from '../lib/compileBrandVoice';
 import EditorTestPanel from '../components/EditorTestPanel';
 
@@ -80,6 +82,9 @@ const TemplateEditor = () => {
   const [dragOverVarId, setDragOverVarId] = useState<string | null>(null);
   const [brandVoiceMode, setBrandVoiceMode] = useState<'structured' | 'advanced'>('structured');
   const [testResetKey, setTestResetKey] = useState(0);
+  // SQEM-142 — per-template role access. New templates inherit the workspace default; existing
+  // ones load their rules below. Empty roles = open to everyone.
+  const [access, setAccess] = useState<TemplateAccessValue>(() => rolesToAccessValue(workspace?.defaultTemplateAccess ?? []));
 
   const canEdit = isLibrary ? isSqemesAdmin : can(currentUser, workspace, 'prompts:edit');
 
@@ -163,6 +168,13 @@ const TemplateEditor = () => {
     }
   }, [id, location.state]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // SQEM-142 — load an existing workspace template's access rules.
+  useEffect(() => {
+    if (id && !isLibrary) {
+      fetchTemplateAccessRoles(id).then(roles => setAccess(rolesToAccessValue(roles))).catch(() => {});
+    }
+  }, [id, isLibrary]);
+
   const handleSave = async () => {
     if (!formData.title.trim()) {
       showToast(isLibrary ? 'Template title is required.' : 'Prompt title is required.', 'error');
@@ -185,14 +197,22 @@ const TemplateEditor = () => {
       setIsDirty(false);
       return;
     }
+    let savedId = id;
     if (id) {
       await updatePrompt(saveData);
     } else {
       const created = await addPrompt(saveData);
-      if (created) {
-        navigate(`/prompts/${created.id}/edit`, { replace: true });
+      savedId = created?.id;
+    }
+    // SQEM-142 — persist the role access rules (empty = open). Non-fatal if it fails.
+    if (savedId) {
+      try {
+        await setTemplateAccessRoles(savedId, workspace.id, accessValueToRoles(access));
+      } catch {
+        showToast('Saved, but updating access failed — try again.', 'error');
       }
     }
+    if (!id && savedId) navigate(`/prompts/${savedId}/edit`, { replace: true });
     showToast('Prompt successfully saved', 'success');
     setIsDirty(false);
   };
@@ -644,6 +664,11 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                   </span>
                 </button>
               </div>
+            )}
+
+            {/* Access (SQEM-142) — workspace templates only */}
+            {!isLibrary && canEdit && (
+              <TemplateAccessControl value={access} onChange={v => { setAccess(v); setIsDirty(true); }} />
             )}
 
             {/* Context Files — workspace templates only */}

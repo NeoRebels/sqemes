@@ -48,6 +48,8 @@ export interface Workspace {
   openrouterModels: string[];
   /** SQEM-106 — brand profile captured from onboarding; powers marketplace adaptation. */
   brandProfile?: BrandProfile;
+  /** SQEM-142 — default access (roles) applied to newly-created templates. Empty/undefined = open to everyone. */
+  defaultTemplateAccess?: UserRole[];
 }
 
 /** SQEM-106 — workspace-level brand context, seeded from the onboarding wizard. */

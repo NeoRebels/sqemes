@@ -7,6 +7,7 @@ import { hasActiveSubscription, isTrialing } from '../lib/subscription';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { UserRole } from '../types';
 import { BrandProfileForm, brandFormFromProfile, type BrandFormValue } from '../components/BrandProfileForm';
+import { TemplateAccessControl, rolesToAccessValue, accessValueToRoles } from '../components/TemplateAccessControl';
 import { supabase } from '../lib/supabase';
 import { saveApiKey, deleteApiKey, getApiKeyStatus } from '../lib/api/apiKeys';
 import { ProviderIcon } from '../components/ProviderIcon';
@@ -753,6 +754,19 @@ const Settings = () => {
                   </div>
                 </div>
               </Card>
+
+              {can(currentUser, workspace, 'team:manage') && (
+                <Card className="p-6 md:p-8">
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Template Access</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">The default access applied to newly-created templates. Editors can override it per template.</p>
+                  <TemplateAccessControl
+                    label="Default access for new templates"
+                    hint="Applies to templates created after this is saved"
+                    value={rolesToAccessValue(workspace.defaultTemplateAccess ?? [])}
+                    onChange={v => updateWorkspace({ defaultTemplateAccess: accessValueToRoles(v) })}
+                  />
+                </Card>
+              )}
 
               <Card className="p-8">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-6">

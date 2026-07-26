@@ -367,6 +367,7 @@ Deno.serve(async (req) => {
       expires_at:            accessExpiresAt,      // short-lived access token (enforced by mcp-server)
       connection_expires_at: connectionExpiresAt,  // displayed connection lifetime (Integrations tab)
       is_oauth:              true,                 // distinguishes OAuth connections in the UI
+      user_id:               authCode.user_id,     // SQEM-142 — enables per-user template access filtering
     }).select('id').single();
 
     if (keyErr || !keyRow) {

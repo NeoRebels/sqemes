@@ -26,6 +26,8 @@ export function rowToWorkspace(row: WorkspaceRow, members: User[] = []): Workspa
     tags: row.tags,
     openrouterModels: row.openrouter_models ?? [],
     brandProfile: row.brand_profile ? (row.brand_profile as unknown as BrandProfile) : undefined,
+    // SQEM-142 — column added by migration; not yet in generated types, hence the cast.
+    defaultTemplateAccess: (row as unknown as { default_template_access?: UserRole[] }).default_template_access ?? undefined,
   };
 }
 
@@ -97,6 +99,7 @@ export async function updateWorkspace(id: string, updates: Partial<{
   tags: string[];
   openrouter_models: string[];
   brand_profile: BrandProfile | null;
+  default_template_access: string[] | null;
 }>) {
   const { data, error } = await supabase
     .from('workspaces')

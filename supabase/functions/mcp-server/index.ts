@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
 
   const { data: keyRow, error: keyErr } = await adminClient
     .from('sqemes_api_keys')
-    .select('id, workspace_id, name, scopes, expires_at, is_oauth')
+    .select('id, workspace_id, name, scopes, expires_at, is_oauth, user_id')
     .eq('key_hash', keyHash)
     .single();
 
@@ -289,6 +289,19 @@ Deno.serve(async (req) => {
   if (READ_METHODS.has(method) && !scopes.includes('read')) {
     return rpcError(id, -32002, `Insufficient scope: '${method}' requires the 'read' permission.`);
   }
+
+  // SQEM-142 — per-user template access. OAuth connections carry the authorizing user; restrict
+  // templates to what that user may access. API-key connections (user_id null) stay workspace-wide.
+  const mcpUserId: string | null = (keyRow as { user_id?: string | null }).user_id ?? null;
+  let accessibleTemplateIds: Set<string> | null = null;
+  if (mcpUserId) {
+    const { data: accRows } = await adminClient.rpc('mcp_accessible_template_ids', {
+      p_workspace_id: workspaceId, p_user_id: mcpUserId,
+    });
+    accessibleTemplateIds = new Set(((accRows as { id: string }[] | null) || []).map(r => r.id));
+  }
+  // null ⇒ no per-user filtering (API-key / workspace-wide).
+  const canAccessTemplate = (templateId: string) => !accessibleTemplateIds || accessibleTemplateIds.has(templateId);
 
   // 3. Route methods
 
@@ -348,11 +361,13 @@ Deno.serve(async (req) => {
       .or('published.eq.true,kind.eq.skill')
       .order('title');
 
-    const prompts = (templates || []).map((t: any) => ({
-      name: toSlug(t.title),
-      description: `[${t.kind}] ${t.description || t.title}`,
-      arguments: buildArguments(t.variables || []),
-    }));
+    const prompts = (templates || [])
+      .filter((t: any) => canAccessTemplate(t.id)) // SQEM-142 — per-user access (OAuth only)
+      .map((t: any) => ({
+        name: toSlug(t.title),
+        description: `[${t.kind}] ${t.description || t.title}`,
+        arguments: buildArguments(t.variables || []),
+      }));
 
     return rpcResult(id, { prompts });
   }
@@ -372,7 +387,7 @@ Deno.serve(async (req) => {
       .or('published.eq.true,kind.eq.skill'); // SQEM-110 — no draft fetch/execute via MCP (skills exempt)
 
     const template = (templates || []).find((t: any) => toSlug(t.title) === name);
-    if (!template) return rpcError(id, -32602, `Prompt not found: ${name}`);
+    if (!template || !canAccessTemplate(template.id)) return rpcError(id, -32602, `Prompt not found: ${name}`); // SQEM-142
 
     const resolvedInputs: Record<string, string> = {};
     for (const v of (template.variables || [])) {
@@ -665,14 +680,16 @@ Deno.serve(async (req) => {
       if (kind) query = query.eq('kind', kind);
       const { data: templates } = await query;
 
-      const result = (templates || []).map((t: any) => ({
-        id:            t.id,
-        name:          toSlug(t.title),
-        title:         t.title,
-        kind:          t.kind,
-        description:   t.description || '',
-        argumentCount: (t.variables || []).filter((v: any) => v.type !== 'file').length,
-      }));
+      const result = (templates || [])
+        .filter((t: any) => canAccessTemplate(t.id)) // SQEM-142 — per-user access (OAuth only)
+        .map((t: any) => ({
+          id:            t.id,
+          name:          toSlug(t.title),
+          title:         t.title,
+          kind:          t.kind,
+          description:   t.description || '',
+          argumentCount: (t.variables || []).filter((v: any) => v.type !== 'file').length,
+        }));
 
       return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
     }
@@ -691,8 +708,10 @@ Deno.serve(async (req) => {
 
       const results = (templates || [])
         .filter((t: any) =>
-          t.title.toLowerCase().includes(query) ||
-          (t.description || '').toLowerCase().includes(query)
+          canAccessTemplate(t.id) && ( // SQEM-142 — per-user access (OAuth only)
+            t.title.toLowerCase().includes(query) ||
+            (t.description || '').toLowerCase().includes(query)
+          )
         )
         .map((t: any) => ({
           id:          t.id,
@@ -720,7 +739,7 @@ Deno.serve(async (req) => {
         ? (templates || []).find((t: any) => t.id === templateId)
         : (templates || []).find((t: any) => toSlug(t.title) === templateName);
 
-      if (!tpl) return rpcError(id, -32602, 'Template not found');
+      if (!tpl || !canAccessTemplate(tpl.id)) return rpcError(id, -32602, 'Template not found'); // SQEM-142
 
       // Text context files are inlined; binaries (PDF/images) are referenced by resource URI.
       let content = tpl.content || '';
