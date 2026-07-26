@@ -46,6 +46,18 @@ export default [
     },
   },
   {
+    // CI/build utility scripts (SQEM-135, e.g. the audit gate) — Node scripts.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        ...globals.es2022,
+      },
+    },
+  },
+  {
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       parser: tsParser,

@@ -9,7 +9,7 @@ import { PlanTier } from './types';
 export const TRIAL_DAYS = 14;
 
 export const PLAN_AI_CREDITS: Record<PlanTier, number> = {
-  Solo: 5000,
+  Solo: 2000,
   Team: 25000,
   Business: 100000,
 };
@@ -27,17 +27,17 @@ export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly
     mcpAccess: true,
     features: [
       '1 team member',
-      '5,000 AI credits / month',
+      '2,000 AI credits / month',
       'MCP server access',
-      'Bring Your Own API Keys',
+      'Unlimited AI with your own key (BYOK)',
       'Unlimited templates',
       'Marketplace access',
     ],
   },
   Team: {
     users: 10,
-    price: '€62/mo',
-    priceYearly: 49,
+    price: '€99/mo',
+    priceYearly: 79,
     tagline: 'For teams that move fast',
     libraryAccess: true,
     mcpAccess: true,
@@ -46,15 +46,15 @@ export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly
       '25,000 AI credits / month',
       'MCP server access',
       'Roles & permissions',
-      'Bring Your Own API Keys',
+      'Unlimited AI with your own key (BYOK)',
       'Unlimited templates',
       'Marketplace access',
     ],
   },
   Business: {
     users: 30,
-    price: '€124/mo',
-    priceYearly: 99,
+    price: '€249/mo',
+    priceYearly: 199,
     tagline: 'For teams that need more room',
     libraryAccess: true,
     mcpAccess: true,
@@ -63,7 +63,7 @@ export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly
       '100,000 AI credits / month',
       'MCP server access',
       'Roles & permissions',
-      'Bring Your Own API Keys',
+      'Unlimited AI with your own key (BYOK)',
       'Unlimited templates',
       'Marketplace access',
       'Priority support',

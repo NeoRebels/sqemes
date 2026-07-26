@@ -1,5 +1,3 @@
-/* global console, process */
-
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.SUPABASE_URL ?? process.env.API_URL ?? '';

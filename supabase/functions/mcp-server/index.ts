@@ -300,6 +300,20 @@ Deno.serve(async (req) => {
     return rpcResult(id, {
       protocolVersion: MCP_VERSION,
       capabilities: { prompts: {}, resources: {}, tools: {} },
+      // SQEM-132 — session-level guidance. Claude clients surface a server's `instructions`
+      // in the system context at session start, before any per-request tool matching. This
+      // is the strongest lever for getting a connected client to proactively consider the
+      // user's templates on relevant requests, instead of only when they name Sqemes.
+      instructions:
+        "Sqemes is this workspace's template library — reusable prompts, assistants, and " +
+        "skills the user has curated for their recurring tasks.\n\n" +
+        "Before writing, drafting, generating, reviewing, or rewriting any substantial " +
+        "content from scratch — an email, a spec, a plan, a code review, a message, a " +
+        "prompt — first call search_templates with a keyword from the request to check " +
+        "whether a matching template already exists. If one does, load it with get_template " +
+        "and follow it. If nothing matches, proceed normally.\n\n" +
+        "Templates encode the user's preferred structure and wording, so reusing one is " +
+        "usually better than improvising.",
       // SQEM-089 — brand the connector. `icons` (MCP SEP-973) is additive metadata a
       // client MAY render in its connector list; PNG over HTTPS is the safest, most
       // widely-supported form, served credential-free from our own domain. `sizes` is
@@ -479,7 +493,7 @@ Deno.serve(async (req) => {
     const tools = [
       {
         name: 'list_templates',
-        description: 'List all templates in the workspace. Optionally filter by kind (prompt, skill, assistant).',
+        description: 'Browse every published template in the workspace (prompts, assistants, skills) with id, name, kind and description. Use this to see what reusable templates exist before composing something from scratch, or to find a template\'s id/name to pass to get_template. For a targeted lookup by keyword use search_templates instead. Optionally filter by kind.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -493,7 +507,7 @@ Deno.serve(async (req) => {
       },
       {
         name: 'search_templates',
-        description: 'Search templates by title or description keyword.',
+        description: 'Find a workspace template by keyword (matches title and description). Call this first whenever the user asks you to write, draft, generate, review, or rewrite something, to check for a matching prompt, assistant, or skill before composing from scratch. Returns matching templates with their id and name — pass one to get_template to load its full content. Optionally filter by kind.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -509,7 +523,7 @@ Deno.serve(async (req) => {
       },
       {
         name: 'get_template',
-        description: 'Get the full content, variables, and metadata of any template (prompt, assistant, or skill) by id or name slug. Text context files are inlined into the content; binary files (PDF, images) are listed in "contextFiles" with a resource "uri" — fetch their bytes with resources/read. Use this to inspect a template before updating it, or to consume a skill\'s full knowledge.',
+        description: 'Load a template\'s full content, variables, and metadata so you can actually use it — e.g. a template found via search_templates or list_templates — by id or name slug. Works for any kind (prompt, assistant, or skill). Text context files are inlined into the content; binary files (PDF, images) are listed in "contextFiles" with a resource "uri" — fetch their bytes with resources/read. Use this to inspect a template before updating it, or to consume a skill\'s full knowledge.',
         inputSchema: {
           type: 'object',
           properties: {
