@@ -101,6 +101,10 @@ export function useWorkspaceState(
       setAvailableWorkspaces(prev => [...prev, newWs]);
       setWorkspace(newWs);
       setActiveWorkspaceId(newWs.id);
+      // SQEM-141 — persist so the new workspace survives the full page reload after a Stripe
+      // checkout redirect (init() restores the active workspace from localStorage). Without
+      // this, a create-workspace → subscribe flow lands the user back in the OLD workspace.
+      localStorage.setItem('activeWorkspaceId', newWs.id);
       setUser(prev => ({ ...prev, role: 'admin' }));
       setNoWorkspace(false);
       showToast('Workspace created', 'success');

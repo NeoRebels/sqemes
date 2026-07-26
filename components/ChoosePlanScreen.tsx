@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWorkspace, useUI } from '../store';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
@@ -21,6 +21,34 @@ const ChoosePlanScreen = () => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+
+  // SQEM-141 — back from a successful checkout but still gated ⇒ the Stripe webhook hasn't
+  // flipped subscription_status yet. Poll for it and reload once it lands, so the paid user
+  // isn't stranded on the plan screen (their new/current workspace is upgraded in place).
+  const [confirming, setConfirming] = useState(
+    () => new URLSearchParams(window.location.hash.split('?')[1] || '').get('checkout') === 'success',
+  );
+  useEffect(() => {
+    if (!confirming || !workspace.id) return;
+    let cancelled = false;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      tries += 1;
+      const { data } = await supabase
+        .from('workspaces')
+        .select('subscription_status')
+        .eq('id', workspace.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const status = (data as { subscription_status?: string } | null)?.subscription_status;
+      if (status === 'active' || status === 'trialing') { window.location.reload(); return; }
+      if (tries >= 8) { setConfirming(false); return; } // ~16s → give up, show plans
+      timer = setTimeout(poll, 2000);
+    };
+    timer = setTimeout(poll, 1500);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [confirming, workspace.id]);
 
   // Lapsed with a live sub + failing card → fix in the portal (a fresh checkout would
   // duplicate the subscription). Otherwise (null/canceled) → pick a plan via checkout.
@@ -85,7 +113,13 @@ const ChoosePlanScreen = () => {
           </button>
         </div>
 
-        {isAdmin ? (
+        {confirming ? (
+          <div className="max-w-md mx-auto text-center bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-700 p-8">
+            <Loader2 className="w-8 h-8 text-brand-500 animate-spin mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Confirming your subscription…</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">This only takes a moment — you'll be taken to <span className="font-semibold">{workspace.name}</span> automatically.</p>
+          </div>
+        ) : isAdmin ? (
           paymentFailing ? (
             <div className="max-w-md mx-auto text-center bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-700 p-8">
               <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-4">

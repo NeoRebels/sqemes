@@ -75,7 +75,13 @@ const ResetPassword = () => {
       const { error } = await updatePassword(password);
       if (error) throw error;
       setSuccess(true);
-      setTimeout(() => navigate('/', { replace: true }), 2000);
+      // SQEM-140 — the verifyOtp recovery session leaves the workspace fetch empty (→ the
+      // "create your first workspace" screen). Sign out and send them to sign-in so they
+      // re-auth with the new password on a clean full session that loads workspaces correctly.
+      setTimeout(async () => {
+        await supabase.auth.signOut();
+        navigate('/', { replace: true });
+      }, 2000);
     } catch (err: any) {
       setError(err.message || 'Failed to update password.');
     } finally {
@@ -118,7 +124,7 @@ const ResetPassword = () => {
         <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-700 p-8 text-center">
           <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Password Updated</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">Redirecting you to the dashboard...</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Redirecting you to sign in…</p>
         </div>
       </ScrollScreen>
     );
