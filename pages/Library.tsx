@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, memo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useUI, useWorkspace, useData, usePrompts } from '../store';
 import { TEMPLATE_CATEGORIES, CATEGORY_COLORS } from '../constants';
 import { can } from '../lib/permissions';

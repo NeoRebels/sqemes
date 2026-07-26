@@ -6,7 +6,7 @@ import { getWorkspaceFileSignedUrl } from '../lib/api/files';
 import { isImageType } from '../lib/uploadTypes';
 import { buildEnabledModels, isFundedModel } from '../lib/enabledModels';
 import { edgeError } from '../lib/edgeError';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ModelSelect } from './ModelSelect';
 import { Send, Loader2, Bot, User, Sparkles, Image, RotateCcw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';

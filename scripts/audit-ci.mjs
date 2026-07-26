@@ -12,11 +12,9 @@
 import { execSync } from 'node:child_process';
 
 const ALLOWLIST = new Map([
-  // React Router "RSC Mode CSRF Bypass" (react-router 7.12.0–8.2.0). Only affects React
-  // Server Components mode; Sqemes is a client-side Vite SPA (HashRouter, no RSC), so the
-  // vulnerable server-action path is never executed. Fixed upstream only in react-router
-  // v8 — the v8 migration is tracked in SQEM-136. Revisit on every react-router bump.
-  ['GHSA-qwww-vcr4-c8h2', 'react-router RSC-mode CSRF — not reachable in a client SPA (SQEM-136)'],
+  // Currently empty. Add a GHSA here ONLY when it is genuinely non-applicable to Sqemes
+  // and can't be fixed now — with rationale + a tracking ticket. (The prior react-router
+  // RSC-CSRF entry was removed in SQEM-136: the react-router v8 upgrade fixed it at source.)
 ]);
 
 let report;

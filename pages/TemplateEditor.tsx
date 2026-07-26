@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router';
 import { useUI, useWorkspace, usePrompts, useData } from '../store';
 import { can } from '../lib/permissions';
 import { Prompt, Variable, VariableType, PromptKind, WorkspaceFile, TemplateCategory, LibraryTemplate, Step } from '../types';

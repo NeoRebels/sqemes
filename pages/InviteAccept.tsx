@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router';
 import { acceptInvitation } from '../lib/api/invitations';
 import { useAuth } from '../hooks/useAuth';
 import { CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';

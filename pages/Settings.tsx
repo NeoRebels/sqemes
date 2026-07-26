@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUI, useWorkspace, usePrompts } from '../store';
 import { can } from '../lib/permissions';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { PLANS, TRIAL_DAYS } from '../constants';
 import { hasActiveSubscription, isTrialing } from '../lib/subscription';
 import { IS_SELF_HOSTED } from '../lib/env';

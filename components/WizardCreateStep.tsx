@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useWorkspace, useUI, usePrompts } from '../store';
 import { firstTextModelId } from '../lib/authoringAI';
 import { generateStarterLibrary, type TemplateDraft } from '../lib/wizardGeneration';

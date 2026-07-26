@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import Card from './Card';
 
 // SQEM-106 — shared presentational card shell for template-style cards.

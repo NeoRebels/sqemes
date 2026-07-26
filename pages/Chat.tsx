@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, Link } from 'react-router';
 import { SUPPORTED_MIME_TYPES, ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, isImageType, isTextType, fileTypeLabel } from '../lib/uploadTypes';
 import {
   createChatSession, addChatMessage, fetchChatMessages, deleteChatMessages,

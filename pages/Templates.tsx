@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, memo } from 'react';
 import { useUI, useWorkspace, usePrompts, useData } from '../store';
 import { collectWorkspaceTags } from '../lib/workspaceTags';
 import { can } from '../lib/permissions';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Search, Plus, Play, Edit, Trash2, Copy, Star, EyeOff, Bot, PenTool, Wand2, Loader2 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import TemplateCard from '../components/ui/TemplateCard';

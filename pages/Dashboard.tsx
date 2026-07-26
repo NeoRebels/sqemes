@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useUI, useWorkspace, usePrompts } from '../store';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { ArrowRight, CreditCard, Check, Sparkles, Loader2, MessageSquarePlus, FilePlus, Key, Chrome } from 'lucide-react';
 import McpIcon from '../components/McpIcon';
 import { PLANS, PLAN_AI_CREDITS } from '../constants';

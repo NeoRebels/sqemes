@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
-import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import Sidebar from './components/Sidebar';
 import ErrorBoundary from './components/ErrorBoundary';
 import ChoosePlanScreen from './components/ChoosePlanScreen';
