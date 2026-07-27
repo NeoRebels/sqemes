@@ -7,6 +7,7 @@ import KindBadge from './ui/KindBadge';
 import { Prompt, PromptKind, WorkspaceFile } from '../types';
 import { SUPPORTED_MIME_TYPES, ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, isImageType } from '../lib/uploadTypes';
 import { getWorkspaceFileSignedUrl } from '../lib/api/files';
+import { fetchResolvedSkills } from '../lib/api/prompts';
 
 const VAR_REGEX = /{{([^}]+)}}/g;
 
@@ -122,12 +123,26 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssis
   };
 
   // Skill bodies → blocks; each skill's context file ids are resolved alongside the template's.
-  const resolveSkillBlocks = (skillIds: string[] | undefined | null): { blocks: string[]; fileIds: string[] } => {
+  // SQEM-144 — resolve embedded skills via the edge function (service role, authorized by access
+  // to THIS template) so a skill restricted away from the user still resolves transparently.
+  // Chat/launch used to compose from the RLS-loaded store, which silently dropped restricted
+  // embedded skills. Falls back to the store if the call fails (graceful; worst case = old behaviour).
+  const resolveSkillBlocks = async (template: Prompt): Promise<{ blocks: string[]; fileIds: string[] }> => {
+    const skillIds = template.skillIds;
     if (!skillIds?.length) return { blocks: [], fileIds: [] };
-    // Skills may live in pr.prompts (after store unification) or da.skills (legacy) — check both
-    const allSkillsById = new Map<string, Prompt>();
-    [...prompts, ...daSkills].forEach(p => { if (p.kind === 'skill') allSkillsById.set(p.id, p); });
-    const skills = skillIds.map(id => allSkillsById.get(id)).filter((s): s is Prompt => !!s);
+    let skills: { title: string; content: string; contextFileIds: string[] }[] | null = null;
+    if (template.id) {
+      skills = await fetchResolvedSkills(template.id).catch(() => null);
+    }
+    if (!skills) {
+      // Fallback: the RLS-loaded client store (skills may live in pr.prompts or legacy da.skills).
+      const allSkillsById = new Map<string, Prompt>();
+      [...prompts, ...daSkills].forEach(p => { if (p.kind === 'skill') allSkillsById.set(p.id, p); });
+      skills = skillIds
+        .map(id => allSkillsById.get(id))
+        .filter((s): s is Prompt => !!s)
+        .map(s => ({ title: s.title, content: s.content, contextFileIds: s.contextFileIds ?? [] }));
+    }
     const blocks: string[] = [];
     const fileIds: string[] = [];
     for (const skill of skills) {
@@ -141,7 +156,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssis
     setIsResolving(true);
     try {
       if (template.kind === 'assistant') {
-        const skill = resolveSkillBlocks(template.skillIds);
+        const skill = await resolveSkillBlocks(template);
         const allFileIds = [...(template.contextFileIds ?? []), ...skill.fileIds];
         const fileBlocks = await resolveFileBlocks(allFileIds);
         const images = await resolveAttachmentFiles(allFileIds);
@@ -151,7 +166,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssis
         return;
       }
 
-      const skill = resolveSkillBlocks(template.skillIds);
+      const skill = await resolveSkillBlocks(template);
       const allFileIds = [...(template.contextFileIds ?? []), ...skill.fileIds];
       const parts: string[] = [...skill.blocks];
       parts.push(...await resolveFileBlocks(allFileIds));

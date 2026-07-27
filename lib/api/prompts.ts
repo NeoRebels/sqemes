@@ -219,3 +219,27 @@ export async function duplicatePrompt(prompt: Prompt, workspaceId: string) {
   if (error) throw error;
   return rowToPrompt(data![0] as unknown as PromptRow);
 }
+
+/** The fields of an embedded skill the launch flow needs to compose its `<skill: …>` block. */
+export type ResolvedSkill = { id: string; title: string; content: string; contextFileIds: string[] };
+
+/**
+ * SQEM-144 — resolve a template's embedded skills transparently via the `resolve-template-skills`
+ * edge function (service role, authorized by access to THIS template). A skill restricted away
+ * from the caller is still returned as long as it is embedded in a template the caller can access,
+ * so the composed prompt never silently loses skill context. Callers should fall back to the
+ * client store if this throws (graceful degradation — worst case is the prior RLS-filtered set).
+ */
+export async function fetchResolvedSkills(templateId: string): Promise<ResolvedSkill[]> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-template-skills`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ templateId }),
+  });
+  if (!res.ok) throw new Error(`resolve-template-skills returned ${res.status}`);
+  const json = await res.json();
+  return ((json.skills ?? []) as { id: string; title: string; content: string; context_file_ids: string[] | null }[])
+    .map(s => ({ id: s.id, title: s.title, content: s.content, contextFileIds: s.context_file_ids ?? [] }));
+}
