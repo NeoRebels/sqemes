@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useCallback, memo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { useUI, useWorkspace, usePrompts, useData } from '../store';
 import { collectWorkspaceTags } from '../lib/workspaceTags';
 import { can } from '../lib/permissions';
+import { fetchRestrictedTemplateIds } from '../lib/api/templateAccess';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Search, Plus, Play, Edit, Trash2, Copy, Star, EyeOff, Bot, PenTool, Wand2, Loader2, Store } from 'lucide-react';
+import { Search, Plus, Play, Edit, Trash2, Copy, Star, EyeOff, Bot, PenTool, Wand2, Loader2, Store, Lock } from 'lucide-react';
 import Card from '../components/ui/Card';
 import TemplateCard from '../components/ui/TemplateCard';
 import Modal from '../components/ui/Modal';
@@ -40,6 +41,7 @@ const PromptCard = memo(({
   prompt,
   canEdit,
   workspaceTags,
+  restricted,
   selected,
   onToggleSelect,
   onFavorite,
@@ -51,6 +53,7 @@ const PromptCard = memo(({
   prompt: Prompt;
   canEdit: boolean;
   workspaceTags: string[];
+  restricted: boolean;
   selected: boolean;
   onToggleSelect: (id: string) => void;
   onFavorite: (prompt: Prompt) => void;
@@ -83,6 +86,14 @@ const PromptCard = memo(({
     badges={(
       <>
         <KindBadge kind={prompt.kind} />
+        {restricted && (
+          <span
+            className="text-2xs font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded-lg uppercase tracking-wider flex items-center gap-1"
+            title="Restricted — not visible to everyone in this workspace"
+          >
+            <Lock className="w-3 h-3" /> Restricted
+          </span>
+        )}
         {prompt.published === false && canEdit && (
           <span className="text-2xs font-bold px-2.5 py-1 bg-amber-50 text-amber-600 rounded-lg uppercase tracking-wider flex items-center gap-1">
             <EyeOff className="w-3 h-3" /> Draft
@@ -153,6 +164,15 @@ const Templates = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  // SQEM-143 — which templates are restricted (have any access rule), for the card indicator.
+  // Re-fetches on mount (returning from the editor remounts this page) and when the set of
+  // templates changes. Non-fatal — a failure just hides the badge.
+  const [restrictedIds, setRestrictedIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!workspace?.id) return;
+    fetchRestrictedTemplateIds(workspace.id).then(setRestrictedIds).catch(() => {});
+  }, [workspace?.id, prompts.length]);
 
   // Shared workspace tag vocabulary (templates + files) — managed in one place.
   const allTags = useMemo(
@@ -343,6 +363,7 @@ const Templates = () => {
               prompt={prompt}
               canEdit={canEdit}
               workspaceTags={workspace.tags}
+              restricted={restrictedIds.has(prompt.id)}
               selected={selectedIds.has(prompt.id)}
               onToggleSelect={toggleSelect}
               onFavorite={toggleFavorite}

@@ -179,12 +179,16 @@ const Settings = () => {
   const [newOrModelId, setNewOrModelId] = useState(''); // OpenRouter "add custom model id" repeater input
 
   // Public API Keys State
-  type SqemesApiKey = { id: string; name: string; key_prefix: string; created_at: string; last_used_at: string | null; scopes: string[] | null; expires_at: string | null; connection_expires_at: string | null; is_oauth: boolean };
+  type SqemesApiKey = { id: string; name: string; key_prefix: string; created_at: string; last_used_at: string | null; scopes: string[] | null; expires_at: string | null; connection_expires_at: string | null; is_oauth: boolean; user_id: string | null };
   const [sqemesApiKeys, setSqemesApiKeys] = useState<SqemesApiKey[]>([]);
   const [sqemesApiKeysLoaded, setSqemesApiKeysLoaded] = useState(false);
   const [showGenerateKeyModal, setShowGenerateKeyModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyScope, setNewKeyScope] = useState<KeyScopeValue>(DEFAULT_KEY_SCOPE);
+  // SQEM-143 — new keys are bound to their creator by default (the key only exposes templates
+  // the creator may access). Admins can opt into a workspace-wide key (all templates).
+  const [newKeyBindToMe, setNewKeyBindToMe] = useState(true);
+  const isWorkspaceAdmin = currentUser.role === 'admin';
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
   const [generatedKeyValue, setGeneratedKeyValue] = useState<string | null>(null);
   const [deletingKeyId, setDeletingKeyId] = useState<string | null>(null);
@@ -198,7 +202,7 @@ const Settings = () => {
   const loadSqemesApiKeys = async () => {
     const { data } = await supabase
       .from('sqemes_api_keys')
-      .select('id, name, key_prefix, created_at, last_used_at, scopes, expires_at, connection_expires_at, is_oauth')
+      .select('id, name, key_prefix, created_at, last_used_at, scopes, expires_at, connection_expires_at, is_oauth, user_id')
       .eq('workspace_id', workspace.id)
       .order('created_at', { ascending: false });
     if (data) setSqemesApiKeys(data);
@@ -216,6 +220,9 @@ const Settings = () => {
       const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
       const keyHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
+      // SQEM-143 — bind the key to its creator (default) so mcp-server filters templates to
+      // that user's access; admins may leave it workspace-wide (user_id null). Non-admins are
+      // always bound to themselves (a workspace-wide key would bypass template access control).
       const { error } = await supabase.from('sqemes_api_keys').insert({
         workspace_id: workspace.id,
         name: newKeyName.trim(),
@@ -223,6 +230,7 @@ const Settings = () => {
         key_prefix: keyPrefix,
         scopes: scopeArrayFromValue(newKeyScope),
         expires_at: expiresAtFromValue(newKeyScope),
+        user_id: newKeyBindToMe || !isWorkspaceAdmin ? currentUser.id : null,
       });
 
       if (error) throw error;
@@ -1347,7 +1355,7 @@ const Settings = () => {
                     </p>
                   </div>
                   <button
-                    onClick={() => { setNewKeyName(''); setNewKeyScope(DEFAULT_KEY_SCOPE); setShowGenerateKeyModal(true); }}
+                    onClick={() => { setNewKeyName(''); setNewKeyScope(DEFAULT_KEY_SCOPE); setNewKeyBindToMe(true); setShowGenerateKeyModal(true); }}
                     disabled={!hasMcpAccess}
                     title={!hasMcpAccess ? 'Upgrade to Team or Business to generate MCP keys' : undefined}
                     className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-violet-200 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
@@ -1379,6 +1387,16 @@ const Settings = () => {
                             {k.is_oauth && (
                               <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">OAuth</span>
                             )}
+                            {/* SQEM-143 — which templates this key exposes. */}
+                            {k.user_id
+                              ? (
+                                <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                                  {k.user_id === currentUser.id ? 'You' : (workspace.members?.find(m => m.id === k.user_id)?.name || 'Member')}
+                                </span>
+                              )
+                              : (
+                                <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">Workspace-wide</span>
+                              )}
                             <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300">read</span>
                             {writeScopes.map(s => (
                               <span key={s} className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">{s}</span>
@@ -1621,6 +1639,38 @@ const Settings = () => {
         />
         <div className="mb-5">
           <ApiKeyScopeFields value={newKeyScope} onChange={setNewKeyScope} />
+        </div>
+        {/* SQEM-143 — template access this key exposes over MCP. */}
+        <div className="mb-5">
+          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Template access</label>
+          {isWorkspaceAdmin ? (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setNewKeyBindToMe(true)}
+                className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl border text-sm text-left transition-all ${newKeyBindToMe ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-slate-900 dark:text-slate-100' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+              >
+                <User className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  <span className="font-semibold">My access</span>
+                  <span className="block text-xs text-slate-400">Only templates you can access</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewKeyBindToMe(false)}
+                className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl border text-sm text-left transition-all ${!newKeyBindToMe ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-slate-900 dark:text-slate-100' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+              >
+                <Users className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  <span className="font-semibold">Whole workspace</span>
+                  <span className="block text-xs text-slate-400">Every template, ignoring per-template restrictions</span>
+                </span>
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400 dark:text-slate-500">This key inherits your template access — it can only reach templates you can access.</p>
+          )}
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowGenerateKeyModal(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>

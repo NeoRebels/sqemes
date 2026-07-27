@@ -1,6 +1,6 @@
 import { supabase } from '../supabase';
 import type { Database } from '../database.types';
-import type { Workspace, User, BrandProfile } from '../../types';
+import type { Workspace, User, BrandProfile, UserRole } from '../../types';
 
 type WorkspaceRow = Database['public']['Tables']['workspaces']['Row'];
 

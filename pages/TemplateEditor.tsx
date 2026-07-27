@@ -15,8 +15,8 @@ import { ContextFilePicker } from '../components/ContextFilePicker';
 import { TagPicker } from '../components/TagPicker';
 import { UploadFileModal } from '../components/UploadFileModal';
 import { BrandVoiceForm } from '../components/BrandVoiceForm';
-import { TemplateAccessControl, rolesToAccessValue, accessValueToRoles, type TemplateAccessValue } from '../components/TemplateAccessControl';
-import { fetchTemplateAccessRoles, setTemplateAccessRoles } from '../lib/api/templateAccess';
+import { TemplateAccessControl, rolesToAccessValue, accessToValue, accessValueToAccess, type TemplateAccessValue } from '../components/TemplateAccessControl';
+import { fetchTemplateAccess, setTemplateAccess } from '../lib/api/templateAccess';
 import { compileAssistantInstruction, defaultBrandConfig } from '../lib/compileBrandVoice';
 import EditorTestPanel from '../components/EditorTestPanel';
 
@@ -168,10 +168,10 @@ const TemplateEditor = () => {
     }
   }, [id, location.state]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // SQEM-142 — load an existing workspace template's access rules.
+  // SQEM-142 / SQEM-143 — load an existing workspace template's access rules (roles + users).
   useEffect(() => {
     if (id && !isLibrary) {
-      fetchTemplateAccessRoles(id).then(roles => setAccess(rolesToAccessValue(roles))).catch(() => {});
+      fetchTemplateAccess(id).then(a => setAccess(accessToValue(a.roles, a.userIds))).catch(() => {});
     }
   }, [id, isLibrary]);
 
@@ -204,10 +204,10 @@ const TemplateEditor = () => {
       const created = await addPrompt(saveData);
       savedId = created?.id;
     }
-    // SQEM-142 — persist the role access rules (empty = open). Non-fatal if it fails.
+    // SQEM-142 / SQEM-143 — persist the access rules (roles + users; empty = open). Non-fatal.
     if (savedId) {
       try {
-        await setTemplateAccessRoles(savedId, workspace.id, accessValueToRoles(access));
+        await setTemplateAccess(savedId, workspace.id, accessValueToAccess(access));
       } catch {
         showToast('Saved, but updating access failed — try again.', 'error');
       }
@@ -668,7 +668,7 @@ Output only the refined prompt text, with no surrounding explanation or commenta
 
             {/* Access (SQEM-142) — workspace templates only */}
             {!isLibrary && canEdit && (
-              <TemplateAccessControl value={access} onChange={v => { setAccess(v); setIsDirty(true); }} />
+              <TemplateAccessControl value={access} onChange={v => { setAccess(v); setIsDirty(true); }} members={workspace?.members} />
             )}
 
             {/* Context Files — workspace templates only */}
