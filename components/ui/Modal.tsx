@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -21,7 +22,11 @@ const sizeClasses: Record<ModalSize, string> = {
 const Modal = ({ open, onClose, size = 'sm', overlayOpacity = 'low', className = '', children }: ModalProps) => {
   if (!open) return null;
 
-  return (
+  // Portal to <body> so the overlay is always viewport-fixed and full-page (backdrop blur + centred),
+  // even when the modal is rendered inside a transformed ancestor — e.g. a tab pane with
+  // `.animate-fade-in` (transform: forwards), which would otherwise become the containing block for
+  // `position: fixed` and clip/confine the overlay to that pane. (SQEM-149)
+  return createPortal(
     <div
       className={[
         'fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4',
@@ -39,7 +44,8 @@ const Modal = ({ open, onClose, size = 'sm', overlayOpacity = 'low', className =
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

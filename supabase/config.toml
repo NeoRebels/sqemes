@@ -393,6 +393,18 @@ verify_jwt = false
 [functions.resolve-template-skills]
 verify_jwt = false
 
+[functions.manage-connectors]
+verify_jwt = false
+
+[functions.connector-oauth-start]
+verify_jwt = false
+
+[functions.connector-oauth-callback]
+verify_jwt = false
+
+[functions.mcp-outlook]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

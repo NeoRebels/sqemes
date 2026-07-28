@@ -12,6 +12,7 @@ import { supabase } from '../lib/supabase';
 import { saveApiKey, deleteApiKey, getApiKeyStatus } from '../lib/api/apiKeys';
 import { ProviderIcon } from '../components/ProviderIcon';
 import McpIcon from '../components/McpIcon';
+import ConnectorsCard from '../components/ConnectorsCard';
 import Card from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -26,6 +27,7 @@ import {
 } from '../components/ApiKeyScopeFields';
 import { 
   CreditCard,
+  Plug,
   Trash2,
   Key,
   Save,
@@ -57,7 +59,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-type TabId = 'general' | 'brand' | 'team' | 'plans' | 'api' | 'profile';
+type TabId = 'general' | 'brand' | 'team' | 'plans' | 'api' | 'connectors' | 'profile';
 
 const MASKED_KEY_RE = /(?:\u2022){4,}|^\*{4,}$/;
 
@@ -371,13 +373,15 @@ const Settings = () => {
     { id: 'brand', label: 'Brand', icon: Sparkles },
     { id: 'team', label: 'Team Members', icon: Users },
     { id: 'plans', label: 'Plans & Billing', icon: CreditCard },
-    { id: 'api', label: 'Integrations', icon: Key },
+    { id: 'api', label: 'API & MCP', icon: Key },
+    { id: 'connectors', label: 'Connectors', icon: Plug },
     { id: 'profile', label: 'My Profile', icon: User },
   ];
 
   const visibleTabs = tabs.filter(tab => {
     if (IS_SELF_HOSTED && tab.id === 'plans') return false; // SQEM-119 — no billing on self-host
-    if (!can(currentUser, workspace, 'settings:general')) return tab.id === 'profile';
+    // Members (no settings:general) still get their Profile + Connectors (they may add personal ones).
+    if (!can(currentUser, workspace, 'settings:general')) return tab.id === 'profile' || tab.id === 'connectors';
     if (!can(currentUser, workspace, 'plans:manage')) return tab.id !== 'plans';
     return true;
   });
@@ -406,7 +410,7 @@ const Settings = () => {
 
   useEffect(() => {
     if (!can(currentUser, workspace, 'settings:general')) {
-      if (activeTab !== 'profile') setActiveTab('profile');
+      if (activeTab !== 'profile' && activeTab !== 'connectors') setActiveTab('profile');
       return;
     }
 
@@ -428,7 +432,7 @@ const Settings = () => {
 
     // Deep-link via URL query (e.g. opened in a new tab): ?tab=plans
     const urlTab = new URLSearchParams(location.search).get('tab');
-    if (urlTab && ['general', 'brand', 'team', 'plans', 'api', 'profile'].includes(urlTab)) {
+    if (urlTab && ['general', 'brand', 'team', 'plans', 'api', 'connectors', 'profile'].includes(urlTab)) {
       if (!can(currentUser, workspace, 'plans:manage') && urlTab === 'plans') {
         if (activeTab !== 'general') setActiveTab('general');
       } else if (activeTab !== urlTab) {
@@ -670,8 +674,9 @@ const Settings = () => {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar Navigation */}
-        <div className="lg:w-64 shrink-0">
+        {/* Sidebar Navigation — sticky on md+ (SQEM-147). Sticky must live on this wrapper flex-item,
+            which stretches with the content column, not on the Card (whose parent is Card-height). */}
+        <div className="lg:w-64 shrink-0 md:sticky md:top-4 lg:self-start z-10">
           <Card overflow className="p-2 flex lg:block overflow-x-auto lg:overflow-visible">
             {visibleTabs.map(tab => (
               <button
@@ -1441,6 +1446,13 @@ const Settings = () => {
               {/* MCP Server */}
               <McpServerCard locked={!hasMcpAccess} onUpgrade={() => setActiveTab('plans')} />
 
+            </div>
+          )}
+
+          {/* --- Connectors Tab (SQEM-149) — accessible to all members (personal connectors) --- */}
+          {activeTab === 'connectors' && (
+            <div className="space-y-6 animate-fade-in">
+              <ConnectorsCard workspaceId={workspace.id} currentUser={currentUser} showToast={showToast} />
             </div>
           )}
 

@@ -1,6 +1,7 @@
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { decryptApiKey } from '../_shared/crypto.ts';
+import { getFreshConnectorToken } from '../_shared/connectorToken.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
 import { fetchWithTimeout } from '../_shared/fetchWithTimeout.ts';
 import { broadcastJobResult } from '../_shared/broadcast.ts';
@@ -49,7 +50,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { workspaceId, modelId, systemInstruction, messages, temperature = 1, jobId, funded } = await req.json();
+    const { workspaceId, modelId, systemInstruction, messages, temperature = 1, jobId, funded, connectorIds } = await req.json();
 
     // Funded (Sqemes-credit) calls don't carry a modelId — they use FUNDED_MODEL.
     if (!workspaceId || (!funded && !modelId) || !messages || !Array.isArray(messages) || messages.length === 0) {
@@ -223,7 +224,12 @@ Deno.serve(async (req) => {
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
     }
-    EdgeRuntime.waitUntil(runAndBroadcast(jobId, provider, apiKey, effectiveModelId, systemInstruction, sanitizedMessages, temperature, !!funded, workspaceId, fundedCreditLimit));
+    // SQEM-149 — connectors: Claude (Messages API) and OpenAI (Responses API) call remote MCP
+    // servers themselves. Resolve the enabled connectors for those providers; others ignore them.
+    const connectors = ((provider === 'claude' || provider === 'openai') && Array.isArray(connectorIds) && connectorIds.length > 0)
+      ? await resolveConnectors(adminClient, workspaceId, user.id, connectorIds)
+      : null;
+    EdgeRuntime.waitUntil(runAndBroadcast(jobId, provider, apiKey, effectiveModelId, systemInstruction, sanitizedMessages, temperature, !!funded, workspaceId, fundedCreditLimit, connectors));
     return new Response(JSON.stringify({ jobId }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
@@ -243,6 +249,39 @@ Deno.serve(async (req) => {
   }
 });
 
+// ── Connectors (SQEM-149) ────────────────────────────────────────────────────
+
+// A connector resolved for a chat turn (token decrypted). Formatted per-provider at the call site.
+type ResolvedConnector = { url: string; name: string; token: string | null; allowedTools: string[] | null };
+
+// Resolve enabled connectors for a turn. Only connectors the caller may see (workspace-shared, or
+// their own per-user) are included; the bearer token is decrypted here.
+async function resolveConnectors(
+  admin: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  userId: string,
+  connectorIds: string[],
+): Promise<ResolvedConnector[] | null> {
+  const { data } = await admin
+    .from('workspace_connectors')
+    .select('id, mcp_url, user_id, allowed_tools, provider, auth_token_encrypted, refresh_token_encrypted, token_expires_at')
+    .eq('workspace_id', workspaceId)
+    .in('id', connectorIds);
+  const rows = ((data as any[]) || []).filter(r => r.user_id === null || r.user_id === userId);
+  if (!rows.length) return null;
+
+  const out: ResolvedConnector[] = [];
+  for (const r of rows) {
+    out.push({
+      url: r.mcp_url,
+      name: 'c_' + String(r.id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 28), // unique, valid server label
+      token: await getFreshConnectorToken(admin, r), // decrypts; refreshes an expired Google token in place
+      allowedTools: Array.isArray(r.allowed_tools) && r.allowed_tools.length ? (r.allowed_tools as string[]) : null,
+    });
+  }
+  return out;
+}
+
 // ── Background job helper ────────────────────────────────────────────────────
 
 async function runAndBroadcast(
@@ -256,6 +295,7 @@ async function runAndBroadcast(
   funded = false,
   workspaceId?: string,
   creditLimit = 0,
+  connectors: ResolvedConnector[] | null = null,
 ): Promise<void> {
   try {
     let result: string;
@@ -263,9 +303,11 @@ async function runAndBroadcast(
     if (provider === 'gemini') {
       result = await callGemini(apiKey, modelId, systemInstruction, messages, temperature, false);
     } else if (provider === 'openai') {
-      result = await callOpenAI(apiKey, modelId, systemInstruction, messages, temperature);
+      result = connectors?.length
+        ? await callOpenAIResponses(apiKey, modelId, systemInstruction, messages, connectors)
+        : await callOpenAI(apiKey, modelId, systemInstruction, messages, temperature);
     } else if (provider === 'claude') {
-      result = await callClaude(apiKey, modelId, systemInstruction, messages, temperature);
+      result = await callClaude(apiKey, modelId, systemInstruction, messages, temperature, connectors);
     } else if (provider === 'deepseek') {
       ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.deepseek.com/v1/chat/completions', systemInstruction, messages, temperature));
     } else if (provider === 'mistral') {
@@ -466,12 +508,63 @@ async function callOpenAI(
   return data.choices?.[0]?.message?.content || 'No content generated.';
 }
 
+// SQEM-149 — OpenAI Responses API with remote MCP connectors (Chat Completions has no MCP support).
+// Only used when connectors are enabled; the plain-chat path stays on callOpenAI (untouched).
+async function callOpenAIResponses(
+  apiKey: string,
+  modelId: string,
+  systemInstruction: string | undefined,
+  messages: ChatMessage[],
+  connectors: ResolvedConnector[],
+): Promise<string> {
+  const input = messages.map((msg): any => {
+    if (typeof msg.content === 'string') return { role: msg.role, content: msg.content };
+    const content = msg.content.map((p: any) => {
+      if (p.inlineData) {
+        if (p.inlineData.mimeType.startsWith('image/')) return { type: 'input_image', image_url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` };
+        if (p.inlineData.mimeType.startsWith('text/')) return { type: 'input_text', text: decodeTextFile(p.inlineData) };
+        return { type: 'input_text', text: '[attachment omitted]' };
+      }
+      return { type: 'input_text', text: p.text || String(p) };
+    });
+    return { role: msg.role, content };
+  });
+
+  const tools = connectors.map(c => {
+    const t: any = { type: 'mcp', server_label: c.name, server_url: c.url, require_approval: 'never' };
+    if (c.token) t.authorization = c.token;
+    if (c.allowedTools) t.allowed_tools = c.allowedTools;
+    return t;
+  });
+
+  const body: Record<string, unknown> = { model: modelId, input, tools };
+  if (systemInstruction) body.instructions = systemInstruction;
+
+  const response = await fetchWithTimeout('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`OpenAI Responses API error (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  const text = (data.output || [])
+    .filter((i: any) => i.type === 'message')
+    .flatMap((i: any) => (i.content || []).filter((c: any) => c.type === 'output_text').map((c: any) => c.text))
+    .join('');
+  return text || data.output_text || 'No content generated.';
+}
+
 async function callClaude(
   apiKey: string,
   modelId: string,
   systemInstruction: string | undefined,
   messages: ChatMessage[],
-  temperature: number
+  temperature: number,
+  connectors: ResolvedConnector[] | null = null,
 ): Promise<string> {
   const apiMessages = messages.map(msg => {
     if (typeof msg.content === 'string') {
@@ -493,9 +586,24 @@ async function callClaude(
   const body: any = { model: modelId, max_tokens: 8192, messages: apiMessages };  // SQEM-125 — no temperature
   if (systemInstruction) body.system = systemInstruction;
 
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' };
+  // SQEM-149 — remote MCP connectors: Claude calls the connectors' tools server-side.
+  if (connectors?.length) {
+    body.mcp_servers = connectors.map(c => ({ type: 'url', url: c.url, name: c.name, ...(c.token ? { authorization_token: c.token } : {}) }));
+    body.tools = connectors.map(c => {
+      const toolset: any = { type: 'mcp_toolset', mcp_server_name: c.name };
+      if (c.allowedTools) {
+        toolset.default_config = { enabled: false };
+        toolset.configs = Object.fromEntries(c.allowedTools.map(t => [t, { enabled: true }]));
+      }
+      return toolset;
+    });
+    headers['anthropic-beta'] = 'mcp-client-2025-11-20';
+  }
+
   const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    headers,
     body: JSON.stringify(body),
   });
 

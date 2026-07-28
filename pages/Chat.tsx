@@ -8,7 +8,7 @@ import { buildEnabledModels, isFundedModel } from '../lib/enabledModels';
 import { edgeError } from '../lib/edgeError';
 import {
   Send, Bot, User, Sparkles, AlertTriangle, Loader2,
-  Copy, Check, Pencil, Paperclip, X, FileText, ArrowLeft, MessageSquarePlus, Search,
+  Copy, Check, Pencil, Paperclip, Plug, X, FileText, ArrowLeft, MessageSquarePlus, Search,
   MoreHorizontal, Globe, Lock, Trash2, MessageSquare, Wand2, PenTool,
   Key, Upload, Files,
 } from 'lucide-react';
@@ -23,9 +23,11 @@ import {
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import { uploadWorkspaceFile, getWorkspaceFileSignedUrl } from '../lib/api/files';
+import { fetchConnectors, type Connector } from '../lib/api/connectors';
 import { WorkspaceFilePickerModal } from '../components/WorkspaceFilePickerModal';
 import type { ChatSession, Prompt, WorkspaceFile } from '../types';
 import { ModelSelect } from '../components/ModelSelect';
+import { ProviderIcon } from '../components/ProviderIcon';
 import TemplateLaunchModal, { type ContextImage } from '../components/TemplateLaunchModal';
 import ChatSearchModal from '../components/ChatSearchModal';
 
@@ -177,6 +179,10 @@ const Chat = () => {
   const [dragActive, setDragActive]           = useState(false);
   const [sessionId, setSessionId]             = useState<string | null>(null);
   const [attachMenuOpen, setAttachMenuOpen]   = useState(false);
+  // SQEM-149 — connectors enabled for this chat session (Claude models).
+  const [connectors, setConnectors]           = useState<Connector[]>([]);
+  const [enabledConnectorIds, setEnabledConnectorIds] = useState<string[]>([]);
+  const [connectorMenuOpen, setConnectorMenuOpen]     = useState(false);
   const [saveToWorkspace, setSaveToWorkspace] = useState(false);
   const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false);
 
@@ -213,6 +219,7 @@ const Chat = () => {
   const textareaRef         = useRef<HTMLTextAreaElement>(null);
   const fileInputRef        = useRef<HTMLInputElement>(null);
   const attachMenuRef       = useRef<HTMLDivElement>(null);
+  const connectorMenuRef    = useRef<HTMLDivElement>(null);
   const sessionLoadedRef    = useRef<string | null>(null);
   // SQEM-115 — ids of messages truncated by an edit, pruned from the DB on the next send.
   const supersededIdsRef    = useRef<string[]>([]);
@@ -442,6 +449,17 @@ const Chat = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, [attachMenuOpen]);
 
+  // SQEM-149 — load the workspace's connectors + close the connector menu on outside click.
+  useEffect(() => { fetchConnectors(workspace.id).then(setConnectors).catch(() => {}); }, [workspace.id]);
+  useEffect(() => {
+    if (!connectorMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (connectorMenuRef.current && !connectorMenuRef.current.contains(e.target as Node)) setConnectorMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [connectorMenuOpen]);
+
   const handleEditMessage = (msg: ChatMsg) => {
     const idx = messages.findIndex(m => m.id === msg.id);
     if (idx >= 0) {
@@ -642,7 +660,7 @@ Output only the refined prompt text, with no surrounding explanation or commenta
         method: 'POST',
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ ...chatPayloadBase, messages: messagesToSend, jobId }),
+        body: JSON.stringify({ ...chatPayloadBase, messages: messagesToSend, jobId, connectorIds: enabledConnectorIds }),
       });
 
       if (!res.ok) throw await edgeError(res);
@@ -1215,6 +1233,52 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                   >
                     <FileText className="w-4 h-4" />
                   </button>
+                  {/* SQEM-149 — connectors for this session. Only shown with a Claude or OpenAI key
+                      configured — v1 passthrough runs on Claude (Messages API) + OpenAI (Responses API). */}
+                  {connectors.length > 0 && enabledModels.some(m => m.provider === 'claude' || m.provider === 'openai') && (
+                    <div ref={connectorMenuRef} className="relative shrink-0">
+                      <button
+                        onClick={() => setConnectorMenuOpen(o => !o)}
+                        disabled={enabledModels.length === 0}
+                        title="Connectors"
+                        className={`relative p-3 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed ${enabledConnectorIds.length ? 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20'}`}
+                      >
+                        <Plug className="w-4 h-4" />
+                        {enabledConnectorIds.length > 0 && (
+                          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-violet-600 text-white text-2xs font-bold flex items-center justify-center">{enabledConnectorIds.length}</span>
+                        )}
+                      </button>
+                      {connectorMenuOpen && (
+                        <div className="absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-xl z-30 p-1.5 animate-scale-up">
+                          <p className="px-3 pt-1.5 pb-1 text-2xs font-bold text-slate-400 uppercase tracking-wider">Connectors</p>
+                          {connectors.map(c => {
+                            const on = enabledConnectorIds.includes(c.id);
+                            return (
+                              <label key={c.id} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={on}
+                                  onChange={() => setEnabledConnectorIds(prev => on ? prev.filter(id => id !== c.id) : [...prev, c.id])}
+                                  className="w-4 h-4 rounded accent-violet-600 cursor-pointer shrink-0"
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-sm text-slate-700 dark:text-slate-200 truncate">{c.name}</span>
+                                  <span className="block text-2xs text-slate-400 truncate">{c.mcp_url}</span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                          <div className="px-3 pt-2 pb-1 mt-1 border-t border-slate-100 dark:border-slate-700">
+                            <p className="text-2xs text-slate-400">Works with:</p>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <ProviderIcon provider="claude" className="w-4 h-4" />
+                              <ProviderIcon provider="openai" className="w-4 h-4" />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="flex-1 relative">
                     <textarea
                       ref={textareaRef}
