@@ -92,6 +92,11 @@ services:
       # The handlers advertise these (extension config + OAuth metadata).
       VITE_SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
       VITE_SUPABASE_ANON_KEY: ${ANON_KEY}
+      # SQEM-181 — marketplace submit proxy. The publisher token is a SERVER secret (never in the
+      # browser); leave empty to disable publishing from this instance. VITE_MARKETPLACE_API_URL sets
+      # the Cloud marketplace to submit to (default Cloud prod).
+      MARKETPLACE_PUBLISHER_TOKEN: ${MARKETPLACE_PUBLISHER_TOKEN:-}
+      VITE_MARKETPLACE_API_URL: ${VITE_MARKETPLACE_API_URL:-}
     ports:
       - ${SQEMES_API_PORT:-8787}:8787
 

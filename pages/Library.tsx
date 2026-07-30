@@ -4,8 +4,8 @@ import { useUI, useWorkspace, useData } from '../store';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { TEMPLATE_CATEGORIES, CATEGORY_COLORS } from '../constants';
 import { LibraryTemplate, TemplateCategory, PromptKind } from '../types';
-import { fetchPendingListings, moderateListing, fetchReports, resolveReport, voteListing, fetchMyVotes, type MarketplaceReport } from '../lib/api/library';
-import { Plus, Edit, Trash2, EyeOff, Layers, Loader2, PenTool, Bot, Wand2, Check, X, ShieldAlert, ArrowUpRight, Flag, Flame, Snowflake } from 'lucide-react';
+import { fetchPendingListings, moderateListing, fetchReports, resolveReport, voteListing, fetchMyVotes, fetchPublishers, createPublisher, setPublisherBanned, type MarketplaceReport, type MarketplacePublisher } from '../lib/api/library';
+import { Plus, Edit, Trash2, EyeOff, Layers, Loader2, PenTool, Bot, Wand2, Check, X, ShieldAlert, ArrowUpRight, Flag, Flame, Snowflake, Users, KeyRound, Copy } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -51,6 +51,11 @@ const Library = () => {
   const [moderatingId, setModeratingId] = useState<string | null>(null);
   const [reports, setReports] = useState<MarketplaceReport[]>([]);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  // SQEM-179 — invite-only publishers (self-host submitters)
+  const [publishers, setPublishers] = useState<MarketplacePublisher[]>([]);
+  const [newPublisherName, setNewPublisherName] = useState('');
+  const [creatingPublisher, setCreatingPublisher] = useState(false);
+  const [issuedToken, setIssuedToken] = useState<{ name: string; token: string } | null>(null);
   // SQEM-169 — votes on cards (myVote + optimistic score override per listing)
   const [myVotes, setMyVotes] = useState<Record<string, number>>({});
   const [scoreOverrides, setScoreOverrides] = useState<Record<string, number>>({});
@@ -64,7 +69,33 @@ const Library = () => {
     if (!showAdmin) return;
     fetchPendingListings().then(setPending).catch(() => {});
     fetchReports().then(setReports).catch(() => {});
+    fetchPublishers().then(setPublishers).catch(() => {});
   }, [showAdmin]);
+
+  const handleCreatePublisher = useCallback(async () => {
+    const name = newPublisherName.trim();
+    if (!name) return;
+    setCreatingPublisher(true);
+    try {
+      const { publisher, token } = await createPublisher(name);
+      setPublishers(prev => [publisher, ...prev]);
+      setIssuedToken({ name, token }); // shown once
+      setNewPublisherName('');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not create publisher', 'error');
+    } finally {
+      setCreatingPublisher(false);
+    }
+  }, [newPublisherName, showToast]);
+
+  const handleToggleBan = useCallback(async (p: MarketplacePublisher) => {
+    try {
+      await setPublisherBanned(p.id, !p.banned);
+      setPublishers(prev => prev.map(x => x.id === p.id ? { ...x, banned: !x.banned } : x));
+    } catch {
+      showToast('Could not update publisher', 'error');
+    }
+  }, [showToast]);
 
   const handleVote = useCallback(async (listingId: string, baseScore: number, value: 1 | -1) => {
     const prev = myVotes[listingId] ?? 0;
@@ -187,7 +218,12 @@ const Library = () => {
                       </span>
                     )}
                   </p>
-                  <p className="text-xs text-slate-400 truncate">{p.description || '—'} · {p.preview?.fileCount || 0} files · {p.preview?.skillCount || 0} skills</p>
+                  <p className="text-xs text-slate-400 truncate">
+                    {p.description || '—'} · {p.preview?.fileCount || 0} files · {p.preview?.skillCount || 0} skills
+                    {p.source === 'self-host' && (
+                      <> · <span className="font-semibold text-indigo-500 dark:text-indigo-400">self-host</span> by {p.publisherName || 'unknown publisher'}</>
+                    )}
+                  </p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <Link to={`/library/${p.id}`} className="px-2.5 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-600">Review</Link>
@@ -229,6 +265,53 @@ const Library = () => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* SQEM-179 — invite-only publishers (self-host submitters). Cloud-admin only. */}
+      {showAdmin && (
+        <div className="mb-8 rounded-2xl border border-indigo-200 dark:border-indigo-800/50 bg-indigo-50/60 dark:bg-indigo-900/10 p-4">
+          <h2 className="text-sm font-bold text-indigo-800 dark:text-indigo-300 flex items-center gap-2 mb-1">
+            <Users className="w-4 h-4" /> Publishers · {publishers.length}
+          </h2>
+          <p className="text-xs text-indigo-500/80 dark:text-indigo-400/70 mb-3">Invite-only identities that can submit templates to the marketplace from self-hosted instances. Each gets a token to place in their self-host <code className="font-mono">MARKETPLACE_PUBLISHER_TOKEN</code>.</p>
+          <div className="flex items-center gap-2 mb-3">
+            <input
+              value={newPublisherName}
+              onChange={e => setNewPublisherName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleCreatePublisher(); }}
+              placeholder="New publisher name (e.g. ACME Agency)"
+              className="flex-1 p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:border-indigo-400 text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
+            />
+            <button
+              onClick={handleCreatePublisher}
+              disabled={creatingPublisher || !newPublisherName.trim()}
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-40 shrink-0"
+            >
+              {creatingPublisher ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />} Create + issue token
+            </button>
+          </div>
+          {publishers.length > 0 && (
+            <div className="space-y-2">
+              {publishers.map(p => (
+                <div key={p.id} className="flex items-center justify-between gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate flex items-center gap-2">
+                      {p.displayName}
+                      {p.banned && <span className="text-2xs font-bold uppercase px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">banned</span>}
+                    </p>
+                    <p className="text-xs text-slate-400">since {new Date(p.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <button
+                    onClick={() => handleToggleBan(p)}
+                    className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-colors shrink-0 ${p.banned ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100' : 'text-red-600 bg-red-50 dark:bg-red-900/20 hover:bg-red-100'}`}
+                  >
+                    {p.banned ? 'Unban' : 'Ban'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -310,6 +393,25 @@ const Library = () => {
           <button onClick={() => setDeleteModalId(null)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
           <Button variant="danger" onClick={() => handleDelete(deleteModalId!)} className="flex-1 py-2.5 text-xs shadow-lg hover:shadow-red-200">Yes, Delete</Button>
         </div>
+      </Modal>
+
+      {/* SQEM-179 — publisher token, shown once */}
+      <Modal open={!!issuedToken} onClose={() => setIssuedToken(null)} size="sm" className="p-6">
+        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2"><KeyRound className="w-4 h-4 text-indigo-500" /> Publisher token</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+          Copy it now — it's shown <b>once</b> and stored only as a hash. Give it to <b>{issuedToken?.name}</b> to set as <code className="font-mono text-xs">MARKETPLACE_PUBLISHER_TOKEN</code> on their self-hosted instance.
+        </p>
+        <div className="flex items-center gap-2 mb-6">
+          <code className="flex-1 p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-800 dark:text-slate-200 break-all">{issuedToken?.token}</code>
+          <button
+            onClick={() => { if (issuedToken) { navigator.clipboard.writeText(issuedToken.token); showToast('Token copied', 'success'); } }}
+            className="p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors shrink-0"
+            title="Copy token"
+          >
+            <Copy className="w-4 h-4" />
+          </button>
+        </div>
+        <Button onClick={() => setIssuedToken(null)} className="w-full py-2.5 text-xs">Done</Button>
       </Modal>
 
     </div>

@@ -5,7 +5,7 @@ import { can } from '../lib/permissions';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { fetchRestrictedTemplateIds } from '../lib/api/templateAccess';
 import { exportTemplatesToZip, downloadBlob, readBundle, importBundle, type BundleManifest } from '../lib/templateBundle';
-import { publishToMarketplace } from '../lib/api/library';
+import { publishToMarketplace, submitToMarketplaceViaProxy, fetchCanPublish } from '../lib/api/library';
 import { TEMPLATE_CATEGORIES } from '../constants';
 import type JSZip from 'jszip';
 import { Link, useNavigate, useSearchParams } from 'react-router';
@@ -55,6 +55,7 @@ const PromptCard = memo(({
   onRun,
   onSetTag,
   onPublish,
+  showPublish,
 }: {
   prompt: Prompt;
   canEdit: boolean;
@@ -68,6 +69,7 @@ const PromptCard = memo(({
   onRun: (prompt: Prompt) => void;
   onSetTag: (prompt: Prompt, tag: string | null) => void;
   onPublish: (prompt: Prompt) => void;
+  showPublish: boolean;
 }) => (
   <TemplateCard
     selected={selected}
@@ -135,12 +137,12 @@ const PromptCard = memo(({
         >
           <Copy className="w-4 h-4" />
         </button>
-        {/* SQEM-178 — publishing to the global marketplace from self-host is Phase B (invite-only); hidden for now */}
-        {!IS_SELF_HOSTED && (
+        {/* SQEM-178/181 — self-host shows Publish only when a publisher token is configured (Phase B). */}
+        {showPublish && (
           <button
             onClick={(e) => { e.preventDefault(); onPublish(prompt); }}
             className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-            title="Publish to Marketplace"
+            title={IS_SELF_HOSTED ? 'Submit to the community Marketplace' : 'Publish to Marketplace'}
           >
             <Store className="w-4 h-4" />
           </button>
@@ -195,6 +197,9 @@ const Templates = () => {
   const [publishTarget, setPublishTarget] = useState<Prompt | null>(null);
   const [publishCategory, setPublishCategory] = useState<TemplateCategory>('General');
   const [publishing, setPublishing] = useState(false);
+  // SQEM-181 — Cloud always allows publishing; self-host only when a publisher token is configured
+  // (the api-sidecar reports it). Gates the per-card Publish action.
+  const [canPublish, setCanPublish] = useState(!IS_SELF_HOSTED);
 
   // SQEM-143 — which templates are restricted (have any access rule), for the card indicator.
   // Re-fetches on mount (returning from the editor remounts this page) and when the set of
@@ -204,6 +209,11 @@ const Templates = () => {
     if (!workspace?.id || IS_SELF_HOSTED) return; // SQEM-170 — template access is Cloud-only
     fetchRestrictedTemplateIds(workspace.id).then(setRestrictedIds).catch(() => {});
   }, [workspace?.id, prompts.length]);
+
+  // SQEM-181 — on self-host, publishing is possible only if a publisher token is configured (server-side).
+  useEffect(() => {
+    if (IS_SELF_HOSTED) fetchCanPublish().then(setCanPublish).catch(() => {});
+  }, []);
 
   // Shared workspace tag vocabulary (templates + files) — managed in one place.
   const allTags = useMemo(
@@ -329,7 +339,13 @@ const Templates = () => {
     if (!publishTarget || !workspace?.id) return;
     setPublishing(true);
     try {
-      await publishToMarketplace({ workspaceId: workspace.id, template: publishTarget, allFiles: workspaceFiles, userId: currentUser.id, category: publishCategory });
+      // SQEM-181 — self-host submits to the global Cloud marketplace through the api-sidecar proxy
+      // (which holds the publisher token); Cloud publishes directly against its own Supabase.
+      if (IS_SELF_HOSTED) {
+        await submitToMarketplaceViaProxy(publishTarget, workspaceFiles, publishCategory);
+      } else {
+        await publishToMarketplace({ workspaceId: workspace.id, template: publishTarget, allFiles: workspaceFiles, userId: currentUser.id, category: publishCategory });
+      }
       showToast('Submitted to the Marketplace — pending review', 'success');
       setPublishTarget(null);
     } catch (e) {
@@ -479,6 +495,7 @@ const Templates = () => {
               onRun={handleRun}
               onSetTag={handleSetTag}
               onPublish={openPublish}
+              showPublish={canPublish}
             />
           ))}
         </div>

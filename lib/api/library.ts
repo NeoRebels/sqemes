@@ -62,6 +62,8 @@ export function rowToLibraryTemplate(row: LibraryTemplateRow): LibraryTemplate {
     voteCount: (row as { vote_count?: number }).vote_count ?? 0,
     scanRisk: ((row as { scan_risk?: string | null }).scan_risk as LibraryTemplate['scanRisk']) ?? null,
     scanReasons: ((row as { scan_reasons?: string[] }).scan_reasons as string[]) ?? [],
+    source: (row as { source?: string }).source ?? 'cloud',
+    publisherName: (row as { marketplace_publishers?: { display_name?: string } }).marketplace_publishers?.display_name ?? null,
   };
 }
 
@@ -327,7 +329,7 @@ export async function reportListing(listingId: string, reason: string, details?:
 /** Sqemes-admin: pending submissions awaiting review. */
 export async function fetchPendingListings(): Promise<LibraryTemplate[]> {
   const { data, error } = await client.from('library_templates')
-    .select(`id, kind, title, description, category, tags, steps, variables, system_instruction, brand_config, usage_count, published, created_by, created_at, updated_at, ${UGC_COLS}`)
+    .select(`id, kind, title, description, category, tags, steps, variables, system_instruction, brand_config, usage_count, published, created_by, created_at, updated_at, ${UGC_COLS}, source, publisher_id, marketplace_publishers(display_name)`)
     .eq('status', 'pending').order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map((r: unknown) => rowToLibraryTemplate(r as LibraryTemplateRow));
@@ -394,4 +396,77 @@ export async function fetchReports(): Promise<MarketplaceReport[]> {
 export async function resolveReport(id: string, status: 'reviewed' | 'dismissed'): Promise<void> {
   const { error } = await client.from('library_template_reports').update({ status }).eq('id', id);
   if (error) throw error;
+}
+
+// ---- SQEM-179 — marketplace publishers (invite-only, admin-managed) ---------------------------------
+
+export type MarketplacePublisher = { id: string; displayName: string; banned: boolean; createdAt: string };
+
+function rowToPublisher(r: { id: string; display_name: string; banned: boolean; created_at: string }): MarketplacePublisher {
+  return { id: r.id, displayName: r.display_name, banned: r.banned, createdAt: r.created_at };
+}
+
+/** Sqemes-admin: create a publisher (invite-only). Returns the raw token ONCE — it is SHA-256 hashed at
+ *  rest and can't be retrieved again. The publisher puts it in their self-host SERVER config. */
+export async function createPublisher(displayName: string): Promise<{ publisher: MarketplacePublisher; token: string }> {
+  const token = 'smp_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+  const tokenHash = await sha256Hex(token);
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await client.from('marketplace_publishers')
+    .insert({ display_name: displayName.trim(), token_hash: tokenHash, granted_by: user?.id ?? null })
+    .select('id, display_name, banned, created_at').single();
+  if (error) throw error;
+  return { publisher: rowToPublisher(data), token };
+}
+
+/** Sqemes-admin: list publishers, newest first. */
+export async function fetchPublishers(): Promise<MarketplacePublisher[]> {
+  const { data, error } = await client.from('marketplace_publishers')
+    .select('id, display_name, banned, created_at').order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(rowToPublisher);
+}
+
+/** Sqemes-admin: ban / unban a publisher (banned publishers can't submit). */
+export async function setPublisherBanned(id: string, banned: boolean): Promise<void> {
+  const { error } = await client.from('marketplace_publishers').update({ banned }).eq('id', id);
+  if (error) throw error;
+}
+
+// ---- SQEM-181 — self-host publish (submit to the global marketplace via the api-sidecar proxy) --------
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Self-host: whether this instance has a publisher token configured (so submitting is possible). The
+ *  token lives server-side in the api-sidecar; this only reveals a boolean, never the token. */
+export async function fetchCanPublish(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/marketplace-submit', { method: 'GET' });
+    const json = await res.json().catch(() => ({}));
+    return !!(json as { canPublish?: boolean }).canPublish;
+  } catch {
+    return false;
+  }
+}
+
+/** Self-host: submit a template to the global marketplace review queue via the api-sidecar proxy
+ *  (which adds the publisher token). Builds the bundle locally and posts it as base64. */
+export async function submitToMarketplaceViaProxy(template: Prompt, allFiles: WorkspaceFile[], category: TemplateCategory): Promise<void> {
+  const { blob } = await buildBundle([template], allFiles);
+  const bundle = await blobToBase64(blob);
+  const res = await fetch('/api/marketplace-submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bundle, category }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((json as { error?: string }).error || `Submit failed (${res.status})`);
 }

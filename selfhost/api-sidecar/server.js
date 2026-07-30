@@ -9,12 +9,14 @@ import http from 'node:http';
 import extensionConfig from './api/extension-config.js';
 import oauthAuthorize from './api/oauth-authorize.js';
 import mcpOauthMetadata from './api/mcp-oauth-metadata.js';
+import marketplaceSubmit from './api/marketplace-submit.js';
 
 // Path → handler. Mirrors the vercel.json rewrites.
 const routes = {
   '/.well-known/sqemes-extension-config': extensionConfig,
   '/oauth/authorize': oauthAuthorize,
   '/.well-known/oauth-authorization-server': mcpOauthMetadata,
+  '/api/marketplace-submit': marketplaceSubmit, // SQEM-181 — self-host → Cloud marketplace submit proxy
 };
 
 const PORT = Number(process.env.PORT) || 8787;
@@ -35,12 +37,13 @@ const server = http.createServer((req, res) => {
     res.status(404).json({ error: 'not_found', path });
     return;
   }
-  try {
-    handler(req, res);
-  } catch (err) {
-    console.error(`[api-sidecar] ${path} failed:`, err);
-    if (!res.headersSent) res.status(500).json({ error: 'internal_error' });
-  }
+  // Handlers may be async (e.g. marketplace-submit reads the body + calls the Cloud) — await safely.
+  Promise.resolve()
+    .then(() => handler(req, res))
+    .catch((err) => {
+      console.error(`[api-sidecar] ${path} failed:`, err);
+      if (!res.headersSent) res.status(500).json({ error: 'internal_error' });
+    });
 });
 
 server.listen(PORT, () => {

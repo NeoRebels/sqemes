@@ -168,6 +168,8 @@ export interface LibraryTemplate {
   status?: 'pending' | 'published' | 'rejected';
   bundlePath?: string | null;    // the .sqemes.zip snapshot in the library-files bucket (Cloud only)
   hasBundle?: boolean;           // whether a bundle exists — set from bundle_path (Cloud) or has_bundle (self-host public feed, SQEM-178)
+  source?: string;               // 'cloud' | 'self-host' — where a submission came from (SQEM-179/180)
+  publisherName?: string | null; // attributed publisher display name for self-host submissions (SQEM-180)
   preview?: { fileNames?: string[]; fileCount?: number; skillCount?: number };
   // SQEM-169 — votes + scan verdict
   score?: number;                // net votes (up - down)

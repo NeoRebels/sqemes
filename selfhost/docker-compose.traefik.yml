@@ -38,7 +38,7 @@ services:
   api-sidecar:
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.sqemes-api.rule=Host(`${PROXY_DOMAIN}`) && (Path(`/.well-known/sqemes-extension-config`) || Path(`/.well-known/oauth-authorization-server`) || PathPrefix(`/oauth/authorize`))"
+      - "traefik.http.routers.sqemes-api.rule=Host(`${PROXY_DOMAIN}`) && (Path(`/.well-known/sqemes-extension-config`) || Path(`/.well-known/oauth-authorization-server`) || PathPrefix(`/oauth/authorize`) || PathPrefix(`/api`))"
       - "traefik.http.routers.sqemes-api.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
       - "traefik.http.routers.sqemes-api.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
       - "traefik.http.routers.sqemes-api.priority=20"

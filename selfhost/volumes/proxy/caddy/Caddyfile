@@ -19,8 +19,8 @@
 		reverse_proxy kong:8000
 	}
 
-	# Sqemes /api handlers → api-sidecar (extension config discovery + MCP OAuth metadata/consent)
-	@sqemes_api path /.well-known/sqemes-extension-config /.well-known/oauth-authorization-server /oauth/authorize
+	# Sqemes /api handlers → api-sidecar (extension config, MCP OAuth, marketplace submit proxy — SQEM-181)
+	@sqemes_api path /.well-known/sqemes-extension-config /.well-known/oauth-authorization-server /oauth/authorize /api/*
 	handle @sqemes_api {
 		reverse_proxy api-sidecar:8787
 	}

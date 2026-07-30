@@ -422,6 +422,11 @@ verify_jwt = false
 [functions.marketplace-public]
 verify_jwt = false
 
+# SQEM-180 — public marketplace submit endpoint (token-gated by a publisher token, not a Supabase JWT).
+# Self-host instances submit templates to the Cloud review queue; the function resolves the token itself.
+[functions.marketplace-submit]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
