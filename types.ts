@@ -162,6 +162,17 @@ export interface LibraryTemplate {
   published: boolean;
   createdAt: string;
   updatedAt: string;
+  content?: string;              // SQEM-163 — display body for UGC listings
+  // SQEM-163 — user-contributed marketplace fields (null/undefined for curated rows)
+  workspaceId?: string | null;   // source workspace (provenance)
+  status?: 'pending' | 'published' | 'rejected';
+  bundlePath?: string | null;    // the .sqemes.zip snapshot in the library-files bucket
+  preview?: { fileNames?: string[]; fileCount?: number; skillCount?: number };
+  // SQEM-169 — votes + scan verdict
+  score?: number;                // net votes (up - down)
+  voteCount?: number;
+  scanRisk?: 'low' | 'medium' | 'high' | null;
+  scanReasons?: string[];
 }
 
 export interface ChatSession {

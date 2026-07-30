@@ -14,7 +14,20 @@ export const CONNECTOR_APPS: Record<string, ConnectorApp> = {
   'google-drive':      { provider: 'google', name: 'Google Drive',    scopes: [G + 'drive.readonly'], mcpUrl: 'https://drivemcp.googleapis.com/mcp/v1' },
   'google-docs':       { provider: 'google', name: 'Google Docs',     scopes: [G + 'documents.readonly', G + 'drive.file'], mcpUrl: 'https://docsmcp.googleapis.com/mcp/v1' },
   'google-sheets':     { provider: 'google', name: 'Google Sheets',   scopes: [G + 'spreadsheets.readonly', G + 'drive.file'], mcpUrl: 'https://sheetsmcp.googleapis.com/mcp/v1' },
-  'microsoft-outlook': { provider: 'microsoft', name: 'Outlook',      scopes: ['Mail.Read', 'Mail.ReadWrite', 'offline_access', 'openid', 'profile', 'email'], mcpUrl: `${PUBLIC_API_URL}/functions/v1/mcp-outlook` },
+  'microsoft-outlook':  { provider: 'microsoft', name: 'Outlook',         scopes: ['Mail.Read', 'Mail.ReadWrite', 'offline_access', 'openid', 'profile', 'email'], mcpUrl: `${PUBLIC_API_URL}/functions/v1/mcp-outlook` },
+  'microsoft-calendar': { provider: 'microsoft', name: 'Outlook Calendar', scopes: ['Calendars.Read', 'offline_access', 'openid', 'profile', 'email'], mcpUrl: `${PUBLIC_API_URL}/functions/v1/mcp-msgraph?service=calendar` },
+  'microsoft-onedrive': { provider: 'microsoft', name: 'OneDrive',         scopes: ['Files.Read', 'offline_access', 'openid', 'profile', 'email'], mcpUrl: `${PUBLIC_API_URL}/functions/v1/mcp-msgraph?service=files` },
+};
+
+// SQEM-157/159 — token-paste apps (no OAuth). The user pastes a static token (Shopify custom-app token,
+// GitHub PAT, Notion internal-integration token); `manage-connectors` `create-token` encrypts it and
+// points the connector at `mcpUrl`. `needsShop` apps (Shopify) append `?shop=` to the URL. GitHub points
+// at its vendor-hosted MCP (accepts a PAT bearer — no shim); Notion at our mcp-notion REST shim.
+export type TokenApp = { provider: string; name: string; mcpUrl: string; needsShop?: boolean };
+export const TOKEN_APPS: Record<string, TokenApp> = {
+  shopify: { provider: 'shopify', name: 'Shopify', mcpUrl: `${PUBLIC_API_URL}/functions/v1/mcp-shopify`, needsShop: true },
+  github:  { provider: 'github',  name: 'GitHub',  mcpUrl: 'https://api.githubcopilot.com/mcp/' },
+  notion:  { provider: 'notion',  name: 'Notion',  mcpUrl: `${PUBLIC_API_URL}/functions/v1/mcp-notion` },
 };
 
 export type ProviderCfg = {

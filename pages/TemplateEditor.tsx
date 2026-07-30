@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
 import { useUI, useWorkspace, usePrompts, useData } from '../store';
 import { can } from '../lib/permissions';
+import { IS_SELF_HOSTED } from '../lib/env';
 import { Prompt, Variable, VariableType, PromptKind, WorkspaceFile, TemplateCategory, LibraryTemplate, Step } from '../types';
 import { fetchPromptDetail } from '../lib/api/prompts';
 import { fetchLibraryTemplateDetail } from '../lib/api/library';
@@ -17,7 +18,6 @@ import { UploadFileModal } from '../components/UploadFileModal';
 import { BrandVoiceForm } from '../components/BrandVoiceForm';
 import { TemplateAccessControl, rolesToAccessValue, accessToValue, accessValueToAccess, type TemplateAccessValue } from '../components/TemplateAccessControl';
 import { fetchTemplateAccess, setTemplateAccess } from '../lib/api/templateAccess';
-import { SkillPicker } from '../components/SkillPicker';
 import { compileAssistantInstruction, defaultBrandConfig } from '../lib/compileBrandVoice';
 import EditorTestPanel from '../components/EditorTestPanel';
 
@@ -39,10 +39,10 @@ const TemplateEditor = () => {
   // marketplace templates (/library/*). Target is derived from the route.
   const isLibrary = location.pathname.startsWith('/library');
   const listPath = isLibrary ? '/library' : '/templates';
-  const { prompts, addPrompt, updatePrompt, deletePrompt, duplicatePrompt } = usePrompts();
+  const { addPrompt, updatePrompt, deletePrompt, duplicatePrompt } = usePrompts();
   const { workspace, currentUser, updateWorkspace, isSqemesAdmin } = useWorkspace();
   const { showToast } = useUI();
-  const { workspaceFiles, skills: daSkills, addWorkspaceFile, addLibraryTemplate, updateLibraryTemplate, deleteLibraryTemplate } = useData();
+  const { workspaceFiles, addWorkspaceFile, addLibraryTemplate, updateLibraryTemplate, deleteLibraryTemplate } = useData();
   const [libraryCategory, setLibraryCategory] = useState<TemplateCategory>('Marketing & Sales');
   const [uploadOpen, setUploadOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -88,14 +88,6 @@ const TemplateEditor = () => {
   const [access, setAccess] = useState<TemplateAccessValue>(() => rolesToAccessValue(workspace?.defaultTemplateAccess ?? []));
 
   const canEdit = isLibrary ? isSqemesAdmin : can(currentUser, workspace, 'prompts:edit');
-
-  // SQEM-146 — the workspace's skills for the editor's skill picker. Skills may live in the unified
-  // prompts store or the legacy da.skills fetcher (matching TemplateLaunchModal); merge + dedupe.
-  const availableSkills = useMemo(() => {
-    const byId = new Map<string, Prompt>();
-    [...prompts, ...daSkills].forEach(p => { if (p.kind === 'skill') byId.set(p.id, p); });
-    return [...byId.values()];
-  }, [prompts, daSkills]);
 
   // Marketplace editor is Sqemes-admin only.
   useEffect(() => {
@@ -675,8 +667,8 @@ Output only the refined prompt text, with no surrounding explanation or commenta
               </div>
             )}
 
-            {/* Access (SQEM-142) — workspace templates only */}
-            {!isLibrary && canEdit && (
+            {/* Access (SQEM-142) — workspace templates only; Cloud-only feature (SQEM-170) */}
+            {!isLibrary && canEdit && !IS_SELF_HOSTED && (
               <TemplateAccessControl value={access} onChange={v => { setAccess(v); setIsDirty(true); }} members={workspace?.members} />
             )}
 
@@ -697,21 +689,9 @@ Output only the refined prompt text, with no surrounding explanation or commenta
               </div>
             )}
 
-            {/* Skills — workspace prompts & assistants (skills don't embed skills). SQEM-146 */}
-            {!isLibrary && formData.kind !== 'skill' && (
-              <div>
-                <div className="flex items-center gap-1.5 mb-3">
-                  <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Skills</label>
-                  <FieldTooltip text="Reusable knowledge blocks composed into this template automatically when it runs." />
-                </div>
-                <SkillPicker
-                  selectedIds={formData.skillIds ?? []}
-                  onChange={ids => { setFormData(prev => ({ ...prev, skillIds: ids })); setIsDirty(true); }}
-                  skills={availableSkills}
-                  disabled={!canEdit}
-                />
-              </div>
-            )}
+            {/* SQEM-167 — skills are applied directly (extension / Chat / MCP), not embedded into
+                prompts/assistants, so the editor no longer has a skill picker. skillIds stays legacy-read
+                for any existing templates (resolvers untouched). */}
 
             {/* Variables — prompt kind only */}
             {formData.kind === 'prompt' && <div>

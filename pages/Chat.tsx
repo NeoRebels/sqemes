@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useUI, useWorkspace, useData, useChatSessions } from '../store';
 import { checkContentViolation } from '../lib/contentGuard';
+import { IS_SELF_HOSTED } from '../lib/env';
 import { supabase } from '../lib/supabase';
 import { waitForJobResult } from '../lib/realtimeJob';
 import { AVAILABLE_MODELS } from '../constants';
@@ -579,8 +580,11 @@ Output only the refined prompt text, with no surrounding explanation or commenta
     const trimmed = input.trim();
     if (!trimmed || isLoading || !selectedModel) return;
 
-    const violation = checkContentViolation(trimmed, workspace);
-    if (violation) { showToast(violation, 'error'); return; }
+    // SQEM-170 — Content Governance is a Cloud-only feature
+    if (!IS_SELF_HOSTED) {
+      const violation = checkContentViolation(trimmed, workspace);
+      if (violation) { showToast(violation, 'error'); return; }
+    }
 
     abortControllerRef.current?.abort();
     const controller = new AbortController();

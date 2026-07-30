@@ -1,13 +1,10 @@
-import React, { useState, useMemo, useCallback, memo } from 'react';
-import { useNavigate } from 'react-router';
-import { useUI, useWorkspace, useData, usePrompts } from '../store';
+import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import { Link, useNavigate } from 'react-router';
+import { useUI, useWorkspace, useData } from '../store';
 import { TEMPLATE_CATEGORIES, CATEGORY_COLORS } from '../constants';
-import { can } from '../lib/permissions';
-import { LibraryTemplate, TemplateCategory, PromptKind, Prompt, Step } from '../types';
-import { fetchLibraryTemplateDetail } from '../lib/api/library';
-import { adaptToBrand } from '../lib/adaptTemplate';
-import { firstTextModelId } from '../lib/authoringAI';
-import { Plus, FilePlus, Edit, Trash2, EyeOff, Layers, Loader2, Zap, PenTool, Bot, Wand2, Sparkles } from 'lucide-react';
+import { LibraryTemplate, TemplateCategory, PromptKind } from '../types';
+import { fetchPendingListings, moderateListing, fetchReports, resolveReport, voteListing, fetchMyVotes, type MarketplaceReport } from '../lib/api/library';
+import { Plus, Edit, Trash2, EyeOff, Layers, Loader2, PenTool, Bot, Wand2, Check, X, ShieldAlert, ArrowUpRight, Flag, Flame, Snowflake } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -37,29 +34,73 @@ const LibrarySkeleton = () => (
 );
 
 const Library = () => {
-  const { libraryTemplates, copyTemplateToWorkspace, deleteLibraryTemplate } = useData();
-  const { addPrompt } = usePrompts();
-  const { currentUser, isSqemesAdmin, workspace } = useWorkspace();
+  const { libraryTemplates, deleteLibraryTemplate } = useData();
+  const { isSqemesAdmin } = useWorkspace();
   const { showToast, isLoading } = useUI();
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<TemplateCategory | 'All'>('All');
   const [activeKind, setActiveKind] = useState<'all' | PromptKind>('all');
   const [search, setSearch] = useState('');
-  const [copyingId, setCopyingId] = useState<string | null>(null);
-  const [adaptingId, setAdaptingId] = useState<string | null>(null);
   const [deleteModalId, setDeleteModalId] = useState<string | null>(null);
+  // SQEM-163 — admin review queue (copy + adapt live on the detail page now, SQEM-165)
+  const [pending, setPending] = useState<LibraryTemplate[]>([]);
+  const [moderatingId, setModeratingId] = useState<string | null>(null);
+  const [reports, setReports] = useState<MarketplaceReport[]>([]);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  // SQEM-169 — votes on cards (myVote + optimistic score override per listing)
+  const [myVotes, setMyVotes] = useState<Record<string, number>>({});
+  const [scoreOverrides, setScoreOverrides] = useState<Record<string, number>>({});
 
-  // SQEM-106 Phase 3 — "Adapt to my brand" needs an AI model + a saved brand profile.
-  const modelId = firstTextModelId(workspace.apiKeys);
-  const canUseAI = !!modelId || !!workspace.fundedAvailable;
-  const brandProfile = workspace.brandProfile;
-  const hasBrand = !!brandProfile?.brandName?.trim();
-  const canAdapt = canUseAI && hasBrand;
-  const adaptReason = !hasBrand
-    ? 'Add your brand profile in Settings → Brand to adapt'
-    : !canUseAI
-      ? 'Connect an AI provider key to adapt'
-      : '';
+  useEffect(() => {
+    fetchMyVotes().then(setMyVotes).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!isSqemesAdmin) return;
+    fetchPendingListings().then(setPending).catch(() => {});
+    fetchReports().then(setReports).catch(() => {});
+  }, [isSqemesAdmin]);
+
+  const handleVote = useCallback(async (listingId: string, baseScore: number, value: 1 | -1) => {
+    const prev = myVotes[listingId] ?? 0;
+    const next = prev === value ? 0 : value; // toggle off
+    const current = scoreOverrides[listingId] ?? baseScore;
+    setMyVotes(m => ({ ...m, [listingId]: next }));
+    setScoreOverrides(s => ({ ...s, [listingId]: current - prev + next }));
+    try { await voteListing(listingId, value); }
+    catch (e) {
+      setMyVotes(m => ({ ...m, [listingId]: prev }));
+      setScoreOverrides(s => ({ ...s, [listingId]: current }));
+      showToast(e instanceof Error ? e.message : 'Vote failed', 'error');
+    }
+  }, [myVotes, scoreOverrides, showToast]);
+
+  const handleReport = useCallback(async (report: MarketplaceReport, action: 'unpublish' | 'dismiss') => {
+    setResolvingId(report.id);
+    try {
+      if (action === 'unpublish') await moderateListing(report.libraryTemplateId, 'unpublish');
+      await resolveReport(report.id, action === 'unpublish' ? 'reviewed' : 'dismissed');
+      setReports(prev => prev.filter(r => r.id !== report.id));
+      showToast(action === 'unpublish' ? 'Unpublished + report resolved' : 'Report dismissed', 'success');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Action failed', 'error');
+    } finally {
+      setResolvingId(null);
+    }
+  }, [showToast]);
+
+  const handleModerate = useCallback(async (id: string, action: 'approve' | 'reject') => {
+    setModeratingId(id);
+    try {
+      await moderateListing(id, action);
+      setPending(prev => prev.filter(p => p.id !== id));
+      showToast(action === 'approve' ? 'Approved — now live' : 'Rejected', 'success');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Action failed', 'error');
+    } finally {
+      setModeratingId(null);
+    }
+  }, [showToast]);
 
   const categoryOrder = useMemo(() => ['All', ...TEMPLATE_CATEGORIES], []);
 
@@ -88,59 +129,6 @@ const Library = () => {
       });
   }, [libraryTemplates, activeKind, activeCategory, search, categoryIndexMap]);
 
-  const handleCopy = useCallback(async (templateId: string) => {
-    setCopyingId(templateId);
-    try {
-      const promptId = await copyTemplateToWorkspace(templateId);
-      if (promptId) {
-        navigate(`/prompts/${promptId}/edit`);
-      }
-    } finally {
-      setCopyingId(null);
-    }
-  }, [copyTemplateToWorkspace, navigate]);
-
-  const handleAdapt = useCallback(async (templateId: string) => {
-    if (!canAdapt || !brandProfile) return;
-    setAdaptingId(templateId);
-    try {
-      const tpl = await fetchLibraryTemplateDetail(templateId);
-      const isAssistant = tpl.kind === 'assistant';
-      const body = isAssistant
-        ? (tpl.systemInstruction ?? '')
-        : (((tpl.steps as Step[] | undefined)?.[0]?.content) ?? '');
-      const adapted = await adaptToBrand(body, tpl.kind, brandProfile, { workspaceId: workspace.id, modelId });
-      const now = new Date().toISOString();
-      const created = await addPrompt({
-        id: crypto.randomUUID(),
-        workspaceId: workspace.id,
-        kind: tpl.kind,
-        title: tpl.title,
-        description: tpl.description,
-        tag: tpl.tags?.[0] ?? null,
-        variables: tpl.variables,
-        content: isAssistant ? '' : adapted,
-        systemInstruction: isAssistant ? adapted : tpl.systemInstruction,
-        contextFileIds: [],
-        skillIds: [],
-        createdAt: now,
-        updatedAt: now,
-        createdBy: currentUser.id,
-        usageCount: 0,
-        published: true,
-        sourceTemplateId: templateId,
-      } as Prompt);
-      if (created) {
-        showToast('Adapted to your brand ✨', 'success');
-        navigate(`/prompts/${created.id}/edit`);
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Adaptation failed', 'error');
-    } finally {
-      setAdaptingId(null);
-    }
-  }, [canAdapt, brandProfile, workspace.id, modelId, addPrompt, currentUser.id, showToast, navigate]);
-
   const handleDelete = useCallback(async (id: string) => {
     await deleteLibraryTemplate(id);
     setDeleteModalId(null);
@@ -153,16 +141,6 @@ const Library = () => {
   const handleDeleteRequest = useCallback((id: string) => {
     setDeleteModalId(id);
   }, []);
-
-  const canSave = isSqemesAdmin || can(currentUser, workspace, 'library:copy');
-
-  const handleUpgrade = useCallback(() => {
-    navigate('/settings', { state: { initialTab: 'plans' } });
-  }, [navigate]);
-
-  const handleSetupBrand = useCallback(() => {
-    navigate('/settings', { state: { initialTab: 'brand' } });
-  }, [navigate]);
 
   const categories = ['All', ...TEMPLATE_CATEGORIES] as const;
 
@@ -183,6 +161,71 @@ const Library = () => {
           </button>
         )}
       </div>
+
+      {/* SQEM-163 — admin review queue for user-submitted listings */}
+      {isSqemesAdmin && pending.length > 0 && (
+        <div className="mb-8 rounded-2xl border border-amber-200 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-900/10 p-4">
+          <h2 className="text-sm font-bold text-amber-800 dark:text-amber-300 flex items-center gap-2 mb-3">
+            <ShieldAlert className="w-4 h-4" /> Pending review · {pending.length}
+          </h2>
+          <div className="space-y-2">
+            {pending.map(p => (
+              <div key={p.id} className="flex items-center justify-between gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate flex items-center gap-2">
+                    <KindBadge kind={p.kind} /> {p.title}
+                    {p.kind === 'skill' && <span className="text-2xs font-bold uppercase text-amber-600">extra review</span>}
+                    {p.scanRisk && p.scanRisk !== 'low' && (
+                      <span className={`text-2xs font-bold uppercase px-1.5 py-0.5 rounded ${p.scanRisk === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'}`}
+                        title={(p.scanReasons || []).join('\n')}>
+                        ⚠ {p.scanRisk} risk
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-slate-400 truncate">{p.description || '—'} · {p.preview?.fileCount || 0} files · {p.preview?.skillCount || 0} skills</p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Link to={`/library/${p.id}`} className="px-2.5 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-600">Review</Link>
+                  <button onClick={() => handleModerate(p.id, 'approve')} disabled={moderatingId === p.id} className="p-2 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg disabled:opacity-50" title="Approve">
+                    {moderatingId === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  </button>
+                  <button onClick={() => handleModerate(p.id, 'reject')} disabled={moderatingId === p.id} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg disabled:opacity-50" title="Reject">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* SQEM-169 — admin reports queue */}
+      {isSqemesAdmin && reports.length > 0 && (
+        <div className="mb-8 rounded-2xl border border-red-200 dark:border-red-800/50 bg-red-50/60 dark:bg-red-900/10 p-4">
+          <h2 className="text-sm font-bold text-red-800 dark:text-red-300 flex items-center gap-2 mb-3">
+            <Flag className="w-4 h-4" /> Reports · {reports.length}
+          </h2>
+          <div className="space-y-2">
+            {reports.map(r => (
+              <div key={r.id} className="flex items-center justify-between gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{r.listingTitle}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate"><span className="font-semibold">{r.reason}</span>{r.details ? ` — ${r.details}` : ''}</p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Link to={`/library/${r.libraryTemplateId}`} className="px-2.5 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-600">View</Link>
+                  <button onClick={() => handleReport(r, 'unpublish')} disabled={resolvingId === r.id} className="px-2.5 py-1.5 text-xs font-bold text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 disabled:opacity-50">
+                    {resolvingId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Unpublish'}
+                  </button>
+                  <button onClick={() => handleReport(r, 'dismiss')} disabled={resolvingId === r.id} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg disabled:opacity-50" title="Dismiss report">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search + Kind filter — mirrors the Templates / Files bar */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -243,18 +286,11 @@ const Library = () => {
               key={template.id}
               template={template}
               isAdmin={isSqemesAdmin}
-              canSave={canSave}
-              isCopying={copyingId === template.id}
-              isAdapting={adaptingId === template.id}
-              canAdapt={canAdapt}
-              hasBrand={hasBrand}
-              adaptReason={adaptReason}
-              onCopy={handleCopy}
-              onAdapt={handleAdapt}
-              onSetupBrand={handleSetupBrand}
+              score={scoreOverrides[template.id] ?? template.score ?? 0}
+              myVote={myVotes[template.id] ?? 0}
+              onVote={handleVote}
               onEdit={handleEdit}
               onDelete={handleDeleteRequest}
-              onUpgrade={handleUpgrade}
             />
           ))}
         </div>
@@ -269,6 +305,7 @@ const Library = () => {
           <Button variant="danger" onClick={() => handleDelete(deleteModalId!)} className="flex-1 py-2.5 text-xs shadow-lg hover:shadow-red-200">Yes, Delete</Button>
         </div>
       </Modal>
+
     </div>
   );
 };
@@ -276,45 +313,31 @@ const Library = () => {
 const MarketplaceCard = memo(({
   template,
   isAdmin,
-  canSave,
-  isCopying,
-  isAdapting,
-  canAdapt,
-  hasBrand,
-  adaptReason,
-  onCopy,
-  onAdapt,
-  onSetupBrand,
+  score,
+  myVote,
+  onVote,
   onEdit,
   onDelete,
-  onUpgrade,
 }: {
   template: LibraryTemplate;
   isAdmin: boolean;
-  canSave: boolean;
-  isCopying: boolean;
-  isAdapting: boolean;
-  canAdapt: boolean;
-  hasBrand: boolean;
-  adaptReason: string;
-  onCopy: (id: string) => void;
-  onAdapt: (id: string) => void;
-  onSetupBrand: () => void;
+  score: number;
+  myVote: number;
+  onVote: (id: string, baseScore: number, value: 1 | -1) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
-  onUpgrade: () => void;
 }) => {
   const colors = CATEGORY_COLORS[template.category] || CATEGORY_COLORS.General;
-  const busy = isCopying || isAdapting;
 
   return (
     <TemplateCard
       topRight={isAdmin && (
-        <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onEdit(template.id)} className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors bg-white/80 dark:bg-slate-800/80" title="Edit">
+        // SQEM-168 — bigger padding + gap so the hover admin buttons clear the stretched card link.
+        <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={() => onEdit(template.id)} className="p-2.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors bg-white/80 dark:bg-slate-800/80" title="Edit">
             <Edit className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => onDelete(template.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors bg-white/80 dark:bg-slate-800/80" title="Delete">
+          <button onClick={() => onDelete(template.id)} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors bg-white/80 dark:bg-slate-800/80" title="Delete">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -333,46 +356,28 @@ const MarketplaceCard = memo(({
         </>
       )}
       title={template.title}
+      titleHref={`/library/${template.id}`}
       description={template.description}
-      footerRight={canSave ? (
-        <div className="flex items-center gap-1.5 flex-1">
-          {!hasBrand ? (
-            <button
-              onClick={onSetupBrand}
-              disabled={busy}
-              title="Set up your brand profile to adapt templates to your brand"
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-violet-600 text-white text-xs font-bold rounded-lg hover:bg-violet-700 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Sparkles className="w-3.5 h-3.5" /> Set up brand
-            </button>
-          ) : (
-            <button
-              onClick={() => onAdapt(template.id)}
-              disabled={busy || !canAdapt}
-              title={canAdapt ? 'Adapt this template to your brand' : adaptReason}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-violet-600 text-white text-xs font-bold rounded-lg hover:bg-violet-700 transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {isAdapting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {isAdapting ? 'Adapting…' : 'Adapt to brand'}
-            </button>
-          )}
-          <button
-            onClick={() => onCopy(template.id)}
-            disabled={busy}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-brand-600 text-white text-xs font-bold rounded-lg hover:bg-brand-700 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isCopying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FilePlus className="w-3.5 h-3.5" />}
-            Add to templates
+      footerLeft={(
+        // SQEM-169 — temperature votes on the card: 🔥 hot (red) vs ❄️ cold (ice-blue); score in degrees.
+        // h-8 (32px) = the exact height of the py-2 text-xs "See template details" button beside it.
+        <div className="flex items-stretch h-8 rounded-lg border border-slate-200 dark:border-slate-700">
+          <button onClick={() => onVote(template.id, score, 1)} title="Hot" className={`flex items-center px-2 rounded-l-lg transition-colors ${myVote === 1 ? 'text-red-500 bg-red-50 dark:bg-red-900/20' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+            <Flame className="w-3.5 h-3.5" />
+          </button>
+          <span className={`flex items-center px-1.5 text-xs font-bold tabular-nums ${score > 0 ? 'text-red-500' : score < 0 ? 'text-sky-500' : 'text-slate-400'}`}>{score > 0 ? `+${score}` : score}°</span>
+          <button onClick={() => onVote(template.id, score, -1)} title="Cold" className={`flex items-center px-2 rounded-r-lg transition-colors ${myVote === -1 ? 'text-sky-500 bg-sky-50 dark:bg-sky-900/20' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+            <Snowflake className="w-3.5 h-3.5" />
           </button>
         </div>
-      ) : (
-        <button
-          onClick={onUpgrade}
-          className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-700 transition-all shadow-sm"
+      )}
+      footerRight={(
+        <Link
+          to={`/library/${template.id}`}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-brand-600 text-white text-xs font-bold rounded-lg hover:bg-brand-700 transition-all shadow-sm"
         >
-          <Zap className="w-3.5 h-3.5 fill-white" />
-          Upgrade to Save
-        </button>
+          <ArrowUpRight className="w-3.5 h-3.5" /> See template details
+        </Link>
       )}
     />
   );

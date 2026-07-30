@@ -405,6 +405,18 @@ verify_jwt = false
 [functions.mcp-outlook]
 verify_jwt = false
 
+[functions.mcp-shopify]
+verify_jwt = false
+
+[functions.mcp-msgraph]
+verify_jwt = false
+
+[functions.mcp-notion]
+verify_jwt = false
+
+[functions.get-marketplace-bundle]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

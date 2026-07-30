@@ -145,6 +145,23 @@ export async function generateBrandAssistant(b: BrandInput, ctx: GenContext): Pr
   };
 }
 
+export async function generateStarterAssistants(b: BrandInput, ctx: GenContext, count = 2): Promise<TemplateDraft[]> {
+  const systemInstruction =
+    `You build a starter set of AI assistants (personas) for a brand's team. An assistant is a reusable persona: a system instruction that sets its role, expertise, and behaviour for this brand. Generate exactly ${count} distinct, useful assistants (e.g. a customer-support agent, a content writer, a research analyst — tailored to this brand). Return ONLY a JSON array — no prose, no code fences — of objects with keys "title" (short), "description" (one sentence on what it's for), and "instruction" (the full system instruction / persona, addressing the assistant in the second person, 3–6 sentences).`;
+  const raw = await runAuthoringAI({ ...ctx, systemInstruction, prompt: brandSummary(b), temperature: 0.7 });
+  return parseJsonArray(raw)
+    .filter(x => x?.title && x?.instruction)
+    .slice(0, count)
+    .map(x => ({
+      kind: 'assistant' as const,
+      title: String(x.title).slice(0, 120),
+      description: String(x.description ?? '').slice(0, 300),
+      content: '',
+      systemInstruction: String(x.instruction),
+      variables: [],
+    }));
+}
+
 export async function generateStarterPrompts(b: BrandInput, ctx: GenContext, count = 5): Promise<TemplateDraft[]> {
   const systemInstruction =
     `You build a starter prompt library for a brand's team. Generate exactly ${count} reusable, practical prompt templates tailored to this brand's work. If a "Primary AI use case" is given, prioritise prompts that serve it. Each prompt MUST use {{variable_name}} placeholders for the user's inputs (snake_case names). Return ONLY a JSON array — no prose, no code fences — of objects with keys "title" (short), "description" (one sentence on when to use it), and "content" (the prompt body with {{placeholders}}).`;
@@ -178,15 +195,16 @@ export async function generateStarterSkills(b: BrandInput, ctx: GenContext, coun
 }
 
 /**
- * Generate the full starter library in parallel: one brand-voice assistant,
- * a handful of starter prompts, and one or two skills. Individual sections that
- * fail return empty so a partial library still comes back.
+ * Generate the full starter library in parallel — **9 templates: 3 assistants, 3 prompts, 3 skills**
+ * (SQEM-170; Cloud-only onboarding). The 3 assistants = the brand-voice assistant + 2 role personas.
+ * Individual sections that fail return empty so a partial library still comes back.
  */
 export async function generateStarterLibrary(b: BrandInput, ctx: GenContext): Promise<TemplateDraft[]> {
-  const [assistant, prompts, skills] = await Promise.all([
+  const [brandAssistant, moreAssistants, prompts, skills] = await Promise.all([
     generateBrandAssistant(b, ctx).then(a => [a]).catch(() => [] as TemplateDraft[]),
-    generateStarterPrompts(b, ctx, 5).catch(() => [] as TemplateDraft[]),
-    generateStarterSkills(b, ctx, 1).catch(() => [] as TemplateDraft[]),
+    generateStarterAssistants(b, ctx, 2).catch(() => [] as TemplateDraft[]),
+    generateStarterPrompts(b, ctx, 3).catch(() => [] as TemplateDraft[]),
+    generateStarterSkills(b, ctx, 3).catch(() => [] as TemplateDraft[]),
   ]);
-  return [...assistant, ...prompts, ...skills];
+  return [...brandAssistant, ...moreAssistants, ...prompts, ...skills];
 }

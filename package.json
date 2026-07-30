@@ -1,7 +1,7 @@
 {
   "name": "promptmaster",
   "private": true,
-  "version": "1.4.0",
+  "version": "1.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -27,6 +27,7 @@
     "@sentry/react": "^10.63.0",
     "@supabase/supabase-js": "^2.95.3",
     "@vercel/speed-insights": "^2.0.0",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.554.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -39,6 +40,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.2",
+    "@types/jszip": "^3.4.0",
     "@types/node": "^22.14.0",
     "@types/react-virtualized-auto-sizer": "^1.0.4",
     "@types/react-window": "^1.8.8",

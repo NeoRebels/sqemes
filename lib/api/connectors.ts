@@ -64,6 +64,14 @@ export function createConnector(input: {
   return invoke({ action: 'create', ...input });
 }
 
+/** SQEM-157/159 — create a token-paste connector (app = 'shopify' | 'github' | 'notion'). `shop` only
+ *  applies to Shopify. No OAuth — the pasted token is encrypted server-side. */
+export function createTokenConnector(input: {
+  workspaceId: string; app: string; token: string; shared: boolean; shop?: string;
+}): Promise<{ ok: boolean; connector: Connector }> {
+  return invoke({ action: 'create-token', ...input });
+}
+
 export async function deleteConnector(id: string): Promise<void> {
   const { error } = await client.from('workspace_connectors').delete().eq('id', id);
   if (error) throw error;

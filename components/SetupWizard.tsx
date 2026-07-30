@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { IS_SELF_HOSTED } from '../lib/env';
 import { useWorkspace, useUI } from '../store';
 import { saveApiKey } from '../lib/api/apiKeys';
 import { supabase } from '../lib/supabase';
@@ -46,7 +47,12 @@ const BROWSERS = [
   { label: 'Vivaldi', src: vivaldiSrc },
 ];
 
-const STEPS = ['Provider key', 'MCP', 'Extension', 'Template access', 'Create templates'];
+// SQEM-170 — Template access + starter-template creation are Cloud-only features; self-host onboarding
+// stops after Extension. (The step blocks below are guarded by `step === N` and `step` is bounded by
+// STEPS.length-1, so dropping the last two labels cleanly removes them on self-host.)
+const STEPS = IS_SELF_HOSTED
+  ? ['Provider key', 'MCP', 'Extension']
+  : ['Provider key', 'MCP', 'Extension', 'Template access', 'Create templates'];
 
 interface SetupWizardProps {
   /** Called when the wizard is dismissed or completed. `completed` distinguishes the two. */
@@ -402,7 +408,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
               <button onClick={() => onClose(true)} className="px-4 py-2.5 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
                 Skip for now
               </button>
-              {createAction && (
+              {createAction ? (
                 <button
                   onClick={createAction.onClick}
                   disabled={createAction.disabled}
@@ -410,6 +416,11 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                 >
                   {createAction.loading && <Loader2 className="w-4 h-4 animate-spin" />}
                   {createAction.label}
+                </button>
+              ) : (
+                // SQEM-170 — last step has no create action (e.g. self-host, where Create-templates is gone)
+                <button onClick={() => onClose(true)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none">
+                  Done
                 </button>
               )}
             </>

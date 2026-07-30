@@ -40,14 +40,18 @@ export default function TemplateCard({
       {topRight}
 
       <div className="p-4 flex-1">
+        {/* SQEM-164 — badges carry interactive controls (TagEditor) → lift above the stretched title link. */}
         {badges && (
-          <div className="flex justify-between items-start mb-3 pr-8">
+          <div className="relative z-10 flex justify-between items-start mb-3 pr-8">
             <div className="flex gap-2 flex-wrap">{badges}</div>
           </div>
         )}
 
+        {/* SQEM-164 — stretched link: the title's ::after covers the whole (relative) card, so clicking
+            anywhere on the card follows the title link, while the title stays a real focusable link and
+            the z-10 controls above keep working. */}
         {titleHref ? (
-          <Link to={titleHref} className="block group-hover:text-brand-600 transition-colors">
+          <Link to={titleHref} className="group-hover:text-brand-600 transition-colors after:absolute after:inset-0 after:content-['']">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2 line-clamp-1">{title}</h3>
           </Link>
         ) : (
@@ -60,7 +64,7 @@ export default function TemplateCard({
       </div>
 
       {(footerLeft || footerRight) && (
-        <div className="px-4 py-3 flex items-center justify-between gap-3">
+        <div className="relative z-10 px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex gap-1 items-center">{footerLeft}</div>
           {footerRight}
         </div>

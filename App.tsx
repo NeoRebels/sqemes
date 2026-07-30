@@ -19,6 +19,7 @@ const PromptRunnerRedirect = () => {
   return null;
 };
 const Library = React.lazy(() => import('./pages/Library'));
+const MarketplaceTemplate = React.lazy(() => import('./pages/MarketplaceTemplate'));
 const Chat = React.lazy(() => import('./pages/Chat'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Files = React.lazy(() => import('./pages/Files'));
@@ -218,6 +219,7 @@ const AppRoutes = () => {
         <Route path="/prompts/:id" element={<PromptRunnerRedirect />} />
         <Route path="/library/new" element={<TemplateEditor />} />
         <Route path="/library/:id/edit" element={<TemplateEditor />} />
+        <Route path="/library/:id" element={<MarketplaceTemplate />} />
 
         {/* Dashboard Layout Routes */}
         <Route path="/" element={<Layout><Dashboard /></Layout>} />

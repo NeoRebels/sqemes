@@ -1,10 +1,15 @@
-import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
 import { useUI, useWorkspace, usePrompts, useData } from '../store';
 import { collectWorkspaceTags } from '../lib/workspaceTags';
 import { can } from '../lib/permissions';
+import { IS_SELF_HOSTED } from '../lib/env';
 import { fetchRestrictedTemplateIds } from '../lib/api/templateAccess';
+import { exportTemplatesToZip, downloadBlob, readBundle, importBundle, type BundleManifest } from '../lib/templateBundle';
+import { publishToMarketplace } from '../lib/api/library';
+import { TEMPLATE_CATEGORIES } from '../constants';
+import type JSZip from 'jszip';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Search, Plus, Play, Edit, Trash2, Copy, Star, EyeOff, Bot, PenTool, Wand2, Loader2, Store, Lock } from 'lucide-react';
+import { Search, Plus, Play, Edit, Trash2, Copy, Star, EyeOff, Bot, PenTool, Wand2, Loader2, Store, Lock, Upload, Package } from 'lucide-react';
 import Card from '../components/ui/Card';
 import TemplateCard from '../components/ui/TemplateCard';
 import Modal from '../components/ui/Modal';
@@ -16,7 +21,7 @@ import EmptyState from '../components/ui/EmptyState';
 import TagFilter from '../components/ui/TagFilter';
 import TagEditor from '../components/ui/TagEditor';
 import KindBadge from '../components/ui/KindBadge';
-import { Prompt, PromptKind } from '../types';
+import { Prompt, PromptKind, TemplateCategory } from '../types';
 
 const PromptSkeleton = () => (
   <Card className="animate-pulse p-4 flex flex-col gap-3">
@@ -49,6 +54,7 @@ const PromptCard = memo(({
   onDeleteRequest,
   onRun,
   onSetTag,
+  onPublish,
 }: {
   prompt: Prompt;
   canEdit: boolean;
@@ -61,23 +67,29 @@ const PromptCard = memo(({
   onDeleteRequest: (id: string) => void;
   onRun: (prompt: Prompt) => void;
   onSetTag: (prompt: Prompt, tag: string | null) => void;
+  onPublish: (prompt: Prompt) => void;
 }) => (
   <TemplateCard
     selected={selected}
     topLeft={canEdit && (
-      <input
-        type="checkbox"
-        checked={selected}
-        onChange={() => onToggleSelect(prompt.id)}
-        onClick={(e) => e.stopPropagation()}
+      // SQEM-168 — padded label gives the 16px checkbox a ~6px hit margin over the stretched card link.
+      <label
         aria-label={`Select ${prompt.title}`}
-        className={`absolute top-2.5 left-2.5 z-10 w-4 h-4 rounded accent-brand-600 cursor-pointer bg-white dark:bg-slate-800 shadow transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
-      />
+        onClick={(e) => e.stopPropagation()}
+        className="absolute top-1 left-1 z-20 p-1.5 cursor-pointer"
+      >
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelect(prompt.id)}
+          className={`block w-4 h-4 rounded accent-brand-600 cursor-pointer bg-white dark:bg-slate-800 shadow transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+        />
+      </label>
     )}
     topRight={(
       <button
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); onFavorite(prompt); }}
-        className="absolute top-3 right-3 z-10 p-2 text-slate-300 hover:text-amber-400 hover:scale-110 transition-all focus:outline-none"
+        className="absolute top-1.5 right-1.5 z-20 p-3 text-slate-300 hover:text-amber-400 hover:scale-110 transition-all focus:outline-none"
         title={prompt.isFavorite ? "Remove from favorites" : "Add to favorites"}
       >
         <Star className={`w-5 h-5 ${prompt.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`} />
@@ -124,6 +136,13 @@ const PromptCard = memo(({
           <Copy className="w-4 h-4" />
         </button>
         <button
+          onClick={(e) => { e.preventDefault(); onPublish(prompt); }}
+          className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+          title="Publish to Marketplace"
+        >
+          <Store className="w-4 h-4" />
+        </button>
+        <button
           onClick={(e) => { e.preventDefault(); onDeleteRequest(prompt.id); }}
           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
           title="Delete"
@@ -145,7 +164,7 @@ const PromptCard = memo(({
 
 const Templates = () => {
   const { prompts, deletePrompt, deletePrompts, duplicatePrompt, toggleFavorite: storeFavorite, updatePrompt } = usePrompts();
-  const { workspaceFiles } = useData();
+  const { workspaceFiles, addWorkspaceFile } = useData();
   const { currentUser, workspace } = useWorkspace();
   const { showToast, isLoading } = useUI();
   const navigate = useNavigate();
@@ -164,13 +183,22 @@ const Templates = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  // SQEM-161 — export / import (.sqemes.zip bundle)
+  const [exporting, setExporting] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importBundleData, setImportBundleData] = useState<{ zip: JSZip; manifest: BundleManifest } | null>(null);
+  const [importing, setImporting] = useState(false);
+  // SQEM-163 — publish to marketplace
+  const [publishTarget, setPublishTarget] = useState<Prompt | null>(null);
+  const [publishCategory, setPublishCategory] = useState<TemplateCategory>('General');
+  const [publishing, setPublishing] = useState(false);
 
   // SQEM-143 — which templates are restricted (have any access rule), for the card indicator.
   // Re-fetches on mount (returning from the editor remounts this page) and when the set of
   // templates changes. Non-fatal — a failure just hides the badge.
   const [restrictedIds, setRestrictedIds] = useState<Set<string>>(new Set());
   useEffect(() => {
-    if (!workspace?.id) return;
+    if (!workspace?.id || IS_SELF_HOSTED) return; // SQEM-170 — template access is Cloud-only
     fetchRestrictedTemplateIds(workspace.id).then(setRestrictedIds).catch(() => {});
   }, [workspace?.id, prompts.length]);
 
@@ -259,6 +287,70 @@ const Templates = () => {
     updatePrompt({ ...prompt, tag });
   }, [updatePrompt]);
 
+  // --- Export / Import (SQEM-161) ---
+  const handleBulkExport = async () => {
+    const selected = prompts.filter(p => selectedIds.has(p.id));
+    if (!selected.length) return;
+    setExporting(true);
+    try {
+      const blob = await exportTemplatesToZip(selected, workspaceFiles);
+      const base = selected.length === 1
+        ? selected[0].title.replace(/[^\w.-]+/g, '_').slice(0, 60) || 'template'
+        : `sqemes-templates-${selected.length}`;
+      downloadBlob(blob, `${base}.sqemes.zip`);
+      showToast(`Exported ${selected.length} template${selected.length === 1 ? '' : 's'}`, 'success');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Export failed', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    try {
+      setImportBundleData(await readBundle(file));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not read bundle', 'error');
+    }
+  };
+
+  const openPublish = useCallback((prompt: Prompt) => {
+    setPublishTarget(prompt);
+    setPublishCategory('General');
+  }, []);
+
+  const confirmPublish = async () => {
+    if (!publishTarget || !workspace?.id) return;
+    setPublishing(true);
+    try {
+      await publishToMarketplace({ workspaceId: workspace.id, template: publishTarget, allFiles: workspaceFiles, userId: currentUser.id, category: publishCategory });
+      showToast('Submitted to the Marketplace — pending review', 'success');
+      setPublishTarget(null);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Publish failed', 'error');
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const confirmImport = async () => {
+    if (!importBundleData || !workspace?.id) return;
+    setImporting(true);
+    try {
+      const { templates, skills, files } = await importBundle(importBundleData.zip, importBundleData.manifest, workspace.id, currentUser.id);
+      files.forEach(addWorkspaceFile); // prompts arrive via the store's realtime subscription
+      showToast(`Imported ${templates} template${templates === 1 ? '' : 's'}${skills ? ` + ${skills} skill${skills === 1 ? '' : 's'}` : ''}`, 'success');
+      setImportBundleData(null);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Import failed', 'error');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="p-4 md:p-8 pb-16 md:pb-20 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 md:mb-10 gap-4">
@@ -267,9 +359,19 @@ const Templates = () => {
           <p className="text-slate-500 dark:text-slate-400 mt-2">Manage and organize your team's prompts, assistants, and skills</p>
         </div>
         {canEdit && (
-          <Link to="/prompts/new" className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-brand-200 hover:shadow-brand-300 dark:shadow-none dark:hover:shadow-none w-full sm:w-auto justify-center">
-            <Plus className="w-5 h-5" /> New Template
-          </Link>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <input ref={importInputRef} type="file" accept=".zip,.sqemes" onChange={handleImportFile} className="hidden" />
+            <button
+              onClick={() => importInputRef.current?.click()}
+              title="Import a .sqemes.zip bundle"
+              className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 px-4 py-2.5 rounded-xl font-medium text-sm transition-all justify-center"
+            >
+              <Upload className="w-4 h-4" /> Import
+            </button>
+            <Link to="/prompts/new" className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-brand-200 hover:shadow-brand-300 dark:shadow-none dark:hover:shadow-none flex-1 sm:flex-none justify-center">
+              <Plus className="w-5 h-5" /> New Template
+            </Link>
+          </div>
         )}
       </div>
 
@@ -319,6 +421,8 @@ const Templates = () => {
           onDelete={() => setBulkConfirm(true)}
           onClear={() => setSelectedIds(new Set())}
           noun="template"
+          onExport={handleBulkExport}
+          exporting={exporting}
         />
       )}
 
@@ -371,6 +475,7 @@ const Templates = () => {
               onDeleteRequest={handleDeleteRequest}
               onRun={handleRun}
               onSetTag={handleSetTag}
+              onPublish={openPublish}
             />
           ))}
         </div>
@@ -411,6 +516,74 @@ const Templates = () => {
             {bulkDeleting ? 'Deleting…' : 'Delete'}
           </button>
         </div>
+      </Modal>
+
+      {/* Publish to Marketplace (SQEM-163) */}
+      <Modal open={!!publishTarget} onClose={() => !publishing && setPublishTarget(null)} size="sm" className="p-6">
+        {publishTarget && (
+          <>
+            <div className="flex items-center gap-2.5 mb-2">
+              <Store className="w-6 h-6 text-brand-500" />
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Publish to Marketplace</h3>
+            </div>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+              Publish <span className="font-semibold">{publishTarget.title}</span> (incl. its skills + context files) as a
+              snapshot others can copy. It's <span className="font-semibold">submitted for review</span> and goes live once approved.
+              {publishTarget.kind === 'skill' && <span className="block mt-1 text-amber-600 dark:text-amber-400">Skills get extra review before they go live.</span>}
+            </p>
+            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Category</label>
+            <select value={publishCategory} onChange={e => setPublishCategory(e.target.value as TemplateCategory)}
+              className="w-full p-3 mb-5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all">
+              {TEMPLATE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <div className="flex gap-2">
+              <button onClick={() => setPublishTarget(null)} disabled={publishing} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={confirmPublish} disabled={publishing} className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                {publishing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Submitting…</> : 'Submit for review'}
+              </button>
+            </div>
+          </>
+        )}
+      </Modal>
+
+      {/* Import preview (SQEM-161) — transparency before applying a third-party bundle */}
+      <Modal open={!!importBundleData} onClose={() => !importing && setImportBundleData(null)} size="sm" className="p-6">
+        {importBundleData && (() => {
+          const { templates, skills, files } = importBundleData.manifest;
+          const totalBytes = (files || []).reduce((s, f) => s + (f.sizeBytes || 0), 0);
+          const mb = (totalBytes / (1024 * 1024));
+          return (
+            <>
+              <div className="flex items-center gap-2.5 mb-2">
+                <Package className="w-6 h-6 text-brand-500" />
+                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Import templates</h3>
+              </div>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                This bundle will be added to <span className="font-semibold">{workspace.name}</span>. Imported templates
+                come from another source — review what lands before continuing.
+              </p>
+              <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 p-4 mb-4 text-sm">
+                <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Templates</span><span className="font-bold text-slate-800 dark:text-slate-100">{(templates || []).length}</span></div>
+                <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Embedded skills</span><span className="font-bold text-slate-800 dark:text-slate-100">{(skills || []).length}</span></div>
+                <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Context files</span><span className="font-bold text-slate-800 dark:text-slate-100">{(files || []).length}{totalBytes ? ` · ${mb < 0.1 ? '<0.1' : mb.toFixed(1)} MB` : ''}</span></div>
+              </div>
+              {(templates || []).length > 0 && (
+                <ul className="mb-5 max-h-32 overflow-y-auto text-sm text-slate-700 dark:text-slate-200 space-y-1">
+                  {(templates || []).slice(0, 8).map((t, i) => (
+                    <li key={i} className="flex items-center gap-2 truncate"><span className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" />{t.title || 'Untitled'}</li>
+                  ))}
+                  {(templates || []).length > 8 && <li className="text-slate-400 text-xs">+ {(templates || []).length - 8} more…</li>}
+                </ul>
+              )}
+              <div className="flex gap-2">
+                <button onClick={() => setImportBundleData(null)} disabled={importing} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50">Cancel</button>
+                <button onClick={confirmImport} disabled={importing || !((templates || []).length)} className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                  {importing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importing…</> : 'Import'}
+                </button>
+              </div>
+            </>
+          );
+        })()}
       </Modal>
     </div>
   );

@@ -9,8 +9,10 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { encryptApiKey } from '../_shared/crypto.ts';
 import { getFreshConnectorToken } from '../_shared/connectorToken.ts';
+import { TOKEN_APPS } from '../_shared/connectorApps.ts';
 
 const MCP_PROTOCOL = '2024-11-05';
+const SHOP_RE = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/;
 
 // Minimal MCP client probe over Streamable HTTP. Handles JSON *and* SSE responses + Mcp-Session-Id.
 async function probeMcp(url: string, token: string | null): Promise<{ serverName?: string; tools: { name: string; description?: string }[] }> {
@@ -112,6 +114,49 @@ Deno.serve(async (req) => {
       };
       const { data: created, error } = await admin.from('workspace_connectors')
         .insert(row).select('id, name, mcp_url, user_id, allowed_tools, created_at').single();
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true, connector: created });
+    }
+
+    // --- create-token (SQEM-157/159): a token-paste app (Shopify/GitHub/Notion). The user pastes a
+    // static token; we encrypt it + point the connector at the app's mcpUrl (a vendor-hosted MCP or our
+    // shim). `needsShop` apps (Shopify) append a validated ?shop=. No OAuth, no secret. --------------
+    if (body.action === 'create-token') {
+      const { workspaceId, app: appId, token, shared } = body;
+      const app = TOKEN_APPS[appId as string];
+      if (!app) return json({ error: 'Unsupported app' }, 400);
+      if (!workspaceId) return json({ error: 'workspaceId required' }, 400);
+      if (!token?.trim()) return json({ error: 'An access token is required' }, 400);
+
+      let mcpUrl = app.mcpUrl;
+      if (app.needsShop) {
+        let shop = String(body.shop || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+        if (!/\.myshopify\.com$/.test(shop) && /^[a-z0-9][a-z0-9-]*$/.test(shop)) shop = `${shop}.myshopify.com`;
+        if (!SHOP_RE.test(shop)) return json({ error: 'Enter your shop as {store}.myshopify.com' }, 400);
+        mcpUrl = `${mcpUrl}?shop=${encodeURIComponent(shop)}`;
+      }
+
+      const { data: mem } = await admin.from('workspace_members').select('role')
+        .eq('workspace_id', workspaceId).eq('user_id', user.id).single();
+      if (!mem) return json({ error: 'Not a member of this workspace' }, 403);
+      if (shared && !['admin', 'editor'].includes(mem.role)) {
+        return json({ error: 'Only admins or editors can add workspace-shared connectors' }, 403);
+      }
+      const userId = shared ? null : user.id;
+      // Reconnect replaces the caller's existing connector for this app (null-safe on the shared slot).
+      let del = admin.from('workspace_connectors').delete()
+        .eq('workspace_id', workspaceId).eq('provider', app.provider).eq('name', app.name);
+      del = userId === null ? del.is('user_id', null) : del.eq('user_id', userId);
+      await del;
+      const { data: created, error } = await admin.from('workspace_connectors').insert({
+        workspace_id: workspaceId,
+        created_by: user.id,
+        user_id: userId,
+        name: app.name,
+        provider: app.provider,
+        mcp_url: mcpUrl,
+        auth_token_encrypted: await encryptApiKey(String(token).trim()),
+      }).select('id, name, mcp_url, user_id, allowed_tools, created_at').single();
       if (error) return json({ error: error.message }, 500);
       return json({ ok: true, connector: created });
     }

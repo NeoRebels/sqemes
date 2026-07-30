@@ -118,9 +118,9 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
 
   const navLinks: { to: string; icon: any; label: string; beta?: boolean; arrow?: boolean }[] = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-    { to: "/files", icon: Paperclip, label: "Files" },
     { to: "/templates", icon: FileText, label: "Templates" },
     { to: "/library", icon: Store, label: "Marketplace" },
+    { to: "/files", icon: Paperclip, label: "Files" },
     { to: "/chat", icon: MessageSquare, label: "Chat", arrow: true },
   ];
 

@@ -380,6 +380,7 @@ const Settings = () => {
 
   const visibleTabs = tabs.filter(tab => {
     if (IS_SELF_HOSTED && tab.id === 'plans') return false; // SQEM-119 — no billing on self-host
+    if (IS_SELF_HOSTED && tab.id === 'brand') return false;  // SQEM-170 — Brand is Cloud-only
     // Members (no settings:general) still get their Profile + Connectors (they may add personal ones).
     if (!can(currentUser, workspace, 'settings:general')) return tab.id === 'profile' || tab.id === 'connectors';
     if (!can(currentUser, workspace, 'plans:manage')) return tab.id !== 'plans';
@@ -432,7 +433,7 @@ const Settings = () => {
 
     // Deep-link via URL query (e.g. opened in a new tab): ?tab=plans
     const urlTab = new URLSearchParams(location.search).get('tab');
-    if (urlTab && ['general', 'brand', 'team', 'plans', 'api', 'connectors', 'profile'].includes(urlTab)) {
+    if (urlTab && ['general', 'brand', 'team', 'plans', 'api', 'connectors', 'profile'].includes(urlTab) && !(IS_SELF_HOSTED && urlTab === 'brand')) {
       if (!can(currentUser, workspace, 'plans:manage') && urlTab === 'plans') {
         if (activeTab !== 'general') setActiveTab('general');
       } else if (activeTab !== urlTab) {
@@ -768,7 +769,8 @@ const Settings = () => {
                 </div>
               </Card>
 
-              {can(currentUser, workspace, 'team:manage') && (
+              {/* SQEM-170 — Template Access (default) is a Cloud-only feature */}
+              {!IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
                 <Card className="p-6 md:p-8">
                   <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Template Access</h2>
                   <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">The default access applied to newly-created templates. Editors can override it per template.</p>
@@ -781,6 +783,8 @@ const Settings = () => {
                 </Card>
               )}
 
+              {/* SQEM-170 — Content Governance is a Cloud-only feature */}
+              {!IS_SELF_HOSTED && (
               <Card className="p-8">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-6">
                   <ShieldAlert className="w-5 h-5 text-red-500" />
@@ -833,6 +837,7 @@ const Settings = () => {
                   ))}
                 </div>
               </Card>
+              )}
 
               {/* Self-host only — version + update notice (SQEM-118); renders nothing on Cloud */}
               <AboutSection />
@@ -858,7 +863,7 @@ const Settings = () => {
           )}
 
           {/* --- Brand Tab --- */}
-          {activeTab === 'brand' && can(currentUser, workspace, 'settings:general') && (
+          {activeTab === 'brand' && !IS_SELF_HOSTED && can(currentUser, workspace, 'settings:general') && (
             <div className="space-y-6 animate-fade-in">
               <Card className="p-6 md:p-8">
                 <div className="flex items-start justify-between mb-6 gap-4">
