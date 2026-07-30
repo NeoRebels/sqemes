@@ -55,6 +55,7 @@ const TOOL_CAPABILITY: Record<string, Capability> = {
   finalize_upload:   'create',
   update_template:   'update',
   delete_template:   'delete',
+  delete_file:       'delete',
 };
 const READ_METHODS = new Set(['prompts/list', 'prompts/get', 'resources/list', 'resources/read']);
 
@@ -648,6 +649,19 @@ Deno.serve(async (req) => {
           required: ['fileId'],
         },
       },
+      {
+        name: 'delete_file',
+        description: 'Permanently delete a workspace file (from storage and the file list). Use this to clean up a context file that a template no longer needs — e.g. after replacing it via update_template, the old file stays in the workspace, unattached, until deleted.\n\nSAFETY: if the file is still attached to OTHER templates, the call is BLOCKED by default and returns the list of templates that use it, so you can confirm with the user before touching them. To then proceed, either:\n  • pass force:true to detach the file from every template and delete it, or\n  • pass replaceWith:<fileId> to swap the file for a replacement in each of those templates (detach old, attach new) and then delete the old file.\nAsk the user before using force or replaceWith. This cannot be undone.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            fileId:      { type: 'string', description: 'UUID of the workspace file to delete (from list_files).' },
+            force:       { type: 'boolean', description: 'If the file is still attached to other templates, detach it from all of them and delete anyway. Default false — without it (and without replaceWith) the call is blocked and returns the referencing templates so you can confirm with the user first.' },
+            replaceWith: { type: 'string', description: 'Optional UUID of a replacement file. When the file is attached to other templates, swap it for this file in each of them (detach old, attach new) instead of just detaching, then delete the old file. Implies force.' },
+          },
+          required: ['fileId'],
+        },
+      },
     ];
 
     // Only advertise tools the connection is scoped for (SQEM-064).
@@ -1058,6 +1072,92 @@ Deno.serve(async (req) => {
 
       return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
         id: inserted.id, name: inserted.name, mimeType: inserted.mime_type,
+      }, null, 2) }] });
+    }
+
+    if (toolName === 'delete_file') {
+      const { fileId, force, replaceWith } = args;
+      if (!fileId?.trim()) return rpcError(id, -32602, 'fileId is required');
+      if (replaceWith && replaceWith === fileId)
+        return rpcError(id, -32602, 'replaceWith must be a different file than the one being deleted');
+
+      // 1. The file must exist in this workspace.
+      const { data: file } = await adminClient
+        .from('workspace_files')
+        .select('id, name, storage_path')
+        .eq('workspace_id', workspaceId)
+        .eq('id', fileId)
+        .maybeSingle();
+      if (!file) return rpcError(id, -32602, `File not found: ${fileId}`);
+
+      // 2. An optional replacement file must also exist in this workspace.
+      let replacement: { id: string; name: string } | null = null;
+      if (replaceWith) {
+        const { data: rep } = await adminClient
+          .from('workspace_files')
+          .select('id, name')
+          .eq('workspace_id', workspaceId)
+          .eq('id', replaceWith)
+          .maybeSingle();
+        if (!rep) return rpcError(id, -32602, `replaceWith file not found: ${replaceWith}`);
+        replacement = rep;
+      }
+
+      // 3. Which templates still reference this file? (context_file_ids is uuid[])
+      const { data: refs } = await adminClient
+        .from('prompts')
+        .select('id, title, kind, context_file_ids')
+        .eq('workspace_id', workspaceId)
+        .contains('context_file_ids', [fileId]);
+      const referencedBy = refs || [];
+
+      // 4. Blocked: still attached elsewhere and no explicit force/replaceWith.
+      //    Return the referencing templates so the assistant can confirm with the
+      //    user before touching them (a tool can't prompt the user itself).
+      if (referencedBy.length > 0 && !force && !replaceWith) {
+        return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
+          deleted: false,
+          blocked: true,
+          reason: `This file is still attached to ${referencedBy.length} other template(s). Confirm with the user before removing it from them.`,
+          referencedBy: referencedBy.map((t: any) => ({ id: t.id, title: t.title, kind: t.kind })),
+          howToProceed: 'Call delete_file again with force:true to detach the file from these templates and delete it, or replaceWith:<fileId> to swap in a replacement file for each of them first.',
+        }, null, 2) }] });
+      }
+
+      // 5. Detach (or swap for the replacement) on every referencing template.
+      const affected: { id: string; title: string; kind: string }[] = [];
+      for (const t of referencedBy) {
+        const current: string[] = t.context_file_ids || [];
+        let next = replaceWith
+          ? current.map((fid: string) => (fid === fileId ? replaceWith : fid))
+          : current.filter((fid: string) => fid !== fileId);
+        next = next.filter((fid: string, i: number) => next.indexOf(fid) === i); // de-dupe
+        const { error: updErr } = await adminClient
+          .from('prompts')
+          .update({ context_file_ids: next, updated_at: new Date().toISOString() })
+          .eq('workspace_id', workspaceId)
+          .eq('id', t.id);
+        if (updErr) return rpcError(id, -32603, `Failed to update template ${t.id}: ${updErr.message}`);
+        affected.push({ id: t.id, title: t.title, kind: t.kind });
+      }
+
+      // 6. Delete the storage object, then the file row. Nothing references the
+      //    file anymore, so no dangling uuid[] entries are left behind.
+      await adminClient.storage.from('workspace-files').remove([file.storage_path]);
+      const { error: delErr } = await adminClient
+        .from('workspace_files')
+        .delete()
+        .eq('workspace_id', workspaceId)
+        .eq('id', fileId);
+      if (delErr) return rpcError(id, -32603, `Failed to delete file: ${delErr.message}`);
+
+      return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
+        deleted: true,
+        id:      file.id,
+        name:    file.name,
+        ...(replacement
+          ? { replacedWith: replacement, reattachedTo: affected }
+          : { detachedFrom: affected }),
       }, null, 2) }] });
     }
 

@@ -148,6 +148,10 @@ const formatRelativeTime = (iso: string) => {
   return new Date(iso).toLocaleDateString();
 };
 
+// Platform-aware hint for the search shortcut (SQEM-173) — cosmetic only.
+const searchShortcutHint =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent) ? '⌘K' : 'Ctrl K';
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -889,6 +893,18 @@ Output only the refined prompt text, with no surrounding explanation or commenta
             >
               <MessageSquarePlus className="w-4 h-4" /> New Chat
             </button>
+            {/* Search (SQEM-173) — labeled entry under New Chat; ⌘K/Ctrl+K also opens it */}
+            <button
+              onClick={() => setSearchOpen(true)}
+              title="Search chats (⌘K / Ctrl+K)"
+              className="w-full mt-2 flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            >
+              <Search className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-500" />
+              <span>Search chats</span>
+              <kbd className="ml-auto hidden sm:inline-flex items-center text-2xs font-sans font-semibold text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded px-1.5 py-0.5">
+                {searchShortcutHint}
+              </kbd>
+            </button>
           </div>
 
           {/* My Chats / Shared toggle */}
@@ -1017,16 +1033,6 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                 </>
               );
             })()}
-
-            {/* Search (SQEM-103) — right end of the top bar; ⌘K also opens it */}
-            <button
-              onClick={() => setSearchOpen(true)}
-              title="Search chats (⌘K / Ctrl+K)"
-              aria-label="Search chats"
-              className="ml-auto shrink-0 p-2 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-            >
-              <Search className="w-4 h-4" />
-            </button>
 
           </div>
 

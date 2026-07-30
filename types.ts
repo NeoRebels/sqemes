@@ -166,7 +166,8 @@ export interface LibraryTemplate {
   // SQEM-163 — user-contributed marketplace fields (null/undefined for curated rows)
   workspaceId?: string | null;   // source workspace (provenance)
   status?: 'pending' | 'published' | 'rejected';
-  bundlePath?: string | null;    // the .sqemes.zip snapshot in the library-files bucket
+  bundlePath?: string | null;    // the .sqemes.zip snapshot in the library-files bucket (Cloud only)
+  hasBundle?: boolean;           // whether a bundle exists — set from bundle_path (Cloud) or has_bundle (self-host public feed, SQEM-178)
   preview?: { fileNames?: string[]; fileCount?: number; skillCount?: number };
   // SQEM-169 — votes + scan verdict
   score?: number;                // net votes (up - down)

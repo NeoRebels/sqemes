@@ -25,7 +25,7 @@ import {
 import { useUI, useWorkspace } from '../store';
 import { can } from '../lib/permissions';
 import { CHROME_STORE_URL } from '../lib/links';
-import { IS_SELF_HOSTED } from '../lib/env';
+import { IS_SELF_HOSTED, MARKETPLACE_ENABLED } from '../lib/env';
 import { CURRENT_VERSION } from '../lib/version';
 import { useExtensionInstalled } from '../hooks/useExtensionInstalled';
 import { useUpdateStatus } from '../hooks/useUpdateStatus';
@@ -125,6 +125,8 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
   ];
 
   const visibleNavLinks = navLinks.filter(link => {
+    // SQEM-178 — hide Marketplace if disabled on this instance (self-host with an empty marketplace URL).
+    if (link.to === '/library' && !MARKETPLACE_ENABLED) return false;
     if (!can(currentUser, workspace, 'settings:general')) {
       return !['/library', '/files'].includes(link.to);
     }

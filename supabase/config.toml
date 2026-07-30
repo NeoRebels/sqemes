@@ -417,6 +417,11 @@ verify_jwt = false
 [functions.get-marketplace-bundle]
 verify_jwt = false
 
+# SQEM-177 — public marketplace read endpoint (unauthenticated; like stripe-webhook). Self-host + anyone
+# can browse/copy the global marketplace with no Cloud account. The function itself enforces published-only.
+[functions.marketplace-public]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

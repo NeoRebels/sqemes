@@ -135,13 +135,16 @@ const PromptCard = memo(({
         >
           <Copy className="w-4 h-4" />
         </button>
-        <button
-          onClick={(e) => { e.preventDefault(); onPublish(prompt); }}
-          className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-          title="Publish to Marketplace"
-        >
-          <Store className="w-4 h-4" />
-        </button>
+        {/* SQEM-178 — publishing to the global marketplace from self-host is Phase B (invite-only); hidden for now */}
+        {!IS_SELF_HOSTED && (
+          <button
+            onClick={(e) => { e.preventDefault(); onPublish(prompt); }}
+            className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+            title="Publish to Marketplace"
+          >
+            <Store className="w-4 h-4" />
+          </button>
+        )}
         <button
           onClick={(e) => { e.preventDefault(); onDeleteRequest(prompt.id); }}
           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"

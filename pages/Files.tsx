@@ -1,7 +1,9 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { Link } from 'react-router';
 import {
   Upload, Search, Image, FileText, FileSpreadsheet, File,
   Trash2, Loader2, ExternalLink, ChevronDown, ArrowUpDown, Pencil,
+  Bot, Wand2, PenTool,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import SearchInput from '../components/ui/SearchInput';
@@ -43,7 +45,16 @@ function FileIcon({ mimeType, className }: { mimeType: string; className?: strin
 }
 
 type TypeFilter = 'all' | 'images' | 'documents';
-type SortKey = 'newest' | 'name' | 'largest' | 'mostused';
+type SortKey = 'newest' | 'name' | 'largest' | 'mostused' | 'leastused';
+
+// A template that references a file — surfaced in the usage popover (SQEM-175).
+type FileUsage = { id: string; title: string; kind: string };
+
+function KindIcon({ kind, className }: { kind: string; className?: string }) {
+  if (kind === 'assistant') return <Bot className={className} />;
+  if (kind === 'skill') return <Wand2 className={className} />;
+  return <PenTool className={className} />;
+}
 
 // ---- FileRow ----
 
@@ -55,14 +66,14 @@ const thumbUrlCache = new Map<string, string>();
 
 const FileRow = ({
   file,
-  usageCount,
+  usedBy,
   workspaceTags,
   selected,
   onToggleSelect,
   onDelete,
 }: {
   file: WorkspaceFile;
-  usageCount: number;
+  usedBy: FileUsage[];
   workspaceTags: string[];
   selected: boolean;
   onToggleSelect: (id: string) => void;
@@ -75,6 +86,19 @@ const FileRow = ({
   const [opening, setOpening] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameVal, setNameVal] = useState(file.name);
+  const [showUsage, setShowUsage] = useState(false);
+  const usageRef = useRef<HTMLDivElement>(null);
+  const usageCount = usedBy.length;
+
+  // Close the usage popover on outside-click (SQEM-175).
+  useEffect(() => {
+    if (!showUsage) return;
+    const onDown = (e: MouseEvent) => {
+      if (usageRef.current && !usageRef.current.contains(e.target as Node)) setShowUsage(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [showUsage]);
 
   // Tags can only be chosen from the workspace tag registry (managed in
   // Settings) — same source the template editor uses. No free-text tags.
@@ -209,15 +233,39 @@ const FileRow = ({
           <span>{formatBytes(file.sizeBytes)}</span>
           <span className="text-slate-300 dark:text-slate-600">·</span>
           <span>{formatDate(file.createdAt)}</span>
-          <span
-            className={`px-1.5 py-0.5 rounded-md font-semibold ${
-              usageCount > 0
-                ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500'
-            }`}
-            title={usageCount > 0 ? `Referenced by ${usageCount} template${usageCount === 1 ? '' : 's'}` : 'Not used by any template'}
-          >
-            {usageCount > 0 ? `Used in ${usageCount}` : 'Unused'}
+          <span className="relative inline-flex" ref={usageRef}>
+            <button
+              type="button"
+              onClick={() => usageCount > 0 && setShowUsage(v => !v)}
+              className={`px-1.5 py-0.5 rounded-md font-semibold transition-colors ${
+                usageCount > 0
+                  ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-900/40 cursor-pointer'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-default'
+              }`}
+              title={usageCount > 0 ? `Referenced by ${usageCount} template${usageCount === 1 ? '' : 's'} — click to see which` : 'Not used by any template'}
+            >
+              {usageCount > 0 ? `Used in ${usageCount}` : 'Unused'}
+            </button>
+            {showUsage && usageCount > 0 && (
+              <div className="absolute left-0 top-full mt-1 z-20 w-56 max-h-64 overflow-y-auto bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-1 animate-scale-up origin-top-left">
+                <div className="px-3 py-1.5 border-b border-slate-50 dark:border-slate-700">
+                  <p className="text-2xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    Used in {usageCount} template{usageCount === 1 ? '' : 's'}
+                  </p>
+                </div>
+                {usedBy.map(t => (
+                  <Link
+                    key={t.id}
+                    to={`/prompts/${t.id}`}
+                    onClick={() => setShowUsage(false)}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+                  >
+                    <KindIcon kind={t.kind} className="w-3.5 h-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
+                    <span className="truncate font-medium">{t.title}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </span>
 
           {(tags.length > 0 || availableTags.length > 0) && (
@@ -293,16 +341,24 @@ export default function Files() {
     [prompts, workspaceFiles]
   );
 
-  // "Used in N templates" — count prompts referencing each file (client-side).
-  const usageByFile = useMemo(() => {
-    const map = new Map<string, number>();
+  // Map each file to the templates referencing it via contextFileIds (client-side).
+  // Drives both the "Used in N" popover and the usage-based sorts (SQEM-175).
+  const templatesByFile = useMemo(() => {
+    const map = new Map<string, FileUsage[]>();
     for (const p of prompts) {
       for (const fid of p.contextFileIds || []) {
-        map.set(fid, (map.get(fid) || 0) + 1);
+        const list = map.get(fid) || [];
+        list.push({ id: p.id, title: p.title, kind: p.kind });
+        map.set(fid, list);
       }
     }
     return map;
   }, [prompts]);
+
+  const usageCountOf = useCallback(
+    (id: string) => templatesByFile.get(id)?.length ?? 0,
+    [templatesByFile],
+  );
 
   const filtered = workspaceFiles.filter(f => {
     const matchesSearch = f.name.toLowerCase().includes(search.toLowerCase())
@@ -319,7 +375,8 @@ export default function Files() {
     switch (sort) {
       case 'name': return a.name.localeCompare(b.name);
       case 'largest': return b.sizeBytes - a.sizeBytes;
-      case 'mostused': return (usageByFile.get(b.id) || 0) - (usageByFile.get(a.id) || 0);
+      case 'mostused': return usageCountOf(b.id) - usageCountOf(a.id);
+      case 'leastused': return usageCountOf(a.id) - usageCountOf(b.id);
       case 'newest':
       default: return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     }
@@ -443,6 +500,7 @@ export default function Files() {
             <option value="name">Name</option>
             <option value="largest">Largest</option>
             <option value="mostused">Most used</option>
+            <option value="leastused">Least used</option>
           </select>
           <ChevronDown className="absolute right-2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
         </div>
@@ -500,7 +558,7 @@ export default function Files() {
             <FileRow
               key={file.id}
               file={file}
-              usageCount={usageByFile.get(file.id) || 0}
+              usedBy={templatesByFile.get(file.id) || []}
               workspaceTags={workspace.tags}
               selected={selectedIds.has(file.id)}
               onToggleSelect={toggleSelect}

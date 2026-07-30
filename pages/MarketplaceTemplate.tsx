@@ -46,7 +46,7 @@ export default function MarketplaceTemplate() {
     if (!id) return;
     setLoading(true);
     fetchLibraryTemplateDetail(id).then(l => { setListing(l); setScore(l.score ?? 0); }).catch(() => setListing(null)).finally(() => setLoading(false));
-    fetchMyVotes().then(m => setMyVote(m[id] ?? 0)).catch(() => {});
+    if (!IS_SELF_HOSTED) fetchMyVotes().then(m => setMyVote(m[id] ?? 0)).catch(() => {}); // voting is Cloud-only (SQEM-178)
   }, [id]);
 
   const vote = async (value: 1 | -1) => {
@@ -187,19 +187,24 @@ export default function MarketplaceTemplate() {
               {adapting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} {hasBrand ? 'Adapt to brand' : 'Set up brand'}
             </button>
           )}
-          {/* SQEM-169 — temperature votes: 🔥 hot (red) vs ❄️ cold (ice-blue); score in degrees */}
-          <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <button onClick={() => vote(1)} title="Hot" className={`inline-flex items-center px-3 py-3 transition-colors ${myVote === 1 ? 'text-red-500 bg-red-50 dark:bg-red-900/20' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-              <Flame className="w-4 h-4" />
-            </button>
-            <span className={`px-2 text-sm font-bold tabular-nums ${score > 0 ? 'text-red-500' : score < 0 ? 'text-sky-500' : 'text-slate-400'}`}>{score > 0 ? `+${score}` : score}°</span>
-            <button onClick={() => vote(-1)} title="Cold" className={`inline-flex items-center px-3 py-3 transition-colors ${myVote === -1 ? 'text-sky-500 bg-sky-50 dark:bg-sky-900/20' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-              <Snowflake className="w-4 h-4" />
-            </button>
-          </div>
-          <button onClick={() => setReportOpen(true)} className="inline-flex items-center gap-1.5 px-4 py-3 text-slate-500 dark:text-slate-400 hover:text-red-500 text-sm font-semibold transition-colors">
-            <Flag className="w-4 h-4" /> Report
-          </button>
+          {/* SQEM-169 — temperature votes: 🔥 hot (red) vs ❄️ cold (ice-blue); score in degrees.
+              SQEM-178 — voting + reporting are Cloud-only (need an account); hidden on self-host. */}
+          {!IS_SELF_HOSTED && (
+            <>
+              <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <button onClick={() => vote(1)} title="Hot" className={`inline-flex items-center px-3 py-3 transition-colors ${myVote === 1 ? 'text-red-500 bg-red-50 dark:bg-red-900/20' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                  <Flame className="w-4 h-4" />
+                </button>
+                <span className={`px-2 text-sm font-bold tabular-nums ${score > 0 ? 'text-red-500' : score < 0 ? 'text-sky-500' : 'text-slate-400'}`}>{score > 0 ? `+${score}` : score}°</span>
+                <button onClick={() => vote(-1)} title="Cold" className={`inline-flex items-center px-3 py-3 transition-colors ${myVote === -1 ? 'text-sky-500 bg-sky-50 dark:bg-sky-900/20' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                  <Snowflake className="w-4 h-4" />
+                </button>
+              </div>
+              <button onClick={() => setReportOpen(true)} className="inline-flex items-center gap-1.5 px-4 py-3 text-slate-500 dark:text-slate-400 hover:text-red-500 text-sm font-semibold transition-colors">
+                <Flag className="w-4 h-4" /> Report
+              </button>
+            </>
+          )}
         </div>
 
         {/* What you get — transparency */}

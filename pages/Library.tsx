@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useUI, useWorkspace, useData } from '../store';
+import { IS_SELF_HOSTED } from '../lib/env';
 import { TEMPLATE_CATEGORIES, CATEGORY_COLORS } from '../constants';
 import { LibraryTemplate, TemplateCategory, PromptKind } from '../types';
 import { fetchPendingListings, moderateListing, fetchReports, resolveReport, voteListing, fetchMyVotes, type MarketplaceReport } from '../lib/api/library';
@@ -36,6 +37,9 @@ const LibrarySkeleton = () => (
 const Library = () => {
   const { libraryTemplates, deleteLibraryTemplate } = useData();
   const { isSqemesAdmin } = useWorkspace();
+  // SQEM-178 — on self-host the marketplace is the global Cloud one (read-only): no admin
+  // moderation, no voting, no publishing here. Those live on the Cloud that owns the queue.
+  const showAdmin = isSqemesAdmin && !IS_SELF_HOSTED;
   const { showToast, isLoading } = useUI();
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<TemplateCategory | 'All'>('All');
@@ -52,14 +56,15 @@ const Library = () => {
   const [scoreOverrides, setScoreOverrides] = useState<Record<string, number>>({});
 
   useEffect(() => {
+    if (IS_SELF_HOSTED) return; // voting is Cloud-only (needs an account)
     fetchMyVotes().then(setMyVotes).catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (!isSqemesAdmin) return;
+    if (!showAdmin) return;
     fetchPendingListings().then(setPending).catch(() => {});
     fetchReports().then(setReports).catch(() => {});
-  }, [isSqemesAdmin]);
+  }, [showAdmin]);
 
   const handleVote = useCallback(async (listingId: string, baseScore: number, value: 1 | -1) => {
     const prev = myVotes[listingId] ?? 0;
@@ -152,7 +157,7 @@ const Library = () => {
           <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Marketplace</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-2">Browse and save templates to your workspace</p>
         </div>
-        {isSqemesAdmin && (
+        {showAdmin && (
           <button
             onClick={() => navigate('/library/new')}
             className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-brand-200 hover:shadow-brand-300 dark:shadow-none dark:hover:shadow-none w-full sm:w-auto justify-center"
@@ -163,7 +168,7 @@ const Library = () => {
       </div>
 
       {/* SQEM-163 — admin review queue for user-submitted listings */}
-      {isSqemesAdmin && pending.length > 0 && (
+      {showAdmin && pending.length > 0 && (
         <div className="mb-8 rounded-2xl border border-amber-200 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-900/10 p-4">
           <h2 className="text-sm font-bold text-amber-800 dark:text-amber-300 flex items-center gap-2 mb-3">
             <ShieldAlert className="w-4 h-4" /> Pending review · {pending.length}
@@ -200,7 +205,7 @@ const Library = () => {
       )}
 
       {/* SQEM-169 — admin reports queue */}
-      {isSqemesAdmin && reports.length > 0 && (
+      {showAdmin && reports.length > 0 && (
         <div className="mb-8 rounded-2xl border border-red-200 dark:border-red-800/50 bg-red-50/60 dark:bg-red-900/10 p-4">
           <h2 className="text-sm font-bold text-red-800 dark:text-red-300 flex items-center gap-2 mb-3">
             <Flag className="w-4 h-4" /> Reports · {reports.length}
@@ -285,7 +290,8 @@ const Library = () => {
             <MarketplaceCard
               key={template.id}
               template={template}
-              isAdmin={isSqemesAdmin}
+              isAdmin={showAdmin}
+              canVote={!IS_SELF_HOSTED}
               score={scoreOverrides[template.id] ?? template.score ?? 0}
               myVote={myVotes[template.id] ?? 0}
               onVote={handleVote}
@@ -313,6 +319,7 @@ const Library = () => {
 const MarketplaceCard = memo(({
   template,
   isAdmin,
+  canVote,
   score,
   myVote,
   onVote,
@@ -321,6 +328,7 @@ const MarketplaceCard = memo(({
 }: {
   template: LibraryTemplate;
   isAdmin: boolean;
+  canVote: boolean;
   score: number;
   myVote: number;
   onVote: (id: string, baseScore: number, value: 1 | -1) => void;
@@ -358,9 +366,10 @@ const MarketplaceCard = memo(({
       title={template.title}
       titleHref={`/library/${template.id}`}
       description={template.description}
-      footerLeft={(
+      footerLeft={canVote && (
         // SQEM-169 — temperature votes on the card: 🔥 hot (red) vs ❄️ cold (ice-blue); score in degrees.
         // h-8 (32px) = the exact height of the py-2 text-xs "See template details" button beside it.
+        // SQEM-178 — hidden on self-host (voting needs a Cloud account).
         <div className="flex items-stretch h-8 rounded-lg border border-slate-200 dark:border-slate-700">
           <button onClick={() => onVote(template.id, score, 1)} title="Hot" className={`flex items-center px-2 rounded-l-lg transition-colors ${myVote === 1 ? 'text-red-500 bg-red-50 dark:bg-red-900/20' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
             <Flame className="w-3.5 h-3.5" />
