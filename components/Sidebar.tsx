@@ -31,6 +31,7 @@ import { useExtensionInstalled } from '../hooks/useExtensionInstalled';
 import { useUpdateStatus } from '../hooks/useUpdateStatus';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
+import PlanBadge from './PlanBadge';
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -109,12 +110,6 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
     setTooltip(null);
   };
 
-  const planColors = {
-    Solo: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',
-    Team: 'bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400',
-    Business: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800',
-    Managed: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400',
-  };
 
   const navLinks: { to: string; icon: any; label: string; beta?: boolean; arrow?: boolean }[] = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -206,12 +201,8 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
               <div className="animate-fade-in">
                 <div className="flex items-center gap-2">
                   <h1 className="font-bold text-slate-900 dark:text-slate-100 leading-tight tracking-tight text-xl">sqemes</h1>
-                  {/* SQEM-119 — no plan tier on self-host */}
-                  {!IS_SELF_HOSTED && (
-                  <span className={`text-2xs font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${workspace.isManaged ? planColors.Managed : (planColors[workspace.plan] || planColors.Solo)}`}>
-                    {workspace.isManaged ? 'Managed' : workspace.plan}
-                  </span>
-                  )}
+                  {/* SQEM-119/182 — plan tier is Cloud-only; PlanBadge is stubbed to null on self-host. */}
+                  <PlanBadge workspace={workspace} />
                 </div>
                 
                 <div className="relative" ref={workspaceMenuRef}>

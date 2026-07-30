@@ -20,7 +20,7 @@ async function marketplaceApi<T>(action: string, payload: Record<string, unknown
 }
 
 // library_templates gained UGC columns (SQEM-163) not yet in the generated types — a loose row type.
-type LibraryTemplateRow = Database['public']['Tables']['library_templates']['Row'] & {
+export type LibraryTemplateRow = Database['public']['Tables']['library_templates']['Row'] & {
   workspace_id?: string | null; status?: string | null; bundle_path?: string | null; content?: string | null; preview?: unknown;
   score?: number; vote_count?: number; scan_risk?: string | null; scan_reasons?: unknown; source_prompt_id?: string | null; content_hash?: string | null;
 };
@@ -31,7 +31,7 @@ async function sha256Hex(text: string): Promise<string> {
 }
 
 // UGC columns beyond the base curated select.
-const UGC_COLS = 'workspace_id, status, bundle_path, content, preview, score, vote_count, scan_risk, scan_reasons';
+export const UGC_COLS = 'workspace_id, status, bundle_path, content, preview, score, vote_count, scan_risk, scan_reasons';
 
 export function rowToLibraryTemplate(row: LibraryTemplateRow): LibraryTemplate {
   return {
@@ -326,25 +326,8 @@ export async function reportListing(listingId: string, reason: string, details?:
   if (error) throw error;
 }
 
-/** Sqemes-admin: pending submissions awaiting review. */
-export async function fetchPendingListings(): Promise<LibraryTemplate[]> {
-  const { data, error } = await client.from('library_templates')
-    .select(`id, kind, title, description, category, tags, steps, variables, system_instruction, brand_config, usage_count, published, created_by, created_at, updated_at, ${UGC_COLS}, source, publisher_id, marketplace_publishers(display_name)`)
-    .eq('status', 'pending').order('created_at', { ascending: false });
-  if (error) throw error;
-  return (data || []).map((r: unknown) => rowToLibraryTemplate(r as LibraryTemplateRow));
-}
-
-/** Sqemes-admin: approve / reject / unpublish a listing (admin RLS UPDATE). */
-export async function moderateListing(id: string, action: 'approve' | 'reject' | 'unpublish'): Promise<void> {
-  const patch = action === 'approve'
-    ? { published: true, status: 'published' }
-    : action === 'reject'
-      ? { published: false, status: 'rejected' }
-      : { published: false, status: 'pending' }; // unpublish → back to review
-  const { error } = await client.from('library_templates').update(patch).eq('id', id);
-  if (error) throw error;
-}
+// Sqemes-admin marketplace moderation + publisher management moved to `lib/api/marketplaceAdmin.ts`
+// (SQEM-182) — a Cloud-only module pruned from the self-host export.
 
 // ---- SQEM-169 — votes -------------------------------------------------------------------------------
 
@@ -376,63 +359,7 @@ export async function fetchMyVotes(): Promise<Record<string, number>> {
   return out;
 }
 
-// ---- SQEM-169 — reports (admin moderation queue) ----------------------------------------------------
-
-export type MarketplaceReport = { id: string; libraryTemplateId: string; reason: string; details: string | null; createdAt: string; listingTitle: string };
-
-/** Sqemes-admin: open reports, newest first, with the reported listing's title. */
-export async function fetchReports(): Promise<MarketplaceReport[]> {
-  const { data, error } = await client.from('library_template_reports')
-    .select('id, library_template_id, reason, details, created_at, library_templates(title)')
-    .eq('status', 'open').order('created_at', { ascending: false });
-  if (error) throw error;
-  return (data || []).map((r: { id: string; library_template_id: string; reason: string; details: string | null; created_at: string; library_templates?: { title?: string } }) => ({
-    id: r.id, libraryTemplateId: r.library_template_id, reason: r.reason, details: r.details, createdAt: r.created_at,
-    listingTitle: r.library_templates?.title ?? '(deleted)',
-  }));
-}
-
-/** Sqemes-admin: mark a report reviewed / dismissed. */
-export async function resolveReport(id: string, status: 'reviewed' | 'dismissed'): Promise<void> {
-  const { error } = await client.from('library_template_reports').update({ status }).eq('id', id);
-  if (error) throw error;
-}
-
-// ---- SQEM-179 — marketplace publishers (invite-only, admin-managed) ---------------------------------
-
-export type MarketplacePublisher = { id: string; displayName: string; banned: boolean; createdAt: string };
-
-function rowToPublisher(r: { id: string; display_name: string; banned: boolean; created_at: string }): MarketplacePublisher {
-  return { id: r.id, displayName: r.display_name, banned: r.banned, createdAt: r.created_at };
-}
-
-/** Sqemes-admin: create a publisher (invite-only). Returns the raw token ONCE — it is SHA-256 hashed at
- *  rest and can't be retrieved again. The publisher puts it in their self-host SERVER config. */
-export async function createPublisher(displayName: string): Promise<{ publisher: MarketplacePublisher; token: string }> {
-  const token = 'smp_' + Array.from(crypto.getRandomValues(new Uint8Array(24)))
-    .map(b => b.toString(16).padStart(2, '0')).join('');
-  const tokenHash = await sha256Hex(token);
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data, error } = await client.from('marketplace_publishers')
-    .insert({ display_name: displayName.trim(), token_hash: tokenHash, granted_by: user?.id ?? null })
-    .select('id, display_name, banned, created_at').single();
-  if (error) throw error;
-  return { publisher: rowToPublisher(data), token };
-}
-
-/** Sqemes-admin: list publishers, newest first. */
-export async function fetchPublishers(): Promise<MarketplacePublisher[]> {
-  const { data, error } = await client.from('marketplace_publishers')
-    .select('id, display_name, banned, created_at').order('created_at', { ascending: false });
-  if (error) throw error;
-  return (data || []).map(rowToPublisher);
-}
-
-/** Sqemes-admin: ban / unban a publisher (banned publishers can't submit). */
-export async function setPublisherBanned(id: string, banned: boolean): Promise<void> {
-  const { error } = await client.from('marketplace_publishers').update({ banned }).eq('id', id);
-  if (error) throw error;
-}
+// Reports + publishers admin API moved to `lib/api/marketplaceAdmin.ts` (SQEM-182, Cloud-only, pruned).
 
 // ---- SQEM-181 — self-host publish (submit to the global marketplace via the api-sidecar proxy) --------
 

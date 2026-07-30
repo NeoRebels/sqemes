@@ -4,8 +4,8 @@ import { useUI, useWorkspace, useData } from '../store';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { TEMPLATE_CATEGORIES, CATEGORY_COLORS } from '../constants';
 import { LibraryTemplate, TemplateCategory, PromptKind } from '../types';
-import { fetchPendingListings, moderateListing, fetchReports, resolveReport, voteListing, fetchMyVotes, fetchPublishers, createPublisher, setPublisherBanned, type MarketplaceReport, type MarketplacePublisher } from '../lib/api/library';
-import { Plus, Edit, Trash2, EyeOff, Layers, Loader2, PenTool, Bot, Wand2, Check, X, ShieldAlert, ArrowUpRight, Flag, Flame, Snowflake, Users, KeyRound, Copy } from 'lucide-react';
+import { voteListing, fetchMyVotes } from '../lib/api/library';
+import { Edit, Trash2, EyeOff, ArrowUpRight, Flame, Snowflake, PenTool, Bot, Wand2, Layers } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -13,6 +13,7 @@ import SearchInput from '../components/ui/SearchInput';
 import SegmentedTabs from '../components/ui/SegmentedTabs';
 import KindBadge from '../components/ui/KindBadge';
 import TemplateCard from '../components/ui/TemplateCard';
+import MarketplaceAdminEntry from '../components/MarketplaceAdminEntry';
 
 const LibrarySkeleton = () => (
   <Card className="animate-pulse p-6 flex flex-col gap-3">
@@ -46,16 +47,6 @@ const Library = () => {
   const [activeKind, setActiveKind] = useState<'all' | PromptKind>('all');
   const [search, setSearch] = useState('');
   const [deleteModalId, setDeleteModalId] = useState<string | null>(null);
-  // SQEM-163 — admin review queue (copy + adapt live on the detail page now, SQEM-165)
-  const [pending, setPending] = useState<LibraryTemplate[]>([]);
-  const [moderatingId, setModeratingId] = useState<string | null>(null);
-  const [reports, setReports] = useState<MarketplaceReport[]>([]);
-  const [resolvingId, setResolvingId] = useState<string | null>(null);
-  // SQEM-179 — invite-only publishers (self-host submitters)
-  const [publishers, setPublishers] = useState<MarketplacePublisher[]>([]);
-  const [newPublisherName, setNewPublisherName] = useState('');
-  const [creatingPublisher, setCreatingPublisher] = useState(false);
-  const [issuedToken, setIssuedToken] = useState<{ name: string; token: string } | null>(null);
   // SQEM-169 — votes on cards (myVote + optimistic score override per listing)
   const [myVotes, setMyVotes] = useState<Record<string, number>>({});
   const [scoreOverrides, setScoreOverrides] = useState<Record<string, number>>({});
@@ -64,38 +55,6 @@ const Library = () => {
     if (IS_SELF_HOSTED) return; // voting is Cloud-only (needs an account)
     fetchMyVotes().then(setMyVotes).catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (!showAdmin) return;
-    fetchPendingListings().then(setPending).catch(() => {});
-    fetchReports().then(setReports).catch(() => {});
-    fetchPublishers().then(setPublishers).catch(() => {});
-  }, [showAdmin]);
-
-  const handleCreatePublisher = useCallback(async () => {
-    const name = newPublisherName.trim();
-    if (!name) return;
-    setCreatingPublisher(true);
-    try {
-      const { publisher, token } = await createPublisher(name);
-      setPublishers(prev => [publisher, ...prev]);
-      setIssuedToken({ name, token }); // shown once
-      setNewPublisherName('');
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not create publisher', 'error');
-    } finally {
-      setCreatingPublisher(false);
-    }
-  }, [newPublisherName, showToast]);
-
-  const handleToggleBan = useCallback(async (p: MarketplacePublisher) => {
-    try {
-      await setPublisherBanned(p.id, !p.banned);
-      setPublishers(prev => prev.map(x => x.id === p.id ? { ...x, banned: !x.banned } : x));
-    } catch {
-      showToast('Could not update publisher', 'error');
-    }
-  }, [showToast]);
 
   const handleVote = useCallback(async (listingId: string, baseScore: number, value: 1 | -1) => {
     const prev = myVotes[listingId] ?? 0;
@@ -110,33 +69,6 @@ const Library = () => {
       showToast(e instanceof Error ? e.message : 'Vote failed', 'error');
     }
   }, [myVotes, scoreOverrides, showToast]);
-
-  const handleReport = useCallback(async (report: MarketplaceReport, action: 'unpublish' | 'dismiss') => {
-    setResolvingId(report.id);
-    try {
-      if (action === 'unpublish') await moderateListing(report.libraryTemplateId, 'unpublish');
-      await resolveReport(report.id, action === 'unpublish' ? 'reviewed' : 'dismissed');
-      setReports(prev => prev.filter(r => r.id !== report.id));
-      showToast(action === 'unpublish' ? 'Unpublished + report resolved' : 'Report dismissed', 'success');
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Action failed', 'error');
-    } finally {
-      setResolvingId(null);
-    }
-  }, [showToast]);
-
-  const handleModerate = useCallback(async (id: string, action: 'approve' | 'reject') => {
-    setModeratingId(id);
-    try {
-      await moderateListing(id, action);
-      setPending(prev => prev.filter(p => p.id !== id));
-      showToast(action === 'approve' ? 'Approved — now live' : 'Rejected', 'success');
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Action failed', 'error');
-    } finally {
-      setModeratingId(null);
-    }
-  }, [showToast]);
 
   const categoryOrder = useMemo(() => ['All', ...TEMPLATE_CATEGORIES], []);
 
@@ -188,132 +120,10 @@ const Library = () => {
           <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Marketplace</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-2">Browse and save templates to your workspace</p>
         </div>
-        {showAdmin && (
-          <button
-            onClick={() => navigate('/library/new')}
-            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-brand-200 hover:shadow-brand-300 dark:shadow-none dark:hover:shadow-none w-full sm:w-auto justify-center"
-          >
-            <Plus className="w-5 h-5" /> Add Template
-          </button>
-        )}
+        {/* SQEM-182 — Cloud-admin moderation + publishers, in a self-contained overlay (stubbed to null
+            on self-host, so no admin surface ships there). */}
+        <MarketplaceAdminEntry />
       </div>
-
-      {/* SQEM-163 — admin review queue for user-submitted listings */}
-      {showAdmin && pending.length > 0 && (
-        <div className="mb-8 rounded-2xl border border-amber-200 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-900/10 p-4">
-          <h2 className="text-sm font-bold text-amber-800 dark:text-amber-300 flex items-center gap-2 mb-3">
-            <ShieldAlert className="w-4 h-4" /> Pending review · {pending.length}
-          </h2>
-          <div className="space-y-2">
-            {pending.map(p => (
-              <div key={p.id} className="flex items-center justify-between gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate flex items-center gap-2">
-                    <KindBadge kind={p.kind} /> {p.title}
-                    {p.kind === 'skill' && <span className="text-2xs font-bold uppercase text-amber-600">extra review</span>}
-                    {p.scanRisk && p.scanRisk !== 'low' && (
-                      <span className={`text-2xs font-bold uppercase px-1.5 py-0.5 rounded ${p.scanRisk === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'}`}
-                        title={(p.scanReasons || []).join('\n')}>
-                        ⚠ {p.scanRisk} risk
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-slate-400 truncate">
-                    {p.description || '—'} · {p.preview?.fileCount || 0} files · {p.preview?.skillCount || 0} skills
-                    {p.source === 'self-host' && (
-                      <> · <span className="font-semibold text-indigo-500 dark:text-indigo-400">self-host</span> by {p.publisherName || 'unknown publisher'}</>
-                    )}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Link to={`/library/${p.id}`} className="px-2.5 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-600">Review</Link>
-                  <button onClick={() => handleModerate(p.id, 'approve')} disabled={moderatingId === p.id} className="p-2 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg disabled:opacity-50" title="Approve">
-                    {moderatingId === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                  </button>
-                  <button onClick={() => handleModerate(p.id, 'reject')} disabled={moderatingId === p.id} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg disabled:opacity-50" title="Reject">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* SQEM-169 — admin reports queue */}
-      {showAdmin && reports.length > 0 && (
-        <div className="mb-8 rounded-2xl border border-red-200 dark:border-red-800/50 bg-red-50/60 dark:bg-red-900/10 p-4">
-          <h2 className="text-sm font-bold text-red-800 dark:text-red-300 flex items-center gap-2 mb-3">
-            <Flag className="w-4 h-4" /> Reports · {reports.length}
-          </h2>
-          <div className="space-y-2">
-            {reports.map(r => (
-              <div key={r.id} className="flex items-center justify-between gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{r.listingTitle}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate"><span className="font-semibold">{r.reason}</span>{r.details ? ` — ${r.details}` : ''}</p>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Link to={`/library/${r.libraryTemplateId}`} className="px-2.5 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-600">View</Link>
-                  <button onClick={() => handleReport(r, 'unpublish')} disabled={resolvingId === r.id} className="px-2.5 py-1.5 text-xs font-bold text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 disabled:opacity-50">
-                    {resolvingId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Unpublish'}
-                  </button>
-                  <button onClick={() => handleReport(r, 'dismiss')} disabled={resolvingId === r.id} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg disabled:opacity-50" title="Dismiss report">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* SQEM-179 — invite-only publishers (self-host submitters). Cloud-admin only. */}
-      {showAdmin && (
-        <div className="mb-8 rounded-2xl border border-indigo-200 dark:border-indigo-800/50 bg-indigo-50/60 dark:bg-indigo-900/10 p-4">
-          <h2 className="text-sm font-bold text-indigo-800 dark:text-indigo-300 flex items-center gap-2 mb-1">
-            <Users className="w-4 h-4" /> Publishers · {publishers.length}
-          </h2>
-          <p className="text-xs text-indigo-500/80 dark:text-indigo-400/70 mb-3">Invite-only identities that can submit templates to the marketplace from self-hosted instances. Each gets a token to place in their self-host <code className="font-mono">MARKETPLACE_PUBLISHER_TOKEN</code>.</p>
-          <div className="flex items-center gap-2 mb-3">
-            <input
-              value={newPublisherName}
-              onChange={e => setNewPublisherName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleCreatePublisher(); }}
-              placeholder="New publisher name (e.g. ACME Agency)"
-              className="flex-1 p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:border-indigo-400 text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
-            />
-            <button
-              onClick={handleCreatePublisher}
-              disabled={creatingPublisher || !newPublisherName.trim()}
-              className="flex items-center gap-1.5 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-40 shrink-0"
-            >
-              {creatingPublisher ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />} Create + issue token
-            </button>
-          </div>
-          {publishers.length > 0 && (
-            <div className="space-y-2">
-              {publishers.map(p => (
-                <div key={p.id} className="flex items-center justify-between gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate flex items-center gap-2">
-                      {p.displayName}
-                      {p.banned && <span className="text-2xs font-bold uppercase px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">banned</span>}
-                    </p>
-                    <p className="text-xs text-slate-400">since {new Date(p.createdAt).toLocaleDateString()}</p>
-                  </div>
-                  <button
-                    onClick={() => handleToggleBan(p)}
-                    className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-colors shrink-0 ${p.banned ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100' : 'text-red-600 bg-red-50 dark:bg-red-900/20 hover:bg-red-100'}`}
-                  >
-                    {p.banned ? 'Unban' : 'Ban'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Search + Kind filter — mirrors the Templates / Files bar */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -393,25 +203,6 @@ const Library = () => {
           <button onClick={() => setDeleteModalId(null)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
           <Button variant="danger" onClick={() => handleDelete(deleteModalId!)} className="flex-1 py-2.5 text-xs shadow-lg hover:shadow-red-200">Yes, Delete</Button>
         </div>
-      </Modal>
-
-      {/* SQEM-179 — publisher token, shown once */}
-      <Modal open={!!issuedToken} onClose={() => setIssuedToken(null)} size="sm" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2"><KeyRound className="w-4 h-4 text-indigo-500" /> Publisher token</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-          Copy it now — it's shown <b>once</b> and stored only as a hash. Give it to <b>{issuedToken?.name}</b> to set as <code className="font-mono text-xs">MARKETPLACE_PUBLISHER_TOKEN</code> on their self-hosted instance.
-        </p>
-        <div className="flex items-center gap-2 mb-6">
-          <code className="flex-1 p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-800 dark:text-slate-200 break-all">{issuedToken?.token}</code>
-          <button
-            onClick={() => { if (issuedToken) { navigator.clipboard.writeText(issuedToken.token); showToast('Token copied', 'success'); } }}
-            className="p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors shrink-0"
-            title="Copy token"
-          >
-            <Copy className="w-4 h-4" />
-          </button>
-        </div>
-        <Button onClick={() => setIssuedToken(null)} className="w-full py-2.5 text-xs">Done</Button>
       </Modal>
 
     </div>
