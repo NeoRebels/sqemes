@@ -397,3 +397,17 @@ export async function submitToMarketplaceViaProxy(template: Prompt, allFiles: Wo
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((json as { error?: string }).error || `Submit failed (${res.status})`);
 }
+
+/** Self-host admin: set (or clear with an empty string) the publisher token. Sends the user's JWT so the
+ *  api-sidecar can verify a workspace admin; the token is encrypted server-side and never read back
+ *  (SQEM-183). Cloud never uses this (publishing is direct there). */
+export async function setPublisherToken(token: string): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const res = await fetch('/api/marketplace-config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+    body: JSON.stringify({ token }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((json as { error?: string }).error || `Save failed (${res.status})`);
+}

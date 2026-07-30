@@ -92,11 +92,14 @@ services:
       # The handlers advertise these (extension config + OAuth metadata).
       VITE_SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
       VITE_SUPABASE_ANON_KEY: ${ANON_KEY}
-      # SQEM-181 — marketplace submit proxy. The publisher token is a SERVER secret (never in the
-      # browser); leave empty to disable publishing from this instance. VITE_MARKETPLACE_API_URL sets
-      # the Cloud marketplace to submit to (default Cloud prod).
+      # SQEM-181/183 — marketplace submit proxy. Prefer setting the publisher token in Settings → General
+      # (stored AES-GCM-encrypted in the DB via the service role); the env below is a legacy fallback.
+      # VITE_MARKETPLACE_API_URL sets the Cloud marketplace to submit to (default Cloud prod).
       MARKETPLACE_PUBLISHER_TOKEN: ${MARKETPLACE_PUBLISHER_TOKEN:-}
       VITE_MARKETPLACE_API_URL: ${VITE_MARKETPLACE_API_URL:-}
+      # SQEM-183 — the sidecar stores/reads the token in the DB (service role) and encrypts it at rest.
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY}
     ports:
       - ${SQEMES_API_PORT:-8787}:8787
 

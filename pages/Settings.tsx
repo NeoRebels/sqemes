@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { PLANS, TRIAL_DAYS } from '../constants';
 import { hasActiveSubscription, isTrialing } from '../lib/subscription';
 import { IS_SELF_HOSTED } from '../lib/env';
+import { fetchCanPublish, setPublisherToken } from '../lib/api/library';
 import { UserRole } from '../types';
 import { BrandProfileForm, brandFormFromProfile, type BrandFormValue } from '../components/BrandProfileForm';
 import { TemplateAccessControl, rolesToAccessValue, accessValueToRoles } from '../components/TemplateAccessControl';
@@ -194,6 +195,27 @@ const Settings = () => {
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
   const [generatedKeyValue, setGeneratedKeyValue] = useState<string | null>(null);
   const [deletingKeyId, setDeletingKeyId] = useState<string | null>(null);
+  // SQEM-183 — self-host marketplace publisher token (write-only; stored encrypted server-side)
+  const [pubToken, setPubToken] = useState('');
+  const [pubConfigured, setPubConfigured] = useState(false);
+  const [pubSaving, setPubSaving] = useState(false);
+  useEffect(() => {
+    if (IS_SELF_HOSTED) fetchCanPublish().then(setPubConfigured).catch(() => {});
+  }, []);
+  const savePublisherToken = async (override?: string) => {
+    const t = (override ?? pubToken).trim();
+    setPubSaving(true);
+    try {
+      await setPublisherToken(t);
+      setPubConfigured(!!t);
+      setPubToken('');
+      showToast(t ? 'Publisher token saved' : 'Publisher token cleared', 'success');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not save the token', 'error');
+    } finally {
+      setPubSaving(false);
+    }
+  };
   const [keyCopied, setKeyCopied] = useState(false);
   // Editing scope/expiry of an existing connection (no re-issue).
   const [editingKey, setEditingKey] = useState<SqemesApiKey | null>(null);
@@ -768,6 +790,44 @@ const Settings = () => {
                   </div>
                 </div>
               </Card>
+
+              {/* SQEM-183 — self-host marketplace publisher token (Cloud publishes directly; self-host only) */}
+              {IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
+                <Card className="p-6 md:p-8">
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Marketplace Publisher</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                    A publisher token lets this instance <span className="font-semibold">submit</span> templates to the Sqemes community marketplace (browsing + copying works without one). It's stored encrypted and never shown again.{' '}
+                    <a href="https://sqemes.com/publisher" target="_blank" rel="noopener noreferrer" className="text-brand-600 dark:text-brand-400 font-semibold hover:underline">Apply for a publisher key →</a>
+                  </p>
+                  <div className="mb-2">
+                    <span className={`text-xs font-bold px-2 py-1 rounded-lg ${pubConfigured ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`}>
+                      {pubConfigured ? 'Configured' : 'Not configured'}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={pubToken}
+                      onChange={e => setPubToken(e.target.value)}
+                      placeholder={pubConfigured ? 'Enter a new token to replace it…' : 'smp_…'}
+                      autoComplete="off"
+                      className="flex-1 p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all font-mono"
+                    />
+                    <button
+                      onClick={() => savePublisherToken()}
+                      disabled={pubSaving || !pubToken.trim()}
+                      className="px-5 py-3 bg-brand-600 text-white rounded-xl text-sm font-bold hover:bg-brand-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {pubSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
+                    </button>
+                  </div>
+                  {pubConfigured && (
+                    <button onClick={() => savePublisherToken('')} disabled={pubSaving} className="mt-3 text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50">
+                      Clear token
+                    </button>
+                  )}
+                </Card>
+              )}
 
               {/* SQEM-170 — Template Access (default) is a Cloud-only feature */}
               {!IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (

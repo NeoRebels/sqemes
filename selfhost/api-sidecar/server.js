@@ -10,6 +10,7 @@ import extensionConfig from './api/extension-config.js';
 import oauthAuthorize from './api/oauth-authorize.js';
 import mcpOauthMetadata from './api/mcp-oauth-metadata.js';
 import marketplaceSubmit from './api/marketplace-submit.js';
+import marketplaceConfig from './api/marketplace-config.js';
 
 // Path → handler. Mirrors the vercel.json rewrites.
 const routes = {
@@ -17,6 +18,7 @@ const routes = {
   '/oauth/authorize': oauthAuthorize,
   '/.well-known/oauth-authorization-server': mcpOauthMetadata,
   '/api/marketplace-submit': marketplaceSubmit, // SQEM-181 — self-host → Cloud marketplace submit proxy
+  '/api/marketplace-config': marketplaceConfig, // SQEM-183 — set/check the publisher token (encrypted in DB)
 };
 
 const PORT = Number(process.env.PORT) || 8787;

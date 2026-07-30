@@ -330,10 +330,13 @@ const Templates = () => {
     }
   };
 
+  // SQEM-183 — on self-host without a publisher key, the marketplace icon opens an "apply" modal instead.
+  const [showApplyModal, setShowApplyModal] = useState(false);
   const openPublish = useCallback((prompt: Prompt) => {
+    if (IS_SELF_HOSTED && !canPublish) { setShowApplyModal(true); return; }
     setPublishTarget(prompt);
     setPublishCategory('General');
-  }, []);
+  }, [canPublish]);
 
   const confirmPublish = async () => {
     if (!publishTarget || !workspace?.id) return;
@@ -495,7 +498,7 @@ const Templates = () => {
               onRun={handleRun}
               onSetTag={handleSetTag}
               onPublish={openPublish}
-              showPublish={canPublish}
+              showPublish={true}
             />
           ))}
         </div>
@@ -564,6 +567,23 @@ const Templates = () => {
             </div>
           </>
         )}
+      </Modal>
+
+      {/* SQEM-183 — self-host without a publisher key: prompt to apply instead of publishing */}
+      <Modal open={showApplyModal} onClose={() => setShowApplyModal(false)} size="sm" className="p-6">
+        <div className="flex items-center gap-2.5 mb-2">
+          <Store className="w-6 h-6 text-brand-500" />
+          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">You need a publisher key</h3>
+        </div>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+          Submitting your templates to the Sqemes community marketplace requires a <span className="font-semibold">publisher key</span>. Request one, then add it in <span className="font-semibold">Settings → General → Marketplace Publisher</span>.
+        </p>
+        <div className="flex gap-2">
+          <button onClick={() => setShowApplyModal(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
+          <a href="https://sqemes.com/publisher" target="_blank" rel="noopener noreferrer" onClick={() => setShowApplyModal(false)} className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2">
+            More info
+          </a>
+        </div>
       </Modal>
 
       {/* Import preview (SQEM-161) — transparency before applying a third-party bundle */}
