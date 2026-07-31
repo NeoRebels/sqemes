@@ -31,7 +31,7 @@ export default defineConfig({
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router')) return 'vendor-react';
           if (id.includes('node_modules/@supabase/supabase-js')) return 'vendor-supabase';
           if (id.includes('node_modules/lucide-react')) return 'vendor-icons';
-          if (id.includes('node_modules/react-markdown') || id.includes('node_modules/react-quill-new')) return 'vendor-markdown';
+          if (id.includes('node_modules/react-markdown')) return 'vendor-markdown'; // SQEM-186 — react-quill-new was removed
         },
       },
     },

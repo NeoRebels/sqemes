@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { useUI, useWorkspace, useData, useChatSessions } from '../store';
 import { checkContentViolation } from '../lib/contentGuard';
 import { IS_SELF_HOSTED } from '../lib/env';
@@ -136,6 +136,113 @@ interface ChatMsg {
   userAvatar?: string;
 }
 
+// SQEM-185 — a memoized single message. Extracting this out of the Chat component means composer
+// keystrokes (which re-render Chat) no longer re-render — and re-parse the markdown of — every message.
+// All props are primitives or stable callbacks, so React.memo skips unchanged rows on the hot path.
+interface MessageItemProps {
+  msg: ChatMsg;
+  currentUserId: string;
+  currentUserName: string;
+  userAvatar: string;
+  showUserAvatar: boolean;
+  onAvatarError: () => void;
+  isLastAssistant: boolean;
+  isLoading: boolean;
+  isCopied: boolean;
+  onCopy: (msgId: string, content: string) => void;
+  onEdit: (msg: ChatMsg) => void;
+  innerRef?: React.Ref<HTMLDivElement>;
+}
+
+const MessageItem = memo(function MessageItem({
+  msg, currentUserId, currentUserName, userAvatar, showUserAvatar, onAvatarError,
+  isLastAssistant, isLoading, isCopied, onCopy, onEdit, innerRef,
+}: MessageItemProps) {
+  const isOtherUser = msg.role === 'user' && !!msg.userId && msg.userId !== currentUserId;
+  return (
+    <div ref={innerRef} className={`flex gap-3 ${msg.role === 'user' && !isOtherUser ? 'justify-end' : 'justify-start'}${isLastAssistant ? ' scroll-mt-5' : ''}`}>
+      {msg.role === 'assistant' && (
+        <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center shrink-0 mt-1">
+          <Bot className="w-4 h-4 text-brand-600 dark:text-brand-400" />
+        </div>
+      )}
+      {isOtherUser && (
+        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0 mt-1 overflow-hidden">
+          {msg.userAvatar
+            ? <img src={msg.userAvatar} alt={msg.userName || 'User'} className="w-full h-full object-cover" />
+            : <User className="w-4 h-4 text-slate-500" />}
+        </div>
+      )}
+      <div className={`max-w-[85%] ${msg.role === 'user' && !isOtherUser ? 'order-first' : ''}`}>
+        {isOtherUser && (
+          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1 ml-1">{msg.userName || 'Collaborator'}</p>
+        )}
+        {msg.role === 'user' ? (
+          <div>
+            <div className={`px-4 py-3 rounded-2xl shadow-sm ${isOtherUser ? 'bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-tl-md' : 'bg-brand-600 text-white rounded-tr-md'}`}>
+              {msg.attachments && msg.attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {msg.attachments.map((att, i) =>
+                    isImageType(att.mimeType) ? (
+                      <img key={i} src={att.dataUrl} alt="Attachment" className="max-w-[200px] max-h-[150px] rounded-lg object-cover border border-white/20" />
+                    ) : (
+                      <div key={i} className="flex items-center gap-1.5 bg-white/10 rounded-lg px-2.5 py-1.5">
+                        <FileText className="w-4 h-4 text-white/70" />
+                        <span className="text-xs text-white/80 font-medium">{fileTypeLabel(att.mimeType)}</span>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+            </div>
+            <div className={`mt-2 flex gap-2 ${isOtherUser ? 'ml-1' : 'mr-1 justify-end'}`}>
+              <button onClick={() => onCopy(msg.id, msg.content)} className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+                {isCopied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+              </button>
+              {!isLoading && !isOtherUser && (
+                <button onClick={() => onEdit(msg)} className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+                  <Pencil className="w-3.5 h-3.5" /> Edit
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="bg-white dark:bg-slate-800 px-5 py-4 rounded-2xl rounded-tl-md shadow-sm border border-slate-100 dark:border-slate-700">
+              {msg.pending ? (
+                <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">Thinking...</span>
+                </div>
+              ) : (
+                <div className="prose max-w-none text-sm">
+                  {/* SQEM-019: rely on react-markdown's default urlTransform, which strips
+                      javascript:/data: schemes from model-supplied links (XSS defense). */}
+                  <ReactMarkdown components={MarkdownComponents} remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                </div>
+              )}
+              {msg.model && !msg.pending && <p className="text-3xs text-slate-400 dark:text-slate-500 mt-2 font-mono">{msg.model}</p>}
+            </div>
+            {!msg.pending && (
+              <button onClick={() => onCopy(msg.id, msg.content)} className="mt-2 ml-1 inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+                {isCopied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {msg.role === 'user' && !isOtherUser && (
+        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0 mt-1">
+          {showUserAvatar
+            ? <img src={userAvatar} alt={currentUserName || 'User'} className="w-full h-full rounded-lg object-cover" onError={onAvatarError} />
+            : <User className="w-4 h-4 text-slate-500" />}
+        </div>
+      )}
+    </div>
+  );
+});
+
 const formatRelativeTime = (iso: string) => {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
@@ -238,11 +345,18 @@ const Chat = () => {
   const showUserAvatar = userAvatar.length > 0 && !avatarLoadError;
   const launchTemplateId  = (location.state as { launchTemplateId?: string } | null)?.launchTemplateId;
 
-  const enabledModels = buildEnabledModels(workspace.apiKeys, workspace.openrouterModels, workspace.fundedAvailable);
+  // SQEM-185 — memoized so a keystroke in the composer doesn't rebuild the model list or re-sort sessions.
+  const enabledModels = useMemo(
+    () => buildEnabledModels(workspace.apiKeys, workspace.openrouterModels, workspace.fundedAvailable),
+    [workspace.apiKeys, workspace.openrouterModels, workspace.fundedAvailable],
+  );
 
-  const mySessions = [...chatSessions]
-    .filter(s => s.userId === currentUser.id)
-    .sort((a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime());
+  const mySessions = useMemo(
+    () => [...chatSessions]
+      .filter(s => s.userId === currentUser.id)
+      .sort((a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime()),
+    [chatSessions, currentUser.id],
+  );
 
   // ── Effects ──────────────────────────────────────────────────────────────
 
@@ -379,13 +493,14 @@ const Chat = () => {
     setMobileTab('chat');
   };
 
-  const handleCopyMessage = async (msgId: string, content: string) => {
+  // SQEM-185 — stable so the memoized MessageItem doesn't re-render on unrelated Chat re-renders (typing).
+  const handleCopyMessage = useCallback(async (msgId: string, content: string) => {
     try {
       await navigator.clipboard.writeText(content);
       setCopiedMessageId(msgId);
       setTimeout(() => setCopiedMessageId(prev => prev === msgId ? null : prev), 1500);
     } catch { showToast('Failed to copy text', 'error'); }
-  };
+  }, [showToast]);
 
   const processFile = (file: File) => {
     if (!SUPPORTED_MIME_TYPES.has(file.type)) {
@@ -465,7 +580,9 @@ const Chat = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, [connectorMenuOpen]);
 
-  const handleEditMessage = (msg: ChatMsg) => {
+  // SQEM-185 — useCallback so the memoized MessageItem stays memoized between keystrokes. Depends on
+  // `messages` (unchanged while typing), so it's stable on the hot path but current when messages change.
+  const handleEditMessage = useCallback((msg: ChatMsg) => {
     const idx = messages.findIndex(m => m.id === msg.id);
     if (idx >= 0) {
       // SQEM-115 — remember the truncated tail so it's pruned from the DB on the next send
@@ -480,7 +597,15 @@ const Chat = () => {
       setAttachments([]);
     }
     textareaRef.current?.focus();
-  };
+  }, [messages]);
+
+  // SQEM-185 — stable avatar-error handler + the last-assistant index computed once (was an O(n²)
+  // `messages.map(...).lastIndexOf('assistant')` inside the render map).
+  const handleAvatarError = useCallback(() => setAvatarLoadError(true), []);
+  const lastAssistantIndex = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === 'assistant') return i;
+    return -1;
+  }, [messages]);
 
   const handleEnhanceInput = async () => {
     const trimmed = input.trim();
@@ -1052,92 +1177,23 @@ Output only the refined prompt text, with no surrounding explanation or commenta
               </div>
             ) : (
               <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-                {messages.map((msg, index) => {
-                  const isOtherUser = msg.role === 'user' && msg.userId && msg.userId !== currentUser.id;
-                  const isLastAssistant = msg.role === 'assistant' && index === messages.map(m => m.role).lastIndexOf('assistant');
-                  return (
-                    <div key={msg.id} ref={isLastAssistant ? lastAssistantRef : undefined} className={`flex gap-3 ${msg.role === 'user' && !isOtherUser ? 'justify-end' : 'justify-start'}${isLastAssistant ? ' scroll-mt-5' : ''}`}>
-                      {msg.role === 'assistant' && (
-                        <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center shrink-0 mt-1">
-                          <Bot className="w-4 h-4 text-brand-600 dark:text-brand-400" />
-                        </div>
-                      )}
-                      {isOtherUser && (
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0 mt-1 overflow-hidden">
-                          {msg.userAvatar
-                            ? <img src={msg.userAvatar} alt={msg.userName || 'User'} className="w-full h-full object-cover" />
-                            : <User className="w-4 h-4 text-slate-500" />}
-                        </div>
-                      )}
-                      <div className={`max-w-[85%] ${msg.role === 'user' && !isOtherUser ? 'order-first' : ''}`}>
-                        {isOtherUser && (
-                          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1 ml-1">{msg.userName || 'Collaborator'}</p>
-                        )}
-                        {msg.role === 'user' ? (
-                          <div>
-                            <div className={`px-4 py-3 rounded-2xl shadow-sm ${isOtherUser ? 'bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-tl-md' : 'bg-brand-600 text-white rounded-tr-md'}`}>
-                              {msg.attachments && msg.attachments.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                  {msg.attachments.map((att, i) =>
-                                    isImageType(att.mimeType) ? (
-                                      <img key={i} src={att.dataUrl} alt="Attachment" className="max-w-[200px] max-h-[150px] rounded-lg object-cover border border-white/20" />
-                                    ) : (
-                                      <div key={i} className="flex items-center gap-1.5 bg-white/10 rounded-lg px-2.5 py-1.5">
-                                        <FileText className="w-4 h-4 text-white/70" />
-                                        <span className="text-xs text-white/80 font-medium">{fileTypeLabel(att.mimeType)}</span>
-                                      </div>
-                                    )
-                                  )}
-                                </div>
-                              )}
-                              <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                            </div>
-                            <div className={`mt-2 flex gap-2 ${isOtherUser ? 'ml-1' : 'mr-1 justify-end'}`}>
-                              <button onClick={() => handleCopyMessage(msg.id, msg.content)} className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
-                                {copiedMessageId === msg.id ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
-                              </button>
-                              {!isLoading && !isOtherUser && (
-                                <button onClick={() => handleEditMessage(msg)} className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
-                                  <Pencil className="w-3.5 h-3.5" /> Edit
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <div>
-                            <div className="bg-white dark:bg-slate-800 px-5 py-4 rounded-2xl rounded-tl-md shadow-sm border border-slate-100 dark:border-slate-700">
-                              {msg.pending ? (
-                                <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                  <span className="text-sm">Thinking...</span>
-                                </div>
-                              ) : (
-                                <div className="prose max-w-none text-sm">
-                                  {/* SQEM-019: rely on react-markdown's default urlTransform, which strips
-                                      javascript:/data: schemes from model-supplied links (XSS defense). */}
-                                  <ReactMarkdown components={MarkdownComponents} remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                                </div>
-                              )}
-                              {msg.model && !msg.pending && <p className="text-3xs text-slate-400 dark:text-slate-500 mt-2 font-mono">{msg.model}</p>}
-                            </div>
-                            {!msg.pending && (
-                              <button onClick={() => handleCopyMessage(msg.id, msg.content)} className="mt-2 ml-1 inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
-                                {copiedMessageId === msg.id ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      {msg.role === 'user' && !isOtherUser && (
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0 mt-1">
-                          {showUserAvatar
-                            ? <img src={userAvatar} alt={currentUser.name || 'User'} className="w-full h-full rounded-lg object-cover" onError={() => setAvatarLoadError(true)} />
-                            : <User className="w-4 h-4 text-slate-500" />}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {messages.map((msg, index) => (
+                  <MessageItem
+                    key={msg.id}
+                    msg={msg}
+                    innerRef={index === lastAssistantIndex ? lastAssistantRef : undefined}
+                    isLastAssistant={index === lastAssistantIndex}
+                    currentUserId={currentUser.id}
+                    currentUserName={currentUser.name}
+                    userAvatar={userAvatar}
+                    showUserAvatar={showUserAvatar}
+                    onAvatarError={handleAvatarError}
+                    isLoading={isLoading}
+                    isCopied={copiedMessageId === msg.id}
+                    onCopy={handleCopyMessage}
+                    onEdit={handleEditMessage}
+                  />
+                ))}
 
                 <div ref={messagesEndRef} />
               </div>

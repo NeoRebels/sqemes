@@ -41,8 +41,9 @@ test.describe('Navigation', () => {
     await page.getByRole('button', { name: /sign in/i }).click();
     await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible({ timeout: 20_000 });
 
+    // SQEM-184 — real sidebar nav (the History page was removed; nav is Dashboard·Templates·Marketplace·Files·Chat·Settings).
     const routes = [
-      { link: /history/i, hash: /#\/history/ },
+      { link: /templates/i, hash: /#\/templates/ },
       { link: /settings/i, hash: /#\/settings/ },
     ];
 

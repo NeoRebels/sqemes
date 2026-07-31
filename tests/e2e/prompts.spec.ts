@@ -40,7 +40,10 @@ test.describe('Prompt management', () => {
   });
 });
 
-test.describe('Prompt runner', () => {
+// SQEM-184 — the standalone PromptRunner + History pages were removed (deliberate guardrails).
+// The legacy `/prompts/:id` route now redirects into Chat (PromptRunnerRedirect, App.tsx), rather than
+// showing a 404. This asserts that current behaviour.
+test.describe('Legacy prompt route redirect', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await expect(page.getByPlaceholder('you@company.com')).toBeVisible({ timeout: 10_000 });
@@ -50,11 +53,8 @@ test.describe('Prompt runner', () => {
     await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible({ timeout: 20_000 });
   });
 
-  test('404 page shown for non-existent prompt', async ({ page }) => {
-    await page.goto('/#/prompts/non-existent-id-abc123');
-    // Either a NotFound page or an error state should be visible
-    await expect(
-      page.getByText(/404|not found|does not exist/i)
-    ).toBeVisible({ timeout: 10_000 });
+  test('/prompts/:id redirects into Chat', async ({ page }) => {
+    await page.goto('/#/prompts/some-legacy-id');
+    await expect(page).toHaveURL(/#\/chat/, { timeout: 10_000 });
   });
 });

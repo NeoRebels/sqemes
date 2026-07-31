@@ -1,8 +1,9 @@
 import { supabase } from '../supabase';
 import type { Database } from '../database.types';
 import type { LibraryTemplate, TemplateCategory, Variable, Step, PromptKind, AssistantBrandConfig, Prompt, WorkspaceFile } from '../../types';
-import { buildBundle, readBundle, importBundle } from '../templateBundle';
-import { scanForInjection } from '../injectionScan';
+// SQEM-186 — templateBundle (which statically imports jszip) and injectionScan are dynamically imported
+// at their marketplace call sites below, so jszip stays out of the eager boot chunk (this module is
+// loaded at app start via the store). They only load when a user actually publishes/copies a bundle.
 import { IS_SELF_HOSTED, MARKETPLACE_API_URL, MARKETPLACE_ENABLED } from '../env';
 
 // ---- SQEM-176/178 — global marketplace source ------------------------------------------------------
@@ -210,7 +211,7 @@ export async function publishToMarketplace(input: {
 
   // SQEM-169 — content hash + duplicate pre-check (a friendly message; the DB partial-unique index is
   // the backstop). Blocked only while an earlier listing is still pending/published.
-  const contentHash = await sha256Hex(`${template.title} ${template.description} ${template.content}`);
+  const contentHash = await sha256Hex(`${template.title} ${template.description} ${template.content}`);
   const { data: dupes } = await client.from('library_templates')
     .select('id')
     .eq('workspace_id', workspaceId)
@@ -218,9 +219,11 @@ export async function publishToMarketplace(input: {
     .or(`source_prompt_id.eq.${template.id},content_hash.eq.${contentHash}`);
   if (dupes && dupes.length) throw new Error('This template is already in the Marketplace (published or pending review).');
 
+  const { buildBundle } = await import('../templateBundle');
   const { blob, manifest } = await buildBundle([template], allFiles);
 
   // SQEM-169 — heuristic injection scan (advisory; shown to admins in the review queue).
+  const { scanForInjection } = await import('../injectionScan');
   const scan = scanForInjection(template.content, template.systemInstruction, template.description, ...(manifest.skills || []).map(s => s.content));
 
   const path = `${workspaceId}/${crypto.randomUUID()}/bundle.sqemes.zip`;
@@ -294,6 +297,7 @@ export async function copyListingToWorkspace(listing: LibraryTemplate, workspace
     if (listing.hasBundle) {
       const { url } = await marketplaceApi<{ url: string }>('bundle', { listingId: listing.id });
       const blob = await (await fetch(url)).blob();
+      const { readBundle, importBundle } = await import('../templateBundle');
       const { zip, manifest } = await readBundle(new File([blob], 'bundle.sqemes.zip'));
       await importBundle(zip, manifest, workspaceId, userId);
     } else {
@@ -312,6 +316,7 @@ export async function copyListingToWorkspace(listing: LibraryTemplate, workspace
   const json = await res.json().catch(() => ({}));
   if (!res.ok || !json.url) throw new Error(json.error || `Error ${res.status}`);
   const blob = await (await fetch(json.url)).blob();
+  const { readBundle, importBundle } = await import('../templateBundle');
   const { zip, manifest } = await readBundle(new File([blob], 'bundle.sqemes.zip'));
   await importBundle(zip, manifest, workspaceId, userId);
   await supabase.rpc('increment_template_usage', { template_id: listing.id });
@@ -387,6 +392,7 @@ export async function fetchCanPublish(): Promise<boolean> {
 /** Self-host: submit a template to the global marketplace review queue via the api-sidecar proxy
  *  (which adds the publisher token). Builds the bundle locally and posts it as base64. */
 export async function submitToMarketplaceViaProxy(template: Prompt, allFiles: WorkspaceFile[], category: TemplateCategory): Promise<void> {
+  const { buildBundle } = await import('../templateBundle');
   const { blob } = await buildBundle([template], allFiles);
   const bundle = await blobToBase64(blob);
   const res = await fetch('/api/marketplace-submit', {

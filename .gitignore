@@ -19,3 +19,6 @@ playwright-report/
 !supabase/seed.sql
 # Vendored Supabase self-host DB init scripts (SQEM-116)
 !selfhost/volumes/db/*.sql
+
+# Vitest coverage output
+coverage/

@@ -86,28 +86,5 @@ describe('rowToPrompt', () => {
   });
 });
 
-describe('variable substitution logic', () => {
-  it('replaces {{var}} placeholders with values', () => {
-    let content = 'Hello {{name}}, your role is {{role}}.';
-    const vars = [
-      { name: 'name', value: 'Alice' },
-      { name: 'role', value: 'Engineer' },
-    ];
-    for (const v of vars) {
-      content = content.replace(new RegExp(`{{${v.name}}}`, 'g'), v.value);
-    }
-    expect(content).toBe('Hello Alice, your role is Engineer.');
-  });
-
-  it('replaces multiple occurrences of same variable', () => {
-    let content = '{{x}} and {{x}}';
-    content = content.replace(new RegExp(`{{x}}`, 'g'), 'replaced');
-    expect(content).toBe('replaced and replaced');
-  });
-
-  it('leaves unmatched placeholders unchanged', () => {
-    let content = 'Hello {{name}}';
-    content = content.replace(new RegExp(`{{age}}`, 'g'), '30');
-    expect(content).toBe('Hello {{name}}');
-  });
-});
+// SQEM-184 — the old block here tested a regex re-implemented inline in the test (not product code);
+// removed. The real `{{placeholder}}` extraction is covered in wizardGeneration.test.ts.
