@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 const TEST_EMAIL = process.env.TEST_EMAIL ?? 'test@example.com';
 const TEST_PASSWORD = process.env.TEST_PASSWORD ?? 'testpassword123';
 
-test.describe('Prompt management', () => {
+test.describe('Template management', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await expect(page.getByPlaceholder('you@company.com')).toBeVisible({ timeout: 10_000 });

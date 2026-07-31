@@ -1,5 +1,5 @@
 -- ============================================================
--- Phase 2: Database Schema for PromptMaster (sqemes)
+-- Phase 2: Database Schema for Sqemes
 -- ============================================================
 
 -- Enable UUID extension

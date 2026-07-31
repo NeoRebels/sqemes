@@ -144,7 +144,10 @@ export default function MarketplaceTemplate() {
   const fileNames = listing.preview?.fileNames ?? [];
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+    // Owns its scroll (SQEM-191): this route renders outside Layout, and index.css sets
+    // `overflow: hidden` on html/body — min-h-screen would grow past the viewport and be
+    // clipped, not scrolled. h-screen (not 100vh) keeps the staging-banner override working.
+    <div className="h-screen overflow-y-auto bg-slate-50 dark:bg-slate-900">
       {/* Top bar */}
       <div className="max-w-3xl mx-auto px-6 pt-6 flex items-center justify-between">
         <button onClick={() => navigate('/library')} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors">

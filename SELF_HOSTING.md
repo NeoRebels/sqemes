@@ -1,12 +1,12 @@
 # Self-Hosting Sqemes
 
-Sqemes is **open core**: the prompt/template management platform, MCP server, and Chrome
+Sqemes is **open core**: the AI management platform, MCP server, and Chrome
 extension are open source (Apache 2.0) and run on your own infrastructure with your own AI
 provider keys (BYOK). A few pieces are **Sqemes Cloud only** and simply stay off when their
 secret is absent — nothing breaks.
 
-> Status: internal readiness guide (SQEM-056). It documents how a self-host instance is
-> assembled and where the Cloud/open boundary sits.
+> This guide ships with the public repo — it is what self-hosters read. It documents how a
+> self-host instance is assembled and where the Cloud/open boundary sits.
 
 ---
 
