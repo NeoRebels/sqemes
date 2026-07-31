@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import {
   LayoutDashboard,
   FileText,
-  Bot,
   Store,
   Chrome,
   MessageSquare,
@@ -29,8 +28,6 @@ import { IS_SELF_HOSTED, MARKETPLACE_ENABLED } from '../lib/env';
 import { CURRENT_VERSION } from '../lib/version';
 import { useExtensionInstalled } from '../hooks/useExtensionInstalled';
 import { useUpdateStatus } from '../hooks/useUpdateStatus';
-import Modal from './ui/Modal';
-import Button from './ui/Button';
 import PlanBadge from './PlanBadge';
 
 interface SidebarProps {

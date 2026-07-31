@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { Prompt, LibraryTemplate, ChatSession, User, WorkspaceFile } from '../types';
 import { logError } from '../lib/monitoring';
-import * as assistantsApi from '../lib/api/assistants';
 import * as libraryApi from '../lib/api/library';
 import * as chatSessionsApi from '../lib/api/chatSessions';
 import * as filesApi from '../lib/api/files';

@@ -16,10 +16,10 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useLocation, useNavigate, useParams, Link } from 'react-router';
-import { SUPPORTED_MIME_TYPES, ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, isImageType, isTextType, fileTypeLabel } from '../lib/uploadTypes';
+import { SUPPORTED_MIME_TYPES, ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, isImageType, fileTypeLabel } from '../lib/uploadTypes';
 import {
   createChatSession, addChatMessage, fetchChatMessages, deleteChatMessages,
-  fetchSharedChatSessions, updateChatSession, deleteChatSession,
+  fetchSharedChatSessions,
 } from '../lib/api/chatSessions';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -882,7 +882,6 @@ Output only the refined prompt text, with no surrounding explanation or commenta
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const modelInfo = AVAILABLE_MODELS.find(m => m.id === selectedModel) ?? enabledModels.find(m => m.id === selectedModel);
-  const displayedSessions = sidebarTab === 'mine' ? mySessions : sharedSessions;
   const activeSession = chatSessions.find(s => s.id === sessionId);
   const otherIsGenerating = !!activeSession?.isGenerating && !isLoading;
 

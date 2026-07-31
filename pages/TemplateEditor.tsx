@@ -8,7 +8,7 @@ import { fetchPromptDetail } from '../lib/api/prompts';
 import { fetchLibraryTemplateDetail } from '../lib/api/library';
 import { AVAILABLE_MODELS, TEMPLATE_CATEGORIES } from '../constants';
 import { runAuthoringAI } from '../lib/authoringAI';
-import { Save, Plus, Trash2, ArrowLeft, Settings, Edit, ChevronDown, Check, X, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Bot, Wand2, FlaskConical } from 'lucide-react';
+import { Save, Plus, Trash2, ArrowLeft, Settings, Edit, ChevronDown, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Bot, Wand2, FlaskConical } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import FieldTooltip from '../components/FieldTooltip';
@@ -20,8 +20,6 @@ import { TemplateAccessControl, rolesToAccessValue, accessToValue, accessValueTo
 import { fetchTemplateAccess, setTemplateAccess } from '../lib/api/templateAccess';
 import { compileAssistantInstruction, defaultBrandConfig } from '../lib/compileBrandVoice';
 import EditorTestPanel from '../components/EditorTestPanel';
-
-const DEFAULT_MODEL = 'gemini-2.5-flash';
 
 // Marketplace library templates store their body as a single rich-text step;
 // normalise to plain text when loading into the unified content editor.

@@ -157,7 +157,7 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Review your starter templates</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Edit titles and descriptions, untick anything you don't want, then create them.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Edit titles and descriptions, untick anything you don&apos;t want, then create them.</p>
           </div>
         </div>
 
@@ -219,7 +219,7 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
         </div>
         <div>
           <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Create your starter templates</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Tell us about your brand and AI will generate a brand-voice assistant, starter prompts, and a skill — all editable before they're saved.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Tell us about your brand and AI will generate a brand-voice assistant, starter prompts, and a skill — all editable before they&apos;re saved.</p>
         </div>
       </div>
 

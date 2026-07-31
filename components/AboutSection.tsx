@@ -39,7 +39,7 @@ export function AboutSection() {
                 Version {status!.latest} is available
               </div>
               <p className="text-xs text-amber-700 dark:text-amber-300/90 mt-0.5">
-                You're running v{CURRENT_VERSION}.
+                You&apos;re running v{CURRENT_VERSION}.
               </p>
               <a
                 href={UPDATE_DOCS_URL}
@@ -54,7 +54,7 @@ export function AboutSection() {
         </div>
       ) : status ? (
         <div className="mt-4 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-          <CheckCircle2 className="w-4 h-4" /> You're on the latest version.
+          <CheckCircle2 className="w-4 h-4" /> You&apos;re on the latest version.
         </div>
       ) : null}
     </Card>

@@ -211,7 +211,7 @@ const Auth = ({ inviteEmail }: { inviteEmail?: string }) => {
             <div className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
               {mode === 'login' ? (
                 <>
-                  Don't have an account?{' '}
+                  Don&apos;t have an account?{' '}
                   <button onClick={() => { setMode('register'); setError(null); setMessage(null); }} className="text-brand-600 font-bold hover:text-brand-700">
                     Sign Up
                   </button>

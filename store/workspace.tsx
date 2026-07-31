@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { User, Workspace, UserRole, Invitation } from '../types';
 import { supabase } from '../lib/supabase';
-import { setMonitoringUser, clearMonitoringUser, logError } from '../lib/monitoring';
+import { clearMonitoringUser, logError } from '../lib/monitoring';
 import * as workspacesApi from '../lib/api/workspaces';
 import * as membersApi from '../lib/api/members';
 import * as invitationsApi from '../lib/api/invitations';

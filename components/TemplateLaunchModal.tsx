@@ -4,12 +4,10 @@ import { Search, X, Loader2, Upload, Trash2, FileText as FileIcon, ChevronRight,
 import Modal from './ui/Modal';
 import SegmentedTabs from './ui/SegmentedTabs';
 import KindBadge from './ui/KindBadge';
-import { Prompt, PromptKind, WorkspaceFile } from '../types';
+import { Prompt, PromptKind } from '../types';
 import { SUPPORTED_MIME_TYPES, ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, isImageType } from '../lib/uploadTypes';
 import { getWorkspaceFileSignedUrl } from '../lib/api/files';
 import { fetchResolvedSkills } from '../lib/api/prompts';
-
-const VAR_REGEX = /{{([^}]+)}}/g;
 
 export interface ContextImage { mimeType: string; dataUrl: string; name: string; }
 
@@ -338,7 +336,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssis
             {selected?.kind === 'assistant' && (
               <div className="rounded-xl border border-violet-100 dark:border-violet-800/40 bg-violet-50 dark:bg-violet-900/10 px-4 py-3">
                 <p className="text-xs text-violet-700 dark:text-violet-300 font-semibold mb-0.5">Assistant template</p>
-                <p className="text-xs text-violet-600 dark:text-violet-400">Selecting this will apply the assistant's system instruction to your chat session — no text will be inserted into the input.</p>
+                <p className="text-xs text-violet-600 dark:text-violet-400">Selecting this will apply the assistant&apos;s system instruction to your chat session — no text will be inserted into the input.</p>
               </div>
             )}
             {templateVars.map(v => (

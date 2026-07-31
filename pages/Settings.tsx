@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useUI, useWorkspace, usePrompts } from '../store';
+import { useUI, useWorkspace } from '../store';
 import { can } from '../lib/permissions';
 import { useLocation, useNavigate } from 'react-router';
 import { PLANS, TRIAL_DAYS } from '../constants';
@@ -40,7 +40,6 @@ import {
   X,
   Check,
   Mail,
-  MoreHorizontal,
   Lock,
   Camera,
   RefreshCw,
@@ -55,7 +54,6 @@ import {
   Shield,
   RotateCw,
   Loader2,
-  ChevronUp,
   SlidersHorizontal,
   Sparkles,
 } from 'lucide-react';
@@ -166,8 +164,7 @@ const Settings = () => {
     cancelInvitation, resendInvitation, deleteWorkspace, leaveWorkspace, deleteAccount,
     isSqemesAdmin } = useWorkspace();
   const { showToast } = useUI();
-  const { prompts } = usePrompts();
-  
+
   const location = useLocation();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -326,11 +323,6 @@ const Settings = () => {
   };
 
 
-  const copyWithFeedback = (text: string, setter: (id: string | null) => void, id: string) => {
-    navigator.clipboard.writeText(text);
-    setter(id);
-    setTimeout(() => setter(null), 2000);
-  };
 
   // Buffered workspace name (only saved on button click)
   const [wsName, setWsName] = useState(workspace.name);
@@ -359,7 +351,7 @@ const Settings = () => {
   const [profileName, setProfileName] = useState(currentUser.name);
   const [profileEmail, setProfileEmail] = useState(currentUser.email);
   const [profileAvatar, setProfileAvatar] = useState(currentUser.avatar);
-  const [profileDirty, setProfileDirty] = useState(false);
+  const [, setProfileDirty] = useState(false);
 
   const [blacklistedTerm, setBlacklistedTerm] = useState('');
   const [newTag, setNewTag] = useState('');
@@ -796,7 +788,7 @@ const Settings = () => {
                 <Card className="p-6 md:p-8">
                   <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Marketplace Publisher</h2>
                   <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                    A publisher token lets this instance <span className="font-semibold">submit</span> templates to the Sqemes community marketplace (browsing + copying works without one). It's stored encrypted and never shown again.{' '}
+                    A publisher token lets this instance <span className="font-semibold">submit</span> templates to the Sqemes community marketplace (browsing + copying works without one). It&apos;s stored encrypted and never shown again.{' '}
                     <a href="https://sqemes.com/publisher" target="_blank" rel="noopener noreferrer" className="text-brand-600 dark:text-brand-400 font-semibold hover:underline">Apply for a publisher key →</a>
                   </p>
                   <div className="mb-2">
@@ -1253,7 +1245,7 @@ const Settings = () => {
                   <p className="text-xs mt-0.5 mb-4 text-slate-500 dark:text-slate-400">For organisations with custom needs</p>
 
                   <div className="mb-6">
-                    <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">Let's talk</p>
+                    <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">Let&apos;s talk</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Custom pricing for your team</p>
                   </div>
 
@@ -1804,7 +1796,7 @@ const Settings = () => {
           onClick={() => { setGeneratedKeyValue(null); setKeyCopied(false); }}
           className="w-full py-2.5 bg-slate-900 dark:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors hover:bg-slate-800 dark:hover:bg-slate-600"
         >
-          I've saved my key
+          I&apos;ve saved my key
         </button>
       </Modal>
 

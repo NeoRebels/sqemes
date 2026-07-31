@@ -8,7 +8,7 @@ import { useUI, useWorkspace, usePrompts } from '../store';
 import { fetchLibraryTemplateDetail, copyListingToWorkspace, reportListing, voteListing, fetchMyVotes } from '../lib/api/library';
 import { adaptToBrand } from '../lib/adaptTemplate';
 import { firstTextModelId } from '../lib/authoringAI';
-import { IS_SELF_HOSTED } from '../lib/env';
+import { IS_SELF_HOSTED, MARKETPLACE_ENABLED } from '../lib/env';
 import type { LibraryTemplate, Step, Prompt } from '../types';
 import KindBadge from '../components/ui/KindBadge';
 import Modal from '../components/ui/Modal';
@@ -46,7 +46,7 @@ export default function MarketplaceTemplate() {
     if (!id) return;
     setLoading(true);
     fetchLibraryTemplateDetail(id).then(l => { setListing(l); setScore(l.score ?? 0); }).catch(() => setListing(null)).finally(() => setLoading(false));
-    if (!IS_SELF_HOSTED) fetchMyVotes().then(m => setMyVote(m[id] ?? 0)).catch(() => {}); // voting is Cloud-only (SQEM-178)
+    if (MARKETPLACE_ENABLED) fetchMyVotes().then(m => setMyVote(m[id] ?? 0)).catch(() => {}); // SQEM-189 — self-host votes too
   }, [id]);
 
   const vote = async (value: 1 | -1) => {
@@ -135,7 +135,7 @@ export default function MarketplaceTemplate() {
   if (!listing) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50 dark:bg-slate-900 text-center px-6">
-        <p className="text-slate-500 dark:text-slate-400">This template isn't available.</p>
+        <p className="text-slate-500 dark:text-slate-400">This template isn&apos;t available.</p>
         <button onClick={() => navigate('/library')} className="text-brand-600 font-bold text-sm">← Back to Marketplace</button>
       </div>
     );
@@ -188,18 +188,21 @@ export default function MarketplaceTemplate() {
             </button>
           )}
           {/* SQEM-169 — temperature votes: 🔥 hot (red) vs ❄️ cold (ice-blue); score in degrees.
-              SQEM-178 — voting + reporting are Cloud-only (need an account); hidden on self-host. */}
+              SQEM-189 — voting now works on self-host too (opaque voter key → same Cloud score). */}
+          {MARKETPLACE_ENABLED && (
+            <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <button onClick={() => vote(1)} title="Hot" className={`inline-flex items-center px-3 py-3 transition-colors ${myVote === 1 ? 'text-red-500 bg-red-50 dark:bg-red-900/20' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                <Flame className="w-4 h-4" />
+              </button>
+              <span className={`px-2 text-sm font-bold tabular-nums ${score > 0 ? 'text-red-500' : score < 0 ? 'text-sky-500' : 'text-slate-400'}`}>{score > 0 ? `+${score}` : score}°</span>
+              <button onClick={() => vote(-1)} title="Cold" className={`inline-flex items-center px-3 py-3 transition-colors ${myVote === -1 ? 'text-sky-500 bg-sky-50 dark:bg-sky-900/20' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                <Snowflake className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          {/* SQEM-178 — reporting stays Cloud-only (needs an account). */}
           {!IS_SELF_HOSTED && (
             <>
-              <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                <button onClick={() => vote(1)} title="Hot" className={`inline-flex items-center px-3 py-3 transition-colors ${myVote === 1 ? 'text-red-500 bg-red-50 dark:bg-red-900/20' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                  <Flame className="w-4 h-4" />
-                </button>
-                <span className={`px-2 text-sm font-bold tabular-nums ${score > 0 ? 'text-red-500' : score < 0 ? 'text-sky-500' : 'text-slate-400'}`}>{score > 0 ? `+${score}` : score}°</span>
-                <button onClick={() => vote(-1)} title="Cold" className={`inline-flex items-center px-3 py-3 transition-colors ${myVote === -1 ? 'text-sky-500 bg-sky-50 dark:bg-sky-900/20' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                  <Snowflake className="w-4 h-4" />
-                </button>
-              </div>
               <button onClick={() => setReportOpen(true)} className="inline-flex items-center gap-1.5 px-4 py-3 text-slate-500 dark:text-slate-400 hover:text-red-500 text-sm font-semibold transition-colors">
                 <Flag className="w-4 h-4" /> Report
               </button>
@@ -251,7 +254,7 @@ export default function MarketplaceTemplate() {
       {/* Report modal */}
       <Modal open={reportOpen} onClose={() => !reporting && setReportOpen(false)} size="sm" className="p-6">
         <div className="flex items-center gap-2.5 mb-2"><Flag className="w-6 h-6 text-red-500" /><h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Report this template</h3></div>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Tell us what's wrong. Our team reviews reports and can unpublish a listing.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Tell us what&apos;s wrong. Our team reviews reports and can unpublish a listing.</p>
         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Reason</label>
         <select value={reportReason} onChange={e => setReportReason(e.target.value)} className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
           {REPORT_REASONS.map(r => <option key={r} value={r}>{r}</option>)}

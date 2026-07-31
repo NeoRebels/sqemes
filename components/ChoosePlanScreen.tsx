@@ -117,7 +117,7 @@ const ChoosePlanScreen = () => {
           <div className="max-w-md mx-auto text-center bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-700 p-8">
             <Loader2 className="w-8 h-8 text-brand-500 animate-spin mx-auto mb-4" />
             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Confirming your subscription…</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">This only takes a moment — you'll be taken to <span className="font-semibold">{workspace.name}</span> automatically.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">This only takes a moment — you&apos;ll be taken to <span className="font-semibold">{workspace.name}</span> automatically.</p>
           </div>
         ) : isAdmin ? (
           paymentFailing ? (
@@ -204,7 +204,7 @@ const ChoosePlanScreen = () => {
                 <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">Enterprise</h3>
                 <p className="text-xs mt-0.5 mb-4 text-slate-500 dark:text-slate-400">For organisations with custom needs</p>
                 <div className="mb-6">
-                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">Let's talk</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">Let&apos;s talk</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Custom pricing for your team</p>
                 </div>
                 <ul className="space-y-2.5 text-sm flex-1 text-slate-600 dark:text-slate-300">

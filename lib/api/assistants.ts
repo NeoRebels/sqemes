@@ -41,7 +41,7 @@ export async function createAssistant(
   return rowToPrompt(data![0] as unknown as PromptRow);
 }
 
-export async function updateAssistant(assistant: Prompt, workspaceId: string): Promise<Prompt> {
+export async function updateAssistant(assistant: Prompt, _workspaceId: string): Promise<Prompt> {
   const { data, error } = await supabase
     .from('prompts')
     .update({

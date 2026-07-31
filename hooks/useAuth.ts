@@ -66,7 +66,7 @@ export function useAuth() {
     const inviteMatch = hash.match(/#\/invite\/([^?]+)(?:\?email=([^&]+))?/);
     if (inviteMatch) {
       localStorage.setItem('pendingInviteToken', inviteMatch[1]);
-      localStorage.setItem('pendingInviteTokenAt', String(Date.now())); // eslint-disable-line react-hooks/purity
+      localStorage.setItem('pendingInviteTokenAt', String(Date.now()));
       if (inviteMatch[2]) {
         localStorage.setItem('pendingInviteEmail', decodeURIComponent(inviteMatch[2]));
       }

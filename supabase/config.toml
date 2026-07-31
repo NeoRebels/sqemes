@@ -427,6 +427,11 @@ verify_jwt = false
 [functions.marketplace-submit]
 verify_jwt = false
 
+# SQEM-189 — public marketplace vote endpoint (voter_key-based, no Supabase JWT). Self-host instances vote
+# into the same aggregate as Cloud votes; the function enforces published-only + rate limits itself.
+[functions.marketplace-vote]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

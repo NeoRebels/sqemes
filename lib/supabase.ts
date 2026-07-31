@@ -33,6 +33,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Observability: in development, a console.warn fires whenever strip() actually
 // removes a character, so we can identify the real source if it ever fires.
 // ---------------------------------------------------------------------------
+// Intentional control-char range: \x00 anchors the Latin-1 (byte) span we keep.
+// eslint-disable-next-line no-control-regex
 const _latin1 = /[^\x00-\xFF]/g;
 const strip = (v: string) => {
   const cleaned = v.replace(_latin1, '');

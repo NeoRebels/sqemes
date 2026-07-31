@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useUI, useWorkspace, useData } from '../store';
-import { IS_SELF_HOSTED } from '../lib/env';
+import { IS_SELF_HOSTED, MARKETPLACE_ENABLED } from '../lib/env';
 import { TEMPLATE_CATEGORIES, CATEGORY_COLORS } from '../constants';
 import { LibraryTemplate, TemplateCategory, PromptKind } from '../types';
 import { voteListing, fetchMyVotes } from '../lib/api/library';
@@ -52,7 +52,7 @@ const Library = () => {
   const [scoreOverrides, setScoreOverrides] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    if (IS_SELF_HOSTED) return; // voting is Cloud-only (needs an account)
+    // SQEM-189 — self-host now votes too (via an opaque voter key → same Cloud aggregate).
     fetchMyVotes().then(setMyVotes).catch(() => {});
   }, []);
 
@@ -184,7 +184,7 @@ const Library = () => {
               key={template.id}
               template={template}
               isAdmin={showAdmin}
-              canVote={!IS_SELF_HOSTED}
+              canVote={MARKETPLACE_ENABLED}
               score={scoreOverrides[template.id] ?? template.score ?? 0}
               myVote={myVotes[template.id] ?? 0}
               onVote={handleVote}
@@ -209,7 +209,7 @@ const Library = () => {
   );
 };
 
-const MarketplaceCard = memo(({
+const MarketplaceCard = memo(function MarketplaceCard({
   template,
   isAdmin,
   canVote,
@@ -227,7 +227,7 @@ const MarketplaceCard = memo(({
   onVote: (id: string, baseScore: number, value: 1 | -1) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
-}) => {
+}) {
   const colors = CATEGORY_COLORS[template.category] || CATEGORY_COLORS.General;
 
   return (

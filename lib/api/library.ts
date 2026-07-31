@@ -20,6 +20,29 @@ async function marketplaceApi<T>(action: string, payload: Record<string, unknown
   return json as T;
 }
 
+// SQEM-189 — self-host votes go to the Cloud `marketplace-vote` endpoint (derived from the marketplace
+// URL) with an opaque, stable voter key = sha256(instance | local-user-id). Anonymous to the Cloud, one
+// vote per self-host user per listing. Returns null if no local user (can't vote).
+const MARKETPLACE_VOTE_URL = MARKETPLACE_API_URL.replace(/marketplace-public$/, 'marketplace-vote');
+
+async function selfHostVoterKey(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const instance = import.meta.env.VITE_SUPABASE_URL || '';
+  return sha256Hex(`${instance}|${user.id}`);
+}
+
+async function marketplaceVoteApi<T>(payload: Record<string, unknown>): Promise<T> {
+  const res = await fetch(MARKETPLACE_VOTE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((json as { error?: string }).error || `Vote error ${res.status}`);
+  return json as T;
+}
+
 // library_templates gained UGC columns (SQEM-163) not yet in the generated types — a loose row type.
 export type LibraryTemplateRow = Database['public']['Tables']['library_templates']['Row'] & {
   workspace_id?: string | null; status?: string | null; bundle_path?: string | null; content?: string | null; preview?: unknown;
@@ -338,6 +361,14 @@ export async function reportListing(listingId: string, reason: string, details?:
 
 /** Cast (or toggle off) a vote. value = 1 (up) or -1 (down). Clicking the active direction clears it. */
 export async function voteListing(listingId: string, value: 1 | -1): Promise<void> {
+  // SQEM-189 — self-host votes into the same Cloud aggregate via the voter_key endpoint (toggle handled
+  // server-side, mirroring the Cloud path below).
+  if (IS_SELF_HOSTED) {
+    const voterKey = await selfHostVoterKey();
+    if (!voterKey) throw new Error('Not signed in');
+    await marketplaceVoteApi({ action: 'cast', listingId, value, voterKey });
+    return;
+  }
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
   const { data: existing } = await client.from('library_template_votes')
@@ -356,6 +387,16 @@ export async function voteListing(listingId: string, value: 1 | -1): Promise<voi
 
 /** The caller's own votes, as a map of listingId → value (for highlighting the active direction). */
 export async function fetchMyVotes(): Promise<Record<string, number>> {
+  // SQEM-189 — self-host reads its own votes from the Cloud by voter_key.
+  if (IS_SELF_HOSTED) {
+    if (!MARKETPLACE_ENABLED) return {};
+    const voterKey = await selfHostVoterKey();
+    if (!voterKey) return {};
+    try {
+      const { votes } = await marketplaceVoteApi<{ votes: Record<string, number> }>({ action: 'mine', voterKey });
+      return votes || {};
+    } catch { return {}; }
+  }
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return {};
   const { data } = await client.from('library_template_votes').select('library_template_id, value').eq('user_id', user.id);

@@ -285,7 +285,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                         {copied === 'mcpkey' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                       </button>
                     </div>
-                    <p className="text-2xs text-amber-600 dark:text-amber-400 mt-1">Copy this now — it won't be shown again.</p>
+                    <p className="text-2xs text-amber-600 dark:text-amber-400 mt-1">Copy this now — it won&apos;t be shown again.</p>
                   </div>
                 )}
 
@@ -322,7 +322,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Install the browser extension</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Pull any template into the AI you're already using — pick a template, fill in the variables, and it's inserted straight into the chat box. No copy-paste.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Pull any template into the AI you&apos;re already using — pick a template, fill in the variables, and it&apos;s inserted straight into the chat box. No copy-paste.</p>
               </div>
             </div>
 
@@ -398,7 +398,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
           </button>
         ) : (
           <button onClick={() => onClose(false)} className="text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
-            I'll do this later
+            I&apos;ll do this later
           </button>
         )}
 

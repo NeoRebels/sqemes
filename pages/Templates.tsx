@@ -42,7 +42,7 @@ const PromptSkeleton = () => (
   </Card>
 );
 
-const PromptCard = memo(({
+const PromptCard = memo(function PromptCard({
   prompt,
   canEdit,
   workspaceTags,
@@ -70,7 +70,8 @@ const PromptCard = memo(({
   onSetTag: (prompt: Prompt, tag: string | null) => void;
   onPublish: (prompt: Prompt) => void;
   showPublish: boolean;
-}) => (
+}) {
+  return (
   <TemplateCard
     selected={selected}
     topLeft={canEdit && (
@@ -165,7 +166,8 @@ const PromptCard = memo(({
       </button>
     )}
   />
-));
+  );
+});
 
 const Templates = () => {
   const { prompts, deletePrompt, deletePrompts, duplicatePrompt, toggleFavorite: storeFavorite, updatePrompt } = usePrompts();
@@ -378,7 +380,7 @@ const Templates = () => {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 md:mb-10 gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Templates</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-2">Manage and organize your team's prompts, assistants, and skills</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-2">Manage and organize your team&apos;s prompts, assistants, and skills</p>
         </div>
         {canEdit && (
           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -551,7 +553,7 @@ const Templates = () => {
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
               Publish <span className="font-semibold">{publishTarget.title}</span> (incl. its skills + context files) as a
-              snapshot others can copy. It's <span className="font-semibold">submitted for review</span> and goes live once approved.
+              snapshot others can copy. It&apos;s <span className="font-semibold">submitted for review</span> and goes live once approved.
               {publishTarget.kind === 'skill' && <span className="block mt-1 text-amber-600 dark:text-amber-400">Skills get extra review before they go live.</span>}
             </p>
             <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Category</label>

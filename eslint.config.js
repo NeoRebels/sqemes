@@ -81,13 +81,16 @@ export default [
       ...reactPlugin.configs.recommended.rules,
       ...reactHooksPlugin.configs.recommended.rules,
       'no-undef': 'off',
-      'no-control-regex': 'warn',
+      // SQEM-188 — these four were driven to zero, so promote to error as a regression guard (dead code /
+      // unescaped JSX / missing display names / control-char regex can't creep back in silently).
+      'no-control-regex': 'error',
       'react/react-in-jsx-scope': 'off',
-      'react/display-name': 'warn',
-      'react/no-unescaped-entities': 'warn',
+      'react/display-name': 'error',
+      'react/no-unescaped-entities': 'error',
       'react-hooks/set-state-in-effect': 'warn',
+      // Still warn — bigger separate efforts: `any` needs real typing; exhaustive-deps is behaviour-sensitive.
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', ignoreRestSiblings: true }],
       '@typescript-eslint/no-empty-object-type': 'off',
     },
     settings: {
