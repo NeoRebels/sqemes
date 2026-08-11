@@ -13,6 +13,10 @@ Self-hostable and open-source — own your data. Under the hood everything is on
 distinguished by `kind` (prompt / assistant / skill), so what you author once works across all three
 channels.
 
+Your instance also reads the **community marketplace** (browse, vote, copy a published template —
+no setup needed) and can attach **connectors** for external tools such as Notion, Shopify and
+Outlook. Both are covered in [SELF_HOSTING.md](./SELF_HOSTING.md).
+
 This repository is the **open core**: the full app + backend you can run on your own
 infrastructure. Sqemes Cloud adds hosted convenience and a few proprietary pieces — none of
 them are required to self-host.

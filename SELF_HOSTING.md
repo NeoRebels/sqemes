@@ -20,6 +20,8 @@ secret is absent — nothing breaks.
 | Multi-user workspaces, invites, roles | Transactional email delivery (Resend) |
 | BYOK AI providers (OpenAI, Anthropic, Gemini, Mistral, …) | Error monitoring (Sentry) |
 | Workspace file library + signed-URL delivery | Priority support / SLA, Enterprise SSO, audit logs |
+| Connectors — Notion, Shopify, Outlook, MS Graph (your own OAuth apps) | Marketplace **submission review** + the super-admin review surface |
+| Marketplace **reading** — browse, vote, copy a published template | — |
 
 Every Cloud-only feature is gated on a secret — **absent secret → feature disabled, no crash**
 (see the "Graceful degradation" table at the bottom). Set `SELF_HOSTED=true` (+ `VITE_SELF_HOSTED=true`)
@@ -27,7 +29,18 @@ and there is no subscription model at all.
 
 ---
 
-## Manual install (Docker, step by step)
+## Two ways to run it
+
+There are exactly two deployment shapes, and the rest of this guide refers to them by name:
+
+- **Path B — the Docker bundle.** Everything in one stack: the app *plus* a self-hosted Supabase,
+  from `selfhost/`. This is what `install.sh` sets up and what most self-hosters want.
+- **Path A — bring your own Supabase.** You run the frontend yourself and point it at a Supabase you
+  already operate (Supabase Cloud or your own). See [Path A — bring your own Supabase](#path-a--bring-your-own-supabase).
+
+---
+
+## Path B — Docker bundle (manual install, step by step)
 
 The one-command **[`install.sh`](install.sh)** is the easy path — it does everything below. To do it
 by hand instead:
@@ -85,16 +98,22 @@ lines, and `PROXY_DOMAIN` if you use the bundled Caddy TLS overlay.
 
 ---
 
-## Prerequisites
+## Path A — bring your own Supabase
+
+Everything above this point describes **Path B** (the bundled stack). If you already operate a
+Supabase and only want the Sqemes frontend + edge functions on top of it, follow this path instead —
+you do not need `selfhost/` at all.
+
+**Prerequisites:**
 
 - A **Supabase project** — Supabase Cloud (free tier is fine) or a self-hosted Supabase.
-- **Node.js 20+** and the **Supabase CLI** (`npm i -g supabase`).
+- **Node.js 22+** and the **Supabase CLI** (`npm i -g supabase`).
 - **Docker** (optional) — to build/serve the frontend via the bundled `Dockerfile`.
 - At least one **AI provider key** (BYOK) to actually run prompts — added later in the UI.
 
 ---
 
-## Setup
+## Path A — setup
 
 ### 1. Clone & install
 ```bash
@@ -181,6 +200,8 @@ provider keys (added in Settings → Integrations), encrypted at rest with `API_
 | `VITE_SENTRY_DSN` | No Sentry; structured console logging remains. |
 | `PUBLIC_API_URL` | MCP/OAuth advertise the raw Supabase project URL instead of a custom domain. |
 | `CRON_SECRET` | The abandoned-workspace cleanup cron is simply not scheduled. |
+| `MARKETPLACE_PUBLISHER_TOKEN` | Marketplace stays **read-only** — browse, vote and copy still work; submitting is unavailable (SQEM-183). Set it in the app instead: Settings → General → Marketplace Publisher. |
+| `VITE_MARKETPLACE_API_URL` **set to empty** | Marketplace disabled entirely and the nav item hides. Leaving it *unset* is the opposite — that reads the official Cloud marketplace. |
 
 ---
 
@@ -216,6 +237,49 @@ composers; deeply site-specific behaviour (and exotic editors) may vary.
 
 ---
 
+## Community marketplace (self-host)
+
+The global marketplace is **Cloud-hosted, self-host-readable**. Your instance talks to it over a
+public endpoint — there is no marketplace database of your own to run.
+
+**Browsing works out of the box.** Browse, vote, and copy a published template into your workspace;
+nothing to configure. Controlled by `VITE_MARKETPLACE_API_URL` in the bundle `.env`:
+
+| Value | Effect |
+|---|---|
+| unset (default) | Reads the official Sqemes Cloud marketplace |
+| a URL | Reads that instance's marketplace instead |
+| **empty** | **Marketplace disabled** — the nav item hides entirely |
+
+**Submitting your own templates** needs a **publisher token** (submissions are reviewed, so the
+marketplace stays curated — it is invite-based today). Request one from Sqemes, then set it in the
+app under **Settings → General → Marketplace Publisher**. It is stored **encrypted in your database**
+and takes effect immediately — no restart, no rebuild. The env var `MARKETPLACE_PUBLISHER_TOKEN` in
+`selfhost/.env` is the alternative if you'd rather configure it at deploy time.
+
+Submit goes **through your api sidecar** (`/api/marketplace-submit`), which forwards to Cloud — the
+`marketplace-submit` edge function itself is Cloud-only and is **not** part of this repo, along with
+the server-side submission scan and the super-admin review surface. That split is deliberate: review
+and anti-abuse stay on the side that owns the shared namespace. If you run your own reverse proxy,
+route `/api/marketplace-submit` and `/api/marketplace-config` to the sidecar (see the routing table
+below) — without them, submit and the token field fail.
+
+---
+
+## Connectors — external MCP tools
+
+Connectors let a workspace attach third-party tools (Notion, Shopify, Outlook, Microsoft Graph) and
+expose them inside Sqemes. They ship with self-host in full: `manage-connectors` plus the OAuth pair
+`connector-oauth-start` / `connector-oauth-callback`, and one edge function per integration
+(`mcp-notion`, `mcp-shopify`, `mcp-outlook`, `mcp-msgraph`).
+
+Each connector is configured **per workspace in the UI**, with its own OAuth app credentials that you
+register with the respective provider — there is no shared Sqemes-side app, so the redirect URI points
+at *your* instance. Tokens are encrypted at rest with `API_KEY_ENCRYPTION_KEY`, the same key that
+protects provider keys — which is the other reason never to change it after first use.
+
+---
+
 ## Behind an existing reverse proxy (Traefik, nginx)
 
 The bundled **Caddy overlay** (`docker-compose.caddy.yml`) publishes ports **80/443** and fetches its
@@ -236,8 +300,13 @@ compose network, or via those host ports):
 | Path(s) | → backend |
 |---|---|
 | `/auth/v1/*`, `/rest/v1/*`, `/graphql/v1`, `/realtime/v1/*`, `/storage/v1/*`, `/functions/v1/*`, `/mcp`, `/sso/*` | Kong (`:8000`) |
-| `/.well-known/sqemes-extension-config`, `/.well-known/oauth-authorization-server`, `/oauth/authorize` | api-sidecar (`:8787`) |
+| `/.well-known/sqemes-extension-config`, `/.well-known/oauth-authorization-server`, `/oauth/authorize`, `/api/marketplace-submit`, `/api/marketplace-config` | api-sidecar (`:8787`) |
 | everything else (`/`, `/assets/*`) | app (`:80`, published on `:3000`) |
+
+> **Route *all five* sidecar paths, not just the `.well-known` ones.** Miss `/api/marketplace-*` and
+> the SPA fallback answers with `index.html` instead — so marketplace submit and the publisher-token
+> field fail with a parse error rather than a 404, which is considerably harder to diagnose. This is
+> the same trap as the extension-config endpoint above, and it bites the same way.
 
 Then set `SUPABASE_PUBLIC_URL`, `SITE_URL`, `API_EXTERNAL_URL` (and `PROXY_DOMAIN`) to your domain.
 
@@ -292,7 +361,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.1.0        # the version you want
+git checkout v1.9.2        # the version you want
 ```
 
 ### 3. Check for new env vars
@@ -358,3 +427,9 @@ Supabase project.
 
 Apache License 2.0 — see [`LICENSE`](LICENSE). The open-core boundary above is intentional: the
 proprietary Cloud pieces are separately gated and not required to run a self-hosted instance.
+
+---
+
+*Last updated: 2026-08-09 (SQEM-194) — added the marketplace and connectors sections, completed the
+reverse-proxy routing table with the two `/api/marketplace-*` sidecar paths, and named the two
+install paths (A / B) that the Updating section had been referring to without ever defining them.*

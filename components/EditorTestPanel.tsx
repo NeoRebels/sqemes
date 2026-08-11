@@ -11,6 +11,7 @@ import { ModelSelect } from './ModelSelect';
 import { Send, Loader2, Bot, User, Sparkles, Image, RotateCcw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { markdownUrlTransform } from '../lib/markdownUrlTransform';
 import type { PromptKind, Variable } from '../types';
 
 interface TemplateSnapshot {
@@ -316,7 +317,9 @@ export default function EditorTestPanel({ template, resetKey, onReset }: Props) 
                 <Loader2 className="w-4 h-4 animate-spin opacity-50" />
               ) : msg.role === 'assistant' ? (
                 <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                  {/* SQEM-196 — same sanitizer exception as Chat, so generated images
+                      render here too. See lib/markdownUrlTransform.ts. */}
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={markdownUrlTransform}>{msg.content}</ReactMarkdown>
                 </div>
               ) : (
                 <div>

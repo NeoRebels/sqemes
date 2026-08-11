@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { markdownUrlTransform } from '../lib/markdownUrlTransform';
 import { useLocation, useNavigate, useParams, Link } from 'react-router';
 import { SUPPORTED_MIME_TYPES, ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, isImageType, fileTypeLabel } from '../lib/uploadTypes';
 import {
@@ -217,9 +218,9 @@ const MessageItem = memo(function MessageItem({
                 </div>
               ) : (
                 <div className="prose max-w-none text-sm">
-                  {/* SQEM-019: rely on react-markdown's default urlTransform, which strips
-                      javascript:/data: schemes from model-supplied links (XSS defense). */}
-                  <ReactMarkdown components={MarkdownComponents} remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                  {/* SQEM-019 sanitizes model-supplied URLs (XSS defense); SQEM-196 narrows
+                      that to let generated images through — see lib/markdownUrlTransform.ts. */}
+                  <ReactMarkdown components={MarkdownComponents} remarkPlugins={[remarkGfm]} urlTransform={markdownUrlTransform}>{msg.content}</ReactMarkdown>
                 </div>
               )}
               {msg.model && !msg.pending && <p className="text-3xs text-slate-400 dark:text-slate-500 mt-2 font-mono">{msg.model}</p>}
