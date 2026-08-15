@@ -1,0 +1,35 @@
+# Rafter policy (SQEM-217). Schema: https://docs.rafter.so/guides/agent-security/policy-file
+#
+# What this file can and cannot do — read before adding to it:
+#
+#   `scan.exclude_paths` removes a PATH from **secret scanning**. That is the only suppression
+#   Rafter offers. There is no per-finding ignore, and no way to hand it our ESLint config — the
+#   SAST findings (including the 33 "Definition for rule … was not found" lines from the first run)
+#   come from Rafter's own remote analysis and are not configurable from here.
+#
+# So: paths below are excluded because a *secret-shaped string* in them is provably not a secret.
+# Everything else stays visible, and the standing verdicts live in AGENTS.md so nobody
+# re-investigates them every quarter.
+#
+# ⚠️ Excluding a path is blunt. If a real credential is ever added to one of these files, Rafter
+# will not tell us. Both entries below are files whose entire purpose is to hold placeholders — do
+# not extend this list to a path where real secrets could plausibly land.
+
+version: "1"
+
+scan:
+  exclude_paths:
+    # Upstream Supabase demo values, not ours: JWT_SECRET is the literal
+    # "your-super-secret-jwt-token-…" placeholder, and the ANON_KEY / SERVICE_ROLE_KEY pair is the
+    # well-known demo JWT (`iss: supabase-demo`) printed in Supabase's own self-hosting docs.
+    # `selfhost/setup.sh` runs `generate-secrets.sh`, which replaces the JWT trio, SECRET_KEY_BASE,
+    # the S3 pair, and the Postgres/dashboard passwords before a real instance ever starts.
+    # (That the *documented* path replaces them is not the same as it being enforced — the startup
+    #  guard for a hand-started `docker compose up` is SQEM-216, not this file.)
+    - "selfhost/.env.example"
+
+    # Rafter matched the Supabase CLI's own warning *comment* — "DO NOT commit your Twilio auth
+    # token to git. Use environment variable substitution instead:" — while the value on the next
+    # line is exactly that substitution: `auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"`.
+    # Same for the Apple OAuth secret. The file holds no literal credential.
+    - "supabase/config.toml"

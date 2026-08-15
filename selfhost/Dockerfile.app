@@ -35,8 +35,12 @@ COPY selfhost/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 # SQEM-126 — regenerate /config.js from runtime env on container start (nginx runs every
 # /docker-entrypoint.d/*.sh before booting). Lets the instance URL change with a restart, no rebuild.
-COPY selfhost/docker-entrypoint.d/40-sqemes-config.sh /docker-entrypoint.d/40-sqemes-config.sh
-RUN chmod +x /docker-entrypoint.d/40-sqemes-config.sh
+# SQEM-216 — copy the whole directory, not one file by name: the previous line listed
+# 40-sqemes-config.sh explicitly, so a second script (the demo-key guard) would have been added to
+# the repo, passed review, and simply never reached the image. Silent, and only discoverable by
+# noticing the guard never fires.
+COPY selfhost/docker-entrypoint.d/ /docker-entrypoint.d/
+RUN chmod +x /docker-entrypoint.d/*.sh
 EXPOSE 80
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1/ || exit 1

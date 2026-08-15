@@ -68,6 +68,30 @@ The installer's **[`setup.sh`](selfhost/setup.sh)** (called by `install.sh`) run
 `ANON_KEY` / `SERVICE_ROLE_KEY`). A fresh install is therefore secure by default — you don't set these
 by hand. (Both are idempotent: re-running does nothing once secrets exist.)
 
+**If you skip the installer, the app refuses to start.** Running `docker compose up` straight from
+the example file would serve an instance whose `ANON_KEY` and `SERVICE_ROLE_KEY` are Supabase's
+public demo tokens — printed in their documentation, so anyone finding your instance could read and
+write the whole database. Since v1.9.5 the app container checks for exactly that and stops with a
+message instead of starting. On a fresh setup, fix it the way the message says:
+
+```bash
+cd selfhost && sh generate-secrets.sh
+docker compose up -d
+```
+
+**On an instance that already has data, that is not enough** — most secrets bake into the database
+on its first start, so a new `JWT_SECRET` will not match what is already there. That case is a
+rotation: see *Change / rotate them* below, and back up `selfhost/volumes/` first.
+
+If `generate-secrets.sh` answers *"JWT_SECRET is already custom — nothing to do"* while the app
+still refuses to start, the two are looking at different values: the guard checks `ANON_KEY`, the
+script checks `JWT_SECRET`. Someone changed one by hand and not the other, which breaks logins on
+its own. Reset `JWT_SECRET` in `.env` to its `.env.example` value and run the script again — it
+mints all three together.
+
+There is no flag to switch the check off — an escape hatch would be used once "just to try it" and
+then forgotten in production.
+
 **View them** — all config lives in `.env` on the server; read it in your terminal:
 ```bash
 grep -E '^(JWT_SECRET|ANON_KEY|SERVICE_ROLE_KEY|POSTGRES_PASSWORD|DASHBOARD_USERNAME|DASHBOARD_PASSWORD)=' selfhost/.env
@@ -361,7 +385,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.9.4        # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.9.5        # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### 3. Check for new env vars
@@ -430,6 +454,11 @@ proprietary Cloud pieces are separately gated and not required to run a self-hos
 
 ---
 
-*Last updated: 2026-08-09 (SQEM-194) — added the marketplace and connectors sections, completed the
-reverse-proxy routing table with the two `/api/marketplace-*` sidecar paths, and named the two
-install paths (A / B) that the Updating section had been referring to without ever defining them.*
+*Last updated: 2026-08-15 (SQEM-216) — documented the demo-key start guard shipped in v1.9.5: both
+cases it can hit (fresh setup vs. an instance that already has data, where the fix is a rotation and
+not a re-run) and the one dead end it can produce, because the guard checks `ANON_KEY` while
+`generate-secrets.sh` checks `JWT_SECRET`.*
+
+*2026-08-09 (SQEM-194) — added the marketplace and connectors sections, completed the reverse-proxy
+routing table with the two `/api/marketplace-*` sidecar paths, and named the two install paths
+(A / B) that the Updating section had been referring to without ever defining them.*

@@ -298,10 +298,17 @@ export function useWorkspaceState(
   const updateMemberRole = useCallback(async (id: string, role: UserRole) => {
     if (!activeWorkspaceId) return;
 
-    // SQEM-214 — the third door into an adminless workspace, and the quietest one: demoting the
-    // last admin. Leaving was already guarded, account deletion now is; without this you could
-    // simply set your own role to "editor" and achieve the same dead state in one click.
-    // Phrased as "would this leave zero admins", which also covers demoting *someone else*.
+    // SQEM-214 — belt and braces, and **it cannot currently fire**. It was added as "the third door
+    // into an adminless workspace"; checking afterwards showed that door was never open:
+    //
+    //   Settings → Team, the role <select>   disabled={member.id === currentUser.id}
+    //   RLS workspace_members_update         and user_id != auth.uid()
+    //                                        ("Admin can update roles (but not their own)")
+    //
+    // Only an admin reaches this code, so `admins.length === 1` means the sole admin is the caller,
+    // and `admins[0].id === id` means they are demoting themselves — which both of the above already
+    // refuse. Kept because three lines cost nothing if the policy is ever loosened, but **do not
+    // count this as the enforcement point**: it is the database that stops this, not the store.
     const admins = workspace.members.filter(m => m.role === 'admin');
     if (role !== 'admin' && admins.length === 1 && admins[0].id === id) {
       showToast(
