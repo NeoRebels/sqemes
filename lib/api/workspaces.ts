@@ -111,13 +111,27 @@ export async function updateWorkspace(id: string, updates: Partial<{
   return data![0] as WorkspaceRow;
 }
 
+/**
+ * SQEM-213 — goes through the `delete-workspace` edge function, which **cancels the Stripe
+ * subscription before deleting the row**. This used to be a bare `.delete()` from here, and nothing
+ * anywhere told Stripe: the workspace vanished and the card kept being charged.
+ *
+ * The RLS policy that allowed the direct delete is dropped in the same change, so this is not a
+ * matter of preference — the raw path no longer exists. A failed cancellation surfaces here as an
+ * error and the workspace is still there, which is the intended outcome, not a half-done deletion.
+ */
 export async function deleteWorkspace(id: string) {
-  const { error } = await supabase
-    .from('workspaces')
-    .delete()
-    .eq('id', id);
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
 
-  if (error) throw error;
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-workspace`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ workspaceId: id }),
+  });
+
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || 'Failed to delete workspace');
 }
 
 export async function setWorkspaceManaged(id: string, managed: boolean) {

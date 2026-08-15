@@ -361,7 +361,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.9.2        # the version you want
+git checkout v1.9.4        # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### 3. Check for new env vars

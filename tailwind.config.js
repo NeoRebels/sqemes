@@ -35,8 +35,12 @@ export default {
           100: '#f3f4f6',
           200: '#e5e7eb',
           300: '#d1d5db',
-          400: '#9ca3af',
-          500: '#6b7280',
+          // SQEM-202 — themenabhängig, siehe index.css. Nur diese beiden Werte sind
+          // variabel, weil sie in hell ausschliesslich Text/Placeholder färben und dort
+          // einen dunkleren, in dunkel einen helleren Ton brauchen. Nicht auf einen
+          // festen Hex zurückdrehen — das bricht eines der beiden Themen.
+          400: 'rgb(var(--c-slate-400) / <alpha-value>)',
+          500: 'rgb(var(--c-slate-500) / <alpha-value>)',
           600: '#4b5563',
           700: '#374151',
           800: '#1f2937',

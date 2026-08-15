@@ -20,8 +20,13 @@ import {
   Sun,
   Moon,
   BookOpen,
+  Loader2,
 } from 'lucide-react';
 import { useUI, useWorkspace } from '../store';
+import Avatar from './ui/Avatar';
+import { PLANS } from '../constants';
+import type { PlanTier } from '../types';
+import { startCheckout, type BillingCycle } from '../lib/billing';
 import { can } from '../lib/permissions';
 import { CHROME_STORE_URL } from '../lib/links';
 import { IS_SELF_HOSTED, MARKETPLACE_ENABLED } from '../lib/env';
@@ -57,6 +62,20 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
   const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [workspaceNameError, setWorkspaceNameError] = useState('');
+  // SQEM-209 — two steps: pick the plan, then name it. Self-host skips straight to naming.
+  const [wsStep, setWsStep] = useState<'plan' | 'name'>(IS_SELF_HOSTED ? 'name' : 'plan');
+  const [selectedPlan, setSelectedPlan] = useState<PlanTier | null>(null);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('yearly');
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
+
+  const openWorkspaceModal = () => {
+    setWsStep(IS_SELF_HOSTED ? 'name' : 'plan');
+    setSelectedPlan(null);
+    setNewWorkspaceName('');
+    setWorkspaceNameError('');
+    setIsWorkspaceModalOpen(true);
+    setIsWorkspaceMenuOpen(false);
+  };
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
 
   const handleClickOutside = useCallback((event: MouseEvent) => {
@@ -82,19 +101,45 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
     if (setMobileOpen) setMobileOpen(false);
   };
 
-  const handleCreateWorkspace = useCallback((e: React.FormEvent) => {
+  /**
+   * SQEM-209 — plan first, name second, and the workspace row is created **last**.
+   *
+   * It used to be the other way round: the modal asked for a name, `create_workspace` wrote the row,
+   * the store switched into it — and `needsSubscriptionGate` immediately threw up the paywall. So
+   * the user had made something and was asked to pay for it in the same breath, and every abandoned
+   * attempt left a row behind. That is exactly what the 30-day cleanup (SQEM-102) exists to sweep up.
+   *
+   * The row still has to exist before Stripe (`create-checkout-session` puts `workspace_id` in the
+   * session metadata, and the webhook matches the subscription back by it), so it cannot be created
+   * after payment. Creating it here, one step before the redirect, is as late as the design allows:
+   * the orphan window shrinks from "until someone gives up" to the seconds spent loading Stripe.
+   */
+  const handleCreateWorkspace = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newWorkspaceName.trim()) {
       setWorkspaceNameError('Workspace name is required');
       return;
     }
-    createWorkspace(newWorkspaceName);
-    setNewWorkspaceName('');
-    setWorkspaceNameError('');
-    setIsWorkspaceModalOpen(false);
-    setIsWorkspaceMenuOpen(false);
-    showToast("Workspace created successfully", "success");
-  }, [newWorkspaceName, createWorkspace, showToast]);
+    setCreatingWorkspace(true);
+    try {
+      const created = await createWorkspace(newWorkspaceName.trim());
+      if (!created) return; // createWorkspace already surfaced the reason
+      setIsWorkspaceModalOpen(false);
+      setIsWorkspaceMenuOpen(false);
+      // Self-host has no plans and no gate — there is nothing to check out.
+      if (!IS_SELF_HOSTED && selectedPlan) {
+        await startCheckout(created.id, selectedPlan, billingCycle);
+      }
+      setNewWorkspaceName('');
+      setWorkspaceNameError('');
+    } catch (err: any) {
+      // The workspace exists at this point; only the redirect failed. Say so, rather than implying
+      // nothing happened — the user will find it in the switcher, gated until a plan is chosen.
+      showToast(err.message || 'Workspace created, but checkout could not be opened.', 'error');
+    } finally {
+      setCreatingWorkspace(false);
+    }
+  }, [newWorkspaceName, createWorkspace, showToast, selectedPlan, billingCycle]);
 
   const showTooltip = (e: React.MouseEvent, label: string) => {
     if (isCollapsed) {
@@ -134,6 +179,11 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
         onClick={closeMobileMenu}
         onMouseEnter={(e) => showTooltip(e, label)}
         onMouseLeave={hideTooltip}
+        // SQEM-206 — the arrow already hinted that this one leaves the shell; say it out loud for
+        // anyone who cannot see the arrow. Chat is a full-screen mode: entering it takes the main
+        // navigation away, so the entrance should admit that before the click, not after.
+        title={arrow ? `${label} — opens full screen` : undefined}
+        aria-label={arrow ? `${label} — opens full screen` : undefined}
         className={`relative flex items-center gap-3 ${isCollapsed ? 'justify-center px-2' : 'px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
           active
             ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400'
@@ -207,7 +257,10 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
                     onClick={() => setIsWorkspaceMenuOpen(!isWorkspaceMenuOpen)}
                     className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 font-medium hover:text-brand-600 dark:hover:text-brand-400 transition-colors mt-0.5 group outline-none"
                   >
-                    <span className="truncate max-w-[120px]">{workspace.name}</span>
+                    {/* SQEM-207 — 120px held 19 characters, so any real name was cut mid-word and
+                        nobody noticed because short test names fit. Wider, and the full name is on
+                        hover for the cases that still don't. */}
+                    <span className="truncate max-w-[168px]" title={workspace.name}>{workspace.name}</span>
                     <ChevronDown className={`w-3 h-3 transition-transform ${isWorkspaceMenuOpen ? 'rotate-180' : ''}`} />
                   </button>
 
@@ -244,8 +297,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
                       <div className="p-1 border-t border-slate-50 dark:border-slate-700 mt-1">
                         <button
                           onClick={() => {
-                            setIsWorkspaceModalOpen(true);
-                            setIsWorkspaceMenuOpen(false);
+                            openWorkspaceModal();
                           }}
                           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-brand-600 dark:hover:text-brand-400 rounded-lg transition-colors"
                         >
@@ -316,7 +368,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
             onMouseLeave={hideTooltip}
             className={`mt-2 flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-3'} rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 cursor-pointer hover:bg-white dark:hover:bg-slate-700 hover:shadow-soft transition-all group`}
           >
-            <img src={currentUser.avatar} alt={currentUser.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-white dark:ring-slate-700 shrink-0" />
+            <Avatar src={currentUser.avatar} name={currentUser.name} className="w-8 h-8 ring-2 ring-white dark:ring-slate-700" />
             {!isCollapsed && (
               <div className="overflow-hidden flex-1">
                 <div className="flex items-center gap-2">
@@ -325,7 +377,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
                      {currentUser.role}
                    </span>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 truncate group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">Manage Profile</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">My Profile</p>
               </div>
             )}
           </div>
@@ -398,7 +450,66 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
       {!IS_SELF_HOSTED && isWorkspaceModalOpen && (
         <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-slate-100 dark:border-slate-700 animate-scale-up">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4">Create Workspace</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-1">Create Workspace</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+              {wsStep === 'plan' ? 'Step 1 of 2 · Choose a plan' : IS_SELF_HOSTED ? 'Name your workspace' : 'Step 2 of 2 · Name it'}
+            </p>
+
+            {/* SQEM-209 — Step 1. The old modal claimed "You will start on the Solo plan", which the
+                product then contradicted: the plan column did say Solo, but the gate reads the
+                subscription, so a fresh workspace was paywalled on sight. Choosing the plan up front
+                replaces a promise that wasn't kept with a decision the user actually makes. */}
+            {wsStep === 'plan' && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-700 rounded-xl">
+                  {(['monthly', 'yearly'] as const).map(cycle => (
+                    <button
+                      key={cycle}
+                      type="button"
+                      onClick={() => setBillingCycle(cycle)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold capitalize transition-all ${
+                        billingCycle === cycle
+                          ? 'bg-white dark:bg-slate-600 shadow-sm text-slate-900 dark:text-slate-100'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      {cycle}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  {(Object.keys(PLANS) as PlanTier[]).map(tier => {
+                    const plan = PLANS[tier];
+                    const monthly = billingCycle === 'yearly' ? plan.priceYearly : parseInt(plan.price.replace(/[^0-9]/g, ''), 10);
+                    return (
+                      <button
+                        key={tier}
+                        type="button"
+                        onClick={() => { setSelectedPlan(tier); setWsStep('name'); }}
+                        className="w-full flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-600 hover:border-brand-400 hover:bg-brand-50/40 dark:hover:bg-brand-900/10 transition-colors text-left"
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">{tier}</span>
+                          <span className="block text-2xs text-slate-500 dark:text-slate-400 truncate">{plan.tagline}</span>
+                        </span>
+                        <span className="text-sm font-bold text-slate-900 dark:text-slate-100 shrink-0">€{monthly}<span className="text-2xs font-medium text-slate-400">/mo</span></span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsWorkspaceModalOpen(false)}
+                  className="w-full py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            {wsStep === 'name' && (
             <form onSubmit={handleCreateWorkspace} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Workspace Name</label>
@@ -411,25 +522,32 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
                 />
                 {workspaceNameError && <p className="text-xs text-red-500 dark:text-red-400 mt-1">{workspaceNameError}</p>}
               </div>
-              <p className="text-xs text-slate-400 dark:text-slate-500">
-                You will start on the <span className="font-bold text-slate-600 dark:text-slate-300">Solo</span> plan.
-              </p>
+              {!IS_SELF_HOSTED && selectedPlan && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <span className="font-bold text-slate-700 dark:text-slate-200">{selectedPlan}</span>, billed {billingCycle}.
+                  Next step is payment — the workspace is created when you continue.
+                </p>
+              )}
               <div className="flex gap-2 mt-6">
                 <button
                   type="button"
-                  onClick={() => { setIsWorkspaceModalOpen(false); setWorkspaceNameError(''); }}
-                  className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors"
+                  onClick={() => (IS_SELF_HOSTED ? setIsWorkspaceModalOpen(false) : setWsStep('plan'))}
+                  disabled={creatingWorkspace}
+                  className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-60"
                 >
-                  Cancel
+                  {IS_SELF_HOSTED ? 'Cancel' : 'Back'}
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 text-white bg-brand-600 rounded-xl hover:bg-brand-700 text-xs font-bold shadow-lg hover:shadow-brand-200 dark:shadow-none dark:hover:shadow-none transition-all"
+                  disabled={creatingWorkspace}
+                  className="flex-1 py-2.5 text-white bg-brand-600 rounded-xl hover:bg-brand-700 text-xs font-bold shadow-lg hover:shadow-brand-200 dark:shadow-none dark:hover:shadow-none transition-all disabled:opacity-60 inline-flex items-center justify-center gap-2"
                 >
-                  Create
+                  {creatingWorkspace && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {IS_SELF_HOSTED ? 'Create' : 'Continue to payment'}
                 </button>
               </div>
             </form>
+            )}
           </div>
         </div>
       )}

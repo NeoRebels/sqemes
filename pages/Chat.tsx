@@ -9,7 +9,7 @@ import { buildEnabledModels, isFundedModel } from '../lib/enabledModels';
 import { edgeError } from '../lib/edgeError';
 import {
   Send, Bot, User, Sparkles, AlertTriangle, Loader2,
-  Copy, Check, Pencil, Paperclip, Plug, X, FileText, ArrowLeft, MessageSquarePlus, Search,
+  Copy, Check, Pencil, Paperclip, Plug, X, FileText, MessageSquarePlus, Search,
   MoreHorizontal, Globe, Lock, Trash2, MessageSquare, Wand2, PenTool,
   Key, Upload, Files,
 } from 'lucide-react';
@@ -32,6 +32,8 @@ import { ModelSelect } from '../components/ModelSelect';
 import { ProviderIcon } from '../components/ProviderIcon';
 import TemplateLaunchModal, { type ContextImage } from '../components/TemplateLaunchModal';
 import ChatSearchModal from '../components/ChatSearchModal';
+import Avatar from '../components/ui/Avatar';
+import FullScreenExit from '../components/ui/FullScreenExit';
 
 
 // ---------------------------------------------------------------------------
@@ -167,12 +169,10 @@ const MessageItem = memo(function MessageItem({
           <Bot className="w-4 h-4 text-brand-600 dark:text-brand-400" />
         </div>
       )}
+      {/* SQEM-205 — Avatar falls back to initials when the picture is missing *or* fails to load.
+          The old markup only covered "missing", so a blocked external image rendered broken. */}
       {isOtherUser && (
-        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0 mt-1 overflow-hidden">
-          {msg.userAvatar
-            ? <img src={msg.userAvatar} alt={msg.userName || 'User'} className="w-full h-full object-cover" />
-            : <User className="w-4 h-4 text-slate-500" />}
-        </div>
+        <Avatar src={msg.userAvatar} name={msg.userName || 'User'} className="w-8 h-8 mt-1" rounded="rounded-lg" />
       )}
       <div className={`max-w-[85%] ${msg.role === 'user' && !isOtherUser ? 'order-first' : ''}`}>
         {isOtherUser && (
@@ -366,6 +366,9 @@ const Chat = () => {
   }, [enabledModels, selectedModel]);
 
   useEffect(() => { setAvatarLoadError(false); }, [userAvatar]);
+
+  // SQEM-208 — the Escape handler moved into FullScreenExit; the list of "something more local is
+  // open" states stays here, where those states live, and is passed down as `escapeReady`.
 
   // Open template modal when navigated here with a launchTemplateId
   useEffect(() => {
@@ -904,7 +907,7 @@ Output only the refined prompt text, with no surrounding explanation or commenta
       >
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 overflow-hidden ${isActive ? 'bg-brand-100 dark:bg-brand-800' : 'bg-slate-100 dark:bg-slate-600'}`}>
           {showOwner && session.ownerAvatar ? (
-            <img src={session.ownerAvatar} alt={ownerLabel} className="w-full h-full object-cover" />
+            <Avatar src={session.ownerAvatar} name={ownerLabel} className="w-full h-full" rounded="rounded-lg" />
           ) : showOwner ? (
             <span className={`text-[11px] font-bold ${isActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-500 dark:text-slate-400'}`}>
               {ownerLabel.charAt(0).toUpperCase()}
@@ -1005,13 +1008,23 @@ Output only the refined prompt text, with no surrounding explanation or commenta
 
           {/* Panel header */}
           <div className="p-4 border-b border-slate-50 dark:border-slate-700 shrink-0">
-            <button
-              onClick={() => navigate('/')}
-              className="text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 mb-4 flex items-center gap-2 transition-colors text-sm"
-            >
+            {/* SQEM-206/208 — Chat is a full-screen mode, and this is the door out of it. The
+                behaviour now lives in FullScreenExit, shared with the editor and the marketplace
+                detail page; `escapeReady` is what keeps Escape from firing while something more
+                local should consume it. */}
+            <div className="flex items-center gap-2 mb-4">
               <img src="/logo-favicon-V2.png" alt="sqemes" className="w-8 h-8 rounded-lg shrink-0" />
-              <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-            </button>
+              <FullScreenExit
+                label="Back to Dashboard"
+                onExit={() => navigate('/')}
+                escapeEnabled
+                escapeReady={
+                  !templateModalOpen && !searchOpen && !attachMenuOpen && !connectorMenuOpen &&
+                  !workspacePickerOpen && !renamingId && !openMenuId && !deleteConfirmId
+                }
+                className="flex-1"
+              />
+            </div>
             <button
               onClick={handleNewChat}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 transition-colors shadow-sm dark:shadow-none"
@@ -1061,7 +1074,7 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                     <MessageSquare className="w-5 h-5 text-slate-300 dark:text-slate-500" />
                   </div>
                   <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-0.5">No chats yet</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">Start a conversation above.</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">Your chats will show up here.</p>
                 </div>
               ) : (
                 mySessions.map(s => renderSession(s))

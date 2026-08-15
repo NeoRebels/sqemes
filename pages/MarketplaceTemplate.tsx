@@ -12,8 +12,9 @@ import { IS_SELF_HOSTED, MARKETPLACE_ENABLED } from '../lib/env';
 import type { LibraryTemplate, Step, Prompt } from '../types';
 import KindBadge from '../components/ui/KindBadge';
 import Modal from '../components/ui/Modal';
+import FullScreenExit from '../components/ui/FullScreenExit';
 import sqemesIcon from '../assets/sqemes-icon.svg';
-import { ArrowLeft, FilePlus, Flag, Loader2, FileText, Wand2, Users, ArrowUpRight, Sparkles, Flame, Snowflake } from 'lucide-react';
+import { FilePlus, Flag, Loader2, FileText, Wand2, Users, ArrowUpRight, Sparkles, Flame, Snowflake } from 'lucide-react';
 
 const REPORT_REASONS = ['Spam or low quality', 'Malicious or unsafe content', 'Copyright / not yours to share', 'Other'];
 
@@ -136,7 +137,8 @@ export default function MarketplaceTemplate() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50 dark:bg-slate-900 text-center px-6">
         <p className="text-slate-500 dark:text-slate-400">This template isn&apos;t available.</p>
-        <button onClick={() => navigate('/library')} className="text-brand-600 font-bold text-sm">← Back to Marketplace</button>
+        {/* SQEM-208 — the dead-end state needs the exit most of all: there is nothing else here. */}
+        <FullScreenExit label="Back to Marketplace" onExit={() => navigate('/library')} escapeEnabled />
       </div>
     );
   }
@@ -150,9 +152,9 @@ export default function MarketplaceTemplate() {
     <div className="h-screen overflow-y-auto bg-slate-50 dark:bg-slate-900">
       {/* Top bar */}
       <div className="max-w-3xl mx-auto px-6 pt-6 flex items-center justify-between">
-        <button onClick={() => navigate('/library')} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Marketplace
-        </button>
+        {/* SQEM-208 — shared exit. Escape is on: this page is read-only, so leaving costs nothing,
+            and the label now names the destination rather than just saying "Marketplace". */}
+        <FullScreenExit label="Back to Marketplace" onExit={() => navigate('/library')} escapeEnabled />
         <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
           <img src={sqemesIcon} alt="Sqemes" className="w-5 h-5" />
           <span className="text-sm font-bold tracking-tight text-slate-600 dark:text-slate-300">Sqemes</span>

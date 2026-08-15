@@ -5,6 +5,46 @@
 @tailwind components;
 @tailwind utilities;
 
+/* SQEM-202 — gedämpfter Text, themenabhängig.
+   `slate-400` und `slate-500` färben in diesem Projekt in hell ausschliesslich Text und
+   Platzhalter: slate-400 hat null Ränder und null Hintergründe, und alle sechs
+   `border-slate-500` sind `dark:`-gebunden. Nachgezählt, nicht angenommen — nur deshalb
+   ist es zulässig, den Wert selbst zu ändern statt die Aufruforte.
+
+   Tailwinds Werte reichen auf hellem Grund nicht: #9ca3af ergibt 2,54:1, #6b7280 auf den
+   grauen Flächen der App 4,39:1 — gefordert sind 4,5:1. Ein fester dunklerer Wert wäre
+   trotzdem keine Lösung, denn auf dunklem Grund braucht dieselbe Rolle einen *helleren*
+   Ton (#6b7280 auf #111827 wären 3,54:1). Deshalb wechselt der Wert pro Thema.
+
+   Die Helligkeitsreihenfolge der Skala bleibt gewahrt: 400 heller als 500 heller als 600.
+   Wer hier Werte anfasst, prüft das mit — eine invertierte Skala ist eine Falle, die erst
+   Monate später jemandem auffällt. */
+:root {
+  --c-slate-400: 91 100 114;  /* #5b6472 — 5,98:1 auf Weiss, 5,44:1 auf slate-100 */
+  --c-slate-500: 79 88 102;   /* #4f5866 — 7,19:1 auf Weiss, 6,53:1 auf slate-100 */
+  --c-focus: 147 51 234;      /* brand-600 */
+}
+
+.dark {
+  --c-slate-400: 156 163 175; /* #9ca3af — auf dunklem Grund bereits kontrastreich */
+  --c-slate-500: 107 114 128; /* #6b7280 — unverändert, auf dunklem Grund ausreichend */
+  --c-focus: 192 132 252;     /* brand-400 — auf dunklem Grund sichtbarer als brand-600 */
+}
+
+/* SQEM-202 — sichtbarer Tastaturfokus, global.
+   Vorher war der Fokus gesetzt, aber unsichtbar: Tailwinds `outline-none` setzt
+   `outline: 2px solid transparent`, und in 60 von 79 Fällen folgte kein Ersatzring.
+   Diese Regel steht bewusst NACH `@tailwind utilities` — sie hat dieselbe Spezifität
+   wie `.outline-none` und gewinnt durch die Quelltextreihenfolge. Damit ist jedes
+   fokussierbare Element abgedeckt, auch künftige.
+   NICHT nach oben verschieben und nicht in `@layer base` packen: beides würde die
+   Regel wieder gegen die Utilities verlieren lassen, und der Fehler käme lautlos
+   zurück — sichtbar nur mit der Tastatur, die niemand beim Entwickeln benutzt. */
+:focus-visible {
+  outline: 2px solid rgb(var(--c-focus));
+  outline-offset: 2px;
+}
+
 html,
 body {
   height: 100%;

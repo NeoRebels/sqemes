@@ -9,7 +9,7 @@ import { publishToMarketplace, submitToMarketplaceViaProxy, fetchCanPublish } fr
 import { TEMPLATE_CATEGORIES } from '../constants';
 import type JSZip from 'jszip';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Search, Plus, Play, Edit, Trash2, Copy, Star, EyeOff, Bot, PenTool, Wand2, Loader2, Store, Lock, Upload, Package } from 'lucide-react';
+import { Search, Plus, Play, Edit, Trash2, Copy, Star, Bot, PenTool, Wand2, Loader2, Store, Lock, Upload, Package } from 'lucide-react';
 import Card from '../components/ui/Card';
 import TemplateCard from '../components/ui/TemplateCard';
 import Modal from '../components/ui/Modal';
@@ -109,11 +109,9 @@ const PromptCard = memo(function PromptCard({
             <Lock className="w-3 h-3" /> Restricted
           </span>
         )}
-        {prompt.published === false && canEdit && (
-          <span className="text-2xs font-bold px-2.5 py-1 bg-amber-50 text-amber-600 rounded-lg uppercase tracking-wider flex items-center gap-1">
-            <EyeOff className="w-3 h-3" /> Draft
-          </span>
-        )}
+        {/* SQEM-210 — no "Draft" badge: the draft axis is gone from workspace templates, and
+            `published` is now always true for them. What it used to signal is the "Restricted"
+            badge above, which reads the access rules that actually govern visibility. */}
         <TagEditor
           tags={prompt.tag ? [prompt.tag] : []}
           available={canEdit && !prompt.tag ? workspaceTags : []}
@@ -228,7 +226,9 @@ const Templates = () => {
   const filteredPrompts = useMemo(() => {
     const lowerSearch = searchTerm.toLowerCase();
     const filtered = prompts.filter(p => {
-      if (p.published === false && !canEdit) return false;
+      // SQEM-210 — no draft filter: RLS decides what a member may see (access rules), and this
+      // list only ever holds what RLS already returned. Filtering on `published` here duplicated
+      // that decision in the client, where it could only ever be the weaker of the two.
       const matchesSearch = p.title.toLowerCase().includes(lowerSearch) ||
                             p.description.toLowerCase().includes(lowerSearch);
       const matchesKind = selectedKind === 'all' || p.kind === selectedKind;

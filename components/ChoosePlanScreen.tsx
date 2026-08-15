@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useWorkspace, useUI } from '../store';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
+import { startCheckout } from '../lib/billing';
 import { PLANS, TRIAL_DAYS } from '../constants';
 import { can } from '../lib/permissions';
 import { isPaymentFailing } from '../lib/subscription';
@@ -80,16 +81,8 @@ const ChoosePlanScreen = () => {
   const startTrial = async (tier: PlanTier) => {
     setLoadingTier(tier);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ workspaceId: workspace.id, plan: tier, billingCycle }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to start checkout');
-      window.location.href = data.url;
+      // SQEM-209 — shared with the create-workspace flow so checkout is opened in exactly one place.
+      await startCheckout(workspace.id, tier, billingCycle);
     } catch (err: any) {
       showToast(err.message || 'Failed to start checkout', 'error');
       setLoadingTier(null);

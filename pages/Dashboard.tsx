@@ -3,7 +3,8 @@ import { useUI, useWorkspace, usePrompts } from '../store';
 import { Link, useNavigate } from 'react-router';
 import { ArrowRight, CreditCard, Check, Sparkles, Loader2, MessageSquarePlus, FilePlus, Key, Chrome } from 'lucide-react';
 import McpIcon from '../components/McpIcon';
-import { PLANS, PLAN_AI_CREDITS } from '../constants';
+import { PLANS } from '../constants';
+import { includedCredits } from '../lib/credits';
 import { can } from '../lib/permissions';
 import { supabase } from '../lib/supabase';
 import Card from '../components/ui/Card';
@@ -80,9 +81,32 @@ const Dashboard = () => {
   };
 
   const currentPlan = PLANS[workspace.plan];
-  const displayPrice = workspace.billingCycle === 'yearly'
-    ? `€${currentPlan.priceYearly}/mo`
-    : currentPlan.price;
+
+  /**
+   * SQEM-207 — the badge on the plan card carries **state, not price**.
+   *
+   * It used to read `€99/mo`, which is the one thing in that card that is not about what the
+   * workspace has: seats, credits and features all are. The price is not actionable there — it is
+   * changed in Settings → Plans, where the card's own "Manage plan" link leads and where the figure
+   * is shown. During the trial it was worse than useless: a charge quoted next to a plan the person
+   * has not decided to keep, on the page they open first every day. Reported as off-putting in the
+   * 2026-08-05 usability test.
+   *
+   * Hiding the price is not the point — naming what actually needs attention is. `null` therefore
+   * means "nothing to say", not "no price": an ordinary active subscription needs no badge at all.
+   *
+   * A "Renews 28 Aug" would be the better third state and is deliberately absent: there is no
+   * period-end on the workspace (no column, no webhook field), and inventing one from the trial
+   * date would be a guess shown as a fact.
+   */
+  const planBadge = isTrialing(workspace)
+    ? (() => {
+        const d = trialDaysLeft(workspace);
+        return d == null ? 'Trial' : d === 1 ? '1 day left' : `${d} days left`;
+      })()
+    : workspace.cancelAtPeriodEnd
+      ? 'Canceling'
+      : null;
   const seatsUsed = workspace.members.length;
   const seatsLimit = workspace.isManaged ? null : currentPlan.users;
   const seatsPercentage = seatsLimit ? Math.min((seatsUsed / seatsLimit) * 100, 100) : 0;
@@ -94,10 +118,8 @@ const Dashboard = () => {
   const hasByokText = useMemo(() => firstTextModelId(workspace.apiKeys) !== null, [workspace.apiKeys]);
   // Effective allowance: the provisioned DB limit if set, else the tier's decided
   // allowance (display-only until SQEM-057 provisions credits_limit). Managed stays
-  // genuinely unlimited (no plan fallback).
-  const effectiveCreditsLimit = workspace.creditsLimit > 0
-    ? workspace.creditsLimit
-    : (workspace.isManaged ? 0 : (PLAN_AI_CREDITS[workspace.plan] ?? 0));
+  // genuinely unlimited (no plan fallback). SQEM-201 — shared with the onboarding step.
+  const effectiveCreditsLimit = includedCredits(workspace);
   const showAiCredits = !!workspace.fundedAvailable && (hasByokText || effectiveCreditsLimit > 0);
 
   // SQEM-086 — "Favourites": the user's starred templates (all kinds, incl. skills).
@@ -154,7 +176,12 @@ const Dashboard = () => {
                           return `${d === 1 ? '1 day' : `${d} days`} left in your ${workspace.plan} trial`;
                         })()}
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Your card is on file — the trial converts to a paid {workspace.plan} subscription automatically.</p>
+                      {/* SQEM-205 — the commitment was named here, the way out was not. The product
+                          said the card is on file and the trial converts automatically, while the
+                          word "cancel" first appeared four plan cards down on the billing page.
+                          Naming both in the same breath is the honest version — and the cancellation
+                          itself is already self-serve, so there is nothing to soften. */}
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Your card is on file — the trial converts to a paid {workspace.plan} subscription automatically. Cancel any time before then and you won&apos;t be charged.</p>
                     </>
                   )}
                 </div>
@@ -177,7 +204,13 @@ const Dashboard = () => {
             </div>
           )}
 
-          {emptyWorkspace && wizardFlag === 'dismissed' && !showWizard && (
+          {/* SQEM-201 — the offer to finish setup depends on the workspace still being empty, not on
+              which button someone left through. This used to require `wizardFlag === 'dismissed'`,
+              so bailing out at step 1 kept the way back while walking to the last step and declining
+              only the generation set the flag to 'complete' and removed it for good — the more
+              engaged user was the one who got locked out. `emptyWorkspace` already covers the case
+              that matters: once templates exist, the banner is gone regardless of the flag. */}
+          {emptyWorkspace && wizardFlag !== null && !showWizard && (
             <div className="md:w-1/2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 rounded-2xl border border-brand-200 dark:border-brand-800/50 bg-brand-50 dark:bg-brand-900/20">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400 shrink-0">
@@ -185,7 +218,9 @@ const Dashboard = () => {
                 </div>
                 <div>
                   <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Finish setting up your workspace</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Connect a provider key, MCP, or the extension to get started.</p>
+                  {/* SQEM-201 — no longer mentions MCP: it left the wizard and lives in the
+                      Connections card right below this banner. */}
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Add a provider key, install the extension, and let AI build your first templates.</p>
                 </div>
               </div>
               <button
@@ -318,7 +353,15 @@ const Dashboard = () => {
                 </span>
                 <h3 className="text-2xl font-bold mt-1">{workspace.plan}</h3>
               </div>
-              <span className="bg-brand-700/50 px-3 py-1 rounded-lg text-xs font-bold border border-brand-600">{displayPrice}</span>
+              {planBadge && (
+                <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${
+                  workspace.cancelAtPeriodEnd
+                    ? 'bg-amber-400/20 border-amber-300/50 text-amber-100'
+                    : 'bg-brand-700/50 border-brand-600'
+                }`}>
+                  {planBadge}
+                </span>
+              )}
             </div>
             <p className="text-xs text-brand-300 mb-4">{currentPlan.tagline}</p>
 
@@ -352,7 +395,7 @@ const Dashboard = () => {
 
             {isAdmin && (
               <Link to="/settings" state={{ initialTab: 'plans' }} className="block w-full py-3 bg-white text-brand-900 text-center rounded-xl text-xs font-bold hover:bg-brand-50 transition-colors shadow-md">
-                Manage Subscription
+                Manage plan
               </Link>
             )}
           </div>

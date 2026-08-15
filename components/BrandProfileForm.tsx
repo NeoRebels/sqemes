@@ -4,7 +4,7 @@ import { firstTextModelId } from '../lib/authoringAI';
 import { analyzeWebsite } from '../lib/wizardGeneration';
 import { TONE_LABELS } from '../lib/compileBrandVoice';
 import type { ToneLevel, BrandProfile } from '../types';
-import { Loader2, Globe } from 'lucide-react';
+import { Loader2, Globe, AlertCircle } from 'lucide-react';
 
 // SQEM-106 — shared brand form used by both onboarding (WizardCreateStep) and
 // Settings → Brand. Owns the "Analyze your website" prefill + the brand fields.
@@ -51,12 +51,22 @@ export function BrandProfileForm({
   const modelId = firstTextModelId(workspace.apiKeys);
   const canUseAI = !!modelId || !!workspace.fundedAvailable;
   const [analyzing, setAnalyzing] = useState(false);
+  const [websiteError, setWebsiteError] = useState<string | null>(null);
 
   const handleAnalyze = async () => {
     if (!canUseAI || !value.website.trim()) return;
+    // SQEM-203 — add the scheme instead of complaining about it. The field is `type="url"`, but the
+    // button submits no form, so native validation never runs: we used to send "example.com" to the
+    // server purely to be told no. Writing the normalised value back also shows what was actually
+    // requested.
+    const url = /^[a-z][a-z0-9+.-]*:\/\//i.test(value.website.trim())
+      ? value.website.trim()
+      : `https://${value.website.trim()}`;
+    if (url !== value.website) onChange({ website: url });
+    setWebsiteError(null);
     setAnalyzing(true);
     try {
-      const fields = await analyzeWebsite(value.website.trim(), { workspaceId: workspace.id, modelId });
+      const fields = await analyzeWebsite(url, { workspaceId: workspace.id, modelId });
       const patch: Partial<BrandFormValue> = {};
       if (fields.brandName) patch.brandName = fields.brandName;
       if (fields.whatItDoes) patch.whatItDoes = fields.whatItDoes;
@@ -65,7 +75,9 @@ export function BrandProfileForm({
       onChange(patch);
       showToast('Filled in from your site — review and edit below.', 'success');
     } catch (err: any) {
-      showToast(err.message || 'Could not read that website. Fill the form in manually.', 'error');
+      // SQEM-203 — this belongs at the field, not in a toast 1200px away in the opposite corner
+      // that disappears after a few seconds. It stays until the input changes.
+      setWebsiteError(err.message || 'Could not read that website. Fill the form in manually.');
     } finally {
       setAnalyzing(false);
     }
@@ -82,11 +94,17 @@ export function BrandProfileForm({
           <input
             type="url"
             value={value.website}
-            onChange={e => onChange({ website: e.target.value })}
+            onChange={e => { onChange({ website: e.target.value }); setWebsiteError(null); }}
             onKeyDown={e => { if (e.key === 'Enter') handleAnalyze(); }}
             placeholder="https://yourbrand.com"
             disabled={disabled}
-            className="flex-1 p-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400"
+            aria-invalid={!!websiteError}
+            aria-describedby={websiteError ? 'website-error' : undefined}
+            className={`flex-1 p-3 border bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:ring-2 transition-all placeholder:text-slate-400 ${
+              websiteError
+                ? 'border-red-400 dark:border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                : 'border-slate-200 dark:border-slate-600 focus:border-brand-500 focus:ring-brand-500/20'
+            }`}
           />
           <button
             onClick={handleAnalyze}
@@ -96,7 +114,12 @@ export function BrandProfileForm({
             {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing…</> : <><Globe className="w-4 h-4" /> Analyze</>}
           </button>
         </div>
-        {!canUseAI && (
+        {websiteError && (
+          <p id="website-error" role="alert" className="flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400 mt-1.5">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-px" /> {websiteError}
+          </p>
+        )}
+        {!canUseAI && !websiteError && (
           <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">Add a provider key or enable Sqemes AI to analyze a website.</p>
         )}
       </div>

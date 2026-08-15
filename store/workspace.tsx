@@ -14,7 +14,8 @@ export interface WorkspaceState {
   isSqemesAdmin: boolean;
   updateWorkspace: (updates: Partial<Workspace>) => void;
   setWorkspaceManaged: (id: string, managed: boolean) => Promise<void>;
-  createWorkspace: (name: string) => void;
+  /** SQEM-209 — returns the new workspace so a caller can continue straight into checkout. */
+  createWorkspace: (name: string) => Promise<Workspace | null>;
   switchWorkspace: (id: string) => void;
   deleteWorkspace: (id: string) => Promise<void>;
   leaveWorkspace: () => Promise<void>;
@@ -109,8 +110,10 @@ export function useWorkspaceState(
       setUser(prev => ({ ...prev, role: 'admin' }));
       setNoWorkspace(false);
       showToast('Workspace created', 'success');
+      return newWs;
     } catch (err: any) {
       showToast(err.message || 'Failed to create workspace', 'error');
+      return null;
     }
   }, [showToast, setNoWorkspace]);
 
@@ -161,16 +164,31 @@ export function useWorkspaceState(
 
     const wsAdmins = workspace.members.filter(m => m.role === 'admin');
     const isSoleAdmin = wsAdmins.length === 1 && wsAdmins[0].id === currentUser.id;
-    if (isSoleAdmin) {
+    const isSoleMember = workspace.members.length === 1;
+
+    // SQEM-214 — the block only makes sense while somebody is left to strand. Alone in the
+    // workspace, refusing would trap the person in something nobody else uses: the workspace goes
+    // with them instead, through the path that cancels the subscription (SQEM-213). The
+    // confirmation in Settings says so before this runs.
+    if (isSoleAdmin && !isSoleMember) {
       showToast(
-        'You are the only admin of this workspace. Transfer admin rights to another member or delete the workspace before leaving.',
+        'You are the only admin of this workspace. Make someone else an admin before you leave.',
         'error'
       );
       return;
     }
 
+    if (isSoleMember) {
+      try {
+        await workspacesApi.deleteWorkspace(activeWorkspaceId);
+      } catch (err: any) {
+        showToast(err.message || 'Failed to leave workspace', 'error');
+        return;
+      }
+    }
+
     try {
-      await membersApi.removeMember(activeWorkspaceId, currentUser.id);
+      if (!isSoleMember) await membersApi.removeMember(activeWorkspaceId, currentUser.id);
       const remaining = availableWorkspaces.filter(w => w.id !== activeWorkspaceId);
       setAvailableWorkspaces(remaining);
 
@@ -279,6 +297,20 @@ export function useWorkspaceState(
 
   const updateMemberRole = useCallback(async (id: string, role: UserRole) => {
     if (!activeWorkspaceId) return;
+
+    // SQEM-214 — the third door into an adminless workspace, and the quietest one: demoting the
+    // last admin. Leaving was already guarded, account deletion now is; without this you could
+    // simply set your own role to "editor" and achieve the same dead state in one click.
+    // Phrased as "would this leave zero admins", which also covers demoting *someone else*.
+    const admins = workspace.members.filter(m => m.role === 'admin');
+    if (role !== 'admin' && admins.length === 1 && admins[0].id === id) {
+      showToast(
+        'A workspace needs at least one admin. Make someone else an admin first.',
+        'error',
+      );
+      return;
+    }
+
     try {
       await membersApi.updateMemberRole(activeWorkspaceId, id, role);
       setWorkspace(prev => ({
@@ -289,7 +321,7 @@ export function useWorkspaceState(
     } catch (err: any) {
       showToast(err.message || 'Failed to update role', 'error');
     }
-  }, [activeWorkspaceId, showToast]);
+  }, [activeWorkspaceId, workspace.members, showToast]);
 
   const fetchInvitations = useCallback(async () => {
     if (!activeWorkspaceId) return;

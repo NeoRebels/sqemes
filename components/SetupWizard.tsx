@@ -1,22 +1,17 @@
 import { useState } from 'react';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { useWorkspace, useUI } from '../store';
-import { saveApiKey } from '../lib/api/apiKeys';
-import { supabase } from '../lib/supabase';
-import { PLANS } from '../constants';
+import { saveApiKey, deleteApiKey, getApiKeyStatus } from '../lib/api/apiKeys';
+import { includedCredits } from '../lib/credits';
+import { firstTextModelId } from '../lib/authoringAI';
+import { useExtensionInstalled } from '../hooks/useExtensionInstalled';
 import { ProviderIcon } from './ProviderIcon';
 import WizardCreateStep, { type WizardAction } from './WizardCreateStep';
 import Modal from './ui/Modal';
-import { TemplateAccessControl, rolesToAccessValue, accessValueToRoles } from './TemplateAccessControl';
 import {
-  Key, Server, Puzzle, Check, Copy, ExternalLink, Loader2, ArrowRight, ArrowLeft, Sparkles, Lock, ChevronDown,
+  Key, Puzzle, Check, ExternalLink, Loader2, ArrowRight, ArrowLeft, Sparkles, ChevronDown,
 } from 'lucide-react';
 import chromeSrc from '../assets/browsers/chrome.svg';
-import edgeSrc from '../assets/browsers/edge.svg';
-import braveSrc from '../assets/browsers/brave.svg';
-import operaSrc from '../assets/browsers/opera.svg';
-import vivaldiSrc from '../assets/browsers/vivaldi.svg';
-import arcSrc from '../assets/browsers/arc.svg';
 import { CHROME_STORE_URL } from '../lib/links';
 
 const PROVIDERS = [
@@ -38,21 +33,36 @@ const EXTENSION_LLMS = [
   { label: 'Perplexity', provider: 'perplexity' },
 ];
 
-const BROWSERS = [
-  { label: 'Chrome', src: chromeSrc },
-  { label: 'Edge', src: edgeSrc },
-  { label: 'Brave', src: braveSrc },
-  { label: 'Arc', src: arcSrc },
-  { label: 'Opera', src: operaSrc },
-  { label: 'Vivaldi', src: vivaldiSrc },
+/**
+ * SQEM-201 — the mandatory path is three steps, and the one that shows what the product does
+ * comes last of the three rather than fifth of five.
+ *
+ * Dropped from the path (both remain reachable, better placed):
+ *   MCP             — an unexpanded acronym, a raw endpoint URL and a JSON block as the *second*
+ *                     screen after signup. The dashboard already lists it under "Connections",
+ *                     optional and named; Settings → API & MCP has the full version.
+ *   Template access — asked in a workspace that has exactly one member, with the correct default
+ *                     already selected. Lives in Settings → General, and in the editor per template.
+ *
+ * Steps are keyed by **id, not index**. The old code guarded each block with `step === N`, so the
+ * self-host variant (a shorter array) and the Cloud variant silently disagreed about which number
+ * meant which screen — the exact trap this ticket was warned about. Adding or removing a step now
+ * cannot desynchronise the two.
+ *
+ * SQEM-170 — starter-template creation is Cloud-only; self-host ends after Extension.
+ */
+type StepId = 'provider' | 'extension' | 'templates';
+
+const STEPS: { id: StepId; label: string }[] = [
+  { id: 'provider', label: 'Provider key' },
+  { id: 'extension', label: 'Extension' },
+  ...(IS_SELF_HOSTED ? [] : [{ id: 'templates' as const, label: 'Create templates' }]),
 ];
 
-// SQEM-170 — Template access + starter-template creation are Cloud-only features; self-host onboarding
-// stops after Extension. (The step blocks below are guarded by `step === N` and `step` is bounded by
-// STEPS.length-1, so dropping the last two labels cleanly removes them on self-host.)
-const STEPS = IS_SELF_HOSTED
-  ? ['Provider key', 'MCP', 'Extension']
-  : ['Provider key', 'MCP', 'Extension', 'Template access', 'Create templates'];
+const PRIMARY_BTN =
+  'inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-brand-200 dark:shadow-none';
+const MUTED_BTN =
+  'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors';
 
 interface SetupWizardProps {
   /** Called when the wizard is dismissed or completed. `completed` distinguishes the two. */
@@ -72,7 +82,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
   const [step, setStep] = useState(0);
   const [createAction, setCreateAction] = useState<WizardAction | null>(null);
   const isLast = step === STEPS.length - 1;
-  const hasMcpAccess = workspace.isManaged || PLANS[workspace.plan]?.mcpAccess;
+  const current = STEPS[step].id;
 
   const next = () => setStep(s => Math.min(s + 1, STEPS.length - 1));
   const back = () => setStep(s => Math.max(s - 1, 0));
@@ -86,7 +96,34 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
   const [providerOpen, setProviderOpen] = useState(false);
   const [keyValue, setKeyValue] = useState('');
   const [savingKey, setSavingKey] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removingKey, setRemovingKey] = useState(false);
   const activeProvider = PROVIDERS.find(p => p.id === provider) ?? PROVIDERS[0];
+
+  /**
+   * SQEM-201 — what the plan already covers, said at the step that asks for a key.
+   *
+   * The step reads as a requirement ("Add an AI provider key") when it is in fact optional on
+   * Cloud: every paid tier ships a monthly funded allowance, so Chat and the generation in step 3
+   * work before any key exists. Someone who does not have a provider account — the audience this
+   * onboarding was rebuilt for — otherwise has no way to tell that skipping is safe.
+   *
+   * Hidden when there is nothing true to say: self-host has no plans, `fundedAvailable` false means
+   * no funded model is configured, and managed workspaces are not metered (`includedCredits` → 0).
+   */
+  const creditsIncluded = includedCredits(workspace);
+  const hasByokText = firstTextModelId(workspace.apiKeys) !== null;
+  const showCredits = !IS_SELF_HOSTED && !!workspace.fundedAvailable && creditsIncluded > 0;
+
+  // SQEM-203 — drives the single footer button's label and weight: "Next" once the step has actually
+  // been done, an honest "Skip this step" while it hasn't. `templates` is not listed because the last
+  // step's button comes from `createAction` instead.
+  const extensionInstalled = useExtensionInstalled();
+  const stepDone: Record<StepId, boolean> = {
+    provider: configured.size > 0,
+    extension: extensionInstalled,
+    templates: false,
+  };
 
   const handleSaveKey = async () => {
     const trimmed = keyValue.trim();
@@ -95,7 +132,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
     try {
       await saveApiKey(workspace.id, provider, trimmed);
       setConfigured(prev => new Set(prev).add(provider));
-      // Sync the store so later steps (Step 4 generation gate) see the new key.
+      // Sync the store so the Create-templates step's generation gate sees the new key.
       updateWorkspace({ apiKeys: { ...workspace.apiKeys, [provider]: '••••••••' } });
       setKeyValue('');
       showToast(`${activeProvider.name} key saved`, 'success');
@@ -106,43 +143,32 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
     }
   };
 
-  // --- MCP state ---
-  const mcpUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mcp-server`;
-  const plansUrl = `${window.location.origin}${window.location.pathname}#/settings?tab=plans`;
-  const [generatingMcp, setGeneratingMcp] = useState(false);
-  const [mcpKey, setMcpKey] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
-  const snippet = `{\n  "mcpServers": {\n    "sqemes": {\n      "url": "${mcpUrl}",\n      "headers": {\n        "Authorization": "Bearer ${mcpKey ?? 'sqm_live_YOUR_KEY'}"\n      }\n    }\n  }\n}`;
-
-  const copy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(id);
-    setTimeout(() => setCopied(null), 2000);
-  };
-
-  const handleGenerateMcpKey = async () => {
-    setGeneratingMcp(true);
+  /**
+   * SQEM-203 — a key pasted into the wrong provider could not be taken back: the step only ever
+   * added. Same call and same refresh as Settings → Integrations (`handleRemoveKey` there), so the
+   * two places cannot drift apart.
+   *
+   * `configured` is rebuilt from the server's answer rather than by deleting one entry locally —
+   * the response is the truth about what is stored, and it also keeps `stepDone.provider` honest:
+   * remove the last key and the footer button goes back to "Skip this step" on its own.
+   */
+  const handleRemoveKey = async () => {
+    setRemovingKey(true);
     try {
-      const randomBytes = crypto.getRandomValues(new Uint8Array(16));
-      const hex = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
-      const key = `sqm_live_${hex}`;
-      const keyPrefix = key.substring(0, 16) + '...';
-      const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
-      const keyHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-      const { error } = await supabase.from('sqemes_api_keys').insert({
-        workspace_id: workspace.id,
-        name: 'Setup wizard',
-        key_hash: keyHash,
-        key_prefix: keyPrefix,
-        scopes: ['read', 'create', 'update', 'delete'],
-        expires_at: null,
-      });
-      if (error) throw error;
-      setMcpKey(key);
+      await deleteApiKey(workspace.id, provider);
+      const { keys: status, fundedAvailable } = await getApiKeyStatus(workspace.id);
+      const remaining: Record<string, string> = {};
+      for (const [p, isConfigured] of Object.entries(status)) {
+        if (isConfigured) remaining[p] = '••••••••';
+      }
+      updateWorkspace({ apiKeys: remaining, fundedAvailable });
+      setConfigured(new Set(Object.keys(remaining)));
+      setConfirmRemove(false);
+      showToast(`${activeProvider.name} key removed`, 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to generate key', 'error');
+      showToast(err.message || 'Failed to remove key', 'error');
     } finally {
-      setGeneratingMcp(false);
+      setRemovingKey(false);
     }
   };
 
@@ -155,17 +181,17 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
         </div>
         <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100">Set up your workspace</h2>
         <div className="flex items-center gap-2 mt-4">
-          {STEPS.map((label, i) => (
-            <div key={label} className={`h-1.5 rounded-full flex-1 transition-colors ${i <= step ? 'bg-brand-500' : 'bg-slate-200 dark:bg-slate-700'}`} />
+          {STEPS.map((s, i) => (
+            <div key={s.id} className={`h-1.5 rounded-full flex-1 transition-colors ${i <= step ? 'bg-brand-500' : 'bg-slate-200 dark:bg-slate-700'}`} />
           ))}
         </div>
-        <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 font-medium">Step {step + 1} of {STEPS.length} · {STEPS[step]}</p>
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 font-medium">Step {step + 1} of {STEPS.length} · {STEPS[step].label}</p>
       </div>
 
       {/* Body */}
       <div className="px-6 py-6 md:px-8 min-h-[320px]">
-        {/* ---- Step 1: Provider key ---- */}
-        {step === 0 && (
+        {/* ---- Provider key ---- */}
+        {current === 'provider' && (
           <div>
             <div className="flex items-start gap-3 mb-5">
               <div className="p-2.5 rounded-xl bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 shrink-0">
@@ -204,7 +230,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                           type="button"
                           role="option"
                           aria-selected={p.id === provider}
-                          onClick={() => { setProvider(p.id); setProviderOpen(false); }}
+                          onClick={() => { setProvider(p.id); setProviderOpen(false); setConfirmRemove(false); }}
                           className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${p.id === provider ? 'bg-brand-50 dark:bg-brand-900/20' : ''}`}
                         >
                           <ProviderIcon provider={p.id} className="w-5 h-5 shrink-0" />
@@ -232,89 +258,78 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                 {savingKey ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
               </button>
             </div>
-            <a href={activeProvider.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline mt-2.5 group/link">
-              Get a {activeProvider.name} key <ExternalLink className="w-3 h-3 transition-transform group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5" />
-            </a>
-          </div>
-        )}
+            <div className="flex items-center justify-between gap-3 mt-2.5 flex-wrap">
+              <a href={activeProvider.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline group/link">
+                Get a {activeProvider.name} key <ExternalLink className="w-3 h-3 transition-transform group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5" />
+              </a>
 
-        {/* ---- Step 2: MCP ---- */}
-        {step === 1 && (
-          <div>
-            <div className="flex items-start gap-3 mb-5">
-              <div className="p-2.5 rounded-xl bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 shrink-0">
-                <Server className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Connect via MCP</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Use your full template library inside Claude Desktop, Cursor, and other MCP clients.</p>
-              </div>
+              {/* SQEM-203 — the way back out. Confirmed inline rather than in a second Modal: the
+                  wizard is already one, and stacking two dialogs on a first-run screen reads as an
+                  error. Hidden while a replacement key is being typed — saving already replaces. */}
+              {configured.has(provider) && !keyValue && (
+                confirmRemove ? (
+                  <span className="inline-flex items-center gap-2 text-xs">
+                    <span className="text-slate-500 dark:text-slate-400">Remove the saved {activeProvider.name} key?</span>
+                    <button
+                      type="button"
+                      onClick={handleRemoveKey}
+                      disabled={removingKey}
+                      className="font-bold text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors disabled:opacity-50"
+                    >
+                      {removingKey ? 'Removing…' : 'Remove'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmRemove(false)}
+                      className="font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmRemove(true)}
+                    className="text-xs font-bold text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 transition-colors"
+                  >
+                    Remove key
+                  </button>
+                )
+              )}
             </div>
 
-            {!hasMcpAccess ? (
-              <div className="flex flex-col items-center justify-center text-center gap-3 py-10 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-                <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                  <Lock className="w-5 h-5 text-slate-400 dark:text-slate-500" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-slate-700 dark:text-slate-200">MCP is available on Team & Business</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-xs">Upgrade to connect Claude Desktop, Cursor, and other MCP clients to your library.</p>
-                </div>
-                <a href={plansUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none">
-                  Upgrade plan <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Endpoint URL</p>
-                  <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 overflow-hidden">
-                    <span className="text-xs font-mono text-slate-600 dark:text-slate-300 truncate flex-1 min-w-0">{mcpUrl}</span>
-                    <button onClick={() => copy(mcpUrl, 'url')} className="shrink-0 text-slate-400 hover:text-brand-500 transition-colors" title="Copy URL">
-                      {copied === 'url' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
+            {/* SQEM-201 — the plan's own allowance, so "skip" is visibly a real option. */}
+            {showCredits && (
+              <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 shrink-0">
+                    <Sparkles className="w-5 h-5" />
                   </div>
-                </div>
-
-                {mcpKey && (
                   <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Your new key</p>
-                    <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl px-3 py-2.5">
-                      <span className="text-xs font-mono text-emerald-700 dark:text-emerald-400 truncate flex-1">{mcpKey}</span>
-                      <button onClick={() => copy(mcpKey, 'mcpkey')} className="shrink-0 text-emerald-600 hover:text-emerald-700" title="Copy key">
-                        {copied === 'mcpkey' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                    <p className="text-2xs text-amber-600 dark:text-amber-400 mt-1">Copy this now — it won&apos;t be shown again.</p>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Client Config (Claude Desktop / Cursor)</p>
-                  <div className="relative bg-slate-900 dark:bg-slate-950 rounded-xl p-4">
-                    <pre className="text-xs font-mono text-slate-300 overflow-x-auto whitespace-pre">{snippet}</pre>
-                    <button onClick={() => copy(snippet, 'snippet')} className="absolute top-3 right-3 p-1.5 text-slate-500 hover:text-slate-200 transition-colors" title="Copy snippet">
-                      {copied === 'snippet' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
+                    {/* Deliberately "your workspace", not "your {plan} plan": the number is the
+                        provisioned `credits_limit` when there is one, and that can differ from the
+                        tier's advertised figure (a Team workspace on staging was metered at 2,000
+                        against an advertised 25,000). Naming the plan would turn that mismatch into
+                        a false promise to a paying customer; naming the workspace stays true either
+                        way, and the plan card still carries the tier's own number. */}
+                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                      Your workspace already includes {creditsIncluded.toLocaleString('en-US')} AI credits a month
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                      {hasByokText
+                        ? <>Your own key is used first, so those credits stay untouched — and AI stays unlimited.</>
+                        : <>Chat and the templates in step 3 work right away, without a key. Add one to make AI unlimited and leave the included credits untouched.</>}
+                      {' '}<span className="text-slate-400 dark:text-slate-500">1 credit = 1,000 tokens.</span>
+                    </p>
                   </div>
                 </div>
-
-                {!mcpKey && (
-                  <button
-                    onClick={handleGenerateMcpKey}
-                    disabled={generatingMcp}
-                    className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {generatingMcp ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</> : 'Generate Key'}
-                  </button>
-                )}
               </div>
             )}
           </div>
         )}
 
-        {/* ---- Step 3: Extension ---- */}
-        {step === 2 && (
+        {/* ---- Extension ---- */}
+        {current === 'extension' && (
           <div>
             <div className="flex items-start gap-3 mb-5">
               <div className="p-2.5 rounded-xl bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 shrink-0">
@@ -340,54 +355,49 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                 </div>
               </div>
 
-              {/* Works on */}
+              {/* Works on — SQEM-207 (P-01/P-02).
+                  "Works on Chromium browsers" used a word the audience does not have: for them
+                  Chromium is not a thing, Chrome is. And Chrome was the *only* icon that did not
+                  look like itself — the set is monochrome Simple Icons glyphs, which is right for
+                  Brave, Opera and Vivaldi (their real marks are single-colour) and wrong for the one
+                  browser this actually ships to. Chrome now leads with its own colours; the rest sit
+                  behind a line of text instead of competing with it. */}
               <div className="bg-slate-50 dark:bg-slate-700/40 rounded-2xl p-4">
-                <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-3">Works on Chromium browsers</p>
-                <div className="grid grid-cols-3 gap-3">
-                  {BROWSERS.map(b => (
-                    <div key={b.label} className="flex flex-col items-center gap-1.5">
-                      <IconTile><img src={b.src} className="w-5 h-5" alt={b.label} /></IconTile>
-                      <span className="text-2xs font-semibold text-slate-600 dark:text-slate-300 text-center">{b.label}</span>
-                    </div>
-                  ))}
+                <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-3">Works in</p>
+                <div className="flex items-center gap-2.5">
+                  <IconTile><img src={chromeSrc} className="w-5 h-5" alt="" /></IconTile>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">Chrome</p>
+                    <p className="text-2xs text-slate-500 dark:text-slate-400 leading-tight">
+                      …and Edge, Brave, Arc, Opera, Vivaldi
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <a
-              href={CHROME_STORE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all"
-            >
-              Install from Chrome Web Store <ExternalLink className="w-4 h-4" />
-            </a>
+            {/* SQEM-207 (P-03) — installation used to end in silence: the button opened a new tab
+                and nothing here ever changed. `useExtensionInstalled` has existed since SQEM-079 and
+                the sidebar already used it; the step that asks for the install did not. */}
+            {extensionInstalled ? (
+              <p className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-sm font-bold">
+                <Check className="w-4 h-4" /> Extension installed — you&apos;re set
+              </p>
+            ) : (
+              <a
+                href={CHROME_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all"
+              >
+                Install from Chrome Web Store <ExternalLink className="w-4 h-4" />
+              </a>
+            )}
           </div>
         )}
 
-        {/* ---- Step 4: Template access default (SQEM-142) ---- */}
-        {step === 3 && (
-          <div>
-            <div className="flex items-start gap-3 mb-5">
-              <div className="p-2.5 rounded-xl bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 shrink-0">
-                <Lock className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Template access</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Choose who can use templates by default. You can change this any time in Settings, and override it per template.</p>
-              </div>
-            </div>
-            <div className="bg-slate-50 dark:bg-slate-700/40 rounded-2xl p-5">
-              <TemplateAccessControl
-                value={rolesToAccessValue(workspace.defaultTemplateAccess ?? [])}
-                onChange={v => updateWorkspace({ defaultTemplateAccess: accessValueToRoles(v) })}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ---- Step 5: Create templates ---- */}
-        {step === 4 && <WizardCreateStep onComplete={() => onClose(true)} onConnectKey={() => setStep(0)} onActionChange={setCreateAction} />}
+        {/* ---- Create templates (Cloud only) ---- */}
+        {current === 'templates' && <WizardCreateStep onComplete={() => onClose(true)} onConnectKey={() => setStep(0)} onActionChange={setCreateAction} />}
       </div>
 
       {/* Footer */}
@@ -402,37 +412,39 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
           </button>
         )}
 
+        {/* SQEM-203 — exactly one button on the right.
+            It used to be two, and they called the same function: `<button onClick={next}>Skip</button>`
+            next to `<button onClick={next}>Next</button>`. Identical behaviour, two labels, two
+            weights — a choice that was not one, with the visually dominant option silently skipping
+            the step. Now the single button says what it will actually do, and carries primary weight
+            only when the step has been completed. */}
         <div className="flex items-center gap-2">
           {isLast ? (
+            // The last step is the one place two buttons are honest: generating and leaving are
+            // genuinely different acts. The audit's complaint was never "two buttons" — it was two
+            // buttons calling the same function. So the exit stays visible next to the action;
+            // collapsing it away left anyone who filled the form and changed their mind with no
+            // way out but the Escape key, which this product's audience will not go looking for.
             <>
-              <button onClick={() => onClose(true)} className="px-4 py-2.5 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
-                Skip for now
-              </button>
+              {createAction && (
+                <button onClick={() => onClose(true)} className={MUTED_BTN}>Skip for now</button>
+              )}
               {createAction ? (
-                <button
-                  onClick={createAction.onClick}
-                  disabled={createAction.disabled}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-brand-200 dark:shadow-none"
-                >
-                  {createAction.loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {createAction.label}
-                </button>
+                (!createAction.disabled || createAction.loading) && (
+                  <button onClick={createAction.onClick} disabled={createAction.loading} className={PRIMARY_BTN}>
+                    {createAction.loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {createAction.label}
+                  </button>
+                )
               ) : (
-                // SQEM-170 — last step has no create action (e.g. self-host, where Create-templates is gone)
-                <button onClick={() => onClose(true)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none">
-                  Done
-                </button>
+                // Self-host: this step has no create action at all (SQEM-170).
+                <button onClick={() => onClose(true)} className={PRIMARY_BTN}>Done</button>
               )}
             </>
           ) : (
-            <>
-              <button onClick={next} className="px-4 py-2.5 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
-                Skip
-              </button>
-              <button onClick={next} className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none">
-                Next <ArrowRight className="w-4 h-4" />
-              </button>
-            </>
+            <button onClick={next} className={stepDone[current] ? PRIMARY_BTN : MUTED_BTN}>
+              {stepDone[current] ? 'Next' : 'Skip this step'} <ArrowRight className="w-4 h-4" />
+            </button>
           )}
         </div>
       </div>

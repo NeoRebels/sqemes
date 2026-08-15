@@ -292,17 +292,35 @@ Deno.serve(async (req) => {
   }
 
   // SQEM-142 — per-user template access. OAuth connections carry the authorizing user; restrict
-  // templates to what that user may access. API-key connections (user_id null) stay workspace-wide.
+  // templates to what that user may access.
   const mcpUserId: string | null = (keyRow as { user_id?: string | null }).user_id ?? null;
-  let accessibleTemplateIds: Set<string> | null = null;
+  let canAccessTemplate: (templateId: string) => boolean;
+
   if (mcpUserId) {
     const { data: accRows } = await adminClient.rpc('mcp_accessible_template_ids', {
       p_workspace_id: workspaceId, p_user_id: mcpUserId,
     });
-    accessibleTemplateIds = new Set(((accRows as { id: string }[] | null) || []).map(r => r.id));
+    const accessible = new Set(((accRows as { id: string }[] | null) || []).map(r => r.id));
+    canAccessTemplate = (templateId: string) => accessible.has(templateId);
+  } else {
+    // SQEM-210 — an API-key connection has no user, so no access rule can be evaluated *for*
+    // anyone. It therefore gets only what is open to everyone: templates with no access rules.
+    //
+    // This closes a real hole rather than a theoretical one. Until now these connections skipped
+    // access filtering entirely and saw every template in the workspace; the only thing holding
+    // restricted ones back was `published = false`, which SQEM-210 retires. Without this, "Only me"
+    // would have become "anyone holding the workspace API key".
+    //
+    // Deliberately over-restrictive: a template restricted *to the key's owner* is invisible here
+    // too, because there is no owner to compare against. Bind the key to a user (OAuth) to get the
+    // per-user set. Restricting too much is the recoverable direction; leaking is not.
+    const { data: ruleRows } = await adminClient
+      .from('template_access')
+      .select('template_id')
+      .eq('workspace_id', workspaceId);
+    const restricted = new Set(((ruleRows as { template_id: string }[] | null) || []).map(r => r.template_id));
+    canAccessTemplate = (templateId: string) => !restricted.has(templateId);
   }
-  // null ⇒ no per-user filtering (API-key / workspace-wide).
-  const canAccessTemplate = (templateId: string) => !accessibleTemplateIds || accessibleTemplateIds.has(templateId);
 
   // 3. Route methods
 
@@ -357,13 +375,14 @@ Deno.serve(async (req) => {
       .from('prompts')
       .select('id, title, description, variables, kind')
       .eq('workspace_id', workspaceId)
-      // SQEM-110 — MCP exposes only published templates; skills are agent-facing so stay
-      // visible while unpublished (matches TemplateLaunchModal). Drafts must not leak via MCP.
+      // SQEM-110 kept a draft out of MCP. SQEM-210 retired that axis — `published` is true for
+      // every workspace template now, so this is a no-op guard against a stray false row from an
+      // older client, not the boundary. Visibility is the access filter below.
       .or('published.eq.true,kind.eq.skill')
       .order('title');
 
     const prompts = (templates || [])
-      .filter((t: any) => canAccessTemplate(t.id)) // SQEM-142 — per-user access (OAuth only)
+      .filter((t: any) => canAccessTemplate(t.id)) // SQEM-142/210 — access-filtered (per user on OAuth, open-only on API keys)
       .map((t: any) => ({
         name: toSlug(t.title),
         description: `[${t.kind}] ${t.description || t.title}`,
@@ -385,7 +404,7 @@ Deno.serve(async (req) => {
       .from('prompts')
       .select('id, title, description, content, system_instruction, variables, skill_ids, context_file_ids, kind')
       .eq('workspace_id', workspaceId)
-      .or('published.eq.true,kind.eq.skill'); // SQEM-110 — no draft fetch/execute via MCP (skills exempt)
+      .or('published.eq.true,kind.eq.skill'); // SQEM-110/210 — vestigial guard, see above
 
     const template = (templates || []).find((t: any) => toSlug(t.title) === name);
     if (!template || !canAccessTemplate(template.id)) return rpcError(id, -32602, `Prompt not found: ${name}`); // SQEM-142
@@ -689,13 +708,13 @@ Deno.serve(async (req) => {
         .from('prompts')
         .select('id, title, description, kind, variables')
         .eq('workspace_id', workspaceId)
-        .or('published.eq.true,kind.eq.skill') // SQEM-110 — no drafts via MCP (skills exempt)
+        .or('published.eq.true,kind.eq.skill') // SQEM-110/210 — vestigial guard, see above
         .order('title');
       if (kind) query = query.eq('kind', kind);
       const { data: templates } = await query;
 
       const result = (templates || [])
-        .filter((t: any) => canAccessTemplate(t.id)) // SQEM-142 — per-user access (OAuth only)
+        .filter((t: any) => canAccessTemplate(t.id)) // SQEM-142/210 — access-filtered (per user on OAuth, open-only on API keys)
         .map((t: any) => ({
           id:            t.id,
           name:          toSlug(t.title),
@@ -716,13 +735,13 @@ Deno.serve(async (req) => {
         .from('prompts')
         .select('id, title, description, kind')
         .eq('workspace_id', workspaceId)
-        .or('published.eq.true,kind.eq.skill'); // SQEM-110 — no drafts via MCP (skills exempt)
+        .or('published.eq.true,kind.eq.skill'); // SQEM-110/210 — vestigial guard, see above
       if (args.kind) dbQuery = dbQuery.eq('kind', args.kind);
       const { data: templates } = await dbQuery;
 
       const results = (templates || [])
         .filter((t: any) =>
-          canAccessTemplate(t.id) && ( // SQEM-142 — per-user access (OAuth only)
+          canAccessTemplate(t.id) && ( // SQEM-142/210 — access-filtered (per user on OAuth, open-only on API keys)
             t.title.toLowerCase().includes(query) ||
             (t.description || '').toLowerCase().includes(query)
           )
@@ -747,7 +766,7 @@ Deno.serve(async (req) => {
         .from('prompts')
         .select('id, title, description, kind, content, system_instruction, variables, context_file_ids')
         .eq('workspace_id', workspaceId)
-        .or('published.eq.true,kind.eq.skill'); // SQEM-110 — no draft fetch via MCP (skills exempt)
+        .or('published.eq.true,kind.eq.skill'); // SQEM-110/210 — vestigial guard, see above
 
       const tpl = templateId
         ? (templates || []).find((t: any) => t.id === templateId)

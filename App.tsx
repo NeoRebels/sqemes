@@ -222,21 +222,21 @@ const AppRoutes = () => {
         <Route path="/library/:id" element={<MarketplaceTemplate />} />
 
         {/* Dashboard Layout Routes */}
-        <Route path="/" element={<Layout><Dashboard /></Layout>} />
-        <Route path="/templates" element={<Layout><Templates /></Layout>} />
+        <Route path="/" element={<LayoutPage><Dashboard /></LayoutPage>} />
+        <Route path="/templates" element={<LayoutPage><Templates /></LayoutPage>} />
         <Route path="/prompts" element={<Navigate to="/templates" replace />} />
         <Route path="/assistants" element={<Navigate to="/templates?kind=assistant" replace />} />
-        <Route path="/files" element={<Layout><Files /></Layout>} />
+        <Route path="/files" element={<LayoutPage><Files /></LayoutPage>} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/chat/:sessionId" element={<Chat />} />
         <Route path="/chat-history" element={<Navigate to="/chat" replace />} />
-        <Route path="/library" element={<Layout><Library /></Layout>} />
-        <Route path="/settings" element={<Layout><Settings /></Layout>} />
+        <Route path="/library" element={<LayoutPage><Library /></LayoutPage>} />
+        <Route path="/settings" element={<LayoutPage><Settings /></LayoutPage>} />
         <Route path="/workspace" element={<Navigate to="/settings" state={{ initialTab: 'team' }} replace />} />
         <Route path="/invite/:token" element={<InviteAccept />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
-        <Route path="*" element={<Layout><NotFound /></Layout>} />
+        <Route path="*" element={<LayoutPage><NotFound /></LayoutPage>} />
       </Routes>
     </Suspense>
   );
@@ -280,6 +280,25 @@ const AuthenticatedApp = () => {
     </ErrorBoundary>
   );
 };
+
+/**
+ * SQEM-207 — keep the shell up while a page chunk loads.
+ *
+ * One `<Suspense>` wrapped every route, so switching section blanked the *whole* app for a moment,
+ * navigation included — on a route the user had already committed to. `Layout` is not lazy, so
+ * rendering it outside the inner boundary keeps the sidebar mounted and only the content area waits.
+ */
+const PageLoading = () => (
+  <div className="flex items-center justify-center py-24" role="status" aria-label="Loading">
+    <img src="/logo-favicon-V2.png" alt="" className="w-8 h-8 rounded-lg opacity-60 animate-pulse" />
+  </div>
+);
+
+const LayoutPage = ({ children }: { children: React.ReactNode }) => (
+  <Layout>
+    <Suspense fallback={<PageLoading />}>{children}</Suspense>
+  </Layout>
+);
 
 const LoadingScreen = () => (
   <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">

@@ -46,7 +46,8 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssis
   const filteredPrompts = useMemo(() => {
     const q = search.toLowerCase();
     return prompts.filter(p => {
-      if (!p.published && p.kind !== 'skill') return false; // hide drafts, but skills may be unpublished
+      // SQEM-210 — the draft filter is gone with the draft axis; access rules govern visibility and
+      // RLS has already applied them to this list.
       if (kindFilter !== 'all' && p.kind !== kindFilter) return false;
       if (showFavoritesOnly && !p.isFavorite) return false;
       return p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q);

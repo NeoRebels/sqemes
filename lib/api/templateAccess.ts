@@ -13,8 +13,15 @@ type AccessClient = {
 };
 const client = supabase as unknown as AccessClient;
 
-/** The principals explicitly granted access. Both empty ⇒ the template is open to everyone. */
-export type TemplateAccess = { roles: UserRole[]; userIds: string[] };
+/**
+ * The principals explicitly granted access.
+ *
+ * `hasRules` is what separates the two states that both arrive as empty lists (SQEM-210):
+ * **no rows at all** = open to everyone, versus **a row naming nobody** = only the creator (plus
+ * admins and editors, who are granted by `can_access_template` itself). Without it, "only me" and
+ * "everyone" would be indistinguishable on read — they are opposites.
+ */
+export type TemplateAccess = { roles: UserRole[]; userIds: string[]; hasRules: boolean };
 
 /**
  * The set of template ids in a workspace that have ANY access rule (i.e. are restricted, not
@@ -41,11 +48,17 @@ export async function fetchTemplateAccess(templateId: string): Promise<TemplateA
   return {
     roles: rows.filter(r => r.role != null).map(r => r.role as UserRole),
     userIds: rows.filter(r => r.user_id != null).map(r => r.user_id as string),
+    hasRules: rows.length > 0,
   };
 }
 
 /**
- * Replace the access rules for a template. Both empty ⇒ open (all rows removed).
+ * Replace the access rules for a template.
+ *
+ * `hasRules: false` ⇒ open (all rows removed). `hasRules: true` with no principals ⇒ "only me":
+ * a single row naming nobody, which keeps the template out of the "no rules = open" branch while
+ * granting no one (SQEM-210).
+ *
  * Delete-then-insert (not atomic; a rare mid-write failure leaves the template open, never
  * over-restricted — the safe direction). admin/editor only, enforced by RLS.
  */
@@ -57,11 +70,15 @@ export async function setTemplateAccess(
   const del = await client.from('template_access').delete().eq('template_id', templateId);
   if (del.error) throw del.error;
 
+  if (!access.hasRules) return; // open to everyone
+
   const rows = [
     ...access.roles.map(role => ({ template_id: templateId, workspace_id: workspaceId, role })),
     ...access.userIds.map(user_id => ({ template_id: templateId, workspace_id: workspaceId, user_id })),
   ];
-  if (rows.length === 0) return; // open
-  const ins = await client.from('template_access').insert(rows);
+  // Restricted but nobody named — the one row that means "only me".
+  const ins = await client.from('template_access').insert(
+    rows.length > 0 ? rows : [{ template_id: templateId, workspace_id: workspaceId }],
+  );
   if (ins.error) throw ins.error;
 }

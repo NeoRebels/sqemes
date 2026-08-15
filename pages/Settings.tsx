@@ -8,7 +8,7 @@ import { IS_SELF_HOSTED } from '../lib/env';
 import { fetchCanPublish, setPublisherToken } from '../lib/api/library';
 import { UserRole } from '../types';
 import { BrandProfileForm, brandFormFromProfile, type BrandFormValue } from '../components/BrandProfileForm';
-import { TemplateAccessControl, rolesToAccessValue, accessValueToRoles } from '../components/TemplateAccessControl';
+import { TemplateAccessControl, workspaceDefaultToValue, valueToWorkspaceDefault } from '../components/TemplateAccessControl';
 import { supabase } from '../lib/supabase';
 import { saveApiKey, deleteApiKey, getApiKeyStatus } from '../lib/api/apiKeys';
 import { ProviderIcon } from '../components/ProviderIcon';
@@ -18,6 +18,9 @@ import Card from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import AboutSection from '../components/AboutSection';
+import Avatar, { randomAvatarDataUri } from '../components/ui/Avatar';
+import { buildAccountExport, accountExportFilename } from '../lib/accountExport';
+import { downloadBlob } from '../lib/templateBundle';
 import {
   ApiKeyScopeFields,
   DEFAULT_KEY_SCOPE,
@@ -54,6 +57,7 @@ import {
   Shield,
   RotateCw,
   Loader2,
+  Download,
   SlidersHorizontal,
   Sparkles,
 } from 'lucide-react';
@@ -663,10 +667,29 @@ const Settings = () => {
     }
   };
 
+  // SQEM-205 — account-level data export, next to (and above) account deletion.
+  const [exporting, setExporting] = useState(false);
+  const [exportStep, setExportStep] = useState('');
+  const handleExportAccount = async () => {
+    setExporting(true);
+    setExportStep('');
+    try {
+      const blob = await buildAccountExport(workspace, currentUser, p => setExportStep(p.step));
+      downloadBlob(blob, accountExportFilename(workspace.name));
+      showToast('Your data has been downloaded.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Could not build the export. Please try again.', 'error');
+    } finally {
+      setExporting(false);
+      setExportStep('');
+    }
+  };
+
+  // SQEM-205 — drawn locally as a data: URI. This used to mint an api.dicebear.com URL, creating a
+  // fresh external dependency on every click: broken behind a corporate proxy or ad blocker, and
+  // never loading at all on a self-hosted instance without internet access.
   const handleRandomizeAvatar = () => {
-    const randomSeed = Math.random().toString(36).substring(7);
-    const newAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${randomSeed}`;
-    setProfileAvatar(newAvatar);
+    setProfileAvatar(randomAvatarDataUri());
     setProfileDirty(true);
   };
 
@@ -825,12 +848,16 @@ const Settings = () => {
               {!IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
                 <Card className="p-6 md:p-8">
                   <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Template Access</h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">The default access applied to newly-created templates. Editors can override it per template.</p>
+                  {/* SQEM-211 — this setting decides *whether* new templates start restricted, not
+                      who may use them. Who may use a template is chosen in the template itself, by
+                      name; a workspace-wide list of people would be a second place to maintain the
+                      same thing and would drift from the first. */}
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">How newly-created templates start. Who may use one is chosen in the template itself.</p>
                   <TemplateAccessControl
-                    label="Default access for new templates"
+                    label="Default for new templates"
                     hint="Applies to templates created after this is saved"
-                    value={rolesToAccessValue(workspace.defaultTemplateAccess ?? [])}
-                    onChange={v => updateWorkspace({ defaultTemplateAccess: accessValueToRoles(v) })}
+                    value={workspaceDefaultToValue(workspace.defaultTemplateAccess ?? [])}
+                    onChange={v => updateWorkspace({ defaultTemplateAccess: valueToWorkspaceDefault(v) })}
                   />
                 </Card>
               )}
@@ -902,7 +929,13 @@ const Settings = () => {
                   <button
                     onClick={() => setConfirmDialog({
                       title: `Delete workspace "${workspace.name}"?`,
-                      message: 'This will permanently delete all prompts, history, results, and members. This action cannot be undone.',
+                      // SQEM-213 — the subscription part belongs in the dialog, not in the small
+                      // print afterwards: this is the moment the money decision is actually made.
+                      // Keyed on the subscription id, not `hasActiveSubscription` — that is also
+                      // true for managed workspaces, which have no Stripe subscription to cancel.
+                      message: workspace.stripeSubscriptionId
+                        ? 'This will permanently delete all prompts, history, results, and members. The subscription is cancelled immediately — the rest of the paid period is not refunded. This action cannot be undone.'
+                        : 'This will permanently delete all prompts, history, results, and members. This action cannot be undone.',
                       onConfirm: async () => { await deleteWorkspace(workspace.id); navigate('/'); },
                     })}
                     className="px-4 py-2 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 font-bold text-sm rounded-xl hover:bg-red-600 dark:hover:bg-red-900/30 hover:text-white dark:hover:text-red-300 hover:border-red-600 dark:hover:border-red-700 transition-all shadow-sm"
@@ -948,7 +981,7 @@ const Settings = () => {
                 <div>
                   <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Team Members</h2>
                   <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                    {memberCount} active members{(workspace.isManaged || IS_SELF_HOSTED) ? ' · Unlimited seats' : ` from ${memberLimit}`}
+                    {memberCount} active member{memberCount === 1 ? '' : 's'}{(workspace.isManaged || IS_SELF_HOSTED) ? ' · Unlimited seats' : ` of ${memberLimit} seats`}
                   </p>
                 </div>
                 {can(currentUser, workspace, 'team:manage') && (isLimitReached ? (
@@ -982,7 +1015,7 @@ const Settings = () => {
                       <tr key={member.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/50 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <img src={member.avatar} alt={member.name} className="w-10 h-10 rounded-full object-cover bg-slate-200" />
+                            <Avatar src={member.avatar} name={member.name} className="w-10 h-10" />
                             <div>
                               <p className="font-bold text-slate-900 dark:text-slate-100">{member.name}</p>
                               <p className="text-slate-500 dark:text-slate-400">{member.email}</p>
@@ -1221,19 +1254,24 @@ const Settings = () => {
                         ))}
                       </ul>
 
+                      {/* SQEM-207 (A-01) — this used to render a disabled button labelled
+                          "Switch via Portal" with no explanation of why it was dead, while the
+                          control that actually works sat four plan cards further down. A disabled
+                          control that gives no reason is an error message without any text. Existing
+                          subscribers now get a working button straight to the portal. */}
                       <button
-                        disabled={!canSubscribe || isLoading}
-                        onClick={() => canSubscribe && handleUpgrade(tier)}
+                        disabled={isActivePlan || isLoading}
+                        onClick={() => (canSubscribe ? handleUpgrade(tier) : handleManageSubscription())}
                         className={`w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 ${
                           isActivePlan
                             ? 'bg-brand-600 text-white shadow-lg shadow-brand-200 dark:shadow-none cursor-default'
                             : canSubscribe
                               ? 'bg-slate-900 text-white hover:bg-slate-700'
-                              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                              : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600'
                         }`}
                       >
                         {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                        {isActivePlan ? 'Current Plan' : canSubscribe ? (isLoading ? 'Redirecting...' : `Start ${TRIAL_DAYS}-day trial`) : 'Switch via Portal'}
+                        {isActivePlan ? 'Current Plan' : canSubscribe ? (isLoading ? 'Redirecting...' : `Start ${TRIAL_DAYS}-day trial`) : 'Change in billing portal'}
                       </button>
                     </div>
                   );
@@ -1521,7 +1559,7 @@ const Settings = () => {
                 
                 <div className="flex flex-col sm:flex-row items-start gap-8 mb-8 border-b border-slate-100 dark:border-slate-700 pb-8">
                    <div className="shrink-0 relative group cursor-pointer mx-auto sm:mx-0" onClick={() => fileInputRef.current?.click()}>
-                     <img src={profileAvatar} alt={profileName} className="w-24 h-24 rounded-full object-cover ring-4 ring-slate-50 dark:ring-slate-700 bg-slate-200 dark:bg-slate-600" />
+                     <Avatar src={profileAvatar} name={profileName} className="w-24 h-24 ring-4 ring-slate-50 dark:ring-slate-700" />
                      <div className="absolute inset-0 bg-slate-900/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <Camera className="w-8 h-8 text-white" />
                      </div>
@@ -1619,7 +1657,11 @@ const Settings = () => {
                     <button
                       onClick={() => setConfirmDialog({
                         title: 'Leave workspace?',
-                        message: `You will lose access to "${workspace.name}". You can be re-invited later.`,
+                        // SQEM-214 — alone in the workspace, leaving takes it with you. That has to
+                        // be said *before* the click, not discovered after it.
+                        message: workspace.members.length === 1
+                          ? `You are the only member of "${workspace.name}". Leaving deletes the workspace and everything in it${workspace.stripeSubscriptionId ? ', and cancels its subscription immediately — the rest of the paid period is not refunded' : ''}. This action cannot be undone.`
+                          : `You will lose access to "${workspace.name}". You can be re-invited later.`,
                         onConfirm: leaveWorkspace,
                       })}
                       className="px-4 py-2 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-bold hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-800/50 transition-colors flex items-center justify-center gap-2 flex-1 sm:flex-none"
@@ -1637,13 +1679,39 @@ const Settings = () => {
                 </div>
               </Card>
 
+              {/* SQEM-205 — deliberately directly above the Danger Zone. The product could delete an
+                  account but not hand the data over first, and deletion is the half of that pair
+                  which costs the user something. Whoever is about to leave passes this on the way. */}
+              <Card className="p-8">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Your data</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                  Download everything in <strong>{workspace.name}</strong> as a ZIP — templates, chats, files and your
+                  profile. The archive includes a README listing exactly what is and isn&apos;t in it.
+                  {(workspace.members?.length ?? 0) > 0 && ' Belong to several workspaces? Switch workspace and export again.'}
+                </p>
+                <button
+                  onClick={handleExportAccount}
+                  disabled={exporting}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-bold text-sm rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {exporting
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> {exportStep || 'Preparing…'}</>
+                    : <><Download className="w-4 h-4" /> Download my data</>}
+                </button>
+              </Card>
+
               <div className="bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-100 dark:border-red-800/50 p-8">
                 <h2 className="text-lg font-bold text-red-900 dark:text-red-300 mb-2">Danger Zone</h2>
                 <p className="text-sm text-red-600 dark:text-red-400 mb-6">Permanently delete your account and remove access to all workspaces. This action cannot be undone.</p>
                 <button
                   onClick={() => setConfirmDialog({
                     title: 'Delete your account?',
-                    message: 'This will permanently delete your account and all your data. Any workspaces where you are the only admin will be left without an admin. This action cannot be undone.',
+                    // SQEM-214 — this used to *warn* that workspaces would be left without an
+                    // admin. That state is dead (nobody can manage members or reach billing, and
+                    // the subscription keeps running), so it is refused now instead of announced.
+                    // The server does the refusing and names the workspaces; saying "will be
+                    // blocked" here would be a second, weaker copy of that rule.
+                    message: 'This will permanently delete your account and all your data. Workspaces where you are the only member are deleted with it. This action cannot be undone.',
                     onConfirm: deleteAccount,
                   })}
                   className="px-4 py-2 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 font-bold text-sm rounded-xl hover:bg-red-600 dark:hover:bg-red-900/30 hover:text-white dark:hover:text-red-300 hover:border-red-600 dark:hover:border-red-700 transition-all shadow-sm"

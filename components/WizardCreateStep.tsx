@@ -68,17 +68,31 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
       },
     });
     try {
-      const result = await generateStarterLibrary(
+      const { drafts: result, failures } = await generateStarterLibrary(
         { brandName: brand.brandName.trim(), whatItDoes: brand.whatItDoes.trim(), audience: brand.audience.trim(), tone: brand.tone, useCase: brand.useCase.trim() },
         { workspaceId: workspace.id, modelId },
       );
       if (result.length === 0) {
-        showToast('Generation returned nothing — please try again.', 'error');
+        // SQEM-200 — the two empty outcomes need different advice. A rejected key or exhausted
+        // credits does not get better by retrying, so don't tell the user to try again for those.
+        showToast(
+          failures.length > 0
+            ? `Couldn't generate your starter templates: ${failures[0].message}`
+            : "The AI didn't return anything usable. Try again, or browse the Marketplace for ready-made templates.",
+          'error',
+        );
         return;
       }
       setDrafts(result);
       setSelected(new Set(result.map((_, i) => i)));
       setPhase('review');
+      // Partial success is still success — but name what's missing instead of quietly shipping less.
+      if (failures.length > 0) {
+        showToast(
+          `${failures.map(f => f.section).join(' and ')} couldn't be generated — you can add those later. ${failures[0].message}`,
+          'info',
+        );
+      }
     } catch (err: any) {
       showToast(err.message || 'Generation failed', 'error');
     } finally {

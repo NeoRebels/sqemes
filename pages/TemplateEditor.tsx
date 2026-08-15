@@ -8,7 +8,7 @@ import { fetchPromptDetail } from '../lib/api/prompts';
 import { fetchLibraryTemplateDetail } from '../lib/api/library';
 import { AVAILABLE_MODELS, TEMPLATE_CATEGORIES } from '../constants';
 import { runAuthoringAI } from '../lib/authoringAI';
-import { Save, Plus, Trash2, ArrowLeft, Settings, Edit, ChevronDown, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Bot, Wand2, FlaskConical } from 'lucide-react';
+import { Save, Plus, Trash2, Settings, Edit, ChevronDown, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Bot, Wand2, FlaskConical } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import FieldTooltip from '../components/FieldTooltip';
@@ -16,10 +16,11 @@ import { ContextFilePicker } from '../components/ContextFilePicker';
 import { TagPicker } from '../components/TagPicker';
 import { UploadFileModal } from '../components/UploadFileModal';
 import { BrandVoiceForm } from '../components/BrandVoiceForm';
-import { TemplateAccessControl, rolesToAccessValue, accessToValue, accessValueToAccess, type TemplateAccessValue } from '../components/TemplateAccessControl';
+import { TemplateAccessControl, seedFromWorkspaceDefault, accessToValue, accessValueToAccess, type TemplateAccessValue } from '../components/TemplateAccessControl';
 import { fetchTemplateAccess, setTemplateAccess } from '../lib/api/templateAccess';
 import { compileAssistantInstruction, defaultBrandConfig } from '../lib/compileBrandVoice';
 import EditorTestPanel from '../components/EditorTestPanel';
+import FullScreenExit from '../components/ui/FullScreenExit';
 
 // Marketplace library templates store their body as a single rich-text step;
 // normalise to plain text when loading into the unified content editor.
@@ -27,6 +28,17 @@ const stripHtml = (html: string): string => {
   const tmp = document.createElement('div');
   tmp.innerHTML = html;
   return tmp.textContent || tmp.innerText || '';
+};
+
+/**
+ * SQEM-204 — one sentence per kind, at the point where the choice is made.
+ * Definitions follow `pm/VISION.md`; each example is a real marketplace listing, so the explanation
+ * a reader meets here matches the one they meet while browsing. Keep both in step when editing.
+ */
+const KIND_HELP: Record<PromptKind, string> = {
+  prompt: 'A task you reuse and fill in each time. Example: “Cold Outreach Email” — you supply the customer and the product.',
+  assistant: 'A persona to work with, with its own instructions and context files. Example: “Editor-in-Chief” — sharpens clarity, flow and structure.',
+  skill: 'A piece of your company’s knowledge that AI applies whenever it fits — no filling in. Example: “AIDA Copywriting Framework”, or your brand voice.',
 };
 
 const TemplateEditor = () => {
@@ -83,7 +95,9 @@ const TemplateEditor = () => {
   const [testResetKey, setTestResetKey] = useState(0);
   // SQEM-142 — per-template role access. New templates inherit the workspace default; existing
   // ones load their rules below. Empty roles = open to everyone.
-  const [access, setAccess] = useState<TemplateAccessValue>(() => rolesToAccessValue(workspace?.defaultTemplateAccess ?? []));
+  // SQEM-211 — "restricted by default" seeds "Only me": nobody else has been picked yet, and that
+  // is a state the control can show. It used to seed a role row the editor can no longer represent.
+  const [access, setAccess] = useState<TemplateAccessValue>(() => seedFromWorkspaceDefault(workspace?.defaultTemplateAccess ?? []));
 
   const canEdit = isLibrary ? isSqemesAdmin : can(currentUser, workspace, 'prompts:edit');
 
@@ -170,9 +184,11 @@ const TemplateEditor = () => {
   // SQEM-142 / SQEM-143 — load an existing workspace template's access rules (roles + users).
   useEffect(() => {
     if (id && !isLibrary) {
-      fetchTemplateAccess(id).then(a => setAccess(accessToValue(a.roles, a.userIds))).catch(() => {});
+      // SQEM-211 — members are passed so a legacy `role=member` row resolves into the people it
+      // currently covers, instead of silently disappearing from a control that no longer shows roles.
+      fetchTemplateAccess(id).then(a => setAccess(accessToValue(a.roles, a.userIds, a.hasRules, workspace?.members ?? []))).catch(() => {});
     }
-  }, [id, isLibrary]);
+  }, [id, isLibrary, workspace?.members]);
 
   const handleSave = async () => {
     if (!formData.title.trim()) {
@@ -458,13 +474,17 @@ Output only the refined prompt text, with no surrounding explanation or commenta
       {/* Header */}
       <header className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 h-16 px-4 md:px-6 flex items-center justify-between shrink-0 z-10">
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleBack}
-            className="text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 flex items-center gap-2 transition-colors text-sm"
-          >
-            <img src="/logo-favicon-V2.png" alt="sqemes" className="w-8 h-8 rounded-lg shrink-0" />
-            <ArrowLeft className="w-4 h-4" /> {isLibrary ? 'Back to Marketplace' : 'Back to Templates'}
-          </button>
+          {/* SQEM-208 — same exit as Chat and the marketplace detail page. `onExit` is the editor's
+              own `handleBack`, so the unsaved-changes guard keeps working untouched.
+              Escape is deliberately OFF here: an editor has many local Escape consumers (dropdowns,
+              tag picker, test panel, several modals), and any one not enumerated would turn Escape
+              into "leave the page" when the user only meant "close this menu". Chat's states were
+              knowable and complete; an editor's are not. Flip `escapeEnabled` if that changes. */}
+          <img src="/logo-favicon-V2.png" alt="sqemes" className="w-8 h-8 rounded-lg shrink-0" />
+          <FullScreenExit
+            label={isLibrary ? 'Back to Marketplace' : 'Back to Templates'}
+            onExit={handleBack}
+          />
         </div>
         <div className="flex items-center gap-2 md:gap-3">
           {id && canEdit && (
@@ -536,6 +556,8 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                         if (kind === 'assistant') setBrandVoiceMode('structured');
                         setIsDirty(true);
                       }}
+                      aria-pressed={formData.kind === kind}
+                      aria-describedby="kind-help"
                       className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${
                         formData.kind === kind
                           ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-slate-100 shadow-sm'
@@ -546,6 +568,15 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                     </button>
                   ))}
                 </div>
+                {/* SQEM-204 — the product's central decision used to sit here completely unlabelled:
+                    no description, no title, no aria anything. Meanwhile the marketplace explains the
+                    same three kinds well, by example rather than by definition — the knowledge existed,
+                    just not where the choice is made. Wording checked against pm/VISION.md; the
+                    examples are real marketplace listings, so what a reader sees here and there agrees.
+                    `aria-describedby` points every tab at this line so it is read out too. */}
+                <p id="kind-help" className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                  {KIND_HELP[formData.kind]}
+                </p>
               </div>
             )}
 
@@ -640,34 +671,43 @@ Output only the refined prompt text, with no surrounding explanation or commenta
               </div>
             )}
 
-            {/* Visibility */}
-            {canEdit && (
+            {/* Status — marketplace listings only (SQEM-204 named it, SQEM-210 narrowed it).
+                For workspace templates this was a second, competing answer to "who may see this":
+                "Draft — only editors & admins see it" sat directly above an Access control that
+                answered the same question, and the two could contradict each other on screen. Access
+                now owns it end to end — "Only me" says what Draft was reaching for, and says it in
+                the one place that governs it. The migration carried existing drafts across as
+                no-grantee access rows, so nothing became visible that was not before.
+                Here it stays, because `library_templates.published` is a different column on a
+                different table and means something else entirely: listed in the marketplace or not. */}
+            {isLibrary && canEdit && (
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Visibility</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Status</label>
                 <button
                   onClick={() => { setFormData(prev => ({ ...prev, published: !prev.published })); setIsDirty(true); }}
-                  className={`w-full p-3 rounded-xl text-sm font-medium flex items-center justify-between border transition-all ${
+                  aria-pressed={formData.published}
+                  className={`w-full p-3 rounded-xl text-sm font-medium flex items-center justify-between gap-3 border transition-all ${
                     formData.published
                       ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                       : 'bg-amber-50 border-amber-200 text-amber-700'
                   }`}
                 >
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-2 shrink-0">
                     {formData.published ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                    {formData.published ? 'Published' : 'Draft'}
+                    {formData.published ? 'Listed' : 'Draft'}
                   </span>
-                  <span className="text-xs opacity-70">
-                    {isLibrary
-                      ? (formData.published ? 'Visible in the marketplace' : 'Only visible to admins')
-                      : (formData.published ? 'Visible to all members' : 'Only visible to editors & admins')}
+                  <span className="text-xs opacity-70 text-right">
+                    {formData.published ? 'Shown in the marketplace' : 'Not listed yet — only admins see it'}
                   </span>
                 </button>
               </div>
             )}
 
-            {/* Access (SQEM-142) — workspace templates only; Cloud-only feature (SQEM-170) */}
+            {/* Access (SQEM-142) — workspace templates only; Cloud-only feature (SQEM-170).
+                `allowPrivate` only here: as a workspace *default* (Settings) "Only me" would mean
+                every new template starts invisible to the team (SQEM-210). */}
             {!isLibrary && canEdit && !IS_SELF_HOSTED && (
-              <TemplateAccessControl value={access} onChange={v => { setAccess(v); setIsDirty(true); }} members={workspace?.members} />
+              <TemplateAccessControl value={access} onChange={v => { setAccess(v); setIsDirty(true); }} members={workspace?.members} allowPrivate />
             )}
 
             {/* Context Files — workspace templates only */}

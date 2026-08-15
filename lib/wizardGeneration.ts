@@ -194,17 +194,58 @@ export async function generateStarterSkills(b: BrandInput, ctx: GenContext, coun
     }));
 }
 
+/** A section of the starter library that failed, with the reason kept intact. */
+export interface SectionFailure {
+  /** Human-readable section name, safe to show the user. */
+  section: string;
+  message: string;
+}
+
+export interface StarterLibraryResult {
+  drafts: TemplateDraft[];
+  /** Empty when every section succeeded. Never swallowed — see the note below. */
+  failures: SectionFailure[];
+}
+
 /**
  * Generate the full starter library in parallel — **9 templates: 3 assistants, 3 prompts, 3 skills**
  * (SQEM-170; Cloud-only onboarding). The 3 assistants = the brand-voice assistant + 2 role personas.
- * Individual sections that fail return empty so a partial library still comes back.
+ *
+ * SQEM-200 — this used to be `Promise.all` with `.catch(() => [])` per section. The intent was right
+ * (one failing section shouldn't cost the whole library) but the reason was thrown away with the
+ * error. When *every* section failed the caller got an empty array and told the user "generation
+ * returned nothing — please try again", which is misleading for the most common causes: a rejected
+ * provider key or exhausted credits don't get better by retrying. The failures now travel back with
+ * the drafts so the caller can say what actually happened.
+ *
+ * Note the two distinct empty outcomes, which need different messages:
+ *   drafts empty + failures non-empty → the calls failed; `failures[0].message` is the real cause
+ *   drafts empty + failures empty     → every call succeeded but `parseJsonArray` found no usable
+ *                                       JSON, i.e. the model answered in prose. Retrying can help.
  */
-export async function generateStarterLibrary(b: BrandInput, ctx: GenContext): Promise<TemplateDraft[]> {
-  const [brandAssistant, moreAssistants, prompts, skills] = await Promise.all([
-    generateBrandAssistant(b, ctx).then(a => [a]).catch(() => [] as TemplateDraft[]),
-    generateStarterAssistants(b, ctx, 2).catch(() => [] as TemplateDraft[]),
-    generateStarterPrompts(b, ctx, 3).catch(() => [] as TemplateDraft[]),
-    generateStarterSkills(b, ctx, 3).catch(() => [] as TemplateDraft[]),
-  ]);
-  return [...brandAssistant, ...moreAssistants, ...prompts, ...skills];
+export async function generateStarterLibrary(b: BrandInput, ctx: GenContext): Promise<StarterLibraryResult> {
+  const sections: { label: string; run: () => Promise<TemplateDraft[]> }[] = [
+    { label: 'brand voice', run: () => generateBrandAssistant(b, ctx).then(a => [a]) },
+    { label: 'assistants', run: () => generateStarterAssistants(b, ctx, 2) },
+    { label: 'prompts', run: () => generateStarterPrompts(b, ctx, 3) },
+    { label: 'skills', run: () => generateStarterSkills(b, ctx, 3) },
+  ];
+
+  const settled = await Promise.allSettled(sections.map(s => s.run()));
+
+  const drafts: TemplateDraft[] = [];
+  const failures: SectionFailure[] = [];
+  settled.forEach((outcome, i) => {
+    if (outcome.status === 'fulfilled') {
+      drafts.push(...outcome.value);
+    } else {
+      const reason = outcome.reason;
+      failures.push({
+        section: sections[i].label,
+        message: reason instanceof Error ? reason.message : String(reason ?? 'Unknown error'),
+      });
+    }
+  });
+
+  return { drafts, failures };
 }
