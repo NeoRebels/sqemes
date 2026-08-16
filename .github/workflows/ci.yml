@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# SQEM-220 — declared explicitly, and kept read-only. The repository's default workflow permission
+# has to allow write so the CLA workflow can record a signature; this job needs no such thing, and
+# an undeclared job would silently inherit that maximum. Declare, don't inherit.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest

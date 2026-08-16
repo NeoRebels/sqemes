@@ -63,10 +63,38 @@ options → **Instance**, enter your instance URL → **Check** → **Grant acce
 React + TypeScript + Vite frontend · Supabase (Postgres / Auth / Storage / Realtime / Edge
 Functions) backend · Docker for self-hosting.
 
-## Contributing & security
+## Contributing
 
-- **[CONTRIBUTING.md](./CONTRIBUTING.md)** — local dev setup and PR conventions.
-- **[SECURITY.md](./SECURITY.md)** — report a vulnerability privately.
+**Contributions are welcome — and there is one thing to know before you spend an evening on one.**
+
+This repository is **generated**. It is a curated snapshot exported from the private repository where
+Sqemes is developed, and every release rebuilds it wholesale. So a pull request merged *here* would
+be erased by the next release — not rejected, overwritten, silently.
+
+We therefore do not merge into this repository. **Your PR is the proposal:**
+
+```
+1.  You open a PR here                 ← this is the right thing to do
+2.  We review it in the open, on your PR
+3.  If we take it, we port it upstream, with your name on it
+4.  It comes back in the next release, and we tell you which one
+```
+
+Nothing is lost by this: the review happens where you can see it, and the merge happens where it
+survives.
+
+- **Bug reports and small fixes** — perfect, open a PR or an issue.
+- **Anything large** — open an **issue first**. The upstream repo has product constraints that are
+  invisible from here, and it would be unkind to let you build something we cannot take.
+- **First PR?** A bot will ask you to sign the [CLA](./CLA.md) — one reply, once, about fifteen
+  seconds. You keep your copyright. [CONTRIBUTING.md](./CONTRIBUTING.md) explains why we ask.
+- **Rather not sign?** Then open an issue instead. A well-described problem is worth as much as a
+  patch and raises no licensing question at all.
+
+## Security
+
+- **[SECURITY.md](./SECURITY.md)** — report a vulnerability privately. Please do **not** open a
+  public issue for one.
 - **[Code of Conduct](./CODE_OF_CONDUCT.md)**.
 
 ## License

@@ -29,7 +29,7 @@ on:
 
 permissions:
   actions: write
-  contents: write        # needed to commit the signature to the branch below
+  contents: write        # capped by the org policy to read — the signature is written with the PAT below
   pull-requests: write
   statuses: write
 
@@ -43,10 +43,28 @@ jobs:
     steps:
       - uses: contributor-assistant/github-action@v2.6.1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # SQEM-221 — a repo secret, NOT the automatic GITHUB_TOKEN, and that is not a preference.
+          #
+          # The NeoRebels organisation sets workflow permissions to read-only for every repository,
+          # which is GitHub's recommended posture and worth keeping: the org also holds the repos
+          # whose workflows deploy to Supabase and Vercel. A repository cannot raise that ceiling, so
+          # GITHUB_TOKEN can never write here — the action would comment, accept the reply, and then
+          # fail to store the signature.
+          #
+          # So this uses a fine-grained PAT scoped to THIS repository alone, Contents: read+write.
+          # Narrow beats loosening the org default for five repos to let one bot write one file.
+          #
+          # ⚠️ Fine-grained tokens EXPIRE. When it does, signing breaks — and it breaks quietly, in
+          # the one mechanism whose failure nobody notices. The expiry date belongs in
+          # pm/PRODUCTION_PROMOTION.md, not in someone's memory.
+          GITHUB_TOKEN: ${{ secrets.CLA_SIGNATURE_TOKEN }}
         with:
           path-to-signatures: signatures/version1/cla.json
           path-to-document: https://github.com/NeoRebels/sqemes/blob/main/CLA.md
+          # The branch must already EXIST — this action never creates it. `createFile` calls
+          # createOrUpdateFileContents with `branch:` and nothing more, and GitHub's contents API
+          # 404s on a missing branch. `cla-signatures` was created as an orphan branch on
+          # 2026-08-16; do not delete it, or the first signature silently fails to record.
           branch: cla-signatures
           allowlist: bot*
           custom-notsigned-prcomment: |
