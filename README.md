@@ -71,5 +71,21 @@ Functions) backend · Docker for self-hosting.
 
 ## License
 
-[Apache License 2.0](./LICENSE). Bundled third-party components (the self-hosted Supabase
-stack under `selfhost/`) retain their own licenses — see [NOTICE](./NOTICE).
+**[GNU Affero General Public License v3](./LICENSE)** — from **v1.10.0** onward.
+
+```
+up to and including v1.9.5    Apache-2.0    permanently
+from v1.10.0                  AGPL-3.0
+```
+
+**Self-hosting is unaffected.** Run it, modify it, use it for client work — the AGPL asks nothing of
+you until you *offer it to others as a service*. If you do that, you have to give those users the
+source of what you are running, including your changes. That is the whole difference, and it is
+deliberate: it is what keeps someone from taking this codebase closed and selling it back.
+
+**The change is not retroactive**, and could not be — the Apache-2.0 grant is perpetual and
+irrevocable, so every release up to v1.9.5 stays available under Apache-2.0 to anyone who has it.
+Those releases have not been removed and will not be.
+
+Bundled and depended-upon third-party components keep their own licenses, unaffected — the
+self-hosted Supabase stack under `selfhost/` among them. See [NOTICE](./NOTICE).

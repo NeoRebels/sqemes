@@ -1,0 +1,62 @@
+name: CLA
+
+# SQEM-221 — ask for the CLA signature on the first pull request from a new contributor.
+#
+# ⚠️ THE SIGNATURE STORE MUST NOT LIVE ON `main`.
+#
+# This repository is GENERATED: every release wipes the tree and rewrites it from upstream
+# (scripts/build-public-export.sh, which pushes to `main` only). A signatures file committed to
+# `main` would therefore be erased by the next release — silently, taking the legal record with it.
+#
+# So signatures go to a dedicated `cla-signatures` branch, which the export never touches. If you
+# ever change `branch:` below, check that the export does not write to whatever you point it at.
+#
+# The workflow file itself is safe on `main`: it comes from the `publish/.github/` overlay and is
+# re-written by every export.
+#
+# ⚠️ DO NOT ADD `actions/checkout` TO THIS WORKFLOW.
+#
+# `pull_request_target` runs with the base repository's secrets and write permissions, but with the
+# *fork's* code in the PR. Checking that code out and running anything from it (a build, `npm ci`,
+# a script) would hand a stranger those permissions. This job deliberately checks nothing out — it
+# only reads the PR metadata and writes a signature file. Keep it that way.
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  actions: write
+  contents: write        # needed to commit the signature to the branch below
+  pull-requests: write
+  statuses: write
+
+jobs:
+  cla:
+    runs-on: ubuntu-latest
+    # Only run on PR comments (not issue comments), or on the PR events themselves.
+    if: >
+      (github.event.issue.pull_request && contains(github.event.comment.body, 'I have read the CLA Document and I hereby sign the CLA'))
+      || github.event_name == 'pull_request_target'
+    steps:
+      - uses: contributor-assistant/github-action@v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          path-to-signatures: signatures/version1/cla.json
+          path-to-document: https://github.com/NeoRebels/sqemes/blob/main/CLA.md
+          branch: cla-signatures
+          allowlist: bot*
+          custom-notsigned-prcomment: |
+            Thank you for this pull request — before we can use it, we need your permission.
+
+            Please read the [Contributor License Agreement](https://github.com/NeoRebels/sqemes/blob/main/CLA.md).
+            It is short, and it explains *why* we ask: Sqemes Cloud runs from this same codebase, so
+            we need the right to ship your work there too. You keep your copyright — it is a licence,
+            not an assignment.
+
+            To sign, reply to this pull request with exactly:
+          custom-pr-sign-comment: 'I have read the CLA Document and I hereby sign the CLA'
+          custom-allsigned-prcomment: 'Signed — thank you. This covers everything you contribute from here on; you will not be asked again.'

@@ -1,15 +1,37 @@
 Sqemes
 Copyright 2026 NeoRebels GmbH
 
-This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+This product is licensed under the GNU Affero General Public License, version 3
+(see LICENSE).
 
 --------------------------------------------------------------------------------
+
+LICENSE HISTORY
+
+Sqemes was published under the Apache License 2.0 up to and including version
+1.9.5. From version 1.10.0 onward it is licensed under AGPL-3.0.
+
+That change is not retroactive and cannot be: the Apache-2.0 grant is perpetual
+and irrevocable, so every release up to 1.9.5 remains available under Apache-2.0
+to anyone who has it, permanently. Only 1.10.0 and later carry the AGPL.
+
+--------------------------------------------------------------------------------
+
+THIRD-PARTY COMPONENTS
+
+The AGPL covers Sqemes' own code. Bundled and depended-upon third-party
+components remain under their own licenses, which are unaffected by the change
+above — including their attribution requirements, which continue to apply.
+
+Dependencies include components under the Apache License 2.0; their own NOTICE
+requirements are carried by this file.
 
 For self-hosting convenience, this distribution bundles components of the Supabase
 self-hosted stack under `selfhost/` — Postgres, GoTrue (Auth), PostgREST, Realtime,
 Storage, Kong, edge-runtime, and Studio. Those components are the property of their
 respective authors and are licensed under their own terms (Supabase's own components are
 largely Apache-2.0; bundled databases/services carry PostgreSQL, MIT, and similar licenses).
+Nothing here relicenses them.
 
 `selfhost/docker-compose.yml`, `selfhost/volumes/`, and the Caddy TLS overlay
 (`selfhost/docker-compose.caddy.yml`, `selfhost/volumes/proxy/caddy/`) are adapted from the

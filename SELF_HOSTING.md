@@ -1,9 +1,14 @@
 # Self-Hosting Sqemes
 
 Sqemes is **open core**: the AI management platform, MCP server, and Chrome
-extension are open source (Apache 2.0) and run on your own infrastructure with your own AI
-provider keys (BYOK). A few pieces are **Sqemes Cloud only** and simply stay off when their
-secret is absent — nothing breaks.
+extension are open source (**AGPL-3.0** from v1.10.0; Apache-2.0 up to and including v1.9.5) and run
+on your own infrastructure with your own AI provider keys (BYOK). A few pieces are **Sqemes Cloud
+only** and simply stay off when their secret is absent — nothing breaks.
+
+> **What the AGPL means for you as a self-hoster: in practice, nothing.** Running it for your own
+> team — however commercially — asks nothing of you. The obligation starts only if you *offer this
+> software to other people as a service*, and then you owe those users the source of what you run,
+> your modifications included.
 
 > This guide ships with the public repo — it is what self-hosters read. It documents how a
 > self-host instance is assembled and where the Cloud/open boundary sits.
@@ -385,7 +390,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.9.5        # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.10.0       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### 3. Check for new env vars
@@ -449,12 +454,28 @@ Supabase project.
 
 ## License
 
-Apache License 2.0 — see [`LICENSE`](LICENSE). The open-core boundary above is intentional: the
-proprietary Cloud pieces are separately gated and not required to run a self-hosted instance.
+**GNU Affero General Public License v3** from **v1.10.0** onward — see [`LICENSE`](LICENSE).
+Everything up to and including **v1.9.5 remains Apache-2.0**, permanently: that grant is irrevocable,
+so a change can only apply going forward. Those releases are still published and are not being
+removed.
+
+**What it asks of you, concretely.** Running an instance — for your team, your company, your client
+work, commercially or not — triggers nothing. The AGPL's network clause applies when you **offer this
+software to third parties as a service**; then those users are entitled to the source of what you
+run, your modifications included. That is the one case it was chosen for.
+
+The open-core boundary above is unaffected: the proprietary Cloud pieces are separately gated and not
+required to run a self-hosted instance. Bundled third-party components — the Supabase stack under
+`selfhost/` among them — keep their own licenses; see [`NOTICE`](NOTICE).
 
 ---
 
-*Last updated: 2026-08-15 (SQEM-216) — documented the demo-key start guard shipped in v1.9.5: both
+*Last updated: 2026-08-16 (SQEM-222) — licence changed to **AGPL-3.0 from v1.10.0**; Apache-2.0
+remains in force for every release up to and including v1.9.5, permanently, because that grant is
+irrevocable. What it asks of a self-hoster is spelled out rather than left to be looked up: running
+it triggers nothing, offering it to third parties as a service does. Version pin bumped.*
+
+*2026-08-15 (SQEM-216) — documented the demo-key start guard shipped in v1.9.5: both
 cases it can hit (fresh setup vs. an instance that already has data, where the fix is a rotation and
 not a re-run) and the one dead end it can produce, because the guard checks `ANON_KEY` while
 `generate-secrets.sh` checks `JWT_SECRET`.*

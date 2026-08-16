@@ -20,8 +20,7 @@ comes back to you in the next release:
 1.  You open a PR here                    ← this is the right thing to do
 2.  We review it and discuss it here      ← in the open, on your PR
 3.  If we take it, we port the change upstream, with your name on it
-4.  It returns in the next release — and we check whether it belongs in
-    the hosted product too
+4.  It returns in the next release
 ```
 
 **Nothing is lost by this.** It means the review happens where you can see it, and the merge happens
@@ -68,7 +67,14 @@ npm run build    # production build must succeed
 - Match the existing style — Tailwind utility classes, no UI component libraries, native
   HTML5 drag-and-drop.
 - Add or adjust tests under `tests/` where it makes sense.
-- By contributing, you agree your contributions are licensed under **Apache-2.0**.
+- **You will be asked to sign a [CLA](./CLA.md) on your first pull request.** A bot posts the
+  sentence to reply with; that reply is the signature, and it covers everything you contribute
+  afterwards. The reason it exists is worth a sentence: Sqemes Cloud runs from this same codebase, so
+  we need your permission to ship your work there too — and we would rather ask than assume. You keep
+  your copyright; it is a licence, not an assignment. Contributions are licensed under
+  **AGPL-3.0**, as is the rest of this repository from v1.10.0 onward.
+- Rather not sign? That is a legitimate position — **open an issue instead.** A well-described
+  problem is worth as much as a patch and raises no licensing question at all.
 - Remember the flow above: we will not press "Merge" on your PR — we port it upstream and tell you
   which release carries it. If that has not happened after a release, say so on the PR.
 
