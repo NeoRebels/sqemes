@@ -22,3 +22,7 @@ playwright-report/
 
 # Vitest coverage output
 coverage/
+
+# Deno writes these when type-checking an edge function (SQEM-231).
+# node_modules/.deno is covered by the node_modules rule above; deno.lock is not.
+deno.lock

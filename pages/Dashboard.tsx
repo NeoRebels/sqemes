@@ -5,6 +5,7 @@ import { ArrowRight, CreditCard, Check, Sparkles, Loader2, MessageSquarePlus, Fi
 import McpIcon from '../components/McpIcon';
 import { PLANS } from '../constants';
 import { includedCredits } from '../lib/credits';
+import { countActiveMcpKeys } from '../lib/mcpKeys';
 import { can } from '../lib/permissions';
 import { supabase } from '../lib/supabase';
 import Card from '../components/ui/Card';
@@ -114,6 +115,28 @@ const Dashboard = () => {
     () => Object.values(workspace.apiKeys).filter(Boolean).length,
     [workspace.apiKeys]
   );
+
+  // SQEM-226 — the MCP row used to render a permanent "Set up →" whether or not anything was
+  // connected, so a card called "Connections" answered the question for two of its three rows.
+  //
+  // Queried here rather than through an api module because Settings reads the same table inline
+  // (`loadSqemesApiKeys`); a module for one count would leave two ways to do one thing. Move both if
+  // a third consumer appears. `null` means "not loaded yet" — the row shows nothing rather than
+  // flashing "Set up" at someone who is in fact connected.
+  const [mcpKeysActive, setMcpKeysActive] = useState<number | null>(null);
+  useEffect(() => {
+    // Only admins/editors see the row at all (SQEM-093), and RLS would refuse the read anyway.
+    if (!canManageConnections || !workspace.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('sqemes_api_keys')
+        .select('is_oauth, expires_at, connection_expires_at')
+        .eq('workspace_id', workspace.id);
+      if (!cancelled) setMcpKeysActive(countActiveMcpKeys(data || []));
+    })();
+    return () => { cancelled = true; };
+  }, [canManageConnections, workspace.id]);
   // SQEM-082 — a BYOK text key means funded credits are never consumed (own key wins).
   const hasByokText = useMemo(() => firstTextModelId(workspace.apiKeys) !== null, [workspace.apiKeys]);
   // Effective allowance: the provisioned DB limit if set, else the tier's decided
@@ -304,13 +327,19 @@ const Dashboard = () => {
                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0"><Key className="w-4 h-4 text-slate-500 dark:text-slate-400" /></div>
                     <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex-1">Provider keys</span>
                     {apiKeysConfigured > 0
-                      ? <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><Check className="w-3.5 h-3.5" />{apiKeysConfigured} set</span>
-                      : <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">None set</span>}
+                      ? <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><Check className="w-3.5 h-3.5" />{apiKeysConfigured} active</span>
+                      : <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">None yet</span>}
                   </Link>
                   <Link to="/settings" state={{ initialTab: 'api' }} className="group flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0"><McpIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" /></div>
                     <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex-1">MCP server</span>
-                    <span className="text-xs font-semibold text-brand-600 dark:text-brand-400 flex items-center gap-1">Set up <ArrowRight className="w-3.5 h-3.5" /></span>
+                    {/* SQEM-226 — null while the count is still loading: no state is better than
+                        telling a connected user to set it up. Expired keys do not count as active. */}
+                    {mcpKeysActive === null
+                      ? null
+                      : mcpKeysActive > 0
+                        ? <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><Check className="w-3.5 h-3.5" />{mcpKeysActive} active</span>
+                        : <span className="text-xs font-semibold text-brand-600 dark:text-brand-400 flex items-center gap-1">Set up <ArrowRight className="w-3.5 h-3.5" /></span>}
                   </Link>
                 </>
               )}

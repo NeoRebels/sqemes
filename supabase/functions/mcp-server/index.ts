@@ -148,11 +148,11 @@ async function resolveContextFiles(
   client: any,
   workspaceId: string,
   fileIds: string[] | null | undefined,
-): Promise<Array<{ id: string; name: string; mimeType: string; uri: string; text: string | null }>> {
+): Promise<Array<{ id: string; name: string; mimeType: string; uri: string; byteSize: number; text: string | null }>> {
   if (!fileIds?.length) return [];
   const { data: files } = await client
     .from('workspace_files')
-    .select('id, name, mime_type, storage_path')
+    .select('id, name, mime_type, size_bytes, storage_path')
     .eq('workspace_id', workspaceId)
     .in('id', fileIds);
 
@@ -168,18 +168,101 @@ async function resolveContextFiles(
       name: f.name,
       mimeType: f.mime_type,
       uri: `sqemes://files/${f.id}`,
+      byteSize: f.size_bytes ?? 0,
       text,
     });
   }
   return resolved;
 }
 
+// ---- SQEM-232 — context-file stats for list_templates / search_templates ----
+
+// SQEM-230 gave get_template an `include_files: "list"` mode, but a caller had no way to know it was
+// worth using: neither list_templates nor search_templates said anything about attached files. The
+// decision had to be made before the information existed. These two numbers close that gap.
+//
+// Measured on production 2026-08-16 before choosing the query shape: 44 files in the workspace, 42 of
+// them referenced by some template, 78 templates of which 18 carry files. Fetching every file's
+// id+size for the workspace is therefore ~44 rows (~2 KB) and simpler than assembling an id union
+// that would select almost the same rows anyway. **If a workspace ever holds thousands of files with
+// only a handful attached, switch to `.in()` over the union of context_file_ids** — the tradeoff
+// flips there, and this comment is the reason it was not written that way from the start.
+async function contextFileStats(
+  client: any,
+  workspaceId: string,
+  templates: Array<{ id: string; context_file_ids: string[] | null }>,
+): Promise<Map<string, { count: number; bytes: number }>> {
+  const stats = new Map<string, { count: number; bytes: number }>();
+  if (!templates.some(t => t.context_file_ids?.length)) return stats;
+
+  const { data: files } = await client
+    .from('workspace_files')
+    .select('id, size_bytes')
+    .eq('workspace_id', workspaceId);
+
+  const sizeById = new Map<string, number>(
+    ((files || []) as Array<{ id: string; size_bytes: number | null }>).map(f => [f.id, f.size_bytes ?? 0]),
+  );
+
+  for (const t of templates) {
+    const ids = t.context_file_ids ?? [];
+    if (!ids.length) continue;
+    // Count only ids that actually resolve, so count and bytes describe the same set. A dangling id
+    // (file deleted, reference left behind) would otherwise inflate the count while contributing
+    // nothing to the size, and the caller would size its decision on a file that cannot be read.
+    let count = 0, bytes = 0;
+    for (const fid of ids) {
+      const size = sizeById.get(fid);
+      if (size === undefined) continue;
+      count += 1;
+      bytes += size;
+    }
+    if (count > 0) stats.set(t.id, { count, bytes });
+  }
+  return stats;
+}
+
+// ---- SQEM-230 — previews for include_files: "list" ----
+
+const PREVIEW_HEADING_LIMIT = 40;
+const PREVIEW_CHAR_LIMIT    = 500;
+
+// Builds the preview that decides whether a caller bothers to fetch a file at all.
+//
+// A bare filename is not enough: the caller cannot tell whether the fetch is worth it, so it fetches
+// everything — which costs what inlining costs, plus round-trips. The preview has to carry enough
+// shape to answer "is what I need in here?".
+//
+// Markdown gets its heading outline, because that IS the table of contents of a knowledge file.
+// Everything else falls back to the opening characters. Markdown is detected by mime alone, which is
+// safe here: BOTH upload paths normalise the extension to a mime before the row is written —
+// `lib/api/files.ts` via `inferTextMime()`, and `upload_file` via the `TEXT_MIME` map. A `.md` is
+// always stored as `text/markdown`, never as `application/octet-stream`.
+function buildPreview(text: string, mimeType: string): { preview: string; truncated: boolean } {
+  if (mimeType === 'text/markdown') {
+    const headings = text.split('\n').filter(l => /^#{1,2}\s+\S/.test(l)).map(l => l.trim());
+    if (headings.length > 0) {
+      const kept = headings.slice(0, PREVIEW_HEADING_LIMIT);
+      return { preview: kept.join('\n'), truncated: headings.length > kept.length };
+    }
+    // A markdown file with no h1/h2 — an unstructured note. The outline would be empty and
+    // therefore useless, so fall through to the character preview rather than return nothing.
+  }
+  const slice = text.slice(0, PREVIEW_CHAR_LIMIT);
+  return { preview: slice, truncated: text.length > slice.length };
+}
+
 // Renders resolved context files as prompt text: text inline, binaries as a URI reference.
+//
+// SQEM-230 — `mode: 'list'` renders text files the same way binaries have always been rendered, by
+// reference. The body then names what context exists without carrying it, which is the whole point:
+// the caller decides per file whether to spend the tokens.
 function renderContextBlocks(
   resolved: Array<{ name: string; mimeType: string; uri: string; text: string | null }>,
+  mode: 'inline' | 'list' = 'inline',
 ): string[] {
   return resolved.map(f =>
-    f.text != null
+    f.text != null && mode === 'inline'
       ? `[Context: ${f.name}]\n${f.text}`
       : `[Context file: ${f.name} (${f.mimeType}) — read via ${f.uri}]`,
   );
@@ -528,7 +611,7 @@ Deno.serve(async (req) => {
     const tools = [
       {
         name: 'list_templates',
-        description: 'Browse every published template in the workspace (prompts, assistants, skills) with id, name, kind and description. Use this to see what reusable templates exist before composing something from scratch, or to find a template\'s id/name to pass to get_template. For a targeted lookup by keyword use search_templates instead. Optionally filter by kind.',
+        description: 'Browse every published template in the workspace (prompts, assistants, skills) with id, name, kind and description. Use this to see what reusable templates exist before composing something from scratch, or to find a template\'s id/name to pass to get_template. For a targeted lookup by keyword use search_templates instead. Optionally filter by kind.\n\nTemplates with attached context files also report "contextFileCount" and "contextBytes" (absent when there are none). Use them to decide HOW to load the template: when a template has several files or a large total, call get_template with include_files: "list" — you then get each file\'s name, size and a preview instead of its full text, and read only the ones you need via resources/read. For one small file, the default is fine.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -542,7 +625,7 @@ Deno.serve(async (req) => {
       },
       {
         name: 'search_templates',
-        description: 'Find a workspace template by keyword (matches title and description). Call this first whenever the user asks you to write, draft, generate, review, or rewrite something, to check for a matching prompt, assistant, or skill before composing from scratch. Returns matching templates with their id and name — pass one to get_template to load its full content. Optionally filter by kind.',
+        description: 'Find a workspace template by keyword (matches title and description). Call this first whenever the user asks you to write, draft, generate, review, or rewrite something, to check for a matching prompt, assistant, or skill before composing from scratch. Returns matching templates with their id and name — pass one to get_template to load its full content. Optionally filter by kind.\n\nMatches with attached context files also report "contextFileCount" and "contextBytes" (absent when there are none). Use them to decide HOW to load the template: when a template has several files or a large total, call get_template with include_files: "list" — you then get each file\'s name, size and a preview instead of its full text, and read only the ones you need via resources/read. For one small file, the default is fine.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -558,12 +641,17 @@ Deno.serve(async (req) => {
       },
       {
         name: 'get_template',
-        description: 'Load a template\'s full content, variables, and metadata so you can actually use it — e.g. a template found via search_templates or list_templates — by id or name slug. Works for any kind (prompt, assistant, or skill). Text context files are inlined into the content; binary files (PDF, images) are listed in "contextFiles" with a resource "uri" — fetch their bytes with resources/read. Use this to inspect a template before updating it, or to consume a skill\'s full knowledge.',
+        description: 'Load a template\'s full content, variables, and metadata so you can actually use it — e.g. a template found via search_templates or list_templates — by id or name slug. Works for any kind (prompt, assistant, or skill). Binary files (PDF, images) are always listed in "contextFiles" with a resource "uri" — fetch their bytes with resources/read. Text context files are inlined by default, or listed the same way if you pass include_files: "list". Use this to inspect a template before updating it, or to consume a skill\'s full knowledge.',
         inputSchema: {
           type: 'object',
           properties: {
             id:   { type: 'string', description: 'UUID of the template (from list_templates or search_templates)' },
             name: { type: 'string', description: 'Slug name of the template (from list_templates or search_templates)' },
+            include_files: {
+              type: 'string',
+              enum: ['inline', 'list'],
+              description: 'How to return TEXT context files. "inline" (default) puts their full content into the template content — right for small files and when you need everything anyway. "list" returns them like binaries instead: an entry in "contextFiles" with name, uri, mimeType, byteSize and a preview (markdown gets its heading outline, other text the opening characters), and no file content in the body. Choose "list" when a template carries large text context, or when several files are attached and only one is likely relevant to the task — then read just that one with resources/read on its uri.',
+            },
           },
         },
       },
@@ -706,23 +794,34 @@ Deno.serve(async (req) => {
       const kind = args.kind && args.kind !== 'all' ? args.kind : null;
       let query = adminClient
         .from('prompts')
-        .select('id, title, description, kind, variables')
+        .select('id, title, description, kind, variables, context_file_ids')
         .eq('workspace_id', workspaceId)
         .or('published.eq.true,kind.eq.skill') // SQEM-110/210 — vestigial guard, see above
         .order('title');
       if (kind) query = query.eq('kind', kind);
       const { data: templates } = await query;
 
-      const result = (templates || [])
-        .filter((t: any) => canAccessTemplate(t.id)) // SQEM-142/210 — access-filtered (per user on OAuth, open-only on API keys)
-        .map((t: any) => ({
-          id:            t.id,
-          name:          toSlug(t.title),
-          title:         t.title,
-          kind:          t.kind,
-          description:   t.description || '',
-          argumentCount: (t.variables || []).filter((v: any) => v.type !== 'file').length,
-        }));
+      const visible = (templates || [])
+        .filter((t: any) => canAccessTemplate(t.id)); // SQEM-142/210 — access-filtered (per user on OAuth, open-only on API keys)
+      // SQEM-232 — stats computed AFTER the access filter, so a template the caller may not see
+      // contributes nothing, not even its file count.
+      const stats = await contextFileStats(adminClient, workspaceId, visible);
+
+      const result = visible
+        .map((t: any) => {
+          const s = stats.get(t.id);
+          return {
+            id:            t.id,
+            name:          toSlug(t.title),
+            title:         t.title,
+            kind:          t.kind,
+            description:   t.description || '',
+            argumentCount: (t.variables || []).filter((v: any) => v.type !== 'file').length,
+            // Omitted entirely when there are no files — a list of zeroes is noise the model has to
+            // read past on every entry, and most templates carry nothing.
+            ...(s ? { contextFileCount: s.count, contextBytes: s.bytes } : {}),
+          };
+        });
 
       return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
     }
@@ -733,26 +832,34 @@ Deno.serve(async (req) => {
 
       let dbQuery = adminClient
         .from('prompts')
-        .select('id, title, description, kind')
+        .select('id, title, description, kind, context_file_ids')
         .eq('workspace_id', workspaceId)
         .or('published.eq.true,kind.eq.skill'); // SQEM-110/210 — vestigial guard, see above
       if (args.kind) dbQuery = dbQuery.eq('kind', args.kind);
       const { data: templates } = await dbQuery;
 
-      const results = (templates || [])
+      const matched = (templates || [])
         .filter((t: any) =>
           canAccessTemplate(t.id) && ( // SQEM-142/210 — access-filtered (per user on OAuth, open-only on API keys)
             t.title.toLowerCase().includes(query) ||
             (t.description || '').toLowerCase().includes(query)
           )
-        )
-        .map((t: any) => ({
-          id:          t.id,
-          name:        toSlug(t.title),
-          title:       t.title,
-          kind:        t.kind,
-          description: t.description || '',
-        }));
+        );
+      // SQEM-232 — only for the matches, so a search that hits nothing costs no extra query.
+      const stats = await contextFileStats(adminClient, workspaceId, matched);
+
+      const results = matched
+        .map((t: any) => {
+          const s = stats.get(t.id);
+          return {
+            id:          t.id,
+            name:        toSlug(t.title),
+            title:       t.title,
+            kind:        t.kind,
+            description: t.description || '',
+            ...(s ? { contextFileCount: s.count, contextBytes: s.bytes } : {}),
+          };
+        });
 
       return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify(results, null, 2) }] });
     }
@@ -774,13 +881,42 @@ Deno.serve(async (req) => {
 
       if (!tpl || !canAccessTemplate(tpl.id)) return rpcError(id, -32602, 'Template not found'); // SQEM-142
 
+      // SQEM-230 — how context files come back. Default stays `inline` so every existing caller
+      // gets byte-identical output; an unknown value is rejected rather than silently treated as
+      // the default, because a typo'd mode would look like it worked while doing the opposite.
+      const includeFiles: string = args.include_files ?? 'inline';
+      if (includeFiles !== 'inline' && includeFiles !== 'list') {
+        return rpcError(id, -32602, `include_files must be "inline" or "list" (got "${includeFiles}")`);
+      }
+
       // Text context files are inlined; binaries (PDF/images) are referenced by resource URI.
       let content = tpl.content || '';
       const resolved = await resolveContextFiles(adminClient, workspaceId, tpl.context_file_ids);
-      for (const block of renderContextBlocks(resolved)) {
+      for (const block of renderContextBlocks(resolved, includeFiles)) {
         content += `\n\n${block}`;
       }
-      const contextFiles = resolved.map(f => ({ name: f.name, uri: f.uri, mimeType: f.mimeType }));
+
+      // In `inline` mode the shape is untouched — adding fields here would change every existing
+      // caller's payload, which is exactly what the default is meant to prevent.
+      //
+      // Access note (SQEM-230, decided 2026-08-16): the uris below are read back through
+      // `resources/read`, which authorises on `workspace_id` — NOT on template access. That is
+      // deliberate and matches the product: `workspace_files` is a workspace-wide library
+      // (SQEM-039, `workspace_files_select` grants every member every file), and one file may be
+      // attached to several templates, so "which template decides?" has no answer. Do not "fix"
+      // this into template-derived access without also filtering `resources/list` — otherwise a
+      // caller could list a file it may not read.
+      const contextFiles = resolved.map(f => {
+        const base = { name: f.name, uri: f.uri, mimeType: f.mimeType };
+        if (includeFiles === 'inline') return base;
+        const listed: any = { ...base, byteSize: f.byteSize };
+        if (f.text != null) {
+          const { preview, truncated } = buildPreview(f.text, f.mimeType);
+          listed.preview = preview;
+          listed.previewTruncated = truncated;
+        }
+        return listed;
+      });
 
       const vars = (tpl.variables || []).filter((v: any) => v.type !== 'file');
       const result: any = {

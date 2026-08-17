@@ -11,6 +11,7 @@ import { BrandProfileForm, brandFormFromProfile, type BrandFormValue } from '../
 import { TemplateAccessControl, workspaceDefaultToValue, valueToWorkspaceDefault } from '../components/TemplateAccessControl';
 import { supabase } from '../lib/supabase';
 import { saveApiKey, deleteApiKey, getApiKeyStatus } from '../lib/api/apiKeys';
+import { mcpKeyExpiry, isMcpKeyExpired } from '../lib/mcpKeys';
 import { ProviderIcon } from '../components/ProviderIcon';
 import McpIcon from '../components/McpIcon';
 import ConnectorsCard from '../components/ConnectorsCard';
@@ -1475,9 +1476,11 @@ const Settings = () => {
                     {sqemesApiKeys.map(k => {
                       const scopes = k.scopes && k.scopes.length > 0 ? k.scopes : ['read', 'create', 'update', 'delete'];
                       const writeScopes = scopes.filter(s => s !== 'read');
-                      // OAuth connections show the connection lifetime, not the short access-token TTL.
-                      const displayExpiry = k.is_oauth ? k.connection_expires_at : k.expires_at;
-                      const expired = !!displayExpiry && new Date(displayExpiry).getTime() <= Date.now();
+                      // SQEM-226 — shared with the Dashboard's connection count so the two surfaces
+                      // cannot disagree about which keys are still usable. (OAuth rows expire on
+                      // connection_expires_at, not on the short access-token TTL in expires_at.)
+                      const displayExpiry = mcpKeyExpiry(k);
+                      const expired = isMcpKeyExpired(k);
                       return (
                       <div key={k.id} className="flex items-center justify-between gap-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
                         <div className="min-w-0">
