@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import { SUPPORTED_MIME_TYPES, MAX_FILE_SIZE_BYTES, inferTextMime } from '../uploadTypes';
+import { safeStorageFileName } from '../storageKey';
 import type { WorkspaceFile } from '../../types';
 import type { Database } from '../database.types';
 
@@ -54,7 +55,10 @@ export async function uploadWorkspaceFile(
     : file;
 
   const fileId = crypto.randomUUID();
-  const storagePath = `${workspaceId}/${fileId}/${file.name}`;
+  // SQEM-237 — the browser upload built this key raw while the MCP paths sanitised it. SQEM-111
+  // hardened two of the three call sites; this was the third. The row keeps `file.name` unchanged —
+  // only the storage key is defused, because the visible name is what a client reads back.
+  const storagePath = `${workspaceId}/${fileId}/${safeStorageFileName(file.name)}`;
 
   const { error: uploadError } = await supabase.storage
     .from('workspace-files')

@@ -1,5 +1,6 @@
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
+import { safeStorageFileName } from '../_shared/storageKey.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -1145,7 +1146,7 @@ Deno.serve(async (req) => {
       }
 
       const fileId      = crypto.randomUUID();
-      const safeFileName = fileName.replace(/[/\\]/g, '_').replace(/\.{2,}/g, '_'); // SQEM-111 — no path separators / .. in the storage key
+      const safeFileName = safeStorageFileName(fileName); // SQEM-111/237 — no path separators / .. in the storage key
       const storagePath = `${workspaceId}/${fileId}/${safeFileName}`;
       const blob        = new Blob([content], { type: 'text/plain' });
       const sizeBytes   = new TextEncoder().encode(content).length;
@@ -1192,7 +1193,7 @@ Deno.serve(async (req) => {
       }
 
       const fileId      = crypto.randomUUID();
-      const safeFileName = fileName.replace(/[/\\]/g, '_').replace(/\.{2,}/g, '_'); // SQEM-111 — no path separators / .. in the storage key
+      const safeFileName = safeStorageFileName(fileName); // SQEM-111/237 — no path separators / .. in the storage key
       const storagePath = `${workspaceId}/${fileId}/${safeFileName}`;
 
       const { data: signed, error: signErr } = await adminClient.storage

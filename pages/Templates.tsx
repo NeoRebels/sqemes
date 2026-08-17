@@ -5,11 +5,13 @@ import { can } from '../lib/permissions';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { fetchRestrictedTemplateIds } from '../lib/api/templateAccess';
 import { exportTemplatesToZip, downloadBlob, readBundle, importBundle, type BundleManifest } from '../lib/templateBundle';
+import { readSkillZip, toSlug, type SkillBundle } from '../lib/skillBundle';
+import { exportSkillToZip, importSkillBundle } from '../lib/skillBundleIo';
 import { publishToMarketplace, submitToMarketplaceViaProxy, fetchCanPublish } from '../lib/api/library';
 import { TEMPLATE_CATEGORIES } from '../constants';
 import type JSZip from 'jszip';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Search, Plus, Play, Edit, Trash2, Copy, Star, Bot, PenTool, Wand2, Loader2, Store, Lock, Upload, Package } from 'lucide-react';
+import { Search, Plus, Play, Edit, Trash2, Copy, Star, Bot, PenTool, Wand2, Loader2, Store, Lock, Upload, Package, FolderDown } from 'lucide-react';
 import Card from '../components/ui/Card';
 import TemplateCard from '../components/ui/TemplateCard';
 import Modal from '../components/ui/Modal';
@@ -51,6 +53,7 @@ const PromptCard = memo(function PromptCard({
   onToggleSelect,
   onFavorite,
   onDuplicate,
+  onExportSkill,
   onDeleteRequest,
   onRun,
   onSetTag,
@@ -65,6 +68,7 @@ const PromptCard = memo(function PromptCard({
   onToggleSelect: (id: string) => void;
   onFavorite: (prompt: Prompt) => void;
   onDuplicate: (prompt: Prompt) => void;
+  onExportSkill: (prompt: Prompt) => void;
   onDeleteRequest: (id: string) => void;
   onRun: (prompt: Prompt) => void;
   onSetTag: (prompt: Prompt, tag: string | null) => void;
@@ -136,6 +140,18 @@ const PromptCard = memo(function PromptCard({
         >
           <Copy className="w-4 h-4" />
         </button>
+        {/* SQEM-243 — a skill leaves as the folder format the rest of the world uses: SKILL.md plus
+            its files, at their paths. Skills only, because a prompt's variables and an assistant's
+            brand config have no place in that format — those keep the .sqemes.zip (SQEM-236). */}
+        {prompt.kind === 'skill' && (
+          <button
+            onClick={(e) => { e.preventDefault(); onExportSkill(prompt); }}
+            className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+            title="Download as an Agent Skill folder (.zip)"
+          >
+            <FolderDown className="w-4 h-4" />
+          </button>
+        )}
         {/* SQEM-178/181 — self-host shows Publish only when a publisher token is configured (Phase B). */}
         {showPublish && (
           <button
@@ -192,6 +208,7 @@ const Templates = () => {
   const [exporting, setExporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importBundleData, setImportBundleData] = useState<{ zip: JSZip; manifest: BundleManifest } | null>(null);
+  const [importSkillData, setImportSkillData] = useState<SkillBundle | null>(null); // SQEM-243
   const [importing, setImporting] = useState(false);
   // SQEM-163 — publish to marketplace
   const [publishTarget, setPublishTarget] = useState<Prompt | null>(null);
@@ -321,14 +338,51 @@ const Templates = () => {
     }
   };
 
+  // SQEM-243 — one skill leaves as the folder format everyone else speaks.
+  const handleExportSkill = async (skill: Prompt) => {
+    setExporting(true);
+    try {
+      downloadBlob(await exportSkillToZip(skill, workspaceFiles), `${toSlug(skill.title)}.zip`);
+      showToast('Exported as an Agent Skill folder', 'success');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Export failed', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // One Import button, two formats. A second control would make the person choose which kind of zip
+  // they are holding — a question the file itself answers: a Sqemes bundle has a manifest, an Agent
+  // Skill has a SKILL.md. Try ours first, fall back to theirs, and only then report a failure.
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-picking the same file
     if (!file) return;
     try {
       setImportBundleData(await readBundle(file));
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not read bundle', 'error');
+    } catch (bundleErr) {
+      try {
+        setImportSkillData(await readSkillZip(file));
+      } catch {
+        // Report the FIRST error, not the second: "manifest.json missing" describes what we opened,
+        // while the skill reader's complaint is about a format the user may never have heard of.
+        showToast(bundleErr instanceof Error ? bundleErr.message : 'Could not read bundle', 'error');
+      }
+    }
+  };
+
+  const confirmSkillImport = async () => {
+    if (!importSkillData || !workspace?.id) return;
+    setImporting(true);
+    try {
+      const { files } = await importSkillBundle(importSkillData, workspace.id, currentUser.id);
+      files.forEach(addWorkspaceFile); // the skill itself arrives via the store's realtime subscription
+      showToast(`Imported “${importSkillData.title}” with ${files.length} file${files.length === 1 ? '' : 's'}`, 'success');
+      setImportSkillData(null);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Import failed', 'error');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -387,7 +441,7 @@ const Templates = () => {
             <input ref={importInputRef} type="file" accept=".zip,.sqemes" onChange={handleImportFile} className="hidden" />
             <button
               onClick={() => importInputRef.current?.click()}
-              title="Import a .sqemes.zip bundle"
+              title="Import a .sqemes.zip bundle or an Agent Skill folder (.zip)"
               className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 px-4 py-2.5 rounded-xl font-medium text-sm transition-all justify-center"
             >
               <Upload className="w-4 h-4" /> Import
@@ -496,6 +550,7 @@ const Templates = () => {
               onToggleSelect={toggleSelect}
               onFavorite={toggleFavorite}
               onDuplicate={handleDuplicate}
+              onExportSkill={handleExportSkill}
               onDeleteRequest={handleDeleteRequest}
               onRun={handleRun}
               onSetTag={handleSetTag}
@@ -620,6 +675,50 @@ const Templates = () => {
               <div className="flex gap-2">
                 <button onClick={() => setImportBundleData(null)} disabled={importing} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50">Cancel</button>
                 <button onClick={confirmImport} disabled={importing || !((templates || []).length)} className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                  {importing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importing…</> : 'Import'}
+                </button>
+              </div>
+            </>
+          );
+        })()}
+      </Modal>
+
+      {/* SQEM-243 — the same confirmation for an Agent Skill folder. Its own modal rather than a
+          branch inside the one above: a skill bundle has no templates/skills/files split to report,
+          and folding two shapes into one dialog is how a preview stops previewing anything. */}
+      <Modal open={!!importSkillData} onClose={() => !importing && setImportSkillData(null)} size="sm" className="p-6">
+        {importSkillData && (() => {
+          const bytes = importSkillData.files.reduce((n, f) => n + f.blob.size, 0);
+          const mb = bytes / (1024 * 1024);
+          const dirs = new Set(importSkillData.files.map(f => f.name.split('/').slice(0, -1).join('/')).filter(Boolean));
+          return (
+            <>
+              <div className="flex items-center gap-2.5 mb-2">
+                <FolderDown className="w-6 h-6 text-brand-500" />
+                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Import Agent Skill</h3>
+              </div>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                This adds a skill to <span className="font-semibold">{workspace.name}</span> with its files.
+                Sqemes stores and distributes them — it does not run anything they contain.
+              </p>
+              <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 p-4 mb-4 text-sm">
+                <div className="flex justify-between py-1 gap-4"><span className="text-slate-500 dark:text-slate-400 shrink-0">Skill</span><span className="font-bold text-slate-800 dark:text-slate-100 truncate">{importSkillData.title}</span></div>
+                <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Files</span><span className="font-bold text-slate-800 dark:text-slate-100">{importSkillData.files.length}{bytes ? ` · ${mb < 0.1 ? '<0.1' : mb.toFixed(1)} MB` : ''}</span></div>
+                {dirs.size > 0 && (
+                  <div className="flex justify-between py-1 gap-4"><span className="text-slate-500 dark:text-slate-400 shrink-0">Folders</span><span className="font-bold text-slate-800 dark:text-slate-100 truncate">{Array.from(dirs).sort().join(' · ')}</span></div>
+                )}
+              </div>
+              {importSkillData.files.length > 0 && (
+                <ul className="mb-5 max-h-32 overflow-y-auto text-sm text-slate-700 dark:text-slate-200 space-y-1">
+                  {importSkillData.files.slice(0, 8).map((f, i) => (
+                    <li key={i} className="flex items-center gap-2 truncate"><span className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" />{f.name}</li>
+                  ))}
+                  {importSkillData.files.length > 8 && <li className="text-slate-400 text-xs">+ {importSkillData.files.length - 8} more…</li>}
+                </ul>
+              )}
+              <div className="flex gap-2">
+                <button onClick={() => setImportSkillData(null)} disabled={importing} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50">Cancel</button>
+                <button onClick={confirmSkillImport} disabled={importing} className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                   {importing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importing…</> : 'Import'}
                 </button>
               </div>
