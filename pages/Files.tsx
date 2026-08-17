@@ -293,17 +293,7 @@ const FileRow = ({
 
       {/* Actions */}
       <div className="flex items-center gap-1.5 shrink-0">
-        {/* SQEM-234 — a file a template still needs cannot be deleted here at all. The database
-            refuses it either way; blocking in the UI just means the user learns why before clicking
-            instead of collecting an error toast afterwards. */}
-        {usageCount > 0 ? (
-          <span
-            className="text-2xs text-slate-400 dark:text-slate-500 px-2 py-1 italic"
-            title={`In use by ${usageCount} template${usageCount === 1 ? '' : 's'}. Detach it there before deleting.`}
-          >
-            In use
-          </span>
-        ) : confirmDelete ? (
+        {confirmDelete ? (
           <>
             <button
               onClick={() => onDelete(file.id)}
@@ -328,13 +318,34 @@ const FileRow = ({
             >
               {opening ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
             </button>
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-              title="Delete file"
+            {/* SQEM-234 — a file a template still needs cannot be deleted. The database refuses it
+                either way; disabling here means the user learns why on hover instead of collecting
+                an error afterwards.
+
+                The title sits on the WRAPPER, not the button: a disabled button receives no pointer
+                events in several browsers, so a tooltip on it never appears — and a tooltip that
+                explains a disabled control is the whole point of disabling it visibly. */}
+            <span
+              title={
+                usageCount > 0
+                  ? `Cannot be deleted — this file is in use by ${usageCount} template${usageCount === 1 ? '' : 's'}`
+                  : 'Delete file'
+              }
+              className="inline-flex"
             >
-              <Trash2 className="w-4 h-4" />
-            </button>
+              <button
+                onClick={() => setConfirmDelete(true)}
+                disabled={usageCount > 0}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  usageCount > 0
+                    ? 'text-slate-200 dark:text-slate-700 cursor-not-allowed'
+                    : 'text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
+                }`}
+                aria-label={usageCount > 0 ? 'Delete file (unavailable — file is in use)' : 'Delete file'}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </span>
           </>
         )}
       </div>
