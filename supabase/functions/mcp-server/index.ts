@@ -1270,11 +1270,19 @@ Deno.serve(async (req) => {
       //    Return the referencing templates so the assistant can confirm with the
       //    user before touching them (a tool can't prompt the user itself).
       if (referencedBy.length > 0 && !force && !replaceWith) {
+        // SQEM-234 — the count is deliberately complete, the names are not. `referencedBy` comes
+        // from the service role and therefore includes templates this caller has no access to;
+        // returning their titles turned "try to delete a file" into a way to read the name of
+        // someone else's private template. Same trade as the Files page, from the other side: the
+        // number is what makes the file protectable, the title is what leaks.
+        const nameable = referencedBy.filter((t: any) => canAccessTemplate(t.id));
+        const restricted = referencedBy.length - nameable.length;
         return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
           deleted: false,
           blocked: true,
-          reason: `This file is still attached to ${referencedBy.length} other template(s). Confirm with the user before removing it from them.`,
-          referencedBy: referencedBy.map((t: any) => ({ id: t.id, title: t.title, kind: t.kind })),
+          reason: `This file is still attached to ${referencedBy.length} other template(s)${restricted > 0 ? `, ${restricted} of which you cannot see` : ''}. Confirm with the user before removing it from them.`,
+          referencedBy: nameable.map((t: any) => ({ id: t.id, title: t.title, kind: t.kind })),
+          ...(restricted > 0 ? { restrictedCount: restricted } : {}),
           howToProceed: 'Call delete_file again with force:true to detach the file from these templates and delete it, or replaceWith:<fileId> to swap in a replacement file for each of them first.',
         }, null, 2) }] });
       }

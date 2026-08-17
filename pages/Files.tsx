@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import {
   Upload, Search, Image, FileText, FileSpreadsheet, File,
   Trash2, Loader2, ExternalLink, ChevronDown, ArrowUpDown, Pencil,
-  Bot, Wand2, PenTool,
+  Bot, Wand2, PenTool, Lock,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import SearchInput from '../components/ui/SearchInput';
@@ -14,7 +14,7 @@ import TagEditor from '../components/ui/TagEditor';
 import BulkActionBar from '../components/ui/BulkActionBar';
 import Modal from '../components/ui/Modal';
 import { useData, useWorkspace, useUI, usePrompts } from '../store';
-import { uploadWorkspaceFile, updateWorkspaceFile, getWorkspaceFileSignedUrl } from '../lib/api/files';
+import { uploadWorkspaceFile, updateWorkspaceFile, getWorkspaceFileSignedUrl, getWorkspaceFileUsage } from '../lib/api/files';
 import { collectWorkspaceTags } from '../lib/workspaceTags';
 import { FILE_ACCEPT_STRING, isImageType, fileTypeLabel, MAX_FILE_SIZE_MB } from '../lib/uploadTypes';
 import type { WorkspaceFile } from '../types';
@@ -67,6 +67,7 @@ const thumbUrlCache = new Map<string, string>();
 const FileRow = ({
   file,
   usedBy,
+  totalUsage,
   workspaceTags,
   selected,
   onToggleSelect,
@@ -74,6 +75,8 @@ const FileRow = ({
 }: {
   file: WorkspaceFile;
   usedBy: FileUsage[];
+  /** SQEM-234 — total referencing templates incl. ones this viewer may not see. */
+  totalUsage: number;
   workspaceTags: string[];
   selected: boolean;
   onToggleSelect: (id: string) => void;
@@ -88,7 +91,10 @@ const FileRow = ({
   const [nameVal, setNameVal] = useState(file.name);
   const [showUsage, setShowUsage] = useState(false);
   const usageRef = useRef<HTMLDivElement>(null);
-  const usageCount = usedBy.length;
+  // SQEM-234 — the label must reflect EVERY referencing template, not just the visible ones.
+  // usedBy holds what this viewer may see; the remainder is reported as a count without names.
+  const usageCount = totalUsage;
+  const restrictedCount = Math.max(0, totalUsage - usedBy.length);
 
   // Close the usage popover on outside-click (SQEM-175).
   useEffect(() => {
@@ -264,6 +270,16 @@ const FileRow = ({
                     <span className="truncate font-medium">{t.title}</span>
                   </Link>
                 ))}
+                {/* SQEM-234 — templates this viewer may not see: counted, never named. Without this
+                    line the file read as "Unused" and was the first thing anyone would delete. */}
+                {restrictedCount > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-400 dark:text-slate-500">
+                    <Lock className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate italic">
+                      {restrictedCount} restricted template{restrictedCount === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </span>
@@ -277,7 +293,17 @@ const FileRow = ({
 
       {/* Actions */}
       <div className="flex items-center gap-1.5 shrink-0">
-        {confirmDelete ? (
+        {/* SQEM-234 — a file a template still needs cannot be deleted here at all. The database
+            refuses it either way; blocking in the UI just means the user learns why before clicking
+            instead of collecting an error toast afterwards. */}
+        {usageCount > 0 ? (
+          <span
+            className="text-2xs text-slate-400 dark:text-slate-500 px-2 py-1 italic"
+            title={`In use by ${usageCount} template${usageCount === 1 ? '' : 's'}. Detach it there before deleting.`}
+          >
+            In use
+          </span>
+        ) : confirmDelete ? (
           <>
             <button
               onClick={() => onDelete(file.id)}
@@ -355,9 +381,23 @@ export default function Files() {
     return map;
   }, [prompts]);
 
+  // SQEM-234 — the true count, including templates this viewer may not see. templatesByFile above is
+  // built from the client store and therefore only knows the visible ones; a file attached to
+  // someone else's restricted template counted zero there and was labelled "Unused" — the one label
+  // that invites deleting it. Falls back to the visible count while the request is in flight.
+  const [totalUsageById, setTotalUsageById] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (!workspace.id) return;
+    let cancelled = false;
+    getWorkspaceFileUsage(workspace.id)
+      .then(map => { if (!cancelled) setTotalUsageById(map); })
+      .catch(() => { /* keep the visible-only count rather than showing nothing */ });
+    return () => { cancelled = true; };
+  }, [workspace.id, workspaceFiles.length, prompts]);
+
   const usageCountOf = useCallback(
-    (id: string) => templatesByFile.get(id)?.length ?? 0,
-    [templatesByFile],
+    (id: string) => totalUsageById.get(id) ?? templatesByFile.get(id)?.length ?? 0,
+    [totalUsageById, templatesByFile],
   );
 
   const filtered = workspaceFiles.filter(f => {
@@ -404,9 +444,16 @@ export default function Files() {
     });
   };
 
+  // SQEM-234 — files a template still needs are skipped, not attempted. The database refuses them
+  // anyway; without this the bulk delete would report "deleted 3 of 7 — 4 failed" and leave the user
+  // guessing which four and why. Selecting only in-use files is a no-op with an explanation.
+  const selectedInUse = Array.from(selectedIds).filter(id => usageCountOf(id) > 0);
+  const selectedDeletable = Array.from(selectedIds).filter(id => usageCountOf(id) === 0);
+
   const handleBulkDelete = async () => {
     setBulkDeleting(true);
-    await removeWorkspaceFiles(Array.from(selectedIds));
+    if (selectedDeletable.length > 0) await removeWorkspaceFiles(selectedDeletable);
+    else showToast('Nothing deleted — every selected file is still used by a template', 'info');
     setBulkDeleting(false);
     setBulkConfirm(false);
     setSelectedIds(new Set());
@@ -559,6 +606,7 @@ export default function Files() {
               key={file.id}
               file={file}
               usedBy={templatesByFile.get(file.id) || []}
+              totalUsage={usageCountOf(file.id)}
               workspaceTags={workspace.tags}
               selected={selectedIds.has(file.id)}
               onToggleSelect={toggleSelect}
@@ -570,11 +618,23 @@ export default function Files() {
 
       <Modal open={bulkConfirm} onClose={() => !bulkDeleting && setBulkConfirm(false)} size="sm" className="p-6">
         <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
-          Delete {selectedIds.size} file{selectedIds.size === 1 ? '' : 's'}?
+          Delete {selectedDeletable.length} file{selectedDeletable.length === 1 ? '' : 's'}?
         </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-          This permanently removes the selected file{selectedIds.size === 1 ? '' : 's'}. This action cannot be undone.
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+          This permanently removes {selectedDeletable.length === 1 ? 'it' : 'them'}. This action cannot be undone.
         </p>
+        {/* SQEM-234 — say which of the selection is being kept and why, before the click rather than
+            as a failure count afterwards. Some of those templates may not be visible to this user. */}
+        {selectedInUse.length > 0 && (
+          <p className="text-sm text-amber-600 dark:text-amber-400 mb-2 flex items-start gap-2">
+            <Lock className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>
+              {selectedInUse.length} of the selected file{selectedInUse.length === 1 ? ' is' : 's are'} still
+              used by a template and will be kept. Detach {selectedInUse.length === 1 ? 'it' : 'them'} there first.
+            </span>
+          </p>
+        )}
+        <div className="mb-6" />
         <div className="flex gap-2">
           <button
             onClick={() => setBulkConfirm(false)}

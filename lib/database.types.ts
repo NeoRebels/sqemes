@@ -535,6 +535,12 @@ export type Database = {
         Args: { ws_id: string };
         Returns: 'admin' | 'editor' | 'member';
       };
+      // SQEM-234 — per-file count of referencing templates, including ones the caller cannot see.
+      // Numbers only, never titles; membership-checked because it is SECURITY DEFINER.
+      workspace_file_usage: {
+        Args: { p_workspace_id: string };
+        Returns: { file_id: string; total_templates: number }[];
+      };
       increment_credits: {
         Args: { ws_id: string; amount: number };
         Returns: undefined;

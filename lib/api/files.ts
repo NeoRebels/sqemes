@@ -100,10 +100,30 @@ export async function updateWorkspaceFile(
   return rowToFile(data);
 }
 
+// SQEM-234 — how many templates reference each file, INCLUDING ones the caller cannot see.
+//
+// The Files page used to count this from the client store, which only holds what RLS lets the viewer
+// see. A file attached to someone else's restricted template counted zero and was labelled "Unused",
+// which is an invitation to delete precisely the file that must not be deleted. The count is not
+// computable client-side by design — RLS is hiding the rows that need counting — so it comes from a
+// SECURITY DEFINER function that returns numbers only, never titles.
+export async function getWorkspaceFileUsage(workspaceId: string): Promise<Map<string, number>> {
+  const { data, error } = await supabase.rpc('workspace_file_usage', { p_workspace_id: workspaceId });
+  if (error) throw error;
+  return new Map(((data || []) as Array<{ file_id: string; total_templates: number }>)
+    .map(r => [r.file_id, r.total_templates]));
+}
+
 export async function deleteWorkspaceFile(id: string, storagePath: string): Promise<void> {
-  await supabase.storage.from('workspace-files').remove([storagePath]);
+  // The real guard is a BEFORE DELETE trigger in the database (SQEM-234): a still-referenced file
+  // cannot be removed, and the error below is what surfaces. Checking here as well would only be a
+  // suggestion — the same reason SQEM-213 dropped the workspaces_delete policy instead of relying on
+  // the client taking the safe path.
+  //
+  // Storage first would orphan the object when the row delete is refused, so the row goes first.
   const { error } = await supabase.from('workspace_files').delete().eq('id', id);
   if (error) throw error;
+  await supabase.storage.from('workspace-files').remove([storagePath]);
 }
 
 // SQEM-117 — signed download/open URLs are time-limited bearer capabilities: anyone with the URL
