@@ -662,7 +662,7 @@ Deno.serve(async (req) => {
       },
       {
         name: 'create_template',
-        description: 'Create a new template (prompt, assistant, or skill) in the workspace.\n\nVariables (kind=prompt only): pass a "variables" array of {name, label?, type?} objects. Alternatively, write {{variable_name}} placeholders in content and they are auto-extracted. "type" can be "text" (default) or "textarea" for longer inputs.\nExample: [{"name":"draft","label":"Email Draft","type":"textarea"},{"name":"tone","type":"text"}]\n\nContext files: pass "file_ids" (array of UUIDs from list_files) to attach workspace files as context.',
+        description: 'Create a new template (prompt, assistant, or skill) in the workspace.\n\nVariables (kind=prompt only): pass a "variables" array of {name, label?, type?} objects. Alternatively, write {{variable_name}} placeholders in content and they are auto-extracted. "type" can be "text" (default) or "textarea" for longer inputs.\nExample: [{"name":"draft","label":"Email Draft","type":"textarea"},{"name":"tone","type":"text"}]\n\nContext files: pass "file_ids" (array of UUIDs from list_files) to attach workspace files as context.\n\nWho can see it: the new template follows the workspace default — open to everyone, or restricted to you if the workspace starts new templates restricted. Change it per template in the Sqemes app.\nOn a workspace API key (no authorizing user) the template is ALWAYS created open to everyone and has no owner, because there is no "you" to restrict it to. Connect over OAuth if new templates must start restricted.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -971,6 +971,34 @@ Deno.serve(async (req) => {
         }
       }
 
+      // SQEM-240 — the owner, and the workspace's default access. Both were missing, and this was
+      // the only write path in the product that skipped them: the marketplace copy and the browser
+      // editor have always set `created_by`, and the browser applies `default_template_access` via
+      // `seedFromWorkspaceDefault`. There is no trigger on `prompts` doing either.
+      //
+      // ⚠️ `created_by = NULL` is not cosmetic. `can_access_template` compares `created_by` to the
+      // caller, and `NULL = <uid>` is NULL — never true. Choosing "Only me" on such a template then
+      // writes the principal-less row, which suspends the admin/editor branch (SQEM-212), and the
+      // template becomes invisible to EVERYONE including its owner, recoverable only by SQL.
+      // Measured on production 2026-08-17: 47 of 82 templates had no owner, 24 of 29 skills.
+      //
+      // Without an authorizing user we set neither. Decided with the product owner (2026-08-17):
+      // **a workspace API key creates "everyone" templates only, and reads only "everyone".** It
+      // cannot express "only me" because there is no "me" — and seeding a restriction here would
+      // manufacture exactly the unreachable row described above. The tool description says so.
+      let restrictByDefault = false;
+      if (mcpUserId) {
+        const { data: ws } = await adminClient
+          .from('workspaces')
+          .select('default_template_access')
+          .eq('id', workspaceId)
+          .single();
+        const dflt = (ws as { default_template_access?: string[] | null } | null)?.default_template_access;
+        // SQEM-211 — this column is a two-state marker, not a grantee list. Non-empty means "new
+        // templates start restricted"; reading its roles as who-may-see-it is wrong.
+        restrictByDefault = Array.isArray(dflt) && dflt.length > 0;
+      }
+
       const { data: inserted, error: insertErr } = await adminClient
         .from('prompts')
         .insert({
@@ -982,12 +1010,24 @@ Deno.serve(async (req) => {
           system_instruction: system_instruction || null,
           variables:          resolvedVars,
           context_file_ids:   Array.isArray(file_ids) ? file_ids : [],
+          created_by:         mcpUserId,
         })
         .select('id, title, kind')
         .single();
 
       if (insertErr || !inserted)
         return rpcError(id, -32603, `Failed to create template: ${insertErr?.message ?? 'unknown error'}`);
+
+      if (restrictByDefault) {
+        // The principal-less row: a restriction exists and nobody is named by it (SQEM-210), which
+        // with `created_by` set above means the creator alone. Non-fatal on purpose — a template
+        // that exists and is open is recoverable; failing the whole call after the row is already
+        // inserted would leave the caller believing nothing happened.
+        const { error: accessErr } = await adminClient
+          .from('template_access')
+          .insert({ template_id: inserted.id, workspace_id: workspaceId });
+        if (accessErr) console.error('[mcp] SQEM-240 default access not applied', inserted.id, accessErr.message);
+      }
 
       return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
         id:            inserted.id,
@@ -997,6 +1037,9 @@ Deno.serve(async (req) => {
         argumentCount: resolvedVars.length,
         variables:     resolvedVars.map((v: any) => v.name),
         fileCount:     Array.isArray(file_ids) ? file_ids.length : 0,
+        // SQEM-240 — report it rather than leave the caller guessing. Who can see a template the
+        // agent just created is exactly the kind of thing a person wants told, not discovered.
+        visibility:    restrictByDefault ? 'only-you' : 'everyone-in-workspace',
       }, null, 2) }] });
     }
 

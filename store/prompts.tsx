@@ -77,13 +77,14 @@ export function usePromptsState(
   const duplicatePrompt = useCallback(async (prompt: Prompt) => {
     if (!activeWorkspaceId) return;
     try {
-      const dup = await promptsApi.duplicatePrompt(prompt, activeWorkspaceId);
+      // SQEM-241 — the duplicate belongs to the person making it, not to the original's author.
+      const dup = await promptsApi.duplicatePrompt(prompt, activeWorkspaceId, currentUserId);
       setPrompts(prev => [dup, ...prev]);
       showToast('Prompt duplicated', 'success');
     } catch (err: any) {
       showToast(err.message || 'Failed to duplicate prompt', 'error');
     }
-  }, [activeWorkspaceId, showToast]);
+  }, [activeWorkspaceId, currentUserId, showToast]);
 
   return {
     prompts, setPrompts,

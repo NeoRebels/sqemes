@@ -18,7 +18,7 @@
 // of the decision, not decoration.
 import { useMemo, useState } from 'react';
 import type { UserRole, User } from '../types';
-import { Users, Lock, Search, UserRound } from 'lucide-react';
+import { Users, Lock, Search, UserRound, AlertTriangle } from 'lucide-react';
 
 export type TemplateAccessMode = 'everyone' | 'private' | 'restricted';
 export type TemplateAccessValue = { mode: TemplateAccessMode; userIds: string[] };
@@ -56,11 +56,22 @@ export function seedFromWorkspaceDefault(roles: UserRole[]): TemplateAccessValue
  * `hasRules` carries the distinction the empty lists cannot (SQEM-210): no rows = everyone, a row
  * naming nobody = only me. They are opposites, so reading them from the lists alone is impossible.
  *
- * **Role rows are resolved into the people they currently cover (SQEM-211).** `editor` rows are
- * simply dropped — editors are granted by the RLS function, so the row never mattered. A `member`
- * row expands into today's members, which preserves exactly what the template does *right now* and
- * makes the switch from dynamic to static visible in the list instead of hiding it. Nothing is
- * written until the template is saved, so an untouched template keeps its dynamic row.
+ * **Role rows are resolved into the people they currently cover (SQEM-211).** A `member` row expands
+ * into today's members, which preserves exactly what the template does *right now* and makes the
+ * switch from dynamic to static visible in the list instead of hiding it. Nothing is written until
+ * the template is saved, so an untouched template keeps its dynamic row.
+ *
+ * **SQEM-238 — a rule that resolves to nobody is `restricted`, never `private`.** This function used
+ * to drop `editor`/`admin` rows on the grounds that `can_access_template` grants those roles anyway,
+ * "so the row never mattered". It mattered here: with the row dropped, `people` came out empty and
+ * empty meant `private` — so a template that literally grants **every editor** was displayed as
+ * *"Only me — nobody else, not admins, not editors"*. Measured on production 2026-08-17: one
+ * `role='editor'` row from the SQEM-142 era, shown as Only me, visible to a second account.
+ *
+ * Both of the old answers were wrong, in opposite directions — reading it as `everyone` would have
+ * opened it to members, reading it as `private` claimed a promise that was not being kept. The
+ * honest answer is `restricted`: a restriction exists, nobody is named individually, and admins,
+ * editors and the creator have access — which is exactly what the footer of this control says.
  */
 export function accessToValue(
   roles: UserRole[],
@@ -71,7 +82,27 @@ export function accessToValue(
   if (!hasRules) return { mode: 'everyone', userIds: [] };
   const fromRole = roles.includes('member') ? members.filter(m => m.role === 'member').map(m => m.id) : [];
   const people = Array.from(new Set([...userIds, ...fromRole]));
-  return people.length ? { mode: 'restricted', userIds: people } : { mode: 'private', userIds: [] };
+  if (people.length) return { mode: 'restricted', userIds: people };
+  // Rows exist but name nobody this control can list. Only the principal-less row (no roles, no
+  // users) actually means "only me"; anything else is a rule we cannot express, and calling that
+  // "Only me" is the lie SQEM-238 fixes.
+  return roles.length ? { mode: 'restricted', userIds: [] } : { mode: 'private', userIds: [] };
+}
+
+/**
+ * SQEM-238 — the role rows this control cannot represent, so the editor can say so out loud.
+ *
+ * A `member` row is fine: `accessToValue` turns it into the people it covers, and the user sees
+ * exactly who that is. `editor` and `admin` rows have no such rendering — they resolve to nobody,
+ * because admins and editors are never listed (SQEM-211: ticking them would change nothing).
+ *
+ * The template therefore displays as "Restrict access" with an empty list, which is true but
+ * incomplete — and **saving that state writes the principal-less row**, which since SQEM-212 means
+ * the creator alone. Narrowing a template is a decision, not a side effect of pressing Save, so the
+ * control warns instead of quietly converting.
+ */
+export function unrepresentableRoleGrants(roles: UserRole[]): UserRole[] {
+  return roles.filter(r => r !== 'member');
 }
 /**
  * The control's value → what to persist (per template). **Never writes a role row** — that is the
@@ -91,6 +122,8 @@ export function TemplateAccessControl({
   hint = 'Who can see & use this template',
   members,
   allowPrivate = false,
+  legacyRoles = [],
+  privateDisabledReason,
 }: {
   value: TemplateAccessValue;
   onChange: (v: TemplateAccessValue) => void;
@@ -102,6 +135,14 @@ export function TemplateAccessControl({
   /** SQEM-210 — offer "Only me". Per template only: as a workspace *default* it would mean every
    *  new template starts invisible to the team, which is not a default anyone wants. */
   allowPrivate?: boolean;
+  /** SQEM-238 — role grants stored on this template that the list cannot show (see
+   *  `unrepresentableRoleGrants`). Rendered as a warning, because saving replaces them. */
+  legacyRoles?: UserRole[];
+  /** SQEM-240 — why "Only me" cannot be picked here. Set when the template has no owner:
+   *  `can_access_template` matches the creator by id, and NULL matches nobody, so the choice would
+   *  hide the template from everyone including the person making it. Shown, not hidden — a control
+   *  that silently lacks an option teaches nothing. */
+  privateDisabledReason?: string;
 }) {
   const [memberSearch, setMemberSearch] = useState('');
 
@@ -142,6 +183,20 @@ export function TemplateAccessControl({
     <div>
       <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</label>
       <p className="text-xs text-slate-400 dark:text-slate-500 mb-3">{hint}</p>
+      {/* SQEM-238 — an old role grant this control cannot list. Saying nothing is what produced the
+          bug: the template read as "Only me" while every editor could open it. The warning names
+          the stored rule and what Save will do with it, so replacing it is a choice. */}
+      {legacyRoles.length > 0 && (
+        <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <p className="text-xs text-amber-800 dark:text-amber-200">
+            This template carries an older rule granting{' '}
+            <span className="font-semibold">{legacyRoles.join(' & ')}s</span> as a group, which this
+            list cannot show — it grants roles, not people.{' '}
+            <span className="font-semibold">Saving replaces it with your selection below.</span>
+          </p>
+        </div>
+      )}
       <div className="space-y-2">
         <button type="button" onClick={() => setMode('everyone')} className={optionClass(value.mode === 'everyone')}>
           <Users className="w-4 h-4 shrink-0" />
@@ -151,14 +206,24 @@ export function TemplateAccessControl({
           </span>
         </button>
         {allowPrivate && (
-          <button type="button" onClick={() => setMode('private')} className={optionClass(value.mode === 'private')}>
+          <button
+            type="button"
+            onClick={() => { if (!privateDisabledReason) setMode('private'); }}
+            disabled={!!privateDisabledReason}
+            title={privateDisabledReason}
+            className={`${optionClass(value.mode === 'private')} ${privateDisabledReason ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
             <UserRound className="w-4 h-4 shrink-0" />
             <span>
               <span className="font-semibold">Only me</span>
               {/* SQEM-212 — this used to read "admins & editors aside", which was the truth about
                   the RLS function rather than a promise anyone wanted. The function changed; so
-                  does the sentence. If it ever says "only" again, check `can_access_template`. */}
-              <span className="block text-xs text-slate-400">Nobody else — not admins, not editors</span>
+                  does the sentence. If it ever says "only" again, check `can_access_template`.
+                  SQEM-240 — when the template has no owner the option states why it is unavailable
+                  instead of quietly vanishing. */}
+              <span className="block text-xs text-slate-400">
+                {privateDisabledReason || 'Nobody else — not admins, not editors'}
+              </span>
             </span>
           </button>
         )}
@@ -216,10 +281,18 @@ export function TemplateAccessControl({
 
           {/* SQEM-211 — the trade this control makes, stated where the decision is made. A role
               grant covered whoever joined later; a list of names does not, and that failure is
-              silent: someone joins, cannot see the template, and nobody knows why. */}
+              silent: someone joins, cannot see the template, and nobody knows why.
+
+              SQEM-238 — the second sentence is conditional, because with nobody ticked it is not
+              true. "Restricted, nobody named" is stored as the principal-less row, and since
+              SQEM-212 that row means the creator alone — admins and editors included in the
+              exclusion. Promising them access there was the same class of untruth this ticket
+              fixes, just one step further along. */}
           <p className="text-2xs text-slate-400 dark:text-slate-500 pt-1">
-            Access is per person — people who join later don&apos;t get it automatically.
-            Admins, editors &amp; the creator always have access.
+            Access is per person — people who join later don&apos;t get it automatically.{' '}
+            {value.userIds.length > 0
+              ? 'Admins, editors & the creator always have access.'
+              : 'With nobody picked this is the same as Only me — the creator alone.'}
           </p>
         </div>
       )}

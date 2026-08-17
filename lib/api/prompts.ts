@@ -192,7 +192,14 @@ export async function deletePrompt(id: string) {
   if (error) throw error;
 }
 
-export async function duplicatePrompt(prompt: Prompt, workspaceId: string) {
+// SQEM-241 — the duplicate belongs to whoever made it, not to whoever wrote the original.
+//
+// `created_by` used to be copied straight off the source, with two consequences. Duplicating a
+// colleague's template produced a copy attributed to them, which the person holding it could then
+// not set to "Only me" — `can_access_template` matches the creator by id, and that id was somebody
+// else's. And duplicating an ownerless template produced another ownerless one, so the backfill in
+// `20260817200000_sqem241_template_owner.sql` would have been undone by ordinary use.
+export async function duplicatePrompt(prompt: Prompt, workspaceId: string, userId: string) {
   const dup = {
     workspace_id: workspaceId,
     kind: prompt.kind,
@@ -205,7 +212,7 @@ export async function duplicatePrompt(prompt: Prompt, workspaceId: string) {
     context_file_ids: prompt.contextFileIds || [],
     skill_ids: prompt.skillIds || [],
     model: prompt.model || null,
-    created_by: prompt.createdBy || null,
+    created_by: userId || null,
     usage_count: 0,
     is_favorite: false,
     brand_config: prompt.brandConfig ?? null,

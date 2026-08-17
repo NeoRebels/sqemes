@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   accessToValue,
   accessValueToAccess,
+  unrepresentableRoleGrants,
   workspaceDefaultToValue,
   valueToWorkspaceDefault,
   seedFromWorkspaceDefault,
@@ -57,15 +58,41 @@ describe('accessToValue', () => {
     });
   });
 
-  it('treats an editors-only rule as private, not as everyone', () => {
-    // The trap: dropping the editor row without honouring hasRules would read this as "everyone"
-    // and the next save would open a template only editors and admins could see.
-    expect(accessToValue(['editor'], [], true, TEAM)).toEqual({ mode: 'private', userIds: [] });
+  // SQEM-238 — these two used to expect `private`, and that expectation was the bug written down.
+  // A rule granting editors is not "Only me"; displaying it that way told the owner their template
+  // was seen by nobody while every editor could open it. Measured on production 2026-08-17.
+  it('reads an editors-only rule as restricted — never as private, never as everyone', () => {
+    // Both old answers were wrong in opposite directions: `everyone` would have opened it to
+    // members on the next save, `private` claimed a promise that was not being kept.
+    expect(accessToValue(['editor'], [], true, TEAM)).toEqual({ mode: 'restricted', userIds: [] });
   });
 
-  it('falls back to private when a member row covers nobody (all members have left)', () => {
+  it('reads a member row that covers nobody as restricted (all members have left)', () => {
+    // The rule still exists and still says "members"; the workspace simply has none right now.
+    // Calling that "Only me" would promise exclusivity that the next joiner silently breaks.
     expect(accessToValue(['member'], [], true, [user('admin-1', 'admin')]))
-      .toEqual({ mode: 'private', userIds: [] });
+      .toEqual({ mode: 'restricted', userIds: [] });
+  });
+
+  it('still reads the principal-less row as private — that one really is only me', () => {
+    expect(accessToValue([], [], true, TEAM)).toEqual({ mode: 'private', userIds: [] });
+  });
+});
+
+describe('unrepresentableRoleGrants', () => {
+  // SQEM-238 — what the access list cannot show, so the editor can warn instead of quietly
+  // replacing it on save.
+  it('reports editor and admin grants', () => {
+    expect(unrepresentableRoleGrants(['editor'])).toEqual(['editor']);
+    expect(unrepresentableRoleGrants(['admin', 'editor'])).toEqual(['admin', 'editor']);
+  });
+
+  it('does not report member grants — those resolve into named people', () => {
+    expect(unrepresentableRoleGrants(['member'])).toEqual([]);
+  });
+
+  it('reports nothing when there are no role rows', () => {
+    expect(unrepresentableRoleGrants([])).toEqual([]);
   });
 });
 
@@ -85,7 +112,11 @@ describe('accessValueToAccess', () => {
       .toEqual({ roles: [], userIds: ['member-1'], hasRules: true });
   });
 
-  it('writes restricted-with-nobody the same way as private — they are the same state', () => {
+  it('writes restricted-with-nobody the same way as private — one row, one meaning', () => {
+    // Deliberate and unchanged by SQEM-238: there is exactly one way to store "restricted, nobody
+    // named", and since SQEM-212 that row means the creator alone. The control therefore stops
+    // promising admins & editors access once the list is empty — see the footer. Giving the two
+    // states separate encodings would need a second row shape and is a model change, not a fix.
     expect(accessValueToAccess({ mode: 'restricted', userIds: [] }))
       .toEqual(accessValueToAccess({ mode: 'private', userIds: [] }));
   });

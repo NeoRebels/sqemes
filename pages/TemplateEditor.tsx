@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
 import { useUI, useWorkspace, usePrompts, useData } from '../store';
 import { can } from '../lib/permissions';
 import { IS_SELF_HOSTED } from '../lib/env';
-import { Prompt, Variable, VariableType, PromptKind, WorkspaceFile, TemplateCategory, LibraryTemplate, Step } from '../types';
+import { Prompt, Variable, VariableType, PromptKind, WorkspaceFile, TemplateCategory, LibraryTemplate, Step, UserRole } from '../types';
 import { fetchPromptDetail } from '../lib/api/prompts';
 import { fetchLibraryTemplateDetail } from '../lib/api/library';
 import { AVAILABLE_MODELS, TEMPLATE_CATEGORIES } from '../constants';
 import { runAuthoringAI } from '../lib/authoringAI';
-import { Save, Plus, Trash2, Settings, Edit, ChevronDown, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Bot, Wand2, FlaskConical } from 'lucide-react';
+import { Save, Plus, Trash2, Settings, Edit, ChevronDown, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Bot, Wand2, FlaskConical, UserRound } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import FieldTooltip from '../components/FieldTooltip';
@@ -16,7 +16,8 @@ import { ContextFilePicker } from '../components/ContextFilePicker';
 import { TagPicker } from '../components/TagPicker';
 import { UploadFileModal } from '../components/UploadFileModal';
 import { BrandVoiceForm } from '../components/BrandVoiceForm';
-import { TemplateAccessControl, seedFromWorkspaceDefault, accessToValue, accessValueToAccess, type TemplateAccessValue } from '../components/TemplateAccessControl';
+import { TemplateAccessControl, seedFromWorkspaceDefault, accessToValue, accessValueToAccess, unrepresentableRoleGrants, type TemplateAccessValue } from '../components/TemplateAccessControl';
+import PersonCard from '../components/ui/PersonCard';
 import { fetchTemplateAccess, setTemplateAccess } from '../lib/api/templateAccess';
 import { compileAssistantInstruction, defaultBrandConfig } from '../lib/compileBrandVoice';
 import EditorTestPanel from '../components/EditorTestPanel';
@@ -98,6 +99,18 @@ const TemplateEditor = () => {
   // SQEM-211 — "restricted by default" seeds "Only me": nobody else has been picked yet, and that
   // is a state the control can show. It used to seed a role row the editor can no longer represent.
   const [access, setAccess] = useState<TemplateAccessValue>(() => seedFromWorkspaceDefault(workspace?.defaultTemplateAccess ?? []));
+  // SQEM-238 — role grants stored on this template that the access list cannot render. Kept apart
+  // from `access` because they are not part of the choice: they describe what is stored today.
+  const [legacyRoles, setLegacyRoles] = useState<UserRole[]>([]);
+  // SQEM-241 — who the template belongs to. `created_by` decides whether "Only me" is even
+  // available, so the person making that choice should be able to see the answer rather than infer
+  // it from a disabled button. Resolvable only against the current members: `created_by` survives a
+  // removal from the workspace (it is `on delete set null` on the *profile*, not on membership), so
+  // "not found" is a real and distinct state from "none recorded".
+  const owner = useMemo(
+    () => (workspace?.members ?? []).find(m => m.id === formData.createdBy),
+    [workspace?.members, formData.createdBy],
+  );
 
   const canEdit = isLibrary ? isSqemesAdmin : can(currentUser, workspace, 'prompts:edit');
 
@@ -186,7 +199,10 @@ const TemplateEditor = () => {
     if (id && !isLibrary) {
       // SQEM-211 — members are passed so a legacy `role=member` row resolves into the people it
       // currently covers, instead of silently disappearing from a control that no longer shows roles.
-      fetchTemplateAccess(id).then(a => setAccess(accessToValue(a.roles, a.userIds, a.hasRules, workspace?.members ?? []))).catch(() => {});
+      fetchTemplateAccess(id).then(a => {
+        setAccess(accessToValue(a.roles, a.userIds, a.hasRules, workspace?.members ?? []));
+        setLegacyRoles(unrepresentableRoleGrants(a.roles));
+      }).catch(() => {});
     }
   }, [id, isLibrary, workspace?.members]);
 
@@ -223,6 +239,9 @@ const TemplateEditor = () => {
     if (savedId) {
       try {
         await setTemplateAccess(savedId, workspace.id, accessValueToAccess(access));
+        // SQEM-238 — the old role grant is gone now; the warning must go with it, or it keeps
+        // warning about a rule that no longer exists.
+        setLegacyRoles([]);
       } catch {
         showToast('Saved, but updating access failed — try again.', 'error');
       }
@@ -705,9 +724,25 @@ Output only the refined prompt text, with no surrounding explanation or commenta
 
             {/* Access (SQEM-142) — workspace templates only; Cloud-only feature (SQEM-170).
                 `allowPrivate` only here: as a workspace *default* (Settings) "Only me" would mean
-                every new template starts invisible to the team (SQEM-210). */}
+                every new template starts invisible to the team (SQEM-210).
+
+                SQEM-240 — a template with no owner cannot be made private: `can_access_template`
+                matches the creator by id, and NULL matches nobody, so "Only me" would hide it from
+                everyone including whoever picked it. Templates created over MCP before SQEM-240
+                carry this; 47 of 82 on production did. */}
             {!isLibrary && canEdit && !IS_SELF_HOSTED && (
-              <TemplateAccessControl value={access} onChange={v => { setAccess(v); setIsDirty(true); }} members={workspace?.members} allowPrivate />
+              <TemplateAccessControl
+                value={access}
+                onChange={v => { setAccess(v); setIsDirty(true); }}
+                members={workspace?.members}
+                allowPrivate
+                legacyRoles={legacyRoles}
+                privateDisabledReason={
+                  id && !formData.createdBy
+                    ? 'Unavailable — this template has no owner recorded, so "only me" would hide it from everyone'
+                    : undefined
+                }
+              />
             )}
 
             {/* Context Files — workspace templates only */}
@@ -787,6 +822,42 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                 )}
               </div>
             </div>}
+
+            {/* Owner (SQEM-241) — last in the column, because it is the one thing here that is not a
+                setting: nothing about it is edited on this page. It answers "whose is this", which is
+                also why "Only me" can be unavailable (SQEM-240).
+
+                Rendered with the same `PersonCard` as the sidebar's profile row, so a change to how a
+                person looks happens once. The two unknown states are deliberately NOT PersonCards —
+                they are not people, and giving them an avatar with initials from "None recorded"
+                would dress up an absence as somebody. */}
+            {!isLibrary && id && (
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Owner</label>
+                {owner ? (
+                  <PersonCard
+                    name={owner.name || owner.email}
+                    subtitle={owner.name ? owner.email : undefined}
+                    avatar={owner.avatar}
+                    role={owner.role}
+                  />
+                ) : (
+                  <div className="flex items-start gap-3 px-3 py-3 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
+                    <UserRound className="w-4 h-4 shrink-0 mt-0.5 text-slate-400" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        {formData.createdBy ? 'No longer in this workspace' : 'None recorded'}
+                      </span>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">
+                        {formData.createdBy
+                          ? 'The template stays where it is'
+                          : '“Only me” needs an owner to mean anything'}
+                      </span>
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
           </div>
         </div>

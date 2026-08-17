@@ -23,7 +23,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useUI, useWorkspace } from '../store';
-import Avatar from './ui/Avatar';
+import PersonCard from './ui/PersonCard';
 import { PLANS } from '../constants';
 import type { PlanTier } from '../types';
 import { startCheckout, type BillingCycle } from '../lib/billing';
@@ -359,28 +359,22 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
 
           {renderNavItem('/settings', Settings, 'Settings')}
 
-          <div
+          {/* SQEM-241 — this markup moved into `ui/PersonCard`, which the template editor's Owner
+              block also uses. One element to maintain instead of two that look alike today. */}
+          <PersonCard
+            name={currentUser.name}
+            subtitle="My Profile"
+            avatar={currentUser.avatar}
+            role={currentUser.role}
+            collapsed={isCollapsed}
+            className="mt-2"
             onClick={() => {
               navigate('/settings', { state: { initialTab: 'profile' } });
               closeMobileMenu();
             }}
             onMouseEnter={(e) => showTooltip(e, currentUser.name)}
             onMouseLeave={hideTooltip}
-            className={`mt-2 flex items-center ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-3'} rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 cursor-pointer hover:bg-white dark:hover:bg-slate-700 hover:shadow-soft transition-all group`}
-          >
-            <Avatar src={currentUser.avatar} name={currentUser.name} className="w-8 h-8 ring-2 ring-white dark:ring-slate-700" />
-            {!isCollapsed && (
-              <div className="overflow-hidden flex-1">
-                <div className="flex items-center gap-2">
-                   <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{currentUser.name}</p>
-                   <span className="text-2xs font-bold uppercase tracking-wider px-1.5 py-0.5 bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 rounded border border-slate-300 dark:border-slate-500">
-                     {currentUser.role}
-                   </span>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 truncate group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">My Profile</p>
-              </div>
-            )}
-          </div>
+          />
 
           {isCollapsed ? (
             <button
