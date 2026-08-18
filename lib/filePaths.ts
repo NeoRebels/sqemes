@@ -5,9 +5,26 @@
 // as a path, so a skill with eleven files in three folders looked like eleven unrelated files with
 // long names.
 //
-// ⚠️ **This is display only.** Nothing here writes, and no column is added: the tree is an
-// interpretation of `name` at render time. Strip the prefixes and the list goes flat again — which
-// must stay true, or the way data is stored ends up hostage to a layout decision.
+// ⚠️ **SQEM-254 — this now has exactly one caller: `ContextFilePicker`. The Files page does not
+// group by path any more, and that was a deliberate reversal, not neglect.**
+//
+// The owner's argument, which nothing answered: a folder claims a file belongs to one thing, and in
+// Sqemes a file hangs on as many templates as you like. SQEM-251 made that worse rather than better
+// by putting the skill's own slug in front — the name then *asserted* an owner. And the place where
+// a folder tree would have earned its keep turns out to be solved differently already: over MCP,
+// context files load on demand with names and previews (SQEM-230/232), so nobody navigates a tree
+// to find one.
+//
+// **Why the picker keeps it:** there you are choosing files *for one specific template*. The context
+// is unambiguous, so the grouping claims nothing false — and the alternative is a flat list of 151
+// entries to pick from. The asymmetry is the point; do not "unify" it away.
+//
+// Still true and still load-bearing: *this module only reads.* Strip every prefix in the database
+// and nothing here breaks. The path itself stays in `name` because the **export** has to rebuild the
+// skill folder from it (SQEM-243) — it is structure, not decoration, and it is no longer a claim
+// about ownership because nothing renders it as one.
+//
+// The model behind all of it — a path is an attribute of the *attachment* — is **SQEM-252**.
 //
 // The deliberate imperfection: a file genuinely called `Vertrag 01/2026.pdf` becomes a folder named
 // "Vertrag 01". Accepted (SQEM-244). The alternative is a second field asking "is this a path?", a

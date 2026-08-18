@@ -30,6 +30,11 @@ export function ContextFilePicker({ selectedIds, onChange, files, disabled = fal
   // Grouped only when something is in a folder — otherwise every header would read as an empty
   // hierarchy over a flat list. Derived from ALL files, not the filtered ones, so a search that
   // happens to match a single root file does not make the folders blink out of existence.
+  //
+  // ⚠️ **SQEM-254 — the Files page dropped this and the picker kept it, on purpose.** There a folder
+  // claims a file belongs to one template, which is false as soon as it is attached to a second.
+  // *Here* you are picking files for exactly one template, so the grouping claims nothing — and the
+  // alternative is a flat list of 151 entries to choose from. Do not unify the two.
   const showFolders = hasFolders(files);
 
   const toggle = (id: string) => {

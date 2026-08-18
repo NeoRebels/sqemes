@@ -5,7 +5,7 @@ import { can } from '../lib/permissions';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { fetchRestrictedTemplateIds } from '../lib/api/templateAccess';
 import { exportTemplatesToZip, downloadBlob, readBundle, importBundle, type BundleManifest } from '../lib/templateBundle';
-import { readSkillZip, toSlug, type SkillBundle } from '../lib/skillBundle';
+import { importErrorMessage, readSkillZip, toSlug, type SkillBundle } from '../lib/skillBundle';
 import { exportSkillToZip, importSkillBundle } from '../lib/skillBundleIo';
 import { publishToMarketplace, submitToMarketplaceViaProxy, fetchCanPublish } from '../lib/api/library';
 import { TEMPLATE_CATEGORIES } from '../constants';
@@ -354,6 +354,13 @@ const Templates = () => {
   // One Import button, two formats. A second control would make the person choose which kind of zip
   // they are holding — a question the file itself answers: a Sqemes bundle has a manifest, an Agent
   // Skill has a SKILL.md. Try ours first, fall back to theirs, and only then report a failure.
+  //
+  // ⚠️ **Which error to report is decided by the file, not by the order of attempts (SQEM-250).**
+  // It used to always report the bundle error, on the reasoning that "manifest.json missing"
+  // describes what we opened. For a file that is genuinely neither, that is right. For a repo zip
+  // holding a perfectly good SKILL.md it is the most misleading sentence available — it sent the
+  // product owner to the conclusion that skill import was never built. `SkillArchiveError.kind`
+  // separates the two: only `'none'` means "might not be a skill at all".
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-picking the same file
@@ -363,10 +370,8 @@ const Templates = () => {
     } catch (bundleErr) {
       try {
         setImportSkillData(await readSkillZip(file));
-      } catch {
-        // Report the FIRST error, not the second: "manifest.json missing" describes what we opened,
-        // while the skill reader's complaint is about a format the user may never have heard of.
-        showToast(bundleErr instanceof Error ? bundleErr.message : 'Could not read bundle', 'error');
+      } catch (skillErr) {
+        showToast(importErrorMessage(bundleErr, skillErr), 'error');
       }
     }
   };

@@ -1,6 +1,15 @@
+import JSZip from 'npm:jszip@3.10.1';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
 import { safeStorageFileName } from '../_shared/storageKey.ts';
+import { readSkillMd, toSlug as skillSlug } from '../_shared/skillMd.ts';
+import {
+  findSkillRoot,
+  isArchiveJunk,
+  downloadArchive,
+  resolveArchiveUrl,
+  SKILL_ENTRY,
+} from '../_shared/skillArchive.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -51,6 +60,7 @@ const TOOL_CAPABILITY: Record<string, Capability> = {
   get_template:      'read',
   list_files:        'read',
   create_template:   'create',
+  import_skill_from_url: 'create',
   upload_file:       'create',
   create_upload_url: 'create',
   finalize_upload:   'create',
@@ -104,6 +114,86 @@ const TEXT_MIME: Record<string, string> = {
 const BINARY_MIME = new Set([
   'application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/gif',
 ]);
+
+// ---- Skill folders fetched by URL (SQEM-248) ----
+//
+// A skill folder may hold pictures beside its text — a diagram skill ships example renders. Mapped
+// by extension because a zip entry carries no MIME type; the values must stay inside BINARY_MIME,
+// which is the storage bucket's own allowlist.
+// What text goes into the bucket as. The bucket's allowlist
+// (`20260617000000_workspace_files.sql`) holds three text types; `TEXT_MIME` holds thirty-odd, and
+// the difference is not a bug in either — the row carries the truthful mime, storage only needs to
+// accept the bytes. `upload_file` has always done this; naming it makes the rule checkable
+// (`tests/unit/skillImport.test.ts`) instead of a habit two call sites happen to share.
+const STORAGE_TEXT_MIME = 'text/plain';
+
+const BINARY_EXT_MIME: Record<string, string> = {
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  gif: 'image/gif',
+};
+
+// Caps for the fetched archive. The download cap is the cheap one — it refuses before anything is
+// unpacked; the uncompressed cap is the zip-bomb guard, and the file cap keeps one call from filling
+// a workspace. `diagram-design`, the skill this was built against, is 152 files and 2 MB.
+const SKILL_MAX_UNPACKED_BYTES = 50 * 1024 * 1024;
+const SKILL_MAX_FILES = 500;
+// How many storage uploads run at once. Sequential is too slow for 150 files inside one request;
+// unbounded parallelism is how you get rate-limited by your own storage API.
+const SKILL_UPLOAD_CONCURRENCY = 8;
+
+/**
+ * SQEM-240 — does this workspace start new templates restricted?
+ *
+ * The owner (`created_by`) and this default were both missing on the MCP write path, and it was the
+ * only write path in the product that skipped them: the marketplace copy and the browser editor have
+ * always set `created_by`, and the browser applies `default_template_access` via
+ * `seedFromWorkspaceDefault`. There is no trigger on `prompts` doing either.
+ *
+ * ⚠️ `created_by = NULL` is not cosmetic. `can_access_template` compares `created_by` to the caller,
+ * and `NULL = <uid>` is NULL — never true. Choosing "Only me" on such a template then writes the
+ * principal-less row, which suspends the admin/editor branch (SQEM-212), and the template becomes
+ * invisible to EVERYONE including its owner, recoverable only by SQL. Measured on production
+ * 2026-08-17: 47 of 82 templates had no owner, 24 of 29 skills.
+ *
+ * Without an authorizing user we set neither. Decided with the product owner (2026-08-17): **a
+ * workspace API key creates "everyone" templates only, and reads only "everyone".** It cannot express
+ * "only me" because there is no "me" — and seeding a restriction here would manufacture exactly the
+ * unreachable row described above. The tool descriptions say so.
+ *
+ * SQEM-248 — shared by `create_template` and `import_skill_from_url` rather than copied. A second
+ * copy of this rule is how the first one came to be missing.
+ */
+async function workspaceRestrictsNewTemplates(
+  adminClient: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  mcpUserId: string | null,
+): Promise<boolean> {
+  if (!mcpUserId) return false;
+  const { data: ws } = await adminClient
+    .from('workspaces')
+    .select('default_template_access')
+    .eq('id', workspaceId)
+    .single();
+  const dflt = (ws as { default_template_access?: string[] | null } | null)?.default_template_access;
+  // SQEM-211 — this column is a two-state marker, not a grantee list. Non-empty means "new templates
+  // start restricted"; reading its roles as who-may-see-it is wrong.
+  return Array.isArray(dflt) && dflt.length > 0;
+}
+
+/** Run `fn` over `items` with at most `limit` in flight, preserving order in the result. */
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (let i = next++; i < items.length; i = next++) out[i] = await fn(items[i]);
+  });
+  await Promise.all(workers);
+  return out;
+}
 
 // ---- Helpers ----
 
@@ -658,12 +748,12 @@ Deno.serve(async (req) => {
       },
       {
         name: 'list_files',
-        description: 'List all workspace files with their IDs. Use file IDs with create_template or update_template to attach context files to a template.',
+        description: 'List all workspace files with their IDs. Use file IDs with create_template or update_template to attach context files to a template.\n\nA name may be a relative path (references/type-bar.md) — that file sits in a folder, and the prefix is part of its name, not decoration.',
         inputSchema: { type: 'object', properties: {} },
       },
       {
         name: 'create_template',
-        description: 'Create a new template (prompt, assistant, or skill) in the workspace.\n\nVariables (kind=prompt only): pass a "variables" array of {name, label?, type?} objects. Alternatively, write {{variable_name}} placeholders in content and they are auto-extracted. "type" can be "text" (default) or "textarea" for longer inputs.\nExample: [{"name":"draft","label":"Email Draft","type":"textarea"},{"name":"tone","type":"text"}]\n\nContext files: pass "file_ids" (array of UUIDs from list_files) to attach workspace files as context.\n\nWho can see it: the new template follows the workspace default — open to everyone, or restricted to you if the workspace starts new templates restricted. Change it per template in the Sqemes app.\nOn a workspace API key (no authorizing user) the template is ALWAYS created open to everyone and has no owner, because there is no "you" to restrict it to. Connect over OAuth if new templates must start restricted.',
+        description: 'Create a new template (prompt, assistant, or skill) in the workspace.\n\nVariables (kind=prompt only): pass a "variables" array of {name, label?, type?} objects. Alternatively, write {{variable_name}} placeholders in content and they are auto-extracted. "type" can be "text" (default) or "textarea" for longer inputs.\nExample: [{"name":"draft","label":"Email Draft","type":"textarea"},{"name":"tone","type":"text"}]\n\nContext files: pass "file_ids" (array of UUIDs from list_files) to attach workspace files as context.\n\nAgent Skills (kind=skill): a skill is a FOLDER, and Sqemes holds it whole. Put the SKILL.md body in "content", its frontmatter title/description in "title"/"description", and upload EVERY other file in the folder via upload_file under its relative path (references/…, scripts/…, assets/…), then attach them all through file_ids. Uploading only the SKILL.md leaves a skill that describes files nobody has.\n\nWho can see it: the new template follows the workspace default — open to everyone, or restricted to you if the workspace starts new templates restricted. Change it per template in the Sqemes app.\nOn a workspace API key (no authorizing user) the template is ALWAYS created open to everyone and has no owner, because there is no "you" to restrict it to. Connect over OAuth if new templates must start restricted.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -723,12 +813,24 @@ Deno.serve(async (req) => {
         },
       },
       {
-        name: 'upload_file',
-        description: 'Upload a text file into the workspace so it can be attached to templates via file_ids.\n\nSupported types: .txt .md .mdx .rst .json .yaml .yml .toml .csv .xml .html .css .scss .sass .sql .js .ts .jsx .tsx .mjs .py .rb .go .rs .java .php .swift .kt .c .cpp .cs .sh .bash\n\nFor PDFs and images use create_upload_url + finalize_upload (binary, uploaded out of band). Office documents (.docx/.xlsx/.pptx) are not supported — convert to PDF.\n\nThe returned id can be used directly in file_ids on create_template or update_template without a follow-up list_files call.',
+        name: 'import_skill_from_url',
+        description: 'Import a whole Anthropic Agent Skill from a public GitHub URL in ONE call. The server downloads the archive, unpacks it, stores every file under its relative path and creates the skill template — the file contents never pass through you.\n\nUSE THIS for any skill that lives in a repository. Uploading a real skill file-by-file via upload_file does not work: a skill folder is routinely megabytes, so you run out of room and it arrives half-complete without anything saying so.\n\nAccepted: https://github.com/owner/repo · https://github.com/owner/repo/tree/<ref>/<folder> · any .zip on a GitHub host. If the archive holds several skills, the call names them and you pass "path" to pick one.\n\nReturns what actually landed: file count, total bytes, and every file that was skipped with the reason. Nothing else in Sqemes reports a partial import, so read it.',
         inputSchema: {
           type: 'object',
           properties: {
-            name:    { type: 'string', description: 'Filename with extension (e.g. analyze_survey.js, schema.json)' },
+            url:  { type: 'string', description: 'Public GitHub URL of the repository, the folder, or a .zip archive.' },
+            path: { type: 'string', description: 'Folder inside the archive holding SKILL.md — only needed when the archive holds more than one skill (e.g. skills/diagram-design).' },
+          },
+          required: ['url'],
+        },
+      },
+      {
+        name: 'upload_file',
+        description: 'Upload a text file into the workspace so it can be attached to templates via file_ids.\n\nSupported types: .txt .md .mdx .rst .json .yaml .yml .toml .csv .xml .html .css .scss .sass .sql .js .ts .jsx .tsx .mjs .py .rb .go .rs .java .php .swift .kt .c .cpp .cs .sh .bash\n\nFOLDERS: "name" may be a RELATIVE PATH and it is stored exactly as given — that is how a file keeps its place in a folder. Uploading an Agent Skill or any other folder, send each file under its path relative to the folder root (references/type-bar.md, scripts/extract.py), never the bare filename. Sqemes groups files by that prefix into a folder tree, and a skill whose SKILL.md says "see references/x.md" only works when x.md is actually called references/x.md.\n\nFor PDFs and images use create_upload_url + finalize_upload (binary, uploaded out of band). Office documents (.docx/.xlsx/.pptx) are not supported — convert to PDF.\n\nThe returned id can be used directly in file_ids on create_template or update_template without a follow-up list_files call.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name:    { type: 'string', description: 'Filename with extension, or a relative path when the file belongs to a folder — e.g. schema.json, references/type-bar.md, scripts/extract.py. Paths are preserved verbatim; strip nothing.' },
             content: { type: 'string', description: 'Full file content as plain text' },
           },
           required: ['name', 'content'],
@@ -972,33 +1074,9 @@ Deno.serve(async (req) => {
         }
       }
 
-      // SQEM-240 — the owner, and the workspace's default access. Both were missing, and this was
-      // the only write path in the product that skipped them: the marketplace copy and the browser
-      // editor have always set `created_by`, and the browser applies `default_template_access` via
-      // `seedFromWorkspaceDefault`. There is no trigger on `prompts` doing either.
-      //
-      // ⚠️ `created_by = NULL` is not cosmetic. `can_access_template` compares `created_by` to the
-      // caller, and `NULL = <uid>` is NULL — never true. Choosing "Only me" on such a template then
-      // writes the principal-less row, which suspends the admin/editor branch (SQEM-212), and the
-      // template becomes invisible to EVERYONE including its owner, recoverable only by SQL.
-      // Measured on production 2026-08-17: 47 of 82 templates had no owner, 24 of 29 skills.
-      //
-      // Without an authorizing user we set neither. Decided with the product owner (2026-08-17):
-      // **a workspace API key creates "everyone" templates only, and reads only "everyone".** It
-      // cannot express "only me" because there is no "me" — and seeding a restriction here would
-      // manufacture exactly the unreachable row described above. The tool description says so.
-      let restrictByDefault = false;
-      if (mcpUserId) {
-        const { data: ws } = await adminClient
-          .from('workspaces')
-          .select('default_template_access')
-          .eq('id', workspaceId)
-          .single();
-        const dflt = (ws as { default_template_access?: string[] | null } | null)?.default_template_access;
-        // SQEM-211 — this column is a two-state marker, not a grantee list. Non-empty means "new
-        // templates start restricted"; reading its roles as who-may-see-it is wrong.
-        restrictByDefault = Array.isArray(dflt) && dflt.length > 0;
-      }
+      // SQEM-240 — the owner (`created_by` below) and the workspace's default access. See
+      // `workspaceRestrictsNewTemplates` for why both matter and what breaks without them.
+      const restrictByDefault = await workspaceRestrictsNewTemplates(adminClient, workspaceId, mcpUserId);
 
       const { data: inserted, error: insertErr } = await adminClient
         .from('prompts')
@@ -1126,6 +1204,170 @@ Deno.serve(async (req) => {
         id:      existing.id,
         title:   existing.title,
         kind:    existing.kind,
+      }, null, 2) }] });
+    }
+
+    // SQEM-248 — a skill folder arrives whole, because its bytes never pass through the model.
+    //
+    // The measurement that produced this tool: `diagram-design` was added over MCP and 26 of 152
+    // files arrived. Not because anything rejected the rest — the paths, the extensions and the size
+    // limits were all fine — but because 2 MB of file content cannot be emitted by a client that has
+    // to hold a conversation as well. Any design that routes the bytes through the model has that
+    // ceiling; this one does not, so the completeness question stops being a warning and becomes a
+    // fact the server can state.
+    if (toolName === 'import_skill_from_url') {
+      const { url: rawUrl, path: pathArg } = args;
+      if (!rawUrl?.trim()) return rpcError(id, -32602, 'url is required');
+
+      let resolved: { archiveUrl: string; subPath: string | null };
+      try { resolved = resolveArchiveUrl(rawUrl); }
+      catch (err) { return rpcError(id, -32602, (err as Error).message); }
+
+      let archive: Uint8Array;
+      try { archive = await downloadArchive(resolved.archiveUrl); }
+      catch (err) { return rpcError(id, -32603, `Could not download the archive: ${(err as Error).message}`); }
+
+      let zip: JSZip;
+      try { zip = await JSZip.loadAsync(archive); }
+      catch { return rpcError(id, -32602, 'That URL did not return a readable zip archive.'); }
+
+      const entryPaths = Object.keys(zip.files).filter((p) => !zip.files[p].dir);
+      let root: string;
+      try { root = findSkillRoot(entryPaths, pathArg ?? resolved.subPath); }
+      catch (err) { return rpcError(id, -32602, (err as Error).message); }
+
+      const head = readSkillMd(await zip.files[`${root}${SKILL_ENTRY}`].async('string'));
+      if (!head.description.trim()) {
+        // Same rule as create_template: a skill without a description cannot be discovered, and a
+        // skill nobody finds is not an import worth completing.
+        return rpcError(id, -32602,
+          `${SKILL_ENTRY} has no "description" in its frontmatter. A skill needs one — AI agents use it to discover the skill. Add it and re-run, or import the folder through the Sqemes app and write one there.`);
+      }
+
+      // Everything beside SKILL.md, by relative path. Unsupported types are recorded, not fatal: a
+      // skill that ships one .drawio should still arrive, and the report says what did not.
+      const skipped: { name: string; reason: string }[] = [];
+      // Indexed access rather than `JSZip.JSZipObject`: the namespace type resolves differently
+      // under `npm:` specifiers, and nothing in CI type-checks this file to catch it.
+      const members: { name: string; mimeType: string; storageMime: string; entry: (typeof zip.files)[string] }[] = [];
+      for (const p of entryPaths) {
+        if (!p.startsWith(root)) continue;
+        const rel = p.slice(root.length);
+        if (!rel || rel === SKILL_ENTRY || isArchiveJunk(rel)) continue;
+        const ext = rel.split('.').pop()?.toLowerCase() ?? '';
+        const textMime = TEXT_MIME[ext];
+        const mimeType = textMime ?? BINARY_EXT_MIME[ext];
+        if (!mimeType) { skipped.push({ name: rel, reason: `unsupported file type .${ext}` }); continue; }
+        // ⚠️ The bucket's own allowlist is far shorter than TEXT_MIME (see
+        // `20260617000000_workspace_files.sql`: text/plain, text/csv, text/markdown and four binary
+        // types). `upload_file` has always uploaded text as **text/plain** and kept the real type in
+        // the row; this path skipped that and handed `text/html` to storage, which refused it — the
+        // first real archive failed on `assets/example-bar-dark.html`. The row still carries the
+        // truthful mime, which is what every reader uses.
+        members.push({ name: rel, mimeType, storageMime: textMime ? STORAGE_TEXT_MIME : mimeType, entry: zip.files[p] });
+      }
+
+      if (members.length > SKILL_MAX_FILES) {
+        return rpcError(id, -32602, `That skill holds ${members.length} files, over the ${SKILL_MAX_FILES} limit for one import.`);
+      }
+
+      // Storage first, rows second, template last — so a failure anywhere leaves nothing attached to
+      // a half-built template. Uploaded objects are removed on the way out; an orphan in the bucket
+      // that no row points at is invisible and permanent.
+      const uploaded: { fileId: string; storagePath: string; name: string; mimeType: string; sizeBytes: number }[] = [];
+      const cleanUp = async () => {
+        if (uploaded.length) {
+          await adminClient.storage.from('workspace-files').remove(uploaded.map((u) => u.storagePath));
+        }
+      };
+
+      // SQEM-251 — every file carries the skill's folder in front of it. `workspace_files` is one
+      // flat namespace per workspace with no unique constraint on the name, so without this the
+      // second imported skill merges its `references/` into the first one's — guaranteed, and a
+      // same-named file becomes an indistinguishable twin row.
+      const folder = skillSlug(head.title);
+
+      let unpackedBytes = 0;
+      try {
+        await mapLimit(members, SKILL_UPLOAD_CONCURRENCY, async (member) => {
+          const bytes = await member.entry.async('uint8array');
+          unpackedBytes += bytes.byteLength;
+          if (unpackedBytes > SKILL_MAX_UNPACKED_BYTES) {
+            throw new Error(`unpacks to more than ${SKILL_MAX_UNPACKED_BYTES / 1048576} MB`);
+          }
+
+          const fileId = crypto.randomUUID();
+          const workspaceName = `${folder}/${member.name}`;
+          // The path stays in `name` — that is the folder tree (SQEM-244). Only the storage key is
+          // flattened (SQEM-111/237), and the two must not be confused for each other.
+          const storagePath = `${workspaceId}/${fileId}/${safeStorageFileName(workspaceName)}`;
+          const { error } = await adminClient.storage
+            .from('workspace-files')
+            .upload(storagePath, bytes, { contentType: member.storageMime });
+          if (error) throw new Error(`${member.name}: ${error.message}`);
+          uploaded.push({ fileId, storagePath, name: workspaceName, mimeType: member.mimeType, sizeBytes: bytes.byteLength });
+        });
+      } catch (err) {
+        await cleanUp();
+        return rpcError(id, -32603, `Import stopped, nothing was kept: ${(err as Error).message}`);
+      }
+
+      const { error: rowsErr } = await adminClient.from('workspace_files').insert(
+        uploaded.map((u) => ({
+          id: u.fileId,
+          workspace_id: workspaceId,
+          name: u.name,
+          mime_type: u.mimeType,
+          size_bytes: u.sizeBytes,
+          storage_path: u.storagePath,
+          tags: [],
+        })),
+      );
+      if (rowsErr) {
+        await cleanUp();
+        return rpcError(id, -32603, `Import stopped, nothing was kept: ${rowsErr.message}`);
+      }
+
+      const restrictByDefault = await workspaceRestrictsNewTemplates(adminClient, workspaceId, mcpUserId);
+      const { data: inserted, error: insertErr } = await adminClient
+        .from('prompts')
+        .insert({
+          workspace_id:     workspaceId,
+          kind:             'skill',
+          title:            head.title.trim(),
+          content:          head.content,
+          description:      head.description.trim(),
+          variables:        [],
+          context_file_ids: uploaded.map((u) => u.fileId),
+          created_by:       mcpUserId,
+        })
+        .select('id, title, kind')
+        .single();
+
+      if (insertErr || !inserted) {
+        await adminClient.from('workspace_files').delete().in('id', uploaded.map((u) => u.fileId));
+        await cleanUp();
+        return rpcError(id, -32603, `Import stopped, nothing was kept: ${insertErr?.message ?? 'unknown error'}`);
+      }
+
+      if (restrictByDefault) {
+        const { error: accessErr } = await adminClient
+          .from('template_access')
+          .insert({ template_id: inserted.id, workspace_id: workspaceId });
+        if (accessErr) console.error('[mcp] SQEM-240 default access not applied', inserted.id, accessErr.message);
+      }
+
+      return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
+        id:          inserted.id,
+        title:       inserted.title,
+        kind:        inserted.kind,
+        source:      resolved.archiveUrl,
+        skillFolder: root || '(archive root)',
+        filesImported: uploaded.length,
+        bytesImported: unpackedBytes,
+        // Present even when empty: "skipped: []" is the sentence that makes a complete import
+        // provable, and the absence of a warning is not the same thing.
+        skipped,
       }, null, 2) }] });
     }
 

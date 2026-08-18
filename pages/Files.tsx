@@ -3,22 +3,23 @@ import { Link } from 'react-router';
 import {
   Upload, Search, Image, FileText, FileSpreadsheet, File,
   Trash2, Loader2, ExternalLink, ChevronDown, ArrowUpDown, Pencil,
-  Bot, Wand2, PenTool, Lock, Folder, ChevronRight,
+  Bot, Wand2, PenTool, Lock, Link2,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import SearchInput from '../components/ui/SearchInput';
 import SegmentedTabs, { SegmentedTab } from '../components/ui/SegmentedTabs';
 import EmptyState from '../components/ui/EmptyState';
 import TagFilter from '../components/ui/TagFilter';
+import SelectFilter from '../components/ui/SelectFilter';
 import TagEditor from '../components/ui/TagEditor';
 import BulkActionBar from '../components/ui/BulkActionBar';
 import Modal from '../components/ui/Modal';
 import { useData, useWorkspace, useUI, usePrompts } from '../store';
 import { uploadWorkspaceFile, updateWorkspaceFile, getWorkspaceFileSignedUrl, getWorkspaceFileUsage } from '../lib/api/files';
+import { planTagChange, tagChangeSummary, tagsOnSelection } from '../lib/fileTags';
 import { collectWorkspaceTags } from '../lib/workspaceTags';
 import { FILE_ACCEPT_STRING, isImageType, fileTypeLabel, MAX_FILE_SIZE_MB } from '../lib/uploadTypes';
 import type { WorkspaceFile } from '../types';
-import { baseNameOf, groupByFolder, hasFolders } from '../lib/filePaths';
 
 // ---- helpers ----
 
@@ -73,7 +74,6 @@ const FileRow = ({
   selected,
   onToggleSelect,
   onDelete,
-  displayName,
 }: {
   file: WorkspaceFile;
   usedBy: FileUsage[];
@@ -83,15 +83,15 @@ const FileRow = ({
   selected: boolean;
   onToggleSelect: (id: string) => void;
   onDelete: (id: string) => void;
-  /** SQEM-244 — what to show when a folder header already names the path. Defaults to the full
-   *  name; the rename editor below deliberately keeps working on the full name, because that is
-   *  what is actually being changed. */
-  displayName?: string;
 }) => {
   const { showToast } = useUI();
   const { patchWorkspaceFile } = useData();
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [tags, setTags] = useState<string[]>(file.tags);
+  // SQEM-253 — the store is the single source of truth for tags, patched optimistically the way the
+  // rename below already does. It used to be local state seeded from `file.tags`, which a bulk tag
+  // change could not reach: the row does not remount, so `useState`'s initial value would keep
+  // showing the old tags and the action would look like it had done nothing.
+  const tags = file.tags;
   const [opening, setOpening] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameVal, setNameVal] = useState(file.name);
@@ -135,25 +135,25 @@ const FileRow = ({
   const addTag = useCallback(async (tag: string) => {
     if (!tag || tags.includes(tag)) return;
     const next = [...tags, tag];
-    setTags(next);
+    patchWorkspaceFile(file.id, { tags: next }); // optimistic
     try {
       await updateWorkspaceFile(file.id, { tags: next });
     } catch {
-      setTags(tags);
+      patchWorkspaceFile(file.id, { tags }); // revert
       showToast('Failed to update tags', 'error');
     }
-  }, [tags, file.id, showToast]);
+  }, [tags, file.id, patchWorkspaceFile, showToast]);
 
   const handleRemoveTag = useCallback(async (tag: string) => {
     const next = tags.filter(t => t !== tag);
-    setTags(next);
+    patchWorkspaceFile(file.id, { tags: next }); // optimistic
     try {
       await updateWorkspaceFile(file.id, { tags: next });
     } catch {
-      setTags(tags);
+      patchWorkspaceFile(file.id, { tags }); // revert
       showToast('Failed to update tags', 'error');
     }
-  }, [tags, file.id, showToast]);
+  }, [tags, file.id, patchWorkspaceFile, showToast]);
 
   const handleOpen = useCallback(async () => {
     setOpening(true);
@@ -226,7 +226,7 @@ const FileRow = ({
         ) : (
           <div className="flex items-center gap-1.5 group/name">
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate" title={file.name}>
-              {displayName ?? file.name}
+              {file.name}
             </p>
             <button
               onClick={() => { setNameVal(file.name); setEditingName(true); }}
@@ -362,7 +362,7 @@ const FileRow = ({
 // ---- Main page ----
 
 export default function Files() {
-  const { workspaceFiles, addWorkspaceFile, removeWorkspaceFile, removeWorkspaceFiles } = useData();
+  const { workspaceFiles, addWorkspaceFile, patchWorkspaceFile, removeWorkspaceFile, removeWorkspaceFiles } = useData();
   const { workspace } = useWorkspace();
   const { showToast } = useUI();
   const { prompts } = usePrompts();
@@ -374,9 +374,10 @@ export default function Files() {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set()); // SQEM-244
+  const [usedIn, setUsedIn] = useState<string | null>(null); // SQEM-254
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [tagBusy, setTagBusy] = useState(false); // SQEM-253
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Shared workspace tag vocabulary (templates + files) — managed in one place.
@@ -418,6 +419,24 @@ export default function Files() {
     [totalUsageById, templatesByFile],
   );
 
+  // SQEM-254 — the folder view's replacement. Path grouping claimed an owner a file may not have
+  // (one file can hang on several templates); "used in" says the same thing truthfully, and as a
+  // FILTER rather than a grouping, so no file is listed twice.
+  //
+  // Scoped to templates this viewer can see — `templatesByFile` is built from the RLS-filtered
+  // prompt list. You cannot filter by a template you are not allowed to know about, which is the
+  // right answer rather than a limitation (the *count* on each row still includes the hidden ones,
+  // SQEM-234).
+  const UNUSED = '__unused__';
+  const usageOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const list of templatesByFile.values()) for (const t of list) byId.set(t.id, t.title);
+    return [
+      ...[...byId].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label)),
+      { value: UNUSED, label: 'Not used yet' },
+    ];
+  }, [templatesByFile]);
+
   const filtered = workspaceFiles.filter(f => {
     const matchesSearch = f.name.toLowerCase().includes(search.toLowerCase())
       || f.tags.some(t => t.toLowerCase().includes(search.toLowerCase()));
@@ -426,7 +445,10 @@ export default function Files() {
       || (typeFilter === 'images' && isImageType(f.mimeType))
       || (typeFilter === 'documents' && !isImageType(f.mimeType));
     const matchesTag = selectedTag ? f.tags.includes(selectedTag) : true;
-    return matchesSearch && matchesType && matchesTag;
+    const usedByHere = templatesByFile.get(f.id) || [];
+    const matchesUsage = !usedIn
+      || (usedIn === UNUSED ? usageCountOf(f.id) === 0 : usedByHere.some(t => t.id === usedIn));
+    return matchesSearch && matchesType && matchesTag && matchesUsage;
   });
 
   const sorted = [...filtered].sort((a, b) => {
@@ -439,19 +461,6 @@ export default function Files() {
       default: return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     }
   });
-
-  // SQEM-244 — the folder view. Collapsed state is per session and per folder name: it is a way of
-  // looking at the list, not a property of the data, so it deliberately does not persist.
-  const showTree = useMemo(() => hasFolders(sorted), [sorted]);
-  const grouped = useMemo(() => groupByFolder(sorted), [sorted]);
-  const toggleFolder = useCallback((folder: string) => {
-    setCollapsedFolders(prev => {
-      const next = new Set(prev);
-      if (next.has(folder)) next.delete(folder);
-      else next.add(folder);
-      return next;
-    });
-  }, []);
 
   // --- Bulk selection ---
   // Deliberately over the whole sorted list, not only the expanded folders: "select all" means the
@@ -490,6 +499,36 @@ export default function Files() {
     setBulkDeleting(false);
     setBulkConfirm(false);
     setSelectedIds(new Set());
+  };
+
+  // SQEM-253 — one tag onto (or off) the whole selection.
+  //
+  // **The vocabulary is not extended from here.** Tags come from Settings, curated, shared with the
+  // template editor (`collectWorkspaceTags`); letting a bulk action mint one would hollow out the
+  // very thing that makes the list worth having. Only what already exists is offered.
+  //
+  // Nothing is rolled back on a partial failure: a tag that landed is not damage, and the selection
+  // is kept so the retry is one click. `planTagChange` is what makes a mixed selection a non-event.
+  const handleBulkTag = async (tag: string, mode: 'add' | 'remove') => {
+    const plan = planTagChange(workspaceFiles, selectedIds, tag, mode);
+    if (plan.length === 0) {
+      const { text } = tagChangeSummary(0, 0, tag, mode);
+      showToast(text, 'info');
+      return;
+    }
+    setTagBusy(true);
+    let ok = 0;
+    for (const { id, tags } of plan) {
+      try {
+        await updateWorkspaceFile(id, { tags });
+        patchWorkspaceFile(id, { tags });
+        ok++;
+      } catch { /* keep going — the summary names both numbers */ }
+    }
+    setTagBusy(false);
+    const { text, ok: allGood } = tagChangeSummary(ok, plan.length, tag, mode);
+    showToast(text, allGood ? 'success' : 'error');
+    if (allGood) setSelectedIds(new Set());
   };
 
   const handleFiles = useCallback(async (files: FileList | null) => {
@@ -568,6 +607,16 @@ export default function Files() {
         {allTags.length > 0 && (
           <TagFilter tags={allTags} value={selectedTag} onChange={setSelectedTag} />
         )}
+        {usageOptions.length > 1 && (
+          <SelectFilter
+            icon={Link2}
+            ariaLabel="Filter by the template using the file"
+            allLabel="All files"
+            options={usageOptions}
+            value={usedIn}
+            onChange={setUsedIn}
+          />
+        )}
         <div className="relative flex items-center self-stretch rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
           <ArrowUpDown className="absolute left-3 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
           <select
@@ -604,6 +653,11 @@ export default function Files() {
           onDelete={() => setBulkConfirm(true)}
           onClear={() => setSelectedIds(new Set())}
           noun="file"
+          addableTags={allTags}
+          removableTags={tagsOnSelection(workspaceFiles, selectedIds)}
+          onAddTag={tag => handleBulkTag(tag, 'add')}
+          onRemoveTag={tag => handleBulkTag(tag, 'remove')}
+          tagBusy={tagBusy}
         />
       )}
 
@@ -633,49 +687,6 @@ export default function Files() {
           />
         )
       ) : (
-        // SQEM-244 — grouped only when something is actually in a folder. A tree over a flat
-        // shelf is empty hierarchy, so a workspace that never used paths looks exactly as before.
-        showTree ? (
-          <div className="space-y-5">
-            {grouped.map(({ folder, files }) => (
-              <div key={folder || '__root__'}>
-                {folder && (
-                  <button
-                    type="button"
-                    onClick={() => toggleFolder(folder)}
-                    className="w-full flex items-center gap-2 mb-2 text-left group"
-                    aria-expanded={!collapsedFolders.has(folder)}
-                  >
-                    <ChevronRight
-                      className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${collapsedFolders.has(folder) ? '' : 'rotate-90'}`}
-                    />
-                    <Folder className="w-4 h-4 shrink-0 text-slate-400" />
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{folder}</span>
-                    <span className="text-xs text-slate-400 shrink-0">{files.length}</span>
-                    <span className="flex-1 h-px bg-slate-100 dark:bg-slate-700 ml-1" />
-                  </button>
-                )}
-                {!collapsedFolders.has(folder) && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
-                    {files.map(file => (
-                      <FileRow
-                        key={file.id}
-                        file={file}
-                        displayName={baseNameOf(file.name)}
-                        usedBy={templatesByFile.get(file.id) || []}
-                        totalUsage={usageCountOf(file.id)}
-                        workspaceTags={workspace.tags}
-                        selected={selectedIds.has(file.id)}
-                        onToggleSelect={toggleSelect}
-                        onDelete={removeWorkspaceFile}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
           {sorted.map(file => (
             <FileRow
@@ -690,7 +701,6 @@ export default function Files() {
             />
           ))}
         </div>
-        )
       )}
 
       <Modal open={bulkConfirm} onClose={() => !bulkDeleting && setBulkConfirm(false)} size="sm" className="p-6">

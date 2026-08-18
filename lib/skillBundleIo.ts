@@ -13,19 +13,27 @@
 import type { Prompt, WorkspaceFile } from '../types';
 import { getWorkspaceFileSignedUrl, uploadWorkspaceFile } from './api/files';
 import { createPrompt } from './api/prompts';
-import { buildSkillZip, type SkillBundle } from './skillBundle';
+import { buildSkillZip, commonRootDir, workspacePathFor, type SkillBundle } from './skillBundle';
 
-/** Fetch a skill's files and pack the folder. */
+/**
+ * Fetch a skill's files and pack the folder.
+ *
+ * SQEM-251 — the stored names are workspace paths (`<slug>/references/x.md`); inside the bundle they
+ * must be skill-relative again, or the zip carries a folder named after the skill *inside* the skill.
+ * The prefix comes off with `commonRootDir`, the same rule `readSkillZip` applies on the way in.
+ */
 export async function exportSkillToZip(skill: Prompt, allFiles: WorkspaceFile[]): Promise<Blob> {
   const byId = new Map(allFiles.map(f => [f.id, f]));
+  const attached = (skill.contextFileIds || []).map(id => byId.get(id)).filter((f): f is WorkspaceFile => !!f);
+  const root = commonRootDir(attached.map(f => f.name));
+  const strip = (name: string) => (root ? name.slice(root.length + 1) : name);
+
   const files: SkillBundle['files'] = [];
-  for (const id of skill.contextFileIds || []) {
-    const f = byId.get(id);
-    if (!f) continue; // dangling reference — pruned, same as templateBundle does
+  for (const f of attached) {
     try {
       const resp = await fetch(await getWorkspaceFileSignedUrl(f.storagePath));
       if (!resp.ok) continue;
-      files.push({ name: f.name, blob: await resp.blob(), mimeType: f.mimeType });
+      files.push({ name: strip(f.name), blob: await resp.blob(), mimeType: f.mimeType });
     } catch { /* unreachable file: export the rest rather than nothing */ }
   }
   return buildSkillZip({ title: skill.title, description: skill.description || '', content: skill.content || '', files });
@@ -39,9 +47,13 @@ export async function importSkillBundle(
   for (const f of b.files) {
     // The name keeps its path — that IS the folder structure. `uploadWorkspaceFile` sanitises only
     // the storage key (SQEM-237), which is the separation this whole feature rests on.
+    //
+    // SQEM-251 — and it gets the skill's folder in front of it, because the workspace is one flat
+    // namespace: without the prefix the second imported skill merges its `references/` into the
+    // first one's, every time.
     const uploaded = await uploadWorkspaceFile(
       workspaceId,
-      new File([f.blob], f.name, { type: f.mimeType || 'application/octet-stream' }),
+      new File([f.blob], workspacePathFor(b.title, f.name), { type: f.mimeType || 'application/octet-stream' }),
       [],
     );
     created.push(uploaded);
