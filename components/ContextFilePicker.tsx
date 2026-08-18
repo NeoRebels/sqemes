@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, FileText, FileSpreadsheet, Image, Paperclip, Upload } from 'lucide-react';
+import { X, FileText, FileSpreadsheet, Image, Paperclip, Upload, Folder } from 'lucide-react';
 import type { WorkspaceFile } from '../types';
+import { baseNameOf, groupByFolder, hasFolders } from '../lib/filePaths';
 import PickerDropdown from './ui/PickerDropdown';
 
 function FileTypeIcon({ mimeType, className }: { mimeType: string; className?: string }) {
@@ -25,6 +26,11 @@ export function ContextFilePicker({ selectedIds, onChange, files, disabled = fal
     !selectedIds.includes(f.id) &&
     f.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Grouped only when something is in a folder — otherwise every header would read as an empty
+  // hierarchy over a flat list. Derived from ALL files, not the filtered ones, so a search that
+  // happens to match a single root file does not make the folders blink out of existence.
+  const showFolders = hasFolders(files);
 
   const toggle = (id: string) => {
     onChange(selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, id]);
@@ -73,19 +79,33 @@ export function ContextFilePicker({ selectedIds, onChange, files, disabled = fal
               {files.length === 0 ? 'No files in workspace' : search ? 'No files match your search' : 'All files already attached'}
             </div>
           ) : (
-            available.map(f => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => { toggle(f.id); setSearch(''); }}
-                className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-              >
-                <FileTypeIcon mimeType={f.mimeType} className="w-4 h-4 text-slate-400 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{f.name}</p>
-                  <p className="text-xs text-slate-400">{(f.sizeBytes / 1024).toFixed(0)} KB</p>
-                </div>
-              </button>
+            /* SQEM-244 — the same grouping as the Files page, but NOT collapsible. This list already
+               has a search box above it; a second way to hide entries would compete with it, and a
+               dropdown is scanned rather than navigated. Grouping is the shared part; folding is not. */
+            groupByFolder(available).map(({ folder, files }) => (
+              <div key={folder || '__root__'}>
+                {folder && showFolders && (
+                  <div className="px-3 pt-2 pb-1 flex items-center gap-1.5">
+                    <Folder className="w-3 h-3 shrink-0 text-slate-400" />
+                    <span className="text-2xs font-bold uppercase tracking-wider text-slate-400 truncate">{folder}</span>
+                  </div>
+                )}
+                {files.map(f => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => { toggle(f.id); setSearch(''); }}
+                    title={f.name}
+                    className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    <FileTypeIcon mimeType={f.mimeType} className="w-4 h-4 text-slate-400 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{showFolders ? baseNameOf(f.name) : f.name}</p>
+                      <p className="text-xs text-slate-400">{(f.sizeBytes / 1024).toFixed(0)} KB</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
             ))
           )
         )}

@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { fetchTemplateAccess, setTemplateAccess } from './templateAccess';
 import type { Database } from '../database.types';
 import type { Prompt, PromptKind, Variable, AssistantBrandConfig } from '../../types';
 
@@ -224,7 +225,32 @@ export async function duplicatePrompt(prompt: Prompt, workspaceId: string, userI
     .select();
 
   if (error) throw error;
-  return rowToPrompt(data![0] as unknown as PromptRow);
+  const created = rowToPrompt(data![0] as unknown as PromptRow);
+
+  // SQEM-246 — a copy is never more open than its original.
+  //
+  // Duplicating used to write the row and nothing else, and no rows in `template_access` means "no
+  // rules = open to everyone". So duplicating a template restricted to three people published its
+  // contents to the whole workspace, without anyone being asked. Barely exploitable — you had to be
+  // able to see it to duplicate it — but the *contents become visible to third parties*, which is
+  // exactly what a restriction is for.
+  //
+  // Rules are copied verbatim, including legacy role rows: preserving the source's state is what
+  // makes "never more open" true, and normalising it here would be a second place deciding what a
+  // rule means (see SQEM-238 for how that goes).
+  try {
+    const access = await fetchTemplateAccess(prompt.id);
+    if (access.hasRules) await setTemplateAccess(created.id, workspaceId, access);
+  } catch (err) {
+    // The dangerous direction is a surviving copy with no rules. Roll the duplicate back rather than
+    // leave a restricted template's contents sitting in the open behind a toast nobody reads.
+    await supabase.from('prompts').delete().eq('id', created.id);
+    throw new Error(
+      `Duplicated, but its access rules could not be applied — the copy was removed so it could not stay more open than the original. ${err instanceof Error ? err.message : ''}`.trim(),
+    );
+  }
+
+  return created;
 }
 
 /** The fields of an embedded skill the launch flow needs to compose its `<skill: …>` block. */

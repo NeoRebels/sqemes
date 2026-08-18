@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import {
   Upload, Search, Image, FileText, FileSpreadsheet, File,
   Trash2, Loader2, ExternalLink, ChevronDown, ArrowUpDown, Pencil,
-  Bot, Wand2, PenTool, Lock,
+  Bot, Wand2, PenTool, Lock, Folder, ChevronRight,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import SearchInput from '../components/ui/SearchInput';
@@ -18,6 +18,7 @@ import { uploadWorkspaceFile, updateWorkspaceFile, getWorkspaceFileSignedUrl, ge
 import { collectWorkspaceTags } from '../lib/workspaceTags';
 import { FILE_ACCEPT_STRING, isImageType, fileTypeLabel, MAX_FILE_SIZE_MB } from '../lib/uploadTypes';
 import type { WorkspaceFile } from '../types';
+import { baseNameOf, groupByFolder, hasFolders } from '../lib/filePaths';
 
 // ---- helpers ----
 
@@ -72,6 +73,7 @@ const FileRow = ({
   selected,
   onToggleSelect,
   onDelete,
+  displayName,
 }: {
   file: WorkspaceFile;
   usedBy: FileUsage[];
@@ -81,6 +83,10 @@ const FileRow = ({
   selected: boolean;
   onToggleSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  /** SQEM-244 — what to show when a folder header already names the path. Defaults to the full
+   *  name; the rename editor below deliberately keeps working on the full name, because that is
+   *  what is actually being changed. */
+  displayName?: string;
 }) => {
   const { showToast } = useUI();
   const { patchWorkspaceFile } = useData();
@@ -220,7 +226,7 @@ const FileRow = ({
         ) : (
           <div className="flex items-center gap-1.5 group/name">
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate" title={file.name}>
-              {file.name}
+              {displayName ?? file.name}
             </p>
             <button
               onClick={() => { setNameVal(file.name); setEditingName(true); }}
@@ -368,6 +374,7 @@ export default function Files() {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set()); // SQEM-244
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -433,7 +440,22 @@ export default function Files() {
     }
   });
 
+  // SQEM-244 — the folder view. Collapsed state is per session and per folder name: it is a way of
+  // looking at the list, not a property of the data, so it deliberately does not persist.
+  const showTree = useMemo(() => hasFolders(sorted), [sorted]);
+  const grouped = useMemo(() => groupByFolder(sorted), [sorted]);
+  const toggleFolder = useCallback((folder: string) => {
+    setCollapsedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(folder)) next.delete(folder);
+      else next.add(folder);
+      return next;
+    });
+  }, []);
+
   // --- Bulk selection ---
+  // Deliberately over the whole sorted list, not only the expanded folders: "select all" means the
+  // files the filters left, and collapsing a folder is a way of looking, not a way of filtering.
   const visibleIds = sorted.map(f => f.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.has(id));
 
@@ -611,6 +633,49 @@ export default function Files() {
           />
         )
       ) : (
+        // SQEM-244 — grouped only when something is actually in a folder. A tree over a flat
+        // shelf is empty hierarchy, so a workspace that never used paths looks exactly as before.
+        showTree ? (
+          <div className="space-y-5">
+            {grouped.map(({ folder, files }) => (
+              <div key={folder || '__root__'}>
+                {folder && (
+                  <button
+                    type="button"
+                    onClick={() => toggleFolder(folder)}
+                    className="w-full flex items-center gap-2 mb-2 text-left group"
+                    aria-expanded={!collapsedFolders.has(folder)}
+                  >
+                    <ChevronRight
+                      className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${collapsedFolders.has(folder) ? '' : 'rotate-90'}`}
+                    />
+                    <Folder className="w-4 h-4 shrink-0 text-slate-400" />
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{folder}</span>
+                    <span className="text-xs text-slate-400 shrink-0">{files.length}</span>
+                    <span className="flex-1 h-px bg-slate-100 dark:bg-slate-700 ml-1" />
+                  </button>
+                )}
+                {!collapsedFolders.has(folder) && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+                    {files.map(file => (
+                      <FileRow
+                        key={file.id}
+                        file={file}
+                        displayName={baseNameOf(file.name)}
+                        usedBy={templatesByFile.get(file.id) || []}
+                        totalUsage={usageCountOf(file.id)}
+                        workspaceTags={workspace.tags}
+                        selected={selectedIds.has(file.id)}
+                        onToggleSelect={toggleSelect}
+                        onDelete={removeWorkspaceFile}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
           {sorted.map(file => (
             <FileRow
@@ -625,6 +690,7 @@ export default function Files() {
             />
           ))}
         </div>
+        )
       )}
 
       <Modal open={bulkConfirm} onClose={() => !bulkDeleting && setBulkConfirm(false)} size="sm" className="p-6">
