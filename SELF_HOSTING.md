@@ -390,7 +390,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.10.9       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.10.10       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### 3. Check for new env vars
@@ -470,7 +470,27 @@ required to run a self-hosted instance. Bundled third-party components — the S
 
 ---
 
-*Last updated: 2026-08-16 (SQEM-222) — licence changed to **AGPL-3.0 from v1.10.0**; Apache-2.0
+## One page is visible without signing in
+
+Since **v1.10.10** a marketplace listing — `/#/library/<id>` — renders for visitors who are not signed
+in. Everything else on your instance still requires an account.
+
+Nothing of yours is exposed by this. The listing data comes from the Cloud marketplace's own public,
+unauthenticated endpoint, which is the same source your instance already reads when you browse the
+marketplace while signed in; your workspace, templates and files are not involved. What changes is
+only that **your instance now answers one URL without asking who is calling**, and that is worth
+knowing if you run it behind a gateway that assumed every route needed a session.
+
+If you would rather it did not, block `/#/library/` at your reverse proxy — but note the hash never
+reaches the server, so the block has to happen in the browser or not at all. Removing the route in a
+fork is the reliable way.
+
+*Last updated: 2026-08-19 (SQEM-258) — one page now renders without signing in: a marketplace
+listing. Written down because it changes what your instance answers without a session, even though
+nothing of yours is exposed by it — the data comes from the Cloud marketplace's own public endpoint,
+which your instance already reads.*
+
+*2026-08-16 (SQEM-222) — licence changed to **AGPL-3.0 from v1.10.0**; Apache-2.0
 remains in force for every release up to and including v1.9.5, permanently, because that grant is
 irrevocable. What it asks of a self-hoster is spelled out rather than left to be looked up: running
 it triggers nothing, offering it to third parties as a service does. Version pin bumped.*

@@ -7,9 +7,12 @@ import Card from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { IS_SELF_HOSTED } from '../lib/env';
 
-const Auth = ({ inviteEmail }: { inviteEmail?: string }) => {
+// SQEM-258 — `initialMode` lets a caller open the register form directly. Someone who pressed
+// "Start free trial" on a public listing has said what they want; showing them a sign-in form asks
+// them to answer a question they already answered.
+const Auth = ({ inviteEmail, initialMode }: { inviteEmail?: string; initialMode?: 'login' | 'register' }) => {
   const { signIn, signUp, signInWithOAuth, resetPassword } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(inviteEmail ? 'register' : 'login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(initialMode ?? (inviteEmail ? 'register' : 'login'));
   const [email, setEmail] = useState(inviteEmail || '');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');

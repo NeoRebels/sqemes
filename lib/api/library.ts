@@ -124,6 +124,28 @@ export async function fetchLibraryTemplates(): Promise<LibraryTemplate[]> {
   return (data || []).map(r => rowToLibraryTemplate(r as unknown as LibraryTemplateRow));
 }
 
+/**
+ * SQEM-258 — the same detail, over the **public** endpoint, whatever we are running on.
+ *
+ * `fetchLibraryTemplateDetail` below reaches for Supabase on Cloud, which needs a session. The
+ * public listing page has no session and must not mount the store at all, so it comes through here:
+ * `marketplace-public` is unauthenticated by design (SQEM-177) and answers with a strict public
+ * column allowlist — never `workspace_id`, `created_by`, `bundle_path`, `status` or `scan_*`.
+ */
+export async function fetchPublicListingDetail(id: string): Promise<LibraryTemplate> {
+  const { listing } = await marketplaceApi<{ listing: unknown }>('detail', { id });
+  return rowToLibraryTemplate(listing as LibraryTemplateRow);
+}
+
+/** The listing's `.sqemes.zip`, via the same public endpoint. `null` when it is a curated row. */
+export async function fetchPublicListingBundle(listing: LibraryTemplate): Promise<Blob | null> {
+  if (!listing.hasBundle) return null;
+  const { url } = await marketplaceApi<{ url: string }>('bundle', { listingId: listing.id });
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Could not download the bundle (${res.status})`);
+  return res.blob();
+}
+
 export async function fetchLibraryTemplateDetail(id: string): Promise<LibraryTemplate> {
   if (IS_SELF_HOSTED) {
     const { listing } = await marketplaceApi<{ listing: unknown }>('detail', { id });

@@ -3,40 +3,16 @@
 // applies a bundle back into a workspace with fresh ids. Client-side (JSZip). Reused later by share links
 // (Phase 2) and the UGC marketplace (Phase 3).
 import JSZip from 'jszip';
-import type { Prompt, PromptKind, Variable, WorkspaceFile, AssistantBrandConfig } from '../types';
+import type { Prompt, PromptKind, WorkspaceFile } from '../types';
+// SQEM-258 — the format itself lives in `bundleFormat.ts`, which imports nothing but JSZip. This
+// module keeps the two halves that genuinely need the network. Re-exported so no call site moved.
+import { BUNDLE_SCHEMA, sanitizeName, readBundle, downloadBlob } from './bundleFormat';
+import type { BundleFile, BundleTemplate, BundleManifest } from './bundleFormat';
+export { BUNDLE_SCHEMA, readBundle, downloadBlob };
+export type { BundleFile, BundleTemplate, BundleManifest };
 import { fetchResolvedSkills, createPrompt } from './api/prompts';
 import { getWorkspaceFileSignedUrl, uploadWorkspaceFile } from './api/files';
 
-export const BUNDLE_SCHEMA = 'sqemes-bundle/v1';
-const MAX_BUNDLE_FILES = 100;
-const MAX_BUNDLE_BYTES = 200 * 1024 * 1024; // 200 MB total (zip-bomb guard)
-
-// Bundle-local ids (`t1`/`s1`/`f1`) decouple the portable format from DB ids.
-export type BundleFile = { ref: string; name: string; mimeType: string; sizeBytes: number; path: string };
-export type BundleTemplate = {
-  ref: string;
-  kind: PromptKind;
-  title: string;
-  description: string;
-  tag: string | null;
-  variables: Variable[];
-  content: string;
-  systemInstruction?: string;
-  model?: string;
-  brandConfig?: AssistantBrandConfig;
-  contextFileRefs: string[]; // → BundleFile.ref
-  skillRefs: string[];       // → BundleTemplate.ref in `skills`
-};
-export type BundleManifest = {
-  schema: string;
-  exportedAt?: string;
-  generator?: string;
-  templates: BundleTemplate[];
-  skills: BundleTemplate[];
-  files: BundleFile[];
-};
-
-const sanitizeName = (name: string) => name.replace(/[^\w.-]+/g, '_').slice(0, 80) || 'file';
 
 // ---- Export ----------------------------------------------------------------------------------------
 
@@ -116,32 +92,10 @@ export async function buildBundle(templates: Prompt[], allFiles: WorkspaceFile[]
 }
 
 /** Trigger a browser download of a blob. */
-export function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
 
 // ---- Import ----------------------------------------------------------------------------------------
 
 /** Read + validate a `.sqemes.zip` before showing the confirmation preview. */
-export async function readBundle(zipFile: File): Promise<{ zip: JSZip; manifest: BundleManifest }> {
-  const zip = await JSZip.loadAsync(zipFile);
-  const entry = zip.file('manifest.json');
-  if (!entry) throw new Error('Not a Sqemes bundle (manifest.json missing).');
-  let manifest: BundleManifest;
-  try { manifest = JSON.parse(await entry.async('string')); } catch { throw new Error('Corrupt bundle (invalid manifest).'); }
-  if (manifest.schema !== BUNDLE_SCHEMA) throw new Error(`Unsupported bundle version: ${manifest.schema ?? 'unknown'}.`);
-  const files = manifest.files || [];
-  if (files.length > MAX_BUNDLE_FILES) throw new Error(`Bundle has too many files (${files.length}, max ${MAX_BUNDLE_FILES}).`);
-  if (files.reduce((s, f) => s + (f.sizeBytes || 0), 0) > MAX_BUNDLE_BYTES) throw new Error('Bundle exceeds the size limit.');
-  return { zip, manifest };
-}
 
 function buildPrompt(b: BundleTemplate, workspaceId: string, userId: string, contextFileIds: string[], skillIds: string[]): Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'> {
   return {

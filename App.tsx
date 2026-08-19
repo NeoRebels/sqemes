@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import ErrorBoundary from './components/ErrorBoundary';
 import ChoosePlanScreen from './components/ChoosePlanScreen';
 import { needsSubscriptionGate } from './lib/subscription';
+import { publicListingIdFromHash } from './lib/publicRoutes';
 import { IS_SELF_HOSTED } from './lib/env';
 
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
@@ -20,6 +21,7 @@ const PromptRunnerRedirect = () => {
 };
 const Library = React.lazy(() => import('./pages/Library'));
 const MarketplaceTemplate = React.lazy(() => import('./pages/MarketplaceTemplate'));
+const PublicListing = React.lazy(() => import('./pages/PublicListing')); // SQEM-258
 const Chat = React.lazy(() => import('./pages/Chat'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Files = React.lazy(() => import('./pages/Files'));
@@ -319,12 +321,26 @@ function App() {
     if (returnUrl) {
       localStorage.removeItem('sqm_mcp_oauth_return');
       window.location.href = returnUrl;
+      return;
+    }
+    // SQEM-258 — someone who came from a public listing lands back on it. The hash usually survives
+    // on its own; it does not when the trip went through Stripe checkout, which returns to a bare
+    // URL. Without this the offer would leak at the moment it was accepted.
+    const back = localStorage.getItem('sqm_return_to');
+    if (back) {
+      localStorage.removeItem('sqm_return_to');
+      if (window.location.hash !== back) window.location.hash = back;
     }
   }, [session]);
 
   // SQEM-091 — the password-recovery route must render before a session exists: it redeems
   // the recovery token_hash via verifyOtp itself. Let it through the auth/loading gates.
   const isResetRoute = typeof window !== 'undefined' && window.location.hash.startsWith('#/reset-password');
+
+  // SQEM-258 — a marketplace listing is readable without an account. The rule lives in
+  // `lib/publicRoutes.ts` because it decides what bypasses the auth gate, and that belongs
+  // somewhere a test can pin it.
+  const publicListingId = typeof window !== 'undefined' ? publicListingIdFromHash(window.location.hash) : null;
 
   // Reset the tab title on the signed-out screens (the per-page <PageTitle> only runs
   // inside the authenticated app, so without this the title would stay stale after logout).
@@ -353,6 +369,23 @@ function App() {
     );
   }
 
+  // SQEM-258 — public listing: render it instead of the sign-in screen. Deliberately *without*
+  // AppProvider — the store has never run without a session, and a provider that fires a Supabase
+  // query here would greet a stranger with an error. `pages/PublicListing.tsx` imports no store.
+  if (!session && publicListingId) {
+    return (
+      <EnvironmentShell>
+        <Suspense fallback={<LoadingScreen />}>
+          <HashRouter>
+            <Routes>
+              <Route path="/library/:id" element={<PublicListing />} />
+            </Routes>
+          </HashRouter>
+        </Suspense>
+      </EnvironmentShell>
+    );
+  }
+
   // If not logged in but visiting an invite link, save the token for after auth
   // (the reset route is exempt — it establishes its own recovery session via verifyOtp).
   if (!session && !isResetRoute) {
@@ -366,10 +399,13 @@ function App() {
       }
     }
     const inviteEmail = localStorage.getItem('pendingInviteEmail') || undefined;
+    // SQEM-258 — a pending return means someone pressed "Start free trial" on a public listing.
+    // Open the register form, not the sign-in one: they already said what they want.
+    const fromPublicPage = !!localStorage.getItem('sqm_return_to');
     return (
       <EnvironmentShell>
         <Suspense fallback={<LoadingScreen />}>
-          <Auth inviteEmail={inviteEmail} />
+          <Auth inviteEmail={inviteEmail} initialMode={fromPublicPage ? 'register' : undefined} />
         </Suspense>
       </EnvironmentShell>
     );
