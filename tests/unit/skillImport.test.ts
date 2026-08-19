@@ -167,6 +167,10 @@ describe('the two frontmatter readers agree', () => {
     // about the same archive, or a repo zip imports over MCP and is refused at the file picker.
     ['findSkillRoot', /export function findSkillRoot\(paths: string\[\], subPath\?: string \| null\): string \{([\s\S]*?)\n\}/],
     ['isArchiveJunk', /export function isArchiveJunk\(path: string\): boolean \{([\s\S]*?)\n\}/],
+    // SQEM-249 — the rule that decides which frontmatter keys are ours. Both the export and the MCP
+    // write path depend on it agreeing; a drift would drop a foreign `license:` on one side only.
+    ['splitFrontmatter', /export function splitFrontmatter\(md: string\): \{ own: Record<string, string>; foreign: string\[\]; body: string \} \{([\s\S]*?)\n\}/],
+    ['withoutOwnFrontmatter', /export function withoutOwnFrontmatter\(content: string\): string \{([\s\S]*?)\n\}/],
   ];
 
   for (const [name, pattern] of shapes) {

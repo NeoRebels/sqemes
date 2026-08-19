@@ -104,16 +104,71 @@ const yamlUnquote = (v: string) => {
   return t.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\');
 };
 
+/**
+ * SQEM-249 — the keys the frontmatter block holds on **our** behalf. Everything else in that block
+ * belongs to whoever wrote the skill, and is none of our business beyond carrying it.
+ */
+export const OWN_FRONTMATTER_KEYS = ['name', 'title', 'description'];
+
+/**
+ * Split a leading frontmatter block into the keys we own, the lines we do not, and the body.
+ *
+ * **The foreign half is kept as raw lines, never parsed into a map.** That is the whole design: a
+ * map would have to be written back out, and our reader is line-anchored — `metadata:` matches with
+ * an empty value while its indented `  version: "2.4"` matches nothing at all. Re-emitting from a map
+ * therefore writes `metadata:` and drops what was under it. **The merge that is easy to write
+ * destroys exactly what it is for**; keeping the lines verbatim cannot, because nothing interprets
+ * them.
+ *
+ * Indented continuations of a key we *do* own travel with it, or removing `description: >` would
+ * leave its folded lines behind as orphans.
+ */
+export function splitFrontmatter(md: string): { own: Record<string, string>; foreign: string[]; body: string } {
+  const match = md.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!match) return { own: {}, foreign: [], body: md };
+
+  const own: Record<string, string> = {};
+  const foreign: string[] = [];
+  let takingOwn = false;
+  for (const line of match[1].split(/\r?\n/)) {
+    const kv = line.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
+    if (kv) {
+      takingOwn = OWN_FRONTMATTER_KEYS.includes(kv[1].toLowerCase());
+      if (takingOwn) { own[kv[1].toLowerCase()] = yamlUnquote(kv[2]); continue; }
+    } else if (takingOwn) {
+      continue;
+    }
+    foreign.push(line);
+  }
+  return { own, foreign, body: md.slice(match[0].length) };
+}
+
+/**
+ * Rewrite a skill body so its leading block holds **only** the keys we do not own — ours live in
+ * columns, and a copy in the body is a second truth that drifts the moment someone renames the skill
+ * in Sqemes. Used by the MCP write path (SQEM-249); the exported twin does the same on the edge.
+ */
+export function withoutOwnFrontmatter(content: string): string {
+  const { foreign, body } = splitFrontmatter(content);
+  if (!foreign.length) return body;
+  return `---\n${foreign.join('\n')}\n---\n${body}`;
+}
+
 export function buildSkillMd(b: Pick<SkillBundle, 'title' | 'description' | 'content'>): string {
+  // SQEM-249 — anything the author put here that is not ours rides along, in its own words. This
+  // used to prepend unconditionally, so a body that still carried its author's header exported with
+  // two stacked blocks and their `license:` stopped being a licence.
+  const { foreign, body } = splitFrontmatter(b.content);
   const lines = [
     '---',
     `name: ${toSlug(b.title)}`,
     `title: ${yamlQuote(b.title)}`,
     `description: ${yamlQuote(b.description || '')}`,
+    ...foreign,
     '---',
     '',
   ];
-  return lines.join('\n') + b.content;
+  return lines.join('\n') + body;
 }
 
 /**
@@ -123,20 +178,17 @@ export function buildSkillMd(b: Pick<SkillBundle, 'title' | 'description' | 'con
  * SQEM-236 exists to make unnecessary.
  */
 export function readSkillMd(md: string, fallbackTitle = 'Imported skill'): Pick<SkillBundle, 'title' | 'description' | 'content'> {
-  const match = md.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
-  if (!match) return { title: deriveTitle(md, fallbackTitle), description: '', content: md };
-
-  const meta: Record<string, string> = {};
-  for (const line of match[1].split(/\r?\n/)) {
-    const kv = line.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
-    if (kv) meta[kv[1].toLowerCase()] = yamlUnquote(kv[2]);
-  }
-  const content = md.slice(match[0].length);
+  const { own, body } = splitFrontmatter(md);
+  if (!Object.keys(own).length && body === md) return { title: deriveTitle(md, fallbackTitle), description: '', content: md };
   return {
     // `title` is ours and exact; `name` is the Agent-Skill slug and only a fallback.
-    title: meta.title || meta.name || deriveTitle(content, fallbackTitle),
-    description: meta.description || '',
-    content,
+    title: own.title || own.name || deriveTitle(body, fallbackTitle),
+    description: own.description || '',
+    // SQEM-249 — the author's own keys ride along in the body, because there is nowhere else for
+    // them. Returning the bare body here would drop a `license:` at import, which is the same loss
+    // the export was just taught to avoid — the invariant has to hold on every path or it holds on
+    // none.
+    content: withoutOwnFrontmatter(md),
   };
 }
 

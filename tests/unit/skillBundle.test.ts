@@ -8,6 +8,7 @@ import {
   buildSkillZip,
   readSkillZip,
   toSlug,
+  withoutOwnFrontmatter,
   workspacePathFor,
   SKILL_ENTRY,
   type SkillBundle,
@@ -260,5 +261,85 @@ describe('importErrorMessage — the file decides which error is shown', () => {
 
   it('falls back to the bundle error for a failure that is not ours to classify', () => {
     expect(importErrorMessage(bundleErr, new Error('boom'))).toContain('manifest.json');
+  });
+});
+
+// SQEM-249 — a skill whose body still carries its author's frontmatter. That is not a hypothetical:
+// it is what `create_template` produces when a model reads a SKILL.md and passes the whole file,
+// which is exactly how the first `diagram-design` entry came about.
+
+const FOREIGN = `---
+name: diagram-design
+description: Create branded diagrams.
+license: MIT
+metadata:
+  version: "2.4"
+---
+
+# Diagram Design
+Draw things.
+`;
+
+describe('frontmatter that is not ours', () => {
+  it('exports ONE block, not two stacked ones', () => {
+    const md = buildSkillMd({ title: 'Diagram Design', description: 'Create branded diagrams.', content: FOREIGN });
+    expect((md.match(/^---$/gm) || []).length).toBe(2); // one block = an opening and a closing ---
+  });
+
+  it("keeps the author's licence — it is a legal notice, not decoration", () => {
+    const md = buildSkillMd({ title: 'Diagram Design', description: 'D', content: FOREIGN });
+    expect(md).toContain('license: MIT');
+  });
+
+  it('keeps a NESTED value intact, which is what rules out parsing into a map', () => {
+    // Our reader is line-anchored: `metadata:` matches with an empty value and `  version` matches
+    // nothing. Re-emitting from a map would write `metadata:` and lose the version. Keeping the
+    // lines verbatim cannot lose it, because nothing interprets them.
+    const md = buildSkillMd({ title: 'T', description: 'D', content: FOREIGN });
+    expect(md).toContain('metadata:');
+    expect(md).toContain('  version: "2.4"');
+  });
+
+  it('lets our keys win — the columns are the truth, the body is a copy', () => {
+    const md = buildSkillMd({ title: 'Renamed', description: 'New description', content: FOREIGN });
+    expect(md).toContain('title: "Renamed"');
+    expect(md).toContain('description: "New description"');
+    expect(md).not.toContain('description: Create branded diagrams.');
+  });
+
+  it('survives a full round trip with the foreign keys still foreign', () => {
+    const first = readSkillMd(buildSkillMd({ title: 'Diagram Design', description: 'D', content: FOREIGN }));
+    const second = readSkillMd(buildSkillMd(first));
+    expect(second.content).toContain('license: MIT');
+    expect(second.content).toContain('  version: "2.4"');
+    expect((buildSkillMd(second).match(/^---$/gm) || []).length).toBe(2);
+  });
+});
+
+describe('withoutOwnFrontmatter — what the MCP write path stores', () => {
+  it('drops our keys from the body and keeps the rest', () => {
+    const stored = withoutOwnFrontmatter(FOREIGN);
+    expect(stored).not.toContain('name: diagram-design');
+    expect(stored).not.toContain('description: Create branded diagrams.');
+    expect(stored).toContain('license: MIT');
+    expect(stored).toContain('  version: "2.4"');
+  });
+
+  it('removes the block entirely when nothing foreign is left', () => {
+    const stored = withoutOwnFrontmatter('---\nname: x\ntitle: "X"\ndescription: "D"\n---\n\n# Body\n');
+    expect(stored).toBe('\n# Body\n');
+  });
+
+  it('leaves a body without frontmatter exactly as it was', () => {
+    expect(withoutOwnFrontmatter('# Body\n\n---\n\nstill body\n')).toBe('# Body\n\n---\n\nstill body\n');
+  });
+
+  it('takes the folded continuation of one of OUR keys with it, not just its first line', () => {
+    // `description: >` spans lines. Removing only the first would leave its indented remainder
+    // behind as orphan text inside the block.
+    const stored = withoutOwnFrontmatter('---\ndescription: >\n  line one\n  line two\nlicense: MIT\n---\n\nBody\n');
+    expect(stored).not.toContain('line one');
+    expect(stored).not.toContain('line two');
+    expect(stored).toContain('license: MIT');
   });
 });

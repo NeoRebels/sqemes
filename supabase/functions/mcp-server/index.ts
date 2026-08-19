@@ -2,7 +2,7 @@ import JSZip from 'npm:jszip@3.10.1';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
 import { safeStorageFileName } from '../_shared/storageKey.ts';
-import { readSkillMd, toSlug as skillSlug } from '../_shared/skillMd.ts';
+import { readSkillMd, toSlug as skillSlug, withoutOwnFrontmatter } from '../_shared/skillMd.ts';
 import {
   findSkillRoot,
   isArchiveJunk,
@@ -1078,13 +1078,20 @@ Deno.serve(async (req) => {
       // `workspaceRestrictsNewTemplates` for why both matter and what breaks without them.
       const restrictByDefault = await workspaceRestrictsNewTemplates(adminClient, workspaceId, mcpUserId);
 
+      // SQEM-249 — a skill's body keeps only the frontmatter keys that are not ours. A model that
+      // read a SKILL.md and passed the whole file lands here, header and all; storing it verbatim is
+      // how the double-frontmatter export came about, and it also leaves a `title:` in the body that
+      // contradicts the column the moment someone renames the skill. The author's own keys
+      // (`license`, `metadata`, …) stay — they have nowhere else to live.
+      const storedContent = kind === 'skill' ? withoutOwnFrontmatter(content || '') : (content || '');
+
       const { data: inserted, error: insertErr } = await adminClient
         .from('prompts')
         .insert({
           workspace_id:       workspaceId,
           kind,
           title:              title.trim(),
-          content:            content || '',
+          content:            storedContent,
           description:        description?.trim() || '',
           system_instruction: system_instruction || null,
           variables:          resolvedVars,
@@ -1136,7 +1143,9 @@ Deno.serve(async (req) => {
 
       const updates: Record<string, any> = { updated_at: new Date().toISOString() };
       if (title              !== undefined) updates.title              = title.trim();
-      if (content            !== undefined) updates.content            = content;
+      // SQEM-249 — same rule as create_template, and it has to be here too or an update re-introduces
+      // the header that the create just removed.
+      if (content            !== undefined) updates.content            = existing.kind === 'skill' ? withoutOwnFrontmatter(content) : content;
       if (description        !== undefined) updates.description        = description.trim();
       if (system_instruction !== undefined) updates.system_instruction = system_instruction;
       if (Array.isArray(file_ids))          updates.context_file_ids   = file_ids;
