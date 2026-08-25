@@ -1,4 +1,5 @@
 import { createAdminClient } from '../_shared/supabase-admin.ts';
+import { startsRetentionClock, clearsRetentionClock } from '../_shared/retention.ts';
 import { timingSafeEqual } from '../_shared/timingSafe.ts';
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? '';
@@ -121,6 +122,15 @@ Deno.serve(async (req) => {
         }
 
         const status = subscription.status; // trialing | active | past_due | canceled | ...
+
+        // Read the existing clock first: Stripe re-sends subscription.updated for the same state,
+        // and overwriting `subscription_ended_at` each time would restart the 90 days for ever.
+        const { data: existingWs } = await adminClient
+          .from('workspaces')
+          .select('subscription_ended_at')
+          .eq('id', workspaceId)
+          .maybeSingle();
+        const currentEndedAt = (existingWs as { subscription_ended_at?: string | null } | null)?.subscription_ended_at ?? null;
         const trialEnd = subscription.trial_end
           ? new Date(subscription.trial_end * 1000).toISOString()
           : null;
@@ -142,6 +152,20 @@ Deno.serve(async (req) => {
           update.billing_cycle = billingCycle;
         }
 
+        // SQEM-269 — the 90-day retention clock. The rules live in `_shared/retention.ts` so this
+        // and the cleanup function cannot drift apart; `past_due` deliberately starts nothing,
+        // because Stripe is still retrying the card and the subscription usually recovers.
+        //
+        // **Reactivation clears it.** Somebody who comes back after 40 days must not be deleted on
+        // day 90 — and clearing it here, at the moment the status flips, is why that needs no
+        // special case anywhere downstream.
+        if (startsRetentionClock(status)) {
+          if (!currentEndedAt) update.subscription_ended_at = new Date().toISOString();
+        } else if (clearsRetentionClock(status)) {
+          update.subscription_ended_at = null;
+          update.lapse_warning_sent_at = null;
+        }
+
         await adminClient.from('workspaces').update(update).eq('id', workspaceId);
 
         console.log(`stripe-webhook: workspace ${workspaceId} subscription ${status}${plan ? ` (${plan})` : ''}`);
@@ -157,6 +181,16 @@ Deno.serve(async (req) => {
           break;
         }
 
+        // SQEM-269 — same clock as in the update handler. Read before write: this event can
+        // arrive after a `subscription.updated` that already started the clock, and restarting it
+        // here would silently extend the retention period every time Stripe repeats itself.
+        const { data: endedWs } = await adminClient
+          .from('workspaces')
+          .select('subscription_ended_at')
+          .eq('id', workspaceId)
+          .maybeSingle();
+        const alreadyEndedAt = (endedWs as { subscription_ended_at?: string | null } | null)?.subscription_ended_at ?? null;
+
         // Solo is paid now — a canceled sub does NOT fall back to a free plan. Mark the
         // workspace canceled (access is gated on subscription_status, not plan === 'Solo').
         await adminClient
@@ -165,6 +199,7 @@ Deno.serve(async (req) => {
             subscription_status: 'canceled',
             stripe_subscription_id: null,
             cancel_at_period_end: false,
+            subscription_ended_at: alreadyEndedAt ?? new Date().toISOString(),
           })
           .eq('id', workspaceId);
 

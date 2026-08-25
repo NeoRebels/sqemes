@@ -7,7 +7,9 @@ import { PLANS, TRIAL_DAYS } from '../constants';
 import { can } from '../lib/permissions';
 import { isPaymentFailing } from '../lib/subscription';
 import type { PlanTier } from '../types';
-import { Check, Loader2, LogOut, Building2, CreditCard, ExternalLink } from 'lucide-react';
+import { Check, Loader2, LogOut, Building2, CreditCard, ExternalLink, Download } from 'lucide-react';
+import { buildAccountExport, accountExportFilename } from '../lib/accountExport';
+import { downloadBlob } from '../lib/bundleFormat';
 
 // SQEM-057/083 — gate shown when a non-managed workspace has no active/trialing
 // subscription: never-subscribed (pick a plan) or lapsed (resubscribe / fix payment).
@@ -22,6 +24,27 @@ const ChoosePlanScreen = () => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+
+  // SQEM-267 — see the block above the button for why this lives on the gated screen at all.
+  // It calls the **existing** account export from SQEM-205, unchanged: that function already
+  // gathers templates, chats, files, profile and a README that names its own gaps. Nothing about
+  // the export needed building — only a route to it from the screen a lapsed customer is stuck on.
+  const [exportStep, setExportStep] = useState<string | null>(null);
+  const handleExport = async () => {
+    if (!workspace.id || !currentUser) return;
+    setExportBusy(true);
+    try {
+      const blob = await buildAccountExport(workspace, currentUser, p => setExportStep(p.step));
+      downloadBlob(blob, accountExportFilename(workspace.name));
+      showToast('Your data has been downloaded', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Export failed', 'error');
+    } finally {
+      setExportBusy(false);
+      setExportStep(null);
+    }
+  };
 
   // SQEM-141 — back from a successful checkout but still gated ⇒ the Stripe webhook hasn't
   // flipped subscription_status yet. Poll for it and reload once it lands, so the paid user
@@ -234,6 +257,46 @@ const ChoosePlanScreen = () => {
               <span className="font-semibold">{workspace.name}</span> {isLapsed ? 'no longer has an active subscription' : "doesn't have an active subscription yet"}. Ask a workspace admin to {paymentFailing ? 'update billing' : 'start a plan'}.
             </p>
           </div>
+        )}
+
+        {/* SQEM-267 — the way out with your data, offered where the person actually is.
+
+            ⚠️ **Only when the workspace has actually had a subscription** (`isLapsed`). A workspace
+            that never subscribed lands on this same screen, and it is empty by construction — nobody
+            got in to put anything in it. Offering to download it would be an empty promise attached
+            to an empty archive, on the screen where someone is deciding whether to trust the product.
+            Corrected on the owner's observation, 2026-08-24.
+
+            `isLapsed` is true for `past_due`/`unpaid` as well, not only `canceled`. That is
+            deliberate: a failing card is how a cancellation usually begins, and the data is the
+            customer's either way. If the offer ever reads as contradictory next to "your plan and
+            data are unchanged", narrow it here — not by removing it.
+
+            A lapsed workspace replaces the entire authenticated app with this screen, which put the
+            export on the Templates page out of reach. The data was never locked — RLS checks
+            membership, not payment — so nothing here unlocks anything; it restores a route to
+            something the person was always entitled to. Article 20 GDPR does not stop at a paywall,
+            and it is exercised precisely when a contract ends.
+
+            Placed above the workspace switcher and not hidden behind a disclosure: someone who has
+            just cancelled should not have to hunt for it, and a right you have to find is a right
+            that is being discouraged. The wording deliberately makes no attempt to sell — that is
+            what the rest of this screen is for. */}
+        {isLapsed && (
+        <div className="max-w-md mx-auto mt-8 text-center">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Your templates and files are yours. You can download all of them at any time, whether or not you resubscribe.
+          </p>
+          <button
+            onClick={handleExport}
+            disabled={exportBusy}
+            className="inline-flex items-center justify-center gap-2 mt-3 text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {exportBusy
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> {exportStep ?? 'Preparing your download…'}</>
+              : <><Download className="w-4 h-4" /> Download everything</>}
+          </button>
+        </div>
         )}
 
         {/* Workspace switcher — for users who belong to other workspaces */}

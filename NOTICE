@@ -26,6 +26,17 @@ above — including their attribution requirements, which continue to apply.
 Dependencies include components under the Apache License 2.0; their own NOTICE
 requirements are carried by this file.
 
+**THIRD_PARTY_NOTICES.md** at the root of this distribution lists every npm
+production dependency with its version, its licence, and the licence text as
+published — grouped so identical texts appear once with the packages that ship
+them. It also lists the pinned container images of the self-host bundle.
+
+**sbom.json** is the same inventory in CycloneDX 1.5 form, for tooling.
+
+Both are generated at release time from the dependency tree, not maintained by
+hand: a notices file written once is accurate on that day and quietly wrong at
+the next release, and a stale notice claims a completeness it no longer has.
+
 For self-hosting convenience, this distribution bundles components of the Supabase
 self-hosted stack under `selfhost/` — Postgres, GoTrue (Auth), PostgREST, Realtime,
 Storage, Kong, edge-runtime, and Studio. Those components are the property of their

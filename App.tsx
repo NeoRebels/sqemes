@@ -4,6 +4,7 @@ import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate, useParam
 import Sidebar from './components/Sidebar';
 import ErrorBoundary from './components/ErrorBoundary';
 import ChoosePlanScreen from './components/ChoosePlanScreen';
+import LegalGate from './components/LegalGate';
 import { needsSubscriptionGate } from './lib/subscription';
 import { publicListingIdFromHash } from './lib/publicRoutes';
 import { IS_SELF_HOSTED } from './lib/env';
@@ -411,9 +412,15 @@ function App() {
     );
   }
 
+  // SQEM-264 — agreement to the legal documents is checked here, outside `AuthenticatedApp`, so it
+  // sits **before `AppProvider`**: someone who has not agreed yet should not have their workspace
+  // loaded on their behalf. While nothing is published the gate renders its children untouched and
+  // issues no query — see `lib/legal.ts`.
   return (
     <EnvironmentShell>
-      <AuthenticatedApp />
+      <LegalGate userId={session.user.id}>
+        <AuthenticatedApp />
+      </LegalGate>
     </EnvironmentShell>
   );
 }

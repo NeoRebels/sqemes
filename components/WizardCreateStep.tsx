@@ -128,6 +128,10 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
         brandConfig: d.brandConfig,
         contextFileIds: [],
         skillIds: [],
+        // SQEM-265 — the wizard writes whole templates and the person only picks which to keep.
+        // That is generation under EU AI Act Art. 50(2), unlike the editor's Enhance, which works
+        // on text the person wrote and is covered by the editing exemption.
+        aiGeneratedAt: now,
         createdAt: now,
         updatedAt: now,
         createdBy: currentUser.id,

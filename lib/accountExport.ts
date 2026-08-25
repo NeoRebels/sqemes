@@ -12,7 +12,7 @@
 
 import JSZip from 'jszip';
 import type { Prompt, WorkspaceFile, Workspace, User } from '../types';
-import { fetchPrompts } from './api/prompts';
+import { fetchAllTemplates } from './api/prompts';
 import { fetchWorkspaceFiles, getWorkspaceFileSignedUrl } from './api/files';
 import { fetchChatSessions, fetchChatMessages } from './api/chatSessions';
 
@@ -38,10 +38,15 @@ export async function buildAccountExport(
 
   // ---- Templates -------------------------------------------------------------------------------
   report('Collecting templates…');
+  // ⚠️ SQEM-267 — this used `fetchPrompts`, which filters `kind = 'prompt'`. So `templates.json`
+  // contained the prompts and **silently omitted every assistant and every skill**, while the README
+  // three functions below promised "every template you can see in this workspace". A data export that
+  // claims completeness and is not complete is the worst version of this feature: nobody checks an
+  // archive until they need it, and by then the workspace is gone. `fetchAllTemplates` applies no
+  // kind filter.
   let templates: Prompt[] = [];
   try {
-    const result = await fetchPrompts(workspace.id, currentUser.id);
-    templates = Array.isArray(result) ? result : ((result as { prompts?: Prompt[] })?.prompts ?? []);
+    templates = await fetchAllTemplates(workspace.id, currentUser.id);
   } catch {
     templates = [];
   }

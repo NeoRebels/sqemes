@@ -257,6 +257,7 @@ export type Database = {
           is_favorite: boolean;
           published: boolean;
           source_template_id: string | null;
+          ai_generated_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -279,6 +280,7 @@ export type Database = {
           is_favorite?: boolean;
           published?: boolean;
           source_template_id?: string | null;
+          ai_generated_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

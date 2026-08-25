@@ -1,8 +1,13 @@
 Sqemes self-host bundle
 =======================
 
-This directory bundles Sqemes (Apache-2.0) with configuration vendored from the
-Supabase self-hosting Docker setup.
+This directory bundles Sqemes with configuration vendored from the Supabase
+self-hosting Docker setup.
+
+Sqemes is licensed under AGPL-3.0 from v1.10.0; releases up to and including
+v1.9.5 remain under Apache-2.0, permanently. (This paragraph said "Apache-2.0"
+until 2026-08-25 — it predated the licence change in SQEM-222 and was corrected
+when the distribution evidence was assembled.)
 
 Vendored from supabase/supabase (https://github.com/supabase/supabase), directory
 `docker/`, licensed under the Apache License 2.0:
@@ -20,3 +25,14 @@ Apache-2.0 license; see https://github.com/supabase/supabase/blob/master/LICENSE
 Sqemes-authored files in this directory (docker-compose.sqemes.yml, Dockerfile.app,
 nginx.conf, init/apply.sh, .env.example additions, README.md) are part of Sqemes and
 licensed under Apache-2.0 (see ../LICENSE).
+
+--------------------------------------------------------------------------------
+
+THIRD-PARTY COMPONENTS AND SBOM
+
+The container images used by this bundle are pinned in the compose files and are
+listed, together with every npm production dependency and its licence text, in
+THIRD_PARTY_NOTICES.md at the root of this distribution. A machine-readable
+CycloneDX inventory of the same set is in sbom.json.
+
+Both are regenerated on every release rather than maintained by hand.

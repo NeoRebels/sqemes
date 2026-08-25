@@ -44,6 +44,7 @@ export function rowToPrompt(row: PromptRow, favoriteIds?: Set<string>): Prompt {
     contextFileIds: row.context_file_ids || [],
     skillIds: row.skill_ids || [],
     model: row.model ?? undefined,
+    aiGeneratedAt: row.ai_generated_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     createdBy: row.created_by || '',
@@ -59,6 +60,8 @@ export function rowToPrompt(row: PromptRow, favoriteIds?: Set<string>): Prompt {
 function promptToRow(prompt: Partial<Prompt>, workspaceId: string) {
   const row: Record<string, unknown> = { workspace_id: workspaceId };
   if (prompt.kind !== undefined) row.kind = prompt.kind;
+  // SQEM-265 — only ever written on create, by the wizard. Never inferred, never backfilled.
+  if (prompt.aiGeneratedAt !== undefined) row.ai_generated_at = prompt.aiGeneratedAt;
   if (prompt.title !== undefined) row.title = prompt.title;
   if (prompt.description !== undefined) row.description = prompt.description;
   if (prompt.tag !== undefined) row.tag = prompt.tag;
@@ -97,6 +100,34 @@ export async function fetchPrompts(workspaceId: string, userId: string) {
 
   const favoriteIds = new Set((favoritesResult.data || []).map(f => f.prompt_id));
   return (promptsResult.data || []).map(row => rowToPrompt(row as unknown as PromptRow, favoriteIds));
+}
+
+/**
+ * SQEM-267 — every template in the workspace, all three kinds, for a complete export.
+ *
+ * `fetchPrompts` filters `kind = 'prompt'` and `fetchSkills` filters `kind = 'skill'`, so neither is
+ * "everything" and composing them would still miss assistants. **Article 20 GDPR is about the data
+ * the person provided, not about the subset one page happens to list** — an export that silently
+ * omitted a kind would be worse than no export, because it looks complete.
+ */
+export async function fetchAllTemplates(workspaceId: string, userId: string): Promise<Prompt[]> {
+  const [templatesResult, favoritesResult] = await Promise.all([
+    supabase
+      .from('prompts')
+      .select(PROMPT_SELECT)
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('user_prompt_favorites')
+      .select('prompt_id')
+      .eq('user_id', userId),
+  ]);
+
+  if (templatesResult.error) throw templatesResult.error;
+  if (favoritesResult.error) throw favoritesResult.error;
+
+  const favoriteIds = new Set((favoritesResult.data || []).map(f => f.prompt_id));
+  return (templatesResult.data || []).map(row => rowToPrompt(row as unknown as PromptRow, favoriteIds));
 }
 
 export async function fetchSkills(workspaceId: string): Promise<Prompt[]> {

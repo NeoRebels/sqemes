@@ -113,6 +113,12 @@ export interface Prompt {
   contextFileIds: string[];
   skillIds: string[];
   model?: string;
+  /**
+   * SQEM-265 — set when the setup wizard created this template from AI output (EU AI Act
+   * Art. 50(2)). **NULL means "not known to be generated", not "written by a person"** — it is
+   * never backfilled, because nothing in an old row can tell us which it was.
+   */
+  aiGeneratedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy: string;

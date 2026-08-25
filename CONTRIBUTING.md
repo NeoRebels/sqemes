@@ -39,6 +39,27 @@ let you discover it.
   would be unkind to let you build something we cannot take.
 - **Do not** push directly to `main`, even if you have access. The next export overwrites it.
 
+### What we cannot take, whoever sends it
+
+Saying this plainly is the point of this section. The alternative is that somebody spends two
+weekends on a change we were never going to merge, and finds out at the end — which is a worse
+outcome than an unfriendly-looking list.
+
+| Area | Why |
+|---|---|
+| **Authentication, roles, and row-level security** | A subtle mistake here exposes one customer's workspace to another and is invisible in review. It stays in-house, and no amount of test coverage changes that. |
+| **Anything touching provider API keys** | They are stored encrypted and belong to the customer. The blast radius of getting this wrong is somebody else's OpenAI bill and somebody else's data. |
+| **The MCP server** | It is the interface a customer's AI agent talks to. Its tool surface is a product decision with a security boundary attached. |
+| **The marketplace review path** | It decides what gets distributed to everybody else, including skills that carry executable files. |
+| **Billing, plans, credits** | Cloud-only, and not exercisable from this repository at all. |
+
+**None of this means the code is off-limits to read.** It is all here, and understanding it is
+welcome — a well-argued issue that says "this looks wrong to me, and here is why" is more valuable
+to us than a patch, in exactly these areas.
+
+**Everywhere else, the usual applies:** small fixes are welcome directly, anything larger deserves an
+issue first — and that is a request for a conversation, not a form to fill in.
+
 ## Local development
 
 ```bash

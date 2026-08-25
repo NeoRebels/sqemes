@@ -5,10 +5,17 @@ extension are open source (**AGPL-3.0** from v1.10.0; Apache-2.0 up to and inclu
 on your own infrastructure with your own AI provider keys (BYOK). A few pieces are **Sqemes Cloud
 only** and simply stay off when their secret is absent — nothing breaks.
 
-> **What the AGPL means for you as a self-hoster: in practice, nothing.** Running it for your own
-> team — however commercially — asks nothing of you. The obligation starts only if you *offer this
-> software to other people as a service*, and then you owe those users the source of what you run,
-> your modifications included.
+> **What the AGPL means for you as a self-hoster.** Two cases, and the only thing that separates them
+> is **who operates the instance**:
+>
+> - **You run it for your own organisation** — your team, your company, including the client work you
+>   deliver from it. This asks nothing of you, commercially or not.
+> - **You operate an instance that other people's users work in** — hosting it for a client, or
+>   offering it as a service. The AGPL's network clause applies: those users are entitled to the
+>   source of what you run, your modifications included.
+>
+> **If you are an agency and the second case is what you have in mind, talk to us first.** There is
+> usually a simpler arrangement than publishing your changes, and it is a short conversation.
 
 > This guide ships with the public repo — it is what self-hosters read. It documents how a
 > self-host instance is assembled and where the Cloud/open boundary sits.
@@ -390,7 +397,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.10.10       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.10.11       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### 3. Check for new env vars
@@ -452,6 +459,67 @@ Supabase project.
 
 ---
 
+## Nothing here deletes your data on a schedule (SQEM-269)
+
+The Cloud product deletes a workspace 90 days after its subscription ends, because there a
+subscription is what the retention period hangs on. **Your instance has no subscriptions, so nothing
+can lapse and nothing is ever removed.**
+
+The routine travels with this bundle — it is one file among many — and it **refuses to run when
+`SELF_HOSTED` is set**. That is belt and braces rather than one or the other: even a cron entry
+registered by mistake does nothing.
+
+**What that means for you as an operator:** deciding how long to keep the data of a team that stops
+using your instance is yours, and so is the obligation behind it. Storage limitation under Article
+5(1)(e) GDPR applies to you as the controller of your own instance, and keeping everything for ever
+is a decision, not the absence of one.
+
+---
+
+## AI Act — you are the provider, not us (SQEM-265)
+
+The Chat surface carries a standing notice that responses come from an AI system. It travels with
+this bundle deliberately, so a fresh instance is not a blank surface — but **it does not transfer the
+obligation to us.**
+
+EU AI Act Article 50 attaches to whoever puts an AI system into service **under their own name**
+(Article 3(3)). On a self-hosted instance that is **you**, not NeoRebels. The transparency duties have
+applied since **2 August 2026**, and if you rebrand the UI, remove the notice, or expose the instance
+to people outside your own organisation, keeping that surface compliant is yours.
+
+Two things worth knowing before you decide it does not concern you:
+
+- **Bringing your own key does not move the duty.** Whose key pays for inference is not the question
+  the Article asks; whose name the system runs under is.
+- **The notice is one line of UI.** Removing it to tidy the interface is the kind of change that
+  looks cosmetic and is not.
+
+Our own classification — which surface makes us what, and why the MCP path and the browser extension
+are outside it — is in `pm/DOCUMENTATION.md` in the source repository. It is written for our
+deployment, but the reasoning transfers, and it is a shorter read than the Article.
+
+---
+
+## Third-party notices and SBOM (SQEM-266)
+
+Two files at the root of this distribution:
+
+- **`THIRD_PARTY_NOTICES.md`** — every npm production dependency with its version, its licence and
+  the licence text as published, plus the pinned container images of this bundle. Identical texts
+  appear once, with the packages that ship them, rather than four hundred times.
+- **`sbom.json`** — the same inventory in **CycloneDX 1.5**, for whatever your security team feeds it
+  to.
+
+**Both are generated at release time, not maintained by hand.** That is the whole point: a notices
+file written once is accurate on that day and quietly wrong at the next release — and a stale notice
+claims a completeness it no longer has, which is worse than not having one.
+
+**What we do not claim:** the licence of each container image. They are pinned and named, and each
+carries the licence of its own project; asserting a licence per image without reading each one would
+be a guess dressed as a fact.
+
+---
+
 ## License
 
 **GNU Affero General Public License v3** from **v1.10.0** onward — see [`LICENSE`](LICENSE).
@@ -489,6 +557,18 @@ fork is the reliable way.
 listing. Written down because it changes what your instance answers without a session, even though
 nothing of yours is exposed by it — the data comes from the Cloud marketplace's own public endpoint,
 which your instance already reads.*
+
+*2026-08-25 (SQEM-266) — third-party notices and a CycloneDX SBOM now ship with every release,
+generated by the export rather than kept by hand.*
+
+*2026-08-25 (SQEM-268) — the AGPL passage names the two cases instead of reassuring generally;
+the boundary is who operates the instance.*
+
+*2026-08-25 (SQEM-269) — the Cloud retention job travels with the bundle and is inert here; the
+section above says why, and whose obligation it is instead.*
+
+*2026-08-20 (SQEM-265) — AI Act Article 50: the Chat notice ships with the bundle, and the section
+above states that a self-hoster is the provider of their own instance.*
 
 *2026-08-16 (SQEM-222) — licence changed to **AGPL-3.0 from v1.10.0**; Apache-2.0
 remains in force for every release up to and including v1.9.5, permanently, because that grant is
