@@ -206,7 +206,20 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+#
+# SQEM-277 — true, so local development walks the same path a real signup does. The confirmation
+# mail lands in the local Inbucket at :54324.
+#
+# ⚠️ THIS FILE CONFIGURES A LOCAL STACK ONLY. It does not reach a hosted Supabase project: that
+# switch lives in the dashboard under Authentication → Sign In / Providers, and no deploy carries
+# it. The two silently disagreed here once — the file said confirmation was off while the hosted
+# project had it on — and because neither side is visible from the other, a user's bug report about
+# signup could not be placed from the code at all. Align them deliberately; nothing will warn you.
+#
+# Running the Docker bundle instead? This file is not used there — see ENABLE_EMAIL_AUTOCONFIRM in
+# selfhost/.env.example and SELF_HOSTING.md § 5b, which explain why the bundle ships auto-confirm ON
+# and when to turn it off.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.

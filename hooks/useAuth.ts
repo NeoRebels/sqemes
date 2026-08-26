@@ -51,6 +51,24 @@ export function useAuth() {
     return { data, error };
   }, []);
 
+  // SQEM-277 — resend the signup confirmation.
+  //
+  // This exists because confirmation is *on*: an account is unusable until the mail arrives, so a
+  // mail that lands in spam or gets lost is a dead end with no way out. Password reset has had a
+  // way to retry since it shipped; signup had none, because nothing depended on that mail.
+  //
+  // Supabase answers identically whether or not the address has a pending signup — that is
+  // deliberate on their side (it stops the form being used to test which addresses are
+  // registered), and the caller must not try to be more informative than the API is.
+  const resendConfirmation = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    return { error };
+  }, []);
+
   const signIn = useCallback(async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -109,6 +127,7 @@ export function useAuth() {
     user,
     loading,
     signUp,
+    resendConfirmation,
     signIn,
     signInWithOAuth,
     signOut,

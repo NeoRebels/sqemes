@@ -20,7 +20,9 @@ Deno.serve(async (req) => {
     const app = CONNECTOR_APPS[appId as string];
     if (!app) return json({ error: 'Unsupported app' }, 400);
     const cfg = PROVIDERS[app.provider];
-    const clientId = Deno.env.get(cfg.clientIdEnv) ?? '';
+    // SQEM-273 — trimmed for the same reason as the callback: a pasted value with trailing
+    // whitespace would send a client_id the provider does not recognise, and nothing would say so.
+    const clientId = (Deno.env.get(cfg.clientIdEnv) ?? '').trim();
     if (!clientId) return json({ error: `This connector is not configured on this instance (${cfg.clientIdEnv}).` }, 503);
     if (!workspaceId) return json({ error: 'workspaceId required' }, 400);
 

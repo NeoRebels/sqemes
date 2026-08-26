@@ -36,14 +36,40 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: Deno.env.get(cfg.clientIdEnv) ?? '',
-        client_secret: Deno.env.get(cfg.clientSecretEnv) ?? '',
+        // SQEM-273 — `.trim()`, and it is not defensive noise. This repo has three documented cases
+        // of a pasted env value carrying trailing whitespace and breaking something
+        // (`pm/PRODUCTION_PROMOTION.md`): a newline in `VITE_SUPABASE_ANON_KEY`, a space in
+        // `PUBLIC_API_URL`. Both were fixed by trimming — and the URLs in this very file are trimmed
+        // while the credentials were not. A secret with a trailing newline is rejected as
+        // `invalid_client`, which reads exactly like an expired secret and is invisible in the
+        // dashboard, so the wrong thing gets replaced.
+        client_id: (Deno.env.get(cfg.clientIdEnv) ?? '').trim(),
+        client_secret: (Deno.env.get(cfg.clientSecretEnv) ?? '').trim(),
         redirect_uri: REDIRECT_URI,
         grant_type: 'authorization_code',
       }),
     });
-    const tok = await tokenRes.json();
-    if (!tokenRes.ok || !tok.access_token) return back('connector=error&reason=token_exchange');
+    const tok = await tokenRes.json().catch(() => ({} as Record<string, unknown>));
+    if (!tokenRes.ok || !tok.access_token) {
+      // SQEM-273 — say WHICH failure it was. This used to return a bare `token_exchange`, which is
+      // the one thing the provider never tells you: the response body carries `error` and
+      // `error_description` (Microsoft's `AADSTS…`, Google's equivalent) naming the actual cause —
+      // an expired or mistyped client secret, a redirect_uri that differs from the authorize step, a
+      // reused code. Discarding it left six candidates and no way to choose between them, at the one
+      // moment somebody is stuck.
+      //
+      // Logged in full server-side, and the short machine code travels back in the URL so the person
+      // can quote it. **Neither is secret** — the same reasoning as the granted-scopes log below;
+      // the secret is what we *sent*, and that is never in this response.
+      console.error(
+        `[connector-oauth-callback] ${payload.a} token exchange failed`,
+        tokenRes.status,
+        (tok as { error?: string }).error ?? '(no error field)',
+        (tok as { error_description?: string }).error_description ?? '',
+      );
+      const code = String((tok as { error?: string }).error ?? tokenRes.status);
+      return back(`connector=error&reason=token_exchange&code=${encodeURIComponent(code)}`);
+    }
 
     // Scope-debug: surface the actually-granted scopes; a missing read scope means data calls fail with
     // a permission error even though connect succeeds. Scopes aren't secret.

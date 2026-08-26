@@ -82,12 +82,23 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
       const pendingTokenAt = localStorage.getItem('pendingInviteTokenAt');
       let wsRows = wsRowsResult.rows;
       if (pendingToken) {
-        const isExpired = pendingTokenAt && Date.now() - parseInt(pendingTokenAt, 10) > 86_400_000;
+        // SQEM-277 — this window is how long we hold an invite token locally while the person
+        // finishes signing up. It is NOT the invitation's own lifetime, which lives in
+        // `invitations.expires_at` and is usually far longer.
+        //
+        // Raised from 24h because email confirmation is now required: the invited person has to
+        // receive a mail and click it before this code ever runs, and doing that the next morning
+        // is entirely ordinary. At 24h a normal signup silently lost its workspace.
+        //
+        // ⚠️ The old message here said the *invitation* had expired. It had not — only this cache
+        // had — so it sent people to ask for a new invite that they did not need, while the valid
+        // one sat in their inbox. Say what actually happened and what actually helps.
+        const isExpired = pendingTokenAt && Date.now() - parseInt(pendingTokenAt, 10) > 259_200_000;
         if (isExpired) {
           localStorage.removeItem('pendingInviteToken');
           localStorage.removeItem('pendingInviteEmail');
           localStorage.removeItem('pendingInviteTokenAt');
-          ui.showToast('Invite link has expired. Please request a new invitation.', 'error');
+          ui.showToast('Open your invitation link again to join the workspace.', 'error');
         } else {
           try {
             await invitationsApi.acceptInvitation(pendingToken);

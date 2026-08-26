@@ -110,10 +110,18 @@ export default function ConnectorsCard({
       }
       load();
     } else {
-      showToast(`Connection failed${searchParams.get('reason') ? `: ${searchParams.get('reason')}` : ''}`, 'error');
+      // SQEM-273 — show the provider's own error code when we have it. `reason` names our stage,
+      // `code` names what the provider said; without the second, "token_exchange" is a dead end for
+      // whoever has to fix it, and they are usually the person reading this toast.
+      const reason = searchParams.get('reason');
+      const code = searchParams.get('code');
+      showToast(
+        `Connection failed${reason ? `: ${reason}` : ''}${code ? ` (${code})` : ''}`,
+        'error',
+      );
     }
     const next = new URLSearchParams(searchParams);
-    ['connector', 'name', 'reason', 'scopes', 'read'].forEach(k => next.delete(k));
+    ['connector', 'name', 'reason', 'code', 'scopes', 'read'].forEach(k => next.delete(k));
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);

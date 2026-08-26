@@ -11,7 +11,7 @@ import { IS_SELF_HOSTED } from '../lib/env';
 // "Start free trial" on a public listing has said what they want; showing them a sign-in form asks
 // them to answer a question they already answered.
 const Auth = ({ inviteEmail, initialMode }: { inviteEmail?: string; initialMode?: 'login' | 'register' }) => {
-  const { signIn, signUp, signInWithOAuth, resetPassword } = useAuth();
+  const { signIn, signUp, signInWithOAuth, resetPassword, resendConfirmation } = useAuth();
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(initialMode ?? (inviteEmail ? 'register' : 'login'));
   const [email, setEmail] = useState(inviteEmail || '');
   const [password, setPassword] = useState('');
@@ -20,17 +20,29 @@ const Auth = ({ inviteEmail, initialMode }: { inviteEmail?: string; initialMode?
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // SQEM-277 — shown only once we know a confirmation is genuinely outstanding, never on spec.
+  const [canResend, setCanResend] = useState(false);
+  const [resending, setResending] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setMessage(null);
+    setCanResend(false);
     setLoading(true);
 
     try {
       if (mode === 'login') {
         const { error } = await signIn(email, password);
-        if (error) throw error;
+        if (error) {
+          // SQEM-277 — "Email not confirmed" is the one sign-in failure with a next step, so it
+          // gets one. Everything else falls through to the raw provider message unchanged.
+          if (/email not confirmed|not confirmed/i.test(error.message)) {
+            setCanResend(true);
+            throw new Error('This email has not been confirmed yet. Check your inbox for the confirmation link.');
+          }
+          throw error;
+        }
       } else if (mode === 'forgot') {
         const { error } = await resetPassword(email);
         if (error) throw error;
@@ -39,9 +51,25 @@ const Auth = ({ inviteEmail, initialMode }: { inviteEmail?: string; initialMode?
         if (!name.trim()) {
           throw new Error('Name is required');
         }
-        const { error } = await signUp(email, password, name);
+        const { data, error } = await signUp(email, password, name);
         if (error) throw error;
-        setMessage('Check your email for a confirmation link.');
+
+        // SQEM-277 — ask the response instead of assuming the answer.
+        //
+        // `data.session` is null exactly when Supabase is holding the account until the address is
+        // confirmed, and populated when it is not. The old code announced a confirmation step
+        // unconditionally, so whichever way the project was configured, half the time it told the
+        // person something untrue — and it was untrue in the direction that matters, promising a
+        // check that was not happening.
+        //
+        // Deriving it means this survives the setting being changed in the dashboard, which is
+        // where it lives and where no deploy can see it.
+        if (data.session) {
+          setMessage(null);
+          return; // signed in already — the auth listener takes it from here
+        }
+        setCanResend(true);
+        setMessage('Almost there — open the confirmation link we just emailed you, then sign in.');
         setMode('login');
       }
     } catch (err: any) {
@@ -49,6 +77,23 @@ const Auth = ({ inviteEmail, initialMode }: { inviteEmail?: string; initialMode?
     } finally {
       setLoading(false);
     }
+  };
+
+  // SQEM-277 — Supabase gives the same answer whether or not a signup is pending for this address,
+  // so the confirmation here says what we did, not what it found. Claiming more would leak whether
+  // an address is registered, which is the thing their API deliberately refuses to reveal.
+  const handleResend = async () => {
+    if (!email) return;
+    setError(null);
+    setMessage(null);
+    setResending(true);
+    const { error } = await resendConfirmation(email);
+    setResending(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setMessage('Sent. If a confirmation is pending for this address, the link is on its way.');
   };
 
   const handleOAuth = async (provider: 'google' | 'github') => {
@@ -199,6 +244,20 @@ const Auth = ({ inviteEmail, initialMode }: { inviteEmail?: string; initialMode?
                 <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 rounded-xl text-sm text-emerald-600 dark:text-emerald-400">
                   {message}
                 </div>
+              )}
+
+              {/* SQEM-277 — the way out when the confirmation mail never arrives. Without it an
+                  account that cannot receive that one mail is simply lost, with nothing on screen
+                  to try. Shown only once a confirmation is known to be outstanding. */}
+              {canResend && (
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resending || !email}
+                  className="w-full text-center text-sm text-brand-600 dark:text-brand-400 hover:underline disabled:opacity-50 disabled:no-underline"
+                >
+                  {resending ? 'Sending…' : "Didn't get the email? Send it again"}
+                </button>
               )}
 
               <Button

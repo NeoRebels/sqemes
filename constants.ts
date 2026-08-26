@@ -73,203 +73,124 @@ export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly
 
 export const AVAILABLE_MODELS = [
   // ── Google Gemini ──────────────────────────────────────────────
+  //
+  // SQEM-275 — one entry per JOB, not per version. The list had grown to nine Gemini entries across
+  // three generations, several of them near-identical, which asks a person to choose between things
+  // they cannot tell apart. Checked against ai.google.dev on 2026-08-26.
   {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
-    description: 'Fast and efficient for most tasks',
+    id: 'gemini-3.7-flash',
+    name: 'Gemini 3.7 Flash',
+    description: 'Latest Gemini, fast and capable',
     provider: 'gemini',
     specs: {
-      description: 'The fastest multimodal model for high-frequency tasks. Ideal for summarization, chat, and data extraction. 1M context window.',
-      cost: 2,
-      speed: 10,
-      thinking: 7
+      description: 'Newest-generation Flash model — frontier-class quality at Flash speed. The default choice for chat, summarisation and extraction. 1M context window.',
+      cost: 3,
+      speed: 9,
+      thinking: 8
     }
   },
   {
-    id: 'gemini-2.5-flash-lite',
-    name: 'Gemini 2.5 Flash Lite',
-    description: 'Ultra-fast and cheapest Gemini',
+    id: 'gemini-3.5-flash-lite',
+    name: 'Gemini 3.5 Flash Lite',
+    description: 'Cheapest and fastest Gemini',
     provider: 'gemini',
     specs: {
-      description: 'Extremely cost-efficient model for simple tasks, classification, and high-throughput workloads. 1M context window.',
+      description: 'Built for high-volume, low-latency work — classification, routing, bulk processing. 1M context window.',
       cost: 1,
       speed: 10,
       thinking: 5
     }
   },
   {
-    id: 'gemini-2.5-pro',
-    name: 'Gemini 2.5 Pro',
-    description: 'Best Gemini for complex reasoning',
+    id: 'gemini-3.1-pro-preview',
+    name: 'Gemini 3.1 Pro',
+    description: 'Best Gemini for complex reasoning (Preview)',
     provider: 'gemini',
     specs: {
-      description: 'Top-tier reasoning and coding model with deep thinking capabilities. 1M context window.',
+      description: 'Deep reasoning and coding. Still preview at Google — no stable id exists yet, which is why this one keeps the suffix. 1M context window.',
       cost: 5,
       speed: 6,
       thinking: 10
-    }
-  },
-  {
-    id: 'gemini-3-flash-preview',
-    name: 'Gemini 3 Flash',
-    description: 'Next-gen fast model (Preview)',
-    provider: 'gemini',
-    specs: {
-      description: 'Fast frontier-class performance rivaling larger models at a fraction of the cost. 1M context window.',
-      cost: 3,
-      speed: 9,
-      thinking: 8
-    }
-  },
-  {
-    id: 'gemini-3.1-flash-lite-preview',
-    name: 'Gemini 3.1 Flash Lite',
-    description: 'Ultra-fast next-gen model (Preview)',
-    provider: 'gemini',
-    specs: {
-      description: 'Cost-efficient next-gen model built for high-volume tasks and low-latency workloads. 1M context window.',
-      cost: 2,
-      speed: 10,
-      thinking: 7
-    }
-  },
-  {
-    id: 'gemini-3.1-pro-preview',
-    name: 'Gemini 3.1 Pro',
-    description: 'Next-gen flagship (Preview)',
-    provider: 'gemini',
-    specs: {
-      description: 'Reasoning-first flagship with adaptive thinking, agentic workflows, and coding capabilities. 1M context window.',
-      cost: 7,
-      speed: 5,
-      thinking: 10
-    }
-  },
-  {
-    id: 'gemini-3-pro-image-preview',
-    name: 'Gemini 3 Pro Image',
-    description: 'High quality image generation',
-    provider: 'gemini',
-    specs: {
-      description: 'Produces photorealistic, high-fidelity images with excellent prompt adherence.',
-      cost: 6,
-      speed: 5,
-      thinking: 6
     }
   },
 
   // ── Google Gemini (Image Generation) ─────────────────────────
   {
-    id: 'gemini-3.1-flash-image-preview',
+    id: 'gemini-3.1-flash-image',
     name: 'Gemini 3.1 Flash Image',
-    description: 'Fastest Gemini image generation (new)',
+    description: 'Fast image generation',
     provider: 'gemini',
     specs: {
-      description: 'Newest and fastest Gemini image model. Combines Gemini 3 Pro image quality with Flash speed. Supports generation, editing, and multi-turn iteration. Includes Google Search grounding.',
-      cost: 4,
+      description: 'High-efficiency image generation and editing.',
+      cost: 3,
       speed: 9,
       thinking: 6
     }
   },
-
   {
-    id: 'gemini-2.5-flash-image',
-    name: 'Gemini 2.5 Flash Image',
-    description: 'Gemini fast image generation',
+    id: 'gemini-3-pro-image',
+    name: 'Gemini 3 Pro Image',
+    description: 'Studio-quality image generation',
     provider: 'gemini',
     specs: {
-      description: 'Fast image generation model optimized for high-volume, low-latency tasks. Can create and edit images from text prompts. 1M context window.',
-      cost: 3,
-      speed: 8,
-      thinking: 6
+      description: 'Highest-fidelity image generation and editing.',
+      cost: 6,
+      speed: 5,
+      thinking: 8
     }
   },
 
-
   // ── OpenAI ─────────────────────────────────────────────────────
+  //
+  // SQEM-275 — the GPT-5.6 family, all three variants (owner's decision 2026-08-26). They differ by
+  // intent rather than by generation, so all three earn a place; `gpt-5.6` is an alias for Sol and is
+  // deliberately NOT listed as a fourth entry pointing at the same model.
   {
-    id: 'gpt-5.2',
-    name: 'GPT-5.2',
-    description: 'OpenAI Latest Flagship',
+    id: 'gpt-5.6-sol',
+    name: 'GPT-5.6 Sol',
+    description: 'OpenAI Most Capable',
     provider: 'openai',
     specs: {
-      description: 'OpenAI flagship model for coding and agentic tasks. Best-in-class reasoning with thinking capabilities.',
-      cost: 8,
+      description: 'Advanced reasoning and coding — the one to reach for on hard problems.',
+      cost: 9,
       speed: 5,
       thinking: 10
     }
   },
   {
-    id: 'gpt-5.3-chat-latest',
-    name: 'GPT-5.3',
-    description: 'OpenAI Latest & Fastest',
+    id: 'gpt-5.6-terra',
+    name: 'GPT-5.6 Terra',
+    description: 'OpenAI Best Balance',
     provider: 'openai',
     specs: {
-      description: 'Newest OpenAI release. Speed-optimized with more accurate answers and 3x faster inference. 500K context window.',
-      cost: 6,
-      speed: 9,
-      thinking: 9
-    }
-  },
-  {
-    id: 'gpt-5-mini',
-    name: 'GPT-5 Mini',
-    description: 'OpenAI Fast & Smart',
-    provider: 'openai',
-    specs: {
-      description: 'Faster, cost-efficient reasoning model. Great for well-defined tasks and precise prompts.',
-      cost: 4,
-      speed: 8,
+      description: 'Balanced intelligence and cost. The sensible default for everyday work.',
+      cost: 5,
+      speed: 7,
       thinking: 8
     }
   },
   {
-    id: 'o3',
-    name: 'OpenAI o3',
-    description: 'OpenAI Deep Reasoning',
+    id: 'gpt-5.6-luna',
+    name: 'GPT-5.6 Luna',
+    description: 'OpenAI Cost-Optimised',
     provider: 'openai',
     specs: {
-      description: 'Advanced reasoning model for math, science, and coding. Thinks step-by-step for complex problems. 200K context.',
-      cost: 9,
-      speed: 3,
-      thinking: 10
-    }
-  },
-
-  {
-    id: 'gpt-image-1',
-    name: 'GPT Image 1',
-    description: 'OpenAI Image Generation',
-    provider: 'openai',
-    specs: {
-      description: 'Native multimodal image generation model. Creates high-quality images from text prompts with excellent instruction following.',
-      cost: 6,
-      speed: 5,
+      description: 'Cost-optimised for high-volume workloads where throughput matters more than depth.',
+      cost: 2,
+      speed: 9,
       thinking: 6
     }
   },
   {
-    id: 'gpt-image-1-mini',
-    name: 'GPT Image 1 Mini',
-    description: 'OpenAI fast image generation',
+    id: 'gpt-image-2',
+    name: 'GPT Image 2',
+    description: 'OpenAI image generation',
     provider: 'openai',
     specs: {
-      description: 'Faster, more affordable variant of GPT Image 1. Great for high-volume image generation tasks with good quality.',
-      cost: 3,
-      speed: 8,
-      thinking: 4
-    }
-  },
-  {
-    id: 'dall-e-3',
-    name: 'DALL-E 3',
-    description: 'OpenAI high-quality image generation',
-    provider: 'openai',
-    specs: {
-      description: 'OpenAI flagship image generation model. Produces highly detailed, accurate images with superior prompt adherence and coherent text rendering.',
+      description: 'Image generation and editing.',
       cost: 5,
       speed: 6,
-      thinking: 5
+      thinking: 7
     }
   },
   // ── Anthropic Claude ───────────────────────────────────────────
@@ -286,8 +207,8 @@ export const AVAILABLE_MODELS = [
     }
   },
   {
-    id: 'claude-opus-4-8',
-    name: 'Claude Opus 4.8',
+    id: 'claude-opus-5',
+    name: 'Claude Opus 5',
     description: 'Anthropic Most Powerful',
     provider: 'claude',
     specs: {
@@ -298,8 +219,8 @@ export const AVAILABLE_MODELS = [
     }
   },
   {
-    id: 'claude-sonnet-4-6',
-    name: 'Claude Sonnet 4.6',
+    id: 'claude-sonnet-5',
+    name: 'Claude Sonnet 5',
     description: 'Anthropic Best Balance',
     provider: 'claude',
     specs: {
@@ -323,61 +244,43 @@ export const AVAILABLE_MODELS = [
   },
 
   // ── xAI Grok ───────────────────────────────────────────────────
+  //
+  // ⚠️ SQEM-275 — `grok-4.6` supersedes `grok-4.20`, and the numbering is a trap: 4.20 READS higher
+  // than 4.6 and is older. xAI's own docs name 4.6 'the most intelligent and fastest model'.
   {
-    id: 'grok-4.20-0309-reasoning',
-    name: 'Grok 4',
-    description: 'xAI Flagship',
+    id: 'grok-4.6',
+    name: 'Grok 4.6',
+    description: 'xAI Latest',
     provider: 'grok',
     specs: {
-      description: 'xAI flagship model with strong reasoning capabilities. 256K context window.',
+      description: 'xAI\'s most capable model for code and chat, with real-time knowledge.',
       cost: 6,
-      speed: 6,
+      speed: 8,
       thinking: 9
     }
   },
   {
-    id: 'grok-4-1-fast-reasoning',
-    name: 'Grok 4 Fast',
-    description: 'xAI Fast & Affordable',
+    id: 'grok-imagine-image-2.0',
+    name: 'Grok Imagine 2.0',
+    description: 'xAI image generation',
     provider: 'grok',
     specs: {
-      description: 'Extremely cost-efficient multimodal model with reasoning capabilities. 2M context window.',
-      cost: 1,
-      speed: 9,
-      thinking: 8
-    }
-  },
-  {
-    id: 'grok-3',
-    name: 'Grok 3',
-    description: 'xAI Reliable',
-    provider: 'grok',
-    specs: {
-      description: 'Proven general-purpose model with real-time knowledge access. 131K context window.',
-      cost: 5,
-      speed: 7,
-      thinking: 8
-    }
-  },
-
-  {
-    id: 'grok-imagine-image',
-    name: 'Grok Image (Aurora)',
-    description: 'xAI Image Generation',
-    provider: 'grok',
-    specs: {
-      description: 'Aurora image generation model. Creates high-quality, photorealistic images with accurate text rendering and logos.',
+      description: 'Image generation.',
       cost: 4,
-      speed: 6,
-      thinking: 5
+      speed: 8,
+      thinking: 6
     }
   },
-
   // ── DeepSeek ───────────────────────────────────────────────────
+  //
+  // SQEM-275 — the V4 family. The old `deepseek-chat` / `deepseek-reasoner` aliases named the V3.2
+  // generation; DeepSeek's own docs now list v4-flash and v4-pro, both with thinking mode by default.
+  // Note these two also appear in the OpenRouter shortlist below — same models, different key. That
+  // is not duplication: a customer holds one key or the other, rarely both.
   {
-    id: 'deepseek-chat',
-    name: 'DeepSeek V3.2',
-    description: 'DeepSeek Flagship',
+    id: 'deepseek-v4-flash',
+    name: 'DeepSeek V4 Flash',
+    description: 'DeepSeek Fast',
     provider: 'deepseek',
     specs: {
       description: 'Highly efficient model rivaling top-tier proprietary models in coding and math. Exceptional value. 128K context.',
@@ -387,8 +290,8 @@ export const AVAILABLE_MODELS = [
     }
   },
   {
-    id: 'deepseek-reasoner',
-    name: 'DeepSeek V3.2 Reasoner',
+    id: 'deepseek-v4-pro',
+    name: 'DeepSeek V4 Pro',
     description: 'DeepSeek Reasoning',
     provider: 'deepseek',
     specs: {
@@ -400,6 +303,13 @@ export const AVAILABLE_MODELS = [
   },
 
   // ── Mistral AI ─────────────────────────────────────────────────
+  //
+  // SQEM-275 — the `-latest` aliases are kept deliberately (owner's decision 2026-08-26). They track
+  // the current generation on their own, which is what someone picking "Mistral Large" means. Only
+  // the labels were stale: they now resolve to Large 3, Small 4 and Codestral 25.08.
+  //
+  // ⚠️ The same alias in `_shared/funded.ts` is a different matter — there **we** pay, so a moving
+  // target is a moving cost. Kept as well, knowingly; see SQEM-276.
   {
     id: 'mistral-large-latest',
     name: 'Mistral Large 3',
@@ -414,7 +324,7 @@ export const AVAILABLE_MODELS = [
   },
   {
     id: 'mistral-small-latest',
-    name: 'Mistral Small 3.2',
+    name: 'Mistral Small 4',
     description: 'Mistral Fast & Capable',
     provider: 'mistral',
     specs: {
@@ -426,7 +336,7 @@ export const AVAILABLE_MODELS = [
   },
   {
     id: 'codestral-latest',
-    name: 'Codestral',
+    name: 'Codestral 25.08',
     description: 'Mistral Code Specialist',
     provider: 'mistral',
     specs: {
@@ -437,6 +347,11 @@ export const AVAILABLE_MODELS = [
     }
   },
 
+  // ⚠️ SQEM-275 — `inclusionai/ling-2.6-flash` and `ibm-granite/granite-4.1-8b` were NOT verified on
+  // 2026-08-26: they do not appear among OpenRouter's newest models, which proves nothing either way.
+  // They are left as they are rather than removed on a hunch — OpenRouter answers an unknown slug with
+  // a clear error, so the cost of a stale entry here is one confused attempt, not silent breakage.
+  //
   // ── OpenRouter (BYOK) — curated shortlist. Users can add more model ids in
   //    Settings → Integrations → OpenRouter. Model ids are `vendor/model`.
   {
@@ -468,11 +383,14 @@ export const AVAILABLE_MODELS = [
     specs: { description: 'Higher-capability DeepSeek model for harder reasoning tasks. 1M-token context.', cost: 4, speed: 6, thinking: 9 }
   },
   {
-    id: 'qwen/qwen3.7-plus',
-    name: 'Qwen3.7 Plus',
-    description: 'Strong general model, 1M context',
+    id: 'qwen/qwen3.8-27b',
+    name: 'Qwen3.8 27B',
+    description: 'Strong general-purpose open model',
     provider: 'openrouter',
-    specs: { description: 'Capable general-purpose Qwen model with a 1M-token context.', cost: 4, speed: 7, thinking: 8 }
+    // SQEM-275 — the context window is deliberately not claimed here. The predecessor's entry said
+    // "1M context"; that was about a different model, and repeating it for this one would be a
+    // number carried across a rename rather than a fact about what ships.
+    specs: { description: 'Capable general-purpose Qwen model, current generation on OpenRouter.', cost: 4, speed: 7, thinking: 8 }
   },
 ];
 
