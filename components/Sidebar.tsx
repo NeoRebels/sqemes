@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { useUI, useWorkspace } from '../store';
 import PersonCard from './ui/PersonCard';
-import { PLANS } from '../constants';
+import { PLANS, VAT_NOTE } from '../constants';
 import type { PlanTier } from '../types';
 import { startCheckout, type BillingCycle } from '../lib/billing';
 import { can } from '../lib/permissions';
@@ -492,6 +492,10 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
                     );
                   })}
                 </div>
+
+                {/* SQEM-283 — once under the list, not on every row: this is a compact picker, and
+                    six copies of the same sentence would read as noise and get skipped. */}
+                <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2">{VAT_NOTE}</p>
 
                 <button
                   type="button"

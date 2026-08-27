@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { FileText, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { IS_SELF_HOSTED } from '../lib/env';
 import Button from './ui/Button';
 import {
   LEGAL_DOCUMENTS,
   publishedDocuments,
+  gateApplies,
   pendingAcceptances,
   acceptanceRows,
   type LegalDocument,
@@ -24,15 +26,26 @@ import {
  * 2026-08-21 to serve consumer law rather than restrict the product to businesses. So agreement has to
  * be **active and recorded** — which is this component, run again whenever a version changes.
  *
- * ⚠️ **While nothing is published it renders its children and issues no query at all.** Both versions
- * in `lib/legal.ts` are `null` today. Do not "simplify" the early return away: without it, every
- * authenticated load pays for a request whose answer is structurally known.
+ * ⚠️ **Cloud only.** A self-hosted instance is somebody else's product: its operator is the
+ * controller, and our published documents say so in their own first paragraph — they cover
+ * app.sqemes.com and explicitly not self-hosted installations. Gating a stranger's users behind a
+ * contract that tells them it does not apply to them is worse than showing nothing, and because this
+ * component wraps the whole authenticated app, it is a wall rather than a notice. It also takes from
+ * the operator the one thing they should have: the chance to put *their* terms in front of *their*
+ * users. Shipped that way in v1.10.11–v1.11.0 before anyone noticed (SQEM-284).
+ *
+ * ⚠️ **Two early returns, and both must stay.** The self-host one is a build-time constant, so it
+ * costs nothing; the published-documents one avoids a request whose answer is structurally known.
+ * Do not "simplify" either away — and note that the second stopped firing the moment SQEM-264 set the
+ * first version, which is precisely how the self-host case slipped through: the comment here used to
+ * say both versions were `null`, and that sentence read as reassurance long after it stopped being
+ * true.
  */
 const LegalGate = ({ userId, children }: { userId: string; children: React.ReactNode }) => {
-  const live = publishedDocuments(LEGAL_DOCUMENTS);
+  // Both exemptions live in `gateApplies`, so a test can pin them. See the note above.
+  if (!gateApplies({ selfHosted: IS_SELF_HOSTED, docs: LEGAL_DOCUMENTS })) return <>{children}</>;
 
-  // Nothing published → nothing to check, nothing to ask, no round trip.
-  if (live.length === 0) return <>{children}</>;
+  const live = publishedDocuments(LEGAL_DOCUMENTS);
 
   return <LegalGateActive userId={userId} live={live}>{children}</LegalGateActive>;
 };

@@ -3,7 +3,7 @@ import { useWorkspace, useUI } from '../store';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { startCheckout } from '../lib/billing';
-import { PLANS, TRIAL_DAYS } from '../constants';
+import { PLANS, TRIAL_DAYS, VAT_NOTE } from '../constants';
 import { can } from '../lib/permissions';
 import { isPaymentFailing } from '../lib/subscription';
 import type { PlanTier } from '../types';
@@ -195,6 +195,9 @@ const ChoosePlanScreen = () => {
                     <div className="mb-6">
                       <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">€{price}<span className="text-base font-medium text-slate-400">/mo</span></p>
                       <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">{billingText}</p>
+                      {/* SQEM-283 — the Terms promise consumers that a shown price includes VAT.
+                          This is where that promise has to be visible, not two screens later. */}
+                      <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">{VAT_NOTE}</p>
                     </div>
                     <ul className="space-y-2.5 text-sm flex-1 text-slate-600 dark:text-slate-300">
                       {p.features.map(feature => (

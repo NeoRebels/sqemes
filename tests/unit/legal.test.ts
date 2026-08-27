@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   LEGAL_DOCUMENTS,
   publishedDocuments,
+  gateApplies,
   pendingAcceptances,
   needsAcceptance,
   acceptanceRows,
@@ -92,5 +93,35 @@ describe('legal — the rows that get written', () => {
     // A row with a null version would violate the table's NOT NULL and fail the whole insert —
     // taking the published document's row down with it.
     expect(acceptanceRows('user-1', [doc({ version: null })])).toEqual([]);
+  });
+});
+
+describe('legal — who the gate applies to (SQEM-284)', () => {
+  it('never gates a self-hosted instance, even with documents published', () => {
+    // The whole point. Our documents cover app.sqemes.com and say so; the operator of a self-hosted
+    // instance is the controller, not us. Gating their users behind our contract puts a wall in
+    // front of somebody else's product — and this component wraps the entire authenticated app.
+    expect(gateApplies({ selfHosted: true, docs: [doc({ version: '1.1' })] })).toBe(false);
+  });
+
+  it('gates Cloud once a document is published', () => {
+    expect(gateApplies({ selfHosted: false, docs: [doc({ version: '1.1' })] })).toBe(true);
+  });
+
+  it('does not gate Cloud while nothing is published', () => {
+    expect(gateApplies({ selfHosted: false, docs: [doc({ version: null })] })).toBe(false);
+  });
+
+  it('keeps the two exemptions independent', () => {
+    // ⚠️ This is the regression. Before SQEM-284 the self-host case had no guard of its own — it was
+    // riding on "nothing is published yet", which stopped being true the moment SQEM-264 set the
+    // first version. Nothing failed, no test went red; self-hosters simply started being asked to
+    // accept our Cloud terms, and shipped that way through three releases.
+    //
+    // So: self-host must be false regardless of what the documents say, and the published check must
+    // still do its own job on Cloud. One condition standing in for the other is how this happened.
+    expect(gateApplies({ selfHosted: true, docs: [doc({ version: null })] })).toBe(false);
+    expect(gateApplies({ selfHosted: true, docs: LEGAL_DOCUMENTS })).toBe(false);
+    expect(gateApplies({ selfHosted: false, docs: LEGAL_DOCUMENTS })).toBe(true);
   });
 });

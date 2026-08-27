@@ -14,6 +14,21 @@ export const PLAN_AI_CREDITS: Record<PlanTier, number> = {
   Business: 100000,
 };
 
+// SQEM-283 — the tax line that has to sit beside every price we show.
+//
+// Stripe's prices are `automatic` tax behaviour: **inclusive in the euro/EU case**, exclusive for USD
+// and CAD, where sales tax is customarily added on top. Everything we display is in euro, so for the
+// price a visitor reads here, the number IS the total.
+//
+// ⚠️ **This is not decoration.** The published Terms tell consumers that "prices shown to you include
+// VAT". A price rendered without this line leaves that promise unstated at the one moment it matters,
+// and § 3 PAngV attaches to advertising a price — not to the checkout that follows it.
+//
+// Business customers with a valid VAT ID are reverse-charged at checkout and pay less than the number
+// shown. That is why the line says *includes*, not *plus* — and why it names the exception rather
+// than pretending everyone pays the same.
+export const VAT_NOTE = 'Includes VAT. Business customers with a valid VAT ID are charged net.';
+
 // SQEM-057 — `price` is the monthly (billed-monthly) price; `priceYearly` is the
 // per-month price when billed annually (≈20% off, rounded). All tiers are paid;
 // MCP + AI credits ship on every tier (differentiation is seats/credits/team features).

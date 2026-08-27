@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useUI, useWorkspace } from '../store';
 import { can } from '../lib/permissions';
 import { useLocation, useNavigate } from 'react-router';
-import { PLANS, TRIAL_DAYS } from '../constants';
+import { PLANS, TRIAL_DAYS, VAT_NOTE } from '../constants';
 import { hasActiveSubscription, isTrialing } from '../lib/subscription';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { fetchCanPublish, setPublisherToken } from '../lib/api/library';
@@ -1244,6 +1244,8 @@ const Settings = () => {
                       <div className="mb-6">
                         <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{displayPrice}</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">{billingText}</p>
+                        {/* SQEM-283 — see VAT_NOTE: the Terms promise consumers a shown price includes VAT. */}
+                        <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">{VAT_NOTE}</p>
                       </div>
 
                       <ul className="space-y-2.5 text-sm flex-1 text-slate-600 dark:text-slate-300">
