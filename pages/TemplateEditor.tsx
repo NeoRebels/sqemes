@@ -33,8 +33,9 @@ const stripHtml = (html: string): string => {
 
 /**
  * SQEM-204 — one sentence per kind, at the point where the choice is made.
- * Definitions follow `pm/VISION.md`; each example is a real marketplace listing, so the explanation
- * a reader meets here matches the one they meet while browsing. Keep both in step when editing.
+ * Definitions follow the product's own wording (`pm/VISION.md` in the source repository); each
+ * example is a real marketplace listing, so the explanation a reader meets here matches the one they
+ * meet while browsing. Keep both in step when editing.
  */
 const KIND_HELP: Record<PromptKind, string> = {
   prompt: 'A task you reuse and fill in each time. Example: “Cold Outreach Email” — you supply the customer and the product.',
@@ -590,7 +591,7 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                 {/* SQEM-204 — the product's central decision used to sit here completely unlabelled:
                     no description, no title, no aria anything. Meanwhile the marketplace explains the
                     same three kinds well, by example rather than by definition — the knowledge existed,
-                    just not where the choice is made. Wording checked against pm/VISION.md; the
+                    just not where the choice is made. Wording checked against the product definitions; the
                     examples are real marketplace listings, so what a reader sees here and there agrees.
                     `aria-describedby` points every tab at this line so it is read out too. */}
                 <p id="kind-help" className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">

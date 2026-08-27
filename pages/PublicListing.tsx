@@ -84,9 +84,10 @@ export default function PublicListing() {
             Add this to your workspace, adapt it to your brand, and rate it
           </p>
           {/* The wording is not free: a fresh Cloud workspace fails `needsSubscriptionGate` and lands
-              on the plan chooser. There is no free tier by design (pm/PRICING.md — "free = trial or
-              self-host"), the trial is 14 days, and Stripe asks for a card. Saying "free account"
-              here would be a promise the next screen breaks. */}
+              on the plan chooser. There is no free tier in Cloud by design — free means the trial or
+              self-hosting, nothing else — the trial is 14 days, and Stripe asks for a card. Saying
+              "free account" here would be a promise the next screen breaks. (Self-host has no billing
+              at all, so this gate never fires there.) */}
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
             Start a <span className="font-semibold text-slate-600 dark:text-slate-300">free 14-day trial</span> — a card is required, and you can cancel any time.
             Prefer to keep it free forever? <a href="https://github.com/NeoRebels/sqemes" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-brand-600">Self-host Sqemes</a> — this marketplace is readable from your own instance.

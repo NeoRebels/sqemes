@@ -13,8 +13,9 @@ const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') ?? '';
  * still exists is recoverable, a subscription that keeps billing for a deleted one is not.
  *
  * `resource_missing` is treated as already cancelled: Stripe has nothing to cancel, so there is
- * nothing to block on. ⚠️ A `STRIPE_SECRET_KEY` from the *wrong account* produces the same answer —
- * see the check recorded in `pm/PRODUCTION_PROMOTION.md`.
+ * nothing to block on. ⚠️ A `STRIPE_SECRET_KEY` from the *wrong account* produces the same answer,
+ * and looks exactly like success — so a key swap must be verified against a subscription known to
+ * exist, not against a deletion appearing to work.
  *
  * No subscription at all (self-host, never subscribed) skips Stripe entirely.
  */

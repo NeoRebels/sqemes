@@ -1,19 +1,22 @@
 Sqemes
 Copyright 2026 NeoRebels GmbH
 
-This product is licensed under the GNU Affero General Public License, version 3
-(see LICENSE).
+This product is licensed under the Sustainable Use License (see LICENSE).
+Sqemes is fair-code, not open source; LICENSING.md explains what that permits.
 
 --------------------------------------------------------------------------------
 
 LICENSE HISTORY
 
 Sqemes was published under the Apache License 2.0 up to and including version
-1.9.5. From version 1.10.0 onward it is licensed under AGPL-3.0.
+1.9.5, and under AGPL-3.0 for versions 1.10.0 through 1.10.12. From version
+1.11.0 onward it is licensed under the Sustainable Use License.
 
-That change is not retroactive and cannot be: the Apache-2.0 grant is perpetual
-and irrevocable, so every release up to 1.9.5 remains available under Apache-2.0
-to anyone who has it, permanently. Only 1.10.0 and later carry the AGPL.
+No change is retroactive and none could be: those grants are perpetual and
+irrevocable. Every release up to 1.9.5 remains available under Apache-2.0, and
+1.10.0 through 1.10.12 under AGPL-3.0, to anyone who has them, permanently.
+Only 1.11.0 and later carry the Sustainable Use License. Those older releases
+have not been removed and will not be.
 
 --------------------------------------------------------------------------------
 

@@ -1,9 +1,10 @@
 # Third-Party Notices
 
-Generated 2026-08-26 from the production dependency tree. **Do not edit by hand** — it is rebuilt
+Generated 2026-08-27 from the production dependency tree. **Do not edit by hand** — it is rebuilt
 by `scripts/build-public-export.sh` on every release, which is what keeps it from going stale.
 
-Sqemes itself is licensed under AGPL-3.0 from v1.10.0 (Apache-2.0 up to and including v1.9.5).
+Sqemes itself is licensed under the Sustainable Use License from v1.11.0 (AGPL-3.0 for v1.10.0 to
+v1.10.12; Apache-2.0 up to and including v1.9.5). See LICENSING.md for what that permits.
 The components below keep their own licences, and those licences are unaffected by ours.
 
 ## Summary

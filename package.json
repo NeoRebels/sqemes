@@ -1,8 +1,8 @@
 {
   "name": "sqemes",
   "private": true,
-  "version": "1.10.12",
-  "license": "AGPL-3.0-only",
+  "version": "1.11.0",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -8,8 +8,8 @@
 #   come from Rafter's own remote analysis and are not configurable from here.
 #
 # So: paths below are excluded because a *secret-shaped string* in them is provably not a secret.
-# Everything else stays visible, and the standing verdicts live in AGENTS.md so nobody
-# re-investigates them every quarter.
+# Everything else stays visible. The standing verdicts live in AGENTS.md in the source repository,
+# so nobody re-investigates them every quarter.
 #
 # ⚠️ Excluding a path is blunt. If a real credential is ever added to one of these files, Rafter
 # will not tell us. Both entries below are files whose entire purpose is to hold placeholders — do

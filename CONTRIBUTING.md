@@ -93,7 +93,7 @@ npm run build    # production build must succeed
   afterwards. The reason it exists is worth a sentence: Sqemes Cloud runs from this same codebase, so
   we need your permission to ship your work there too — and we would rather ask than assume. You keep
   your copyright; it is a licence, not an assignment. Contributions are licensed under
-  **AGPL-3.0**, as is the rest of this repository from v1.10.0 onward.
+  the **Sustainable Use License**, as is the rest of this repository from v1.11.0 onward.
 - Rather not sign? That is a legitimate position — **open an issue instead.** A well-described
   problem is worth as much as a patch and raises no licensing question at all.
 - Remember the flow above: we will not press "Merge" on your PR — we port it upstream and tell you

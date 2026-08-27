@@ -1,9 +1,9 @@
 # Supabase Auth email templates (SQEM-097)
 
 Branded HTML for the Supabase **Authentication → Emails** templates. These are **dashboard
-config, not deployed by code** (see `pm/PRODUCTION_PROMOTION.md` + the
-`email-template-manual-prod-step` memory) — paste each into the matching template in the
-Supabase dashboard, for **both** the prod and staging projects.
+config, not deployed by code** — no migration or deploy carries them, so paste each into the
+matching template in the Supabase dashboard, once per project. A fresh or duplicated project
+silently falls back to Supabase's defaults, and nothing announces it.
 
 Design matches the in-code template (`supabase/functions/_shared/emailTemplate.ts`) used for
 the Resend invite email — same logo, card, button, footer.

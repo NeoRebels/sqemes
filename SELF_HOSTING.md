@@ -1,21 +1,28 @@
 # Self-Hosting Sqemes
 
 Sqemes is **open core**: the AI management platform, MCP server, and Chrome
-extension are open source (**AGPL-3.0** from v1.10.0; Apache-2.0 up to and including v1.9.5) and run
+extension are fair-code (**Sustainable Use License** from v1.11.0; AGPL-3.0 for v1.10.0–v1.10.12;
+Apache-2.0 up to and including v1.9.5 — see [LICENSING.md](./LICENSING.md)) and run
 on your own infrastructure with your own AI provider keys (BYOK). A few pieces are **Sqemes Cloud
 only** and simply stay off when their secret is absent — nothing breaks.
 
-> **What the AGPL means for you as a self-hoster.** Two cases, and the only thing that separates them
-> is **who operates the instance**:
+> **What the licence means for you as a self-hoster.** One line: **you may run Sqemes for yourself,
+> not for someone else.** The test is **who the users are** — not who owns the server, and not whose
+> hands are on the keyboard:
 >
 > - **You run it for your own organisation** — your team, your company, including the client work you
 >   deliver from it. This asks nothing of you, commercially or not.
-> - **You operate an instance that other people's users work in** — hosting it for a client, or
->   offering it as a service. The AGPL's network clause applies: those users are entitled to the
->   source of what you run, your modifications included.
+> - **You are an IT provider administering your client's own instance**, on their infrastructure, in
+>   their name. Also fine — it is their instance; you are their administrator.
+> - **You operate an instance that other people's users sign in to** — hosting it for a client, or
+>   offering it as a service. **That one needs Cloud**, not a self-host licence: there is no paid
+>   self-hosting licence, deliberately.
 >
-> **If you are an agency and the second case is what you have in mind, talk to us first.** There is
-> usually a simpler arrangement than publishing your changes, and it is a short conversation.
+> The second and third points can look identical from outside. The difference is **whose instance it
+> is.** [LICENSING.md](./LICENSING.md) spells out the cases.
+>
+> **If you place Sqemes with clients, talk to us** — the client takes a Cloud contract and you earn
+> on it. Short conversation, and the early partner terms are better than the market.
 
 > This guide ships with the public repo — it is what self-hosters read. It documents how a
 > self-host instance is assembled and where the Cloud/open boundary sits.
@@ -24,7 +31,7 @@ only** and simply stay off when their secret is absent — nothing breaks.
 
 ## What runs self-host vs. what's Cloud-only
 
-| ✅ Open source (self-host) | ☁️ Sqemes Cloud only |
+| ✅ Fair-code (self-host) | ☁️ Sqemes Cloud only |
 |---|---|
 | Core data model, prompt/assistant/skill management | Managed hosting & infrastructure |
 | MCP server + OAuth (Claude Desktop / claude.ai) | Billing & subscriptions (Stripe) |
@@ -569,14 +576,16 @@ be a guess dressed as a fact.
 ## License
 
 **GNU Affero General Public License v3** from **v1.10.0** onward — see [`LICENSE`](LICENSE).
-Everything up to and including **v1.9.5 remains Apache-2.0**, permanently: that grant is irrevocable,
-so a change can only apply going forward. Those releases are still published and are not being
-removed.
+Every earlier grant stands, permanently — **Apache-2.0 up to and including v1.9.5, AGPL-3.0 for
+v1.10.0 through v1.10.12.** Those grants are irrevocable, so a change can only apply going forward,
+and the releases are still published and are not being removed. Running an old version, you keep the
+licence it shipped with.
 
 **What it asks of you, concretely.** Running an instance — for your team, your company, your client
-work, commercially or not — triggers nothing. The AGPL's network clause applies when you **offer this
-software to third parties as a service**; then those users are entitled to the source of what you
-run, your modifications included. That is the one case it was chosen for.
+work, commercially or not — triggers nothing. What the licence reserves is **providing the software
+to third parties**: operating an instance that somebody else's users sign in to, offering it as a
+service, white-labelling or reselling it. For that there is no self-host licence at any price; the
+answer is a Cloud contract for the customer. That is the one case it was chosen for.
 
 The open-core boundary above is unaffected: the proprietary Cloud pieces are separately gated and not
 required to run a self-hosted instance. Bundled third-party components — the Supabase stack under

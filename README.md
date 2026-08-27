@@ -99,28 +99,42 @@ survives.
 
 ## License
 
-**[GNU Affero General Public License v3](./LICENSE)** — from **v1.10.0** onward.
+**[Sustainable Use License](./LICENSE)** — from **v1.11.0** onward. Sqemes is **fair-code, not open
+source**: the source is public and yours to read, run and change, with one reservation.
 
 ```
-up to and including v1.9.5    Apache-2.0    permanently
-from v1.10.0                  AGPL-3.0
+up to and including v1.9.5    Apache-2.0              permanently
+v1.10.0 through v1.10.12      AGPL-3.0                permanently
+from v1.11.0                  Sustainable Use License
 ```
 
-**Self-hosting is unaffected — and the boundary is who operates the instance.**
+**You may run Sqemes for yourself. You may not run it for someone else.**
+
+The test is **who the users are** — not who owns the server, and not whose hands are on the keyboard:
 
 - **Running it for your own organisation** asks nothing of you: your team, your company, and the
-  client work you deliver from it.
-- **Operating an instance that other people's users work in** — hosting it for a client, or offering
-  it as a service — triggers the AGPL's network clause: those users are entitled to the source of
-  what you run, your changes included.
+  client work you deliver from it. Commercially or not.
+- **Administering your client's own instance**, on their infrastructure, in their name, is fine too.
+  It is their instance; you are their administrator.
+- **Operating an instance that other people's users sign in to** — hosting it for a client, offering
+  it as a service, white-labelling or reselling it — is the case the licence reserves.
 
-That is the whole difference, and it is deliberate: it is what keeps someone from taking this
-codebase closed and selling it back. **Agencies planning the second case: talk to us first** — there
-is usually a simpler arrangement than publishing your changes.
+Those last two can look identical from outside. The difference is **whose instance it is.**
+**[LICENSING.md](./LICENSING.md) spells out the cases**, including the ones that sit near the line.
 
-**The change is not retroactive**, and could not be — the Apache-2.0 grant is perpetual and
-irrevocable, so every release up to v1.9.5 stays available under Apache-2.0 to anyone who has it.
-Those releases have not been removed and will not be.
+**There is deliberately no paid self-hosting licence.** If somebody else's users need Sqemes, the
+answer is a Cloud contract for them — we would rather run it ourselves and be accountable for it than
+sell permission to run instances we cannot see, support or secure. **If you place Sqemes with clients,
+talk to us:** the client takes Cloud and you earn on it, and the early partner terms are better than
+the market.
+
+**No change is retroactive**, and none could be — those grants are perpetual and irrevocable. Every
+release up to v1.9.5 stays Apache-2.0 and v1.10.0 through v1.10.12 stay AGPL-3.0, for anyone who has
+them. Those releases have not been removed and will not be.
+
+**Why the word "fair-code" and not "open source".** Open source has a definition; this licence does
+not meet it. Saying otherwise would be a small lie, and the people most likely to notice are exactly
+the ones we would be lying to.
 
 Bundled and depended-upon third-party components keep their own licenses, unaffected — the
 self-hosted Supabase stack under `selfhost/` among them. See [NOTICE](./NOTICE).

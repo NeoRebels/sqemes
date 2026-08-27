@@ -78,7 +78,7 @@ const concerning = sorted.filter(([licence]) =>
 
 console.log();
 if (concerning.length === 0) {
-  console.log('✓ No copyleft or unknown licence. The way back to a permissive licence stays open.');
+  console.log('✓ No copyleft or unknown licence. Nothing here blocks distribution under our licence.');
   process.exit(0);
 }
 
@@ -90,7 +90,13 @@ console.log(`
 An UNKNOWN licence is not automatically a problem; it usually means the package omits the field.
 Look it up before concluding anything.
 
-A genuine GPL/AGPL/SSPL dependency means: we may ship it (we are AGPL), but we can never return to a
-permissive licence while it is in the tree. That is a product decision, not a build failure — take it
-deliberately and write down why. See AGENTS.md → Dependency licences.`);
+A genuine GPL/AGPL/SSPL dependency cannot ship. Sqemes is under the Sustainable Use License, which is
+not GPL-compatible: distributing the combined work would require licensing the whole thing under the
+GPL. This is an incompatibility, not a cost to weigh — find another package, or the feature does not
+happen.
+
+If you believe this one is a false positive, say why in the pull request that introduces it, so the
+reasoning outlives the decision.
+
+Maintainers: AGENTS.md → Dependency licences, in the source repository.`);
 process.exit(1);

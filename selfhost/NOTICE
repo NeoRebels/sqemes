@@ -4,10 +4,12 @@ Sqemes self-host bundle
 This directory bundles Sqemes with configuration vendored from the Supabase
 self-hosting Docker setup.
 
-Sqemes is licensed under AGPL-3.0 from v1.10.0; releases up to and including
-v1.9.5 remain under Apache-2.0, permanently. (This paragraph said "Apache-2.0"
-until 2026-08-25 — it predated the licence change in SQEM-222 and was corrected
-when the distribution evidence was assembled.)
+Sqemes is licensed under the Sustainable Use License from v1.11.0; v1.10.0
+through v1.10.12 remain under AGPL-3.0 and releases up to and including v1.9.5
+remain under Apache-2.0, both permanently. (This paragraph has now been wrong
+twice: it said "Apache-2.0" until 2026-08-25, and "AGPL-3.0" until 2026-08-27.
+A licence line in a NOTICE file is not decoration — check it at every licence
+change, in every NOTICE, and see LICENSING.md for the current terms.)
 
 Vendored from supabase/supabase (https://github.com/supabase/supabase), directory
 `docker/`, licensed under the Apache License 2.0:
@@ -24,7 +26,9 @@ Apache-2.0 license; see https://github.com/supabase/supabase/blob/master/LICENSE
 
 Sqemes-authored files in this directory (docker-compose.sqemes.yml, Dockerfile.app,
 nginx.conf, init/apply.sh, .env.example additions, README.md) are part of Sqemes and
-licensed under Apache-2.0 (see ../LICENSE).
+carry the Sqemes licence (see ../LICENSE). This line said "Apache-2.0" until
+2026-08-27 — it was missed when the paragraph above was corrected on 2026-08-25,
+which is exactly why it now names no licence twice over.
 
 --------------------------------------------------------------------------------
 

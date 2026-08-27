@@ -36,9 +36,9 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        // SQEM-273 — `.trim()`, and it is not defensive noise. This repo has three documented cases
-        // of a pasted env value carrying trailing whitespace and breaking something
-        // (`pm/PRODUCTION_PROMOTION.md`): a newline in `VITE_SUPABASE_ANON_KEY`, a space in
+        // SQEM-273 — `.trim()`, and it is not defensive noise. This project has three recorded cases
+        // of a pasted env value carrying trailing whitespace and breaking something:
+        // a newline in `VITE_SUPABASE_ANON_KEY`, a space in
         // `PUBLIC_API_URL`. Both were fixed by trimming — and the URLs in this very file are trimmed
         // while the credentials were not. A secret with a trailing newline is rejected as
         // `invalid_client`, which reads exactly like an expired secret and is invisible in the

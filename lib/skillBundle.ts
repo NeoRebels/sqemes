@@ -15,7 +15,10 @@
 // Two formats for the *same* job would be exactly the failure this ticket exists to prevent.
 //
 // **Sqemes still does not execute anything.** A `scripts/*.py` in here is carried and handed back;
-// Claude Code runs it. That division is a guardrail in `pm/VISION.md`, not an oversight.
+// Claude Code runs it. That division is deliberate and load-bearing: the moment Sqemes runs a
+// contributed script, it inherits every sandboxing and supply-chain problem that comes with it, and
+// a marketplace of shared skills turns that into someone else's code on our machines. Storing and
+// handing back has no such edge. Do not "finish" this by adding execution.
 import JSZip from 'jszip';
 
 export const SKILL_ENTRY = 'SKILL.md';

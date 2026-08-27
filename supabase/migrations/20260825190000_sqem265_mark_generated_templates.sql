@@ -2,8 +2,8 @@
 -- SQEM-265 — mark a template that an AI wrote, not a person
 -- ============================================================
 --
--- The gap named in `pm/DOCUMENTATION.md` → *Regulatory — EU AI Act Article 50*, and left open there
--- rather than buried: **the setup wizard generates whole templates and stores them with no marker
+-- The gap left open — deliberately named rather than buried — when the EU AI Act Article 50
+-- classification was written up (`pm/DOCUMENTATION.md` → Regulatory, in the source repository): **the setup wizard generates whole templates and stores them with no marker
 -- at all.** A generated template lands in `prompts` indistinguishable from one somebody typed, while
 -- Article 50(2) asks providers of systems generating synthetic text to mark the output
 -- machine-readably. No exemption was claimed for it in the classification table, so this was a real
