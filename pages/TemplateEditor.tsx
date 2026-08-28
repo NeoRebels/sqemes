@@ -6,7 +6,7 @@ import { IS_SELF_HOSTED } from '../lib/env';
 import { Prompt, Variable, VariableType, PromptKind, WorkspaceFile, TemplateCategory, LibraryTemplate, Step, UserRole } from '../types';
 import { fetchPromptDetail } from '../lib/api/prompts';
 import { fetchLibraryTemplateDetail } from '../lib/api/library';
-import { AVAILABLE_MODELS, TEMPLATE_CATEGORIES } from '../constants';
+import { AVAILABLE_MODELS, TEMPLATE_CATEGORIES, KIND_HELP } from '../constants';
 import { runAuthoringAI } from '../lib/authoringAI';
 import { Save, Plus, Trash2, Settings, Edit, ChevronDown, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Bot, Wand2, FlaskConical, UserRound } from 'lucide-react';
 import Modal from '../components/ui/Modal';
@@ -31,17 +31,6 @@ const stripHtml = (html: string): string => {
   return tmp.textContent || tmp.innerText || '';
 };
 
-/**
- * SQEM-204 — one sentence per kind, at the point where the choice is made.
- * Definitions follow the product's own wording (`pm/VISION.md` in the source repository); each
- * example is a real marketplace listing, so the explanation a reader meets here matches the one they
- * meet while browsing. Keep both in step when editing.
- */
-const KIND_HELP: Record<PromptKind, string> = {
-  prompt: 'A task you reuse and fill in each time. Example: “Cold Outreach Email” — you supply the customer and the product.',
-  assistant: 'A persona to work with, with its own instructions and context files. Example: “Editor-in-Chief” — sharpens clarity, flow and structure.',
-  skill: 'A piece of your company’s knowledge that AI applies whenever it fits — no filling in. Example: “AIDA Copywriting Framework”, or your brand voice.',
-};
 
 const TemplateEditor = () => {
   const { id } = useParams();

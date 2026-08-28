@@ -14,6 +14,26 @@ export const PLAN_AI_CREDITS: Record<PlanTier, number> = {
   Business: 100000,
 };
 
+// SQEM-204/287 — one sentence per template kind, and it lives here so there is exactly one of them.
+//
+// Written for the point where somebody chooses, so it avoids the words that need explaining
+// themselves: no "system instruction", no "variables", no "context injection". Each example is a
+// real marketplace listing, so the explanation someone meets here matches the one they meet while
+// browsing.
+//
+// ⚠️ **Used in two places on purpose, and that is the whole reason it moved.** It began inside
+// `TemplateEditor` — which is *after* the decision. The empty state on the Templates page names the
+// same three words bare, and that is the first screen every new user sees, because a library is
+// necessarily empty on day one. Two copies of this text would drift; one copy cannot.
+//
+// The confusion is measured, not hypothetical: a customer had **assistant and skill the wrong way
+// round** after using the product.
+export const KIND_HELP: Record<'prompt' | 'assistant' | 'skill', string> = {
+  prompt: 'A task you reuse and fill in each time. Example: \u201cCold Outreach Email\u201d \u2014 you supply the customer and the product.',
+  assistant: 'A persona to work with, with its own instructions and context files. Example: \u201cEditor-in-Chief\u201d \u2014 sharpens clarity, flow and structure.',
+  skill: 'A piece of your company\u2019s knowledge that AI applies whenever it fits \u2014 no filling in. Example: \u201cAIDA Copywriting Framework\u201d, or your brand voice.',
+};
+
 // SQEM-283 — the tax line that has to sit beside every price we show.
 //
 // Stripe's prices are `automatic` tax behaviour: **inclusive in the euro/EU case**, exclusive for USD

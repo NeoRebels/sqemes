@@ -8,7 +8,7 @@ import { exportTemplatesToZip, downloadBlob, readBundle, importBundle, type Bund
 import { importErrorMessage, readSkillZip, toSlug, type SkillBundle } from '../lib/skillBundle';
 import { exportSkillToZip, importSkillBundle } from '../lib/skillBundleIo';
 import { publishToMarketplace, submitToMarketplaceViaProxy, fetchCanPublish } from '../lib/api/library';
-import { TEMPLATE_CATEGORIES } from '../constants';
+import { TEMPLATE_CATEGORIES, KIND_HELP } from '../constants';
 import type JSZip from 'jszip';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Search, Plus, Play, Edit, Trash2, Copy, Star, Bot, PenTool, Wand2, Loader2, Store, Lock, Upload, Package, FolderDown } from 'lucide-react';
@@ -515,12 +515,28 @@ const Templates = () => {
         </div>
       )}
 
+      {/* SQEM-287 — this used to read "Create your first prompt, assistant, or skill": it names the
+          three kinds and explains none. It is the first screen every new user sees, because a
+          library is necessarily empty on day one — the worst possible place to assume the words are
+          self-evident. A customer had assistant and skill the wrong way round after using the
+          product, which is how we know they are not. Text comes from KIND_HELP so this screen and
+          the editor cannot drift apart. */}
       {!isLoading && prompts.length === 0 && (
         <EmptyState
           icon={<Plus className="w-8 h-8 text-brand-400" />}
           iconWrapClassName="bg-brand-50 dark:bg-brand-900/20"
           title="No templates yet"
-          description="Create your first prompt, assistant, or skill."
+          description="Three kinds, depending on what you need:"
+          extra={
+            <dl className="mt-4 space-y-2 text-left max-w-md mx-auto">
+              {(['prompt', 'assistant', 'skill'] as const).map(k => (
+                <div key={k} className="flex gap-2.5">
+                  <dt className="text-xs font-bold text-slate-700 dark:text-slate-200 w-[4.5rem] shrink-0 capitalize pt-px">{k}</dt>
+                  <dd className="text-xs text-slate-500 dark:text-slate-400">{KIND_HELP[k]}</dd>
+                </div>
+              ))}
+            </dl>
+          }
           action={canEdit ? (
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link to="/prompts/new" className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-brand-200 dark:shadow-none">

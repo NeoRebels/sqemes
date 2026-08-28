@@ -394,7 +394,9 @@ const Chat = () => {
         setSessionId(routeSessionId);
         setMobileTab('chat');
       } catch {
-        showToast('Could not load chat session', 'error');
+        // SQEM-287 — a dead end otherwise: the conversation list is right there, and starting a
+        // new chat loses nothing, but neither is obvious while staring at a failure.
+        showToast('Could not load this conversation. Pick another from the list, or start a new one.', 'error');
       }
     })();
   }, [routeSessionId, showToast]);
@@ -555,7 +557,7 @@ const Chat = () => {
         });
         setAttachments(prev => [...prev, { id: crypto.randomUUID(), file: new File([], f.name, { type: f.mimeType }), dataUrl, mimeType: f.mimeType }]);
       } catch {
-        showToast(`Could not attach ${f.name}`, 'error');
+        showToast(`Could not attach ${f.name} — try again, or drag the file in directly.`, 'error');
       }
     }
   };

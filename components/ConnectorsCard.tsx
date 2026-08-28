@@ -116,7 +116,11 @@ export default function ConnectorsCard({
       const reason = searchParams.get('reason');
       const code = searchParams.get('code');
       showToast(
-        `Connection failed${reason ? `: ${reason}` : ''}${code ? ` (${code})` : ''}`,
+        // SQEM-287 — the codes above name the stage and the provider's answer, which is what a
+        // maintainer needs. The person reading this is often not that maintainer, so the sentence
+        // after them says what *they* can do. Reconnecting genuinely fixes the common cases
+        // (expired consent, a revoked grant); where it does not, the code is there to pass on.
+        `Connection failed${reason ? `: ${reason}` : ''}${code ? ` (${code})` : ''}. Try connecting again — if it keeps failing, send us this message.`,
         'error',
       );
     }

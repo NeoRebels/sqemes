@@ -10,12 +10,17 @@ export default function EmptyState({
   iconWrapClassName = 'bg-slate-50 dark:bg-slate-700',
   title,
   description,
+  extra,
   action,
 }: {
   icon: React.ReactNode;
   iconWrapClassName?: string;
   title: string;
   description: string;
+  /** SQEM-287 — optional block between the subtext and the action. Added for the Templates page,
+   *  where "no templates yet" is the first screen a new user sees and the three kinds need a line
+   *  each. Optional so every other empty state stays exactly as it was. */
+  extra?: React.ReactNode;
   action?: React.ReactNode;
 }) {
   return (
@@ -24,8 +29,9 @@ export default function EmptyState({
         {icon}
       </div>
       <h3 className="text-slate-900 dark:text-slate-100 font-bold text-lg">{title}</h3>
-      <p className={`text-slate-400 dark:text-slate-500 text-sm mt-1 ${action ? 'mb-5' : ''}`}>{description}</p>
-      {action}
+      <p className={`text-slate-400 dark:text-slate-500 text-sm mt-1 ${action && !extra ? 'mb-5' : ''}`}>{description}</p>
+      {extra}
+      {action && <div className={extra ? 'mt-5' : ''}>{action}</div>}
     </div>
   );
 }

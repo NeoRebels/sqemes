@@ -332,7 +332,20 @@ const Dashboard = () => {
                   </Link>
                   <Link to="/settings" state={{ initialTab: 'api' }} className="group flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0"><McpIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" /></div>
-                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex-1">MCP server</span>
+                    {/* SQEM-286 — the only row here that needs a second line, and the only one that
+                        gets one. "Provider keys" and "Browser extension" explain themselves; "MCP
+                        server" is an acronym the product never expands anywhere a person can see
+                        (the words "Model Context Protocol" appear once, in a code comment). Someone
+                        who does not know it can guess, look it up, or ignore it — and this is one of
+                        the three channels the product is used through, so being ignored is expensive.
+                        The wording mirrors Settings, where the examples already do the explaining;
+                        two different explanations of the same thing would drift. Symmetry is the
+                        wrong goal here: padding the other two rows so all three match would add
+                        noise where nothing is unclear. */}
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold text-slate-800 dark:text-slate-200">MCP server</span>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">Use your templates in Claude Desktop, Cursor and other AI tools</span>
+                    </span>
                     {/* SQEM-226 — null while the count is still loading: no state is better than
                         telling a connected user to set it up. Expired keys do not count as active. */}
                     {mcpKeysActive === null

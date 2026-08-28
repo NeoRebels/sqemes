@@ -277,7 +277,9 @@ const Settings = () => {
     setDeletingKeyId(id);
     const { error } = await supabase.from('sqemes_api_keys').delete().eq('id', id);
     if (error) {
-      showToast('Failed to delete key', 'error');
+      // SQEM-287 — the key is still there, and that is the part worth saying: somebody who wanted
+      // it gone needs to know it is not.
+      showToast('Could not delete the key — it is still active. Try again.', 'error');
     } else {
       setSqemesApiKeys(prev => prev.filter(k => k.id !== id));
     }
@@ -1340,10 +1342,15 @@ const Settings = () => {
                   <div>
                     <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                       <Key className="w-5 h-5 text-brand-500" />
-                      LLM API Configuration
+                      {/* SQEM-287 — was "LLM API Configuration". Two problems in three words: "LLM"
+                          is never explained anywhere in the product, and this was the *third* name
+                          for one thing — the Dashboard says "Provider keys", the setup wizard says
+                          "AI provider key". Somebody sent here by the wizard arrived at a heading
+                          that did not match what sent them. One name now, and it is the plain one. */}
+                      AI provider keys
                     </h2>
                     <p className="text-sm text-slate-500 mt-1">
-                      Manage API keys for various providers. Keys are stored securely server-side.
+                      Your own keys for OpenAI, Anthropic, Google and others. Stored encrypted, used only for your requests.
                     </p>
                   </div>
                   <Button onClick={handleSaveKeys} className="px-5 py-2 shadow-lg shadow-brand-200">
