@@ -524,6 +524,51 @@ export type Database = {
         };
         Relationships: [];
       };
+      // SQEM-292 — access groups. Hand-written rather than regenerated: the generator needs a live
+      // database, and leaving them out is how `legal_acceptances` ended up with five permanent tsc
+      // errors nobody could act on.
+      workspace_groups: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          name: string;
+          created_at: string;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          name: string;
+          created_at?: string;
+          created_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          name?: string;
+          created_at?: string;
+          created_by?: string | null;
+        };
+        Relationships: [];
+      };
+      workspace_group_members: {
+        Row: {
+          group_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          group_id: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          group_id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

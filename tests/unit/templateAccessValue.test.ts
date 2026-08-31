@@ -25,16 +25,16 @@ const TEAM: User[] = [
 
 describe('accessToValue', () => {
   it('reads no rows as open to everyone', () => {
-    expect(accessToValue([], [], false, TEAM)).toEqual({ mode: 'everyone', userIds: [] });
+    expect(accessToValue([], [], false, TEAM)).toEqual({ mode: 'everyone', userIds: [], groupIds: [] });
   });
 
   it('reads a row that names nobody as private — the opposite of no rows', () => {
-    expect(accessToValue([], [], true, TEAM)).toEqual({ mode: 'private', userIds: [] });
+    expect(accessToValue([], [], true, TEAM)).toEqual({ mode: 'private', userIds: [], groupIds: [] });
   });
 
   it('reads named people as restricted', () => {
     expect(accessToValue([], ['member-1'], true, TEAM)).toEqual({
-      mode: 'restricted', userIds: ['member-1'],
+      mode: 'restricted', userIds: ['member-1'], groupIds: [],
     });
   });
 
@@ -42,7 +42,7 @@ describe('accessToValue', () => {
     // Preserves exactly what the template does today, and makes the switch from a dynamic role
     // grant to a static list visible in the UI instead of hiding it.
     expect(accessToValue(['member'], [], true, TEAM)).toEqual({
-      mode: 'restricted', userIds: ['member-1', 'member-2'],
+      mode: 'restricted', userIds: ['member-1', 'member-2'], groupIds: [],
     });
   });
 
@@ -54,7 +54,7 @@ describe('accessToValue', () => {
 
   it('merges a role row with individual grants without duplicating anyone', () => {
     expect(accessToValue(['member'], ['member-1'], true, TEAM)).toEqual({
-      mode: 'restricted', userIds: ['member-1', 'member-2'],
+      mode: 'restricted', userIds: ['member-1', 'member-2'], groupIds: [],
     });
   });
 
@@ -64,18 +64,18 @@ describe('accessToValue', () => {
   it('reads an editors-only rule as restricted — never as private, never as everyone', () => {
     // Both old answers were wrong in opposite directions: `everyone` would have opened it to
     // members on the next save, `private` claimed a promise that was not being kept.
-    expect(accessToValue(['editor'], [], true, TEAM)).toEqual({ mode: 'restricted', userIds: [] });
+    expect(accessToValue(['editor'], [], true, TEAM)).toEqual({ mode: 'restricted', userIds: [], groupIds: [] });
   });
 
   it('reads a member row that covers nobody as restricted (all members have left)', () => {
     // The rule still exists and still says "members"; the workspace simply has none right now.
     // Calling that "Only me" would promise exclusivity that the next joiner silently breaks.
     expect(accessToValue(['member'], [], true, [user('admin-1', 'admin')]))
-      .toEqual({ mode: 'restricted', userIds: [] });
+      .toEqual({ mode: 'restricted', userIds: [], groupIds: [] });
   });
 
   it('still reads the principal-less row as private — that one really is only me', () => {
-    expect(accessToValue([], [], true, TEAM)).toEqual({ mode: 'private', userIds: [] });
+    expect(accessToValue([], [], true, TEAM)).toEqual({ mode: 'private', userIds: [], groupIds: [] });
   });
 });
 
@@ -98,18 +98,20 @@ describe('unrepresentableRoleGrants', () => {
 
 describe('accessValueToAccess', () => {
   it('writes everyone as no rules', () => {
-    expect(accessValueToAccess({ mode: 'everyone', userIds: ['member-1'] }))
-      .toEqual({ roles: [], userIds: [], hasRules: false });
+    // SQEM-292 — `groupIds` is emptied for the same reason `userIds` is: "everyone" carries no
+    // principals, and a stale selection left in the object would be written as rows.
+    expect(accessValueToAccess({ mode: 'everyone', userIds: ['member-1'], groupIds: ['g-1'] }))
+      .toEqual({ roles: [], userIds: [], groupIds: [], hasRules: false });
   });
 
   it('writes private as a rule with no principals', () => {
-    expect(accessValueToAccess({ mode: 'private', userIds: [] }))
-      .toEqual({ roles: [], userIds: [], hasRules: true });
+    expect(accessValueToAccess({ mode: 'private', userIds: [], groupIds: ['g-1'] }))
+      .toEqual({ roles: [], userIds: [], groupIds: [], hasRules: true });
   });
 
   it('never writes a role row', () => {
     expect(accessValueToAccess({ mode: 'restricted', userIds: ['member-1'] }))
-      .toEqual({ roles: [], userIds: ['member-1'], hasRules: true });
+      .toEqual({ roles: [], userIds: ['member-1'], groupIds: [], hasRules: true });
   });
 
   it('writes restricted-with-nobody the same way as private — one row, one meaning', () => {
@@ -136,7 +138,7 @@ describe('round trip', () => {
   it('survives restricted → write → read, keeping the same people', () => {
     const w = accessValueToAccess({ mode: 'restricted', userIds: ['member-2'] });
     expect(accessToValue(w.roles, w.userIds, w.hasRules, TEAM))
-      .toEqual({ mode: 'restricted', userIds: ['member-2'] });
+      .toEqual({ mode: 'restricted', userIds: ['member-2'], groupIds: [] });
   });
 
   it('makes a resolved legacy row static once saved', () => {
@@ -151,12 +153,14 @@ describe('round trip', () => {
 
 describe('workspace default (two states)', () => {
   it('reads an empty default as everyone', () => {
-    expect(workspaceDefaultToValue([])).toEqual({ mode: 'everyone', userIds: [] });
+    expect(workspaceDefaultToValue([])).toEqual({ mode: 'everyone', userIds: [], groupIds: [] });
   });
 
   it('reads any stored role as "restricted by default" — the array is a marker, not a grantee list', () => {
-    expect(workspaceDefaultToValue(['member'])).toEqual({ mode: 'restricted', userIds: [] });
-    expect(workspaceDefaultToValue(['editor'])).toEqual({ mode: 'restricted', userIds: [] });
+    // SQEM-292 — `private`, not `restricted`: the setting now says what it produces. It always
+    // produced Only me (see seedFromWorkspaceDefault); it just used to be labelled otherwise.
+    expect(workspaceDefaultToValue(['member'])).toEqual({ mode: 'private', userIds: [], groupIds: [] });
+    expect(workspaceDefaultToValue(['editor'])).toEqual({ mode: 'private', userIds: [], groupIds: [] });
   });
 
   it('persists the two states as empty / non-empty', () => {
@@ -165,10 +169,26 @@ describe('workspace default (two states)', () => {
   });
 
   it('seeds a new template as Only me when the workspace restricts by default', () => {
-    expect(seedFromWorkspaceDefault(['member'])).toEqual({ mode: 'private', userIds: [] });
+    expect(seedFromWorkspaceDefault(['member'])).toEqual({ mode: 'private', userIds: [], groupIds: [] });
   });
 
   it('seeds a new template as everyone when the workspace does not', () => {
-    expect(seedFromWorkspaceDefault([])).toEqual({ mode: 'everyone', userIds: [] });
+    expect(seedFromWorkspaceDefault([])).toEqual({ mode: 'everyone', userIds: [], groupIds: [] });
+  });
+});
+
+describe('accessValueToAccess — groups (SQEM-292)', () => {
+  it('carries groups and people together', () => {
+    // Not either/or. A group plus two named exceptions is the ordinary case; forcing a choice would
+    // mean creating a group for every exception.
+    expect(accessValueToAccess({ mode: 'restricted', userIds: ['u-1'], groupIds: ['g-1', 'g-2'] }))
+      .toEqual({ roles: [], userIds: ['u-1'], groupIds: ['g-1', 'g-2'], hasRules: true });
+  });
+
+  it('treats a restriction to groups alone as a rule', () => {
+    // `hasRules` is what separates "everyone" from "restricted to nobody yet" — it must not depend
+    // on which kind of principal was picked.
+    expect(accessValueToAccess({ mode: 'restricted', userIds: [], groupIds: ['g-1'] }))
+      .toEqual({ roles: [], userIds: [], groupIds: ['g-1'], hasRules: true });
   });
 });

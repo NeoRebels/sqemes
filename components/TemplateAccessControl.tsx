@@ -4,24 +4,28 @@
 // SQEM-210/212 — three states, and the difference between two of them is a row, not a list:
 //   everyone    no rows at all
 //   private     one row naming nobody  ("Only me" — the creator, and nobody else at all)
-//   restricted  one row per named principal (plus admins, editors, the creator)
-// The asymmetry is deliberate: "Restrict access" picks a subset of the team and the people who run
-// the workspace come along; "Only me" is a promise to one person and admits no exceptions.
+//   restricted  one row per named principal — a person or a group — plus the creator
 //
-// SQEM-211 — **per template, access is granted to people, not to roles.** The role checkbox is
-// gone; "Restrict access" lists the members and starts with none of them ticked. Admins and editors
-// are not listed at all: `can_access_template` grants them regardless, so a tick would do nothing.
+// SQEM-292 — **admins and editors no longer come along.** "Restrict access" used to mean "these
+// people, and also everyone who runs the workspace", which is not what it said. Both states are now
+// promises: "Only me" to one person, "Restrict access" to a named set. Emergency access is
+// `reassign_orphaned_templates()` — it hands a departing member's templates to the longest-standing
+// admin, which is an event rather than a standing permission.
 //
-// The trade this makes, and the reason the control says so out loud: a role grant is *dynamic*
-// (whoever is a member next month is covered), a list of names is *static*. Restricting a template
-// no longer follows the team as it grows — which fails quietly, so the note under the list is part
-// of the decision, not decoration.
+// SQEM-211 — **per template, access is granted to people, not to roles.** The role checkbox is gone.
+//
+// SQEM-292 — and to **groups**, which is the answer to the trade SQEM-211 had to make. A role grant
+// was *dynamic* (whoever is a member next month is covered); a list of names is *static*, so
+// restricting a template stopped following the team as it grew. A group is static per template and
+// dynamic per person: add somebody to Marketing once, and every template Marketing reaches follows.
+// That is why the group tab comes first — it is the option that keeps working.
 import { useMemo, useState } from 'react';
 import type { UserRole, User } from '../types';
 import { Users, Lock, Search, UserRound, AlertTriangle } from 'lucide-react';
+import Checkbox from './ui/Checkbox';
 
 export type TemplateAccessMode = 'everyone' | 'private' | 'restricted';
-export type TemplateAccessValue = { mode: TemplateAccessMode; userIds: string[] };
+export type TemplateAccessValue = { mode: TemplateAccessMode; userIds: string[]; groupIds?: string[] };
 
 /**
  * The workspace default (SQEM-211) is two states, not a set of roles: new templates are open, or
@@ -32,8 +36,23 @@ export type TemplateAccessValue = { mode: TemplateAccessMode; userIds: string[] 
  * simply the non-empty marker. Anything that interprets the roles in this column as grantees is
  * wrong since SQEM-211.
  */
+/**
+ * The workspace default → what the setting shows.
+ *
+ * ⚠️ **`private`, not `restricted`, and that is a correction (SQEM-292).** The setting used to
+ * display "Restrict access" while `seedFromWorkspaceDefault` below created **Only me** — because at
+ * the moment a template is created, nobody has been picked yet. Two names for one behaviour, and the
+ * one on screen was the wrong one.
+ *
+ * It became worse than cosmetic once admins and editors lost automatic access: before, "restricted"
+ * at least still meant *someone* (every admin and editor). Now it would mean nobody at all, while
+ * promising a selection. **A default cannot offer a choice it has no way to collect** — there is no
+ * person or group to pick for templates that do not exist yet.
+ */
 export function workspaceDefaultToValue(roles: UserRole[]): TemplateAccessValue {
-  return roles.length ? { mode: 'restricted', userIds: [] } : { mode: 'everyone', userIds: [] };
+  return roles.length
+    ? { mode: 'private', userIds: [], groupIds: [] }
+    : { mode: 'everyone', userIds: [], groupIds: [] };
 }
 /** The control's value → what to persist as the workspace default. */
 export function valueToWorkspaceDefault(v: TemplateAccessValue): UserRole[] {
@@ -42,12 +61,16 @@ export function valueToWorkspaceDefault(v: TemplateAccessValue): UserRole[] {
 /**
  * The workspace default → the starting value of a *new* template.
  *
- * "Restricted by default" seeds **Only me**, because that is what the template actually is at that
- * moment: nobody else has been picked yet. Seeding a role row instead — which is what happened
- * before SQEM-211 — planted a state the editor could no longer show or write.
+ * Seeds **Only me**, because that is what the template actually is at that moment: nobody else has
+ * been picked yet. Seeding a role row instead — which is what happened before SQEM-211 — planted a
+ * state the editor could no longer show or write.
+ *
+ * Since SQEM-292 the setting above says the same word, so the two finally agree.
  */
 export function seedFromWorkspaceDefault(roles: UserRole[]): TemplateAccessValue {
-  return roles.length ? { mode: 'private', userIds: [] } : { mode: 'everyone', userIds: [] };
+  return roles.length
+    ? { mode: 'private', userIds: [], groupIds: [] }
+    : { mode: 'everyone', userIds: [], groupIds: [] };
 }
 
 /**
@@ -78,15 +101,18 @@ export function accessToValue(
   userIds: string[],
   hasRules: boolean,
   members: User[] = [],
+  groupIds: string[] = [],
 ): TemplateAccessValue {
-  if (!hasRules) return { mode: 'everyone', userIds: [] };
+  if (!hasRules) return { mode: 'everyone', userIds: [], groupIds: [] };
   const fromRole = roles.includes('member') ? members.filter(m => m.role === 'member').map(m => m.id) : [];
   const people = Array.from(new Set([...userIds, ...fromRole]));
-  if (people.length) return { mode: 'restricted', userIds: people };
+  if (people.length || groupIds.length) return { mode: 'restricted', userIds: people, groupIds };
   // Rows exist but name nobody this control can list. Only the principal-less row (no roles, no
-  // users) actually means "only me"; anything else is a rule we cannot express, and calling that
-  // "Only me" is the lie SQEM-238 fixes.
-  return roles.length ? { mode: 'restricted', userIds: [] } : { mode: 'private', userIds: [] };
+  // users, no groups) actually means "only me"; anything else is a rule we cannot express, and
+  // calling that "Only me" is the lie SQEM-238 fixes.
+  return roles.length
+    ? { mode: 'restricted', userIds: [], groupIds: [] }
+    : { mode: 'private', userIds: [], groupIds: [] };
 }
 
 /**
@@ -109,10 +135,12 @@ export function unrepresentableRoleGrants(roles: UserRole[]): UserRole[] {
  * whole point of SQEM-211. "Restricted" with nobody ticked is the same thing as "Only me" and
  * writes the same principal-less row; the control does not need to prevent it.
  */
-export function accessValueToAccess(v: TemplateAccessValue): { roles: UserRole[]; userIds: string[]; hasRules: boolean } {
-  if (v.mode === 'everyone') return { roles: [], userIds: [], hasRules: false };
-  if (v.mode === 'private') return { roles: [], userIds: [], hasRules: true };
-  return { roles: [], userIds: v.userIds, hasRules: true };
+export function accessValueToAccess(
+  v: TemplateAccessValue,
+): { roles: UserRole[]; userIds: string[]; groupIds: string[]; hasRules: boolean } {
+  if (v.mode === 'everyone') return { roles: [], userIds: [], groupIds: [], hasRules: false };
+  if (v.mode === 'private') return { roles: [], userIds: [], groupIds: [], hasRules: true };
+  return { roles: [], userIds: v.userIds, groupIds: v.groupIds ?? [], hasRules: true };
 }
 
 export function TemplateAccessControl({
@@ -121,6 +149,8 @@ export function TemplateAccessControl({
   label = 'Access',
   hint = 'Who can see & use this template',
   members,
+  groups,
+  onCreateGroup,
   allowPrivate = false,
   legacyRoles = [],
   privateDisabledReason,
@@ -132,6 +162,12 @@ export function TemplateAccessControl({
   /** The people who can be granted access. Provided by the template editor; omitted for the
    *  workspace default, which only decides *whether* new templates start restricted. */
   members?: User[];
+  /** SQEM-292 — the workspace's access groups. Omitted for the workspace default, which cannot
+   *  collect a selection for templates that do not exist yet. */
+  groups?: { id: string; name: string; memberIds: string[] }[];
+  /** Opens group management. Only passed when the viewer may create groups (admins) — an editor
+   *  gets the tab and the picker, but no dead "create" button that RLS would reject. */
+  onCreateGroup?: () => void;
   /** SQEM-210 — offer "Only me". Per template only: as a workspace *default* it would mean every
    *  new template starts invisible to the team, which is not a default anyone wants. */
   allowPrivate?: boolean;
@@ -165,14 +201,31 @@ export function TemplateAccessControl({
         : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'
     }`;
 
-  // SQEM-211 — admins AND editors are out: `can_access_template` grants both regardless, so a tick
-  // beside their name would change nothing while implying it did. What remains is the set of people
-  // a restriction can actually distinguish between.
-  const grantableMembers = useMemo(() => (members ?? []).filter(m => m.role === 'member'), [members]);
+  // ⚠️ SQEM-292 — **admins and editors are back in this list, and leaving them out would now be a
+  // bug.** SQEM-211 filtered them away with a sound reason at the time: `can_access_template()`
+  // granted them regardless, so a tick beside their name changed nothing while implying it did. That
+  // reason is gone — they have no automatic access any more, so omitting them would make it
+  // impossible to grant an admin access to a restricted template at all.
+  const grantableMembers = useMemo(() => members ?? [], [members]);
+  // SQEM-292 — groups first: it is the option that keeps working as the team changes, and the one a
+  // workspace should reach for by default. People stays one click away for the genuine exceptions.
+  const [tab, setTab] = useState<'groups' | 'people'>(
+    (value.groupIds?.length ?? 0) > 0 || (groups?.length ?? 0) > 0 ? 'groups' : 'people',
+  );
+  const selectedGroupIds = value.groupIds ?? [];
+  const toggleGroup = (groupId: string) => {
+    const has = selectedGroupIds.includes(groupId);
+    onChange({
+      ...value,
+      mode: 'restricted',
+      userIds: value.userIds,
+      groupIds: has ? selectedGroupIds.filter(g => g !== groupId) : [...selectedGroupIds, groupId],
+    });
+  };
   // With nobody to grant — the normal state of a fresh workspace, where you are alone and an admin —
-  // "Restrict access" could only produce the state "Only me" already covers. A control that cannot
-  // do anything is a dead control (cf. the disabled billing buttons removed in SQEM-207).
-  const canRestrict = !members || grantableMembers.length > 0;
+  // "Restrict access" could only produce the state "Only me" already covers. Groups count too: a
+  // workspace with groups but one person can still restrict to a group meaningfully later.
+  const canRestrict = !members || grantableMembers.length > 0 || (groups?.length ?? 0) > 0;
   const filteredMembers = useMemo(() => {
     const q = memberSearch.trim().toLowerCase();
     if (!q) return grantableMembers;
@@ -243,7 +296,73 @@ export function TemplateAccessControl({
       </div>
       {value.mode === 'restricted' && (
         <div className="mt-3 pl-1 space-y-2">
-          {grantableMembers.length > 0 && (
+          {/* SQEM-292 — the tab only appears where there is something to choose between. In the
+              workspace default there are no groups and no members, and a switcher over two empty
+              lists is furniture. */}
+          {groups && (
+            <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 mb-1">
+              {(['groups', 'people'] as const).map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTab(t)}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                    tab === t
+                      ? 'bg-brand-600 text-white'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {t === 'groups' ? 'Groups' : 'People'}
+                  {t === 'groups' && selectedGroupIds.length > 0 && ` (${selectedGroupIds.length})`}
+                  {t === 'people' && value.userIds.length > 0 && ` (${value.userIds.length})`}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {groups && tab === 'groups' && (
+            <div>
+              {groups.length === 0 ? (
+                /* ⚠️ Not an empty box. Somebody who picked "Restrict access" wants to restrict it —
+                   telling them there is nothing here leaves them stuck at the moment they decided to
+                   act. The button is absent for editors, who cannot create groups (RLS), so they get
+                   the reason instead of a control that fails. */
+                <div className="text-xs text-slate-500 dark:text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
+                  <p className="font-semibold text-slate-600 dark:text-slate-300">No groups yet</p>
+                  <p className="mt-1">A group keeps working as the team changes — add someone once, and every template that group reaches follows.</p>
+                  {onCreateGroup ? (
+                    <button type="button" onClick={onCreateGroup} className="mt-2 text-brand-600 dark:text-brand-400 font-semibold hover:underline">
+                      Create your first group →
+                    </button>
+                  ) : (
+                    <p className="mt-2 text-slate-400">Ask a workspace admin to create one, or pick people instead.</p>
+                  )}
+                </div>
+              ) : (
+                /* Deliberately identical to the people list below — same row height, same checkbox,
+                   same secondary line. Two pickers that sit behind one switcher and look different
+                   read as two features. */
+                <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                  {groups.map(g => (
+                    <label key={g.id} className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+                      <Checkbox checked={selectedGroupIds.includes(g.id)} onChange={() => toggleGroup(g.id)} />
+                      <span className="min-w-0">
+                        <span className="font-medium">{g.name}</span>
+                        {/* The member count is the difference between picking a name and knowing what
+                            it does. An empty group grants nothing, and that is worth seeing before
+                            saving rather than after somebody reports missing access. */}
+                        <span className="block text-2xs text-slate-400 truncate">
+                          {g.memberIds.length === 0 ? 'No members — grants nobody access' : `${g.memberIds.length} ${g.memberIds.length === 1 ? 'person' : 'people'}`}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {(!groups || tab === 'people') && grantableMembers.length > 0 && (
             <div>
               {grantableMembers.length > 6 && (
                 <div className="relative mb-2">
@@ -260,12 +379,7 @@ export function TemplateAccessControl({
               <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
                 {filteredMembers.map(m => (
                   <label key={m.id} className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={value.userIds.includes(m.id)}
-                      onChange={() => toggleUser(m.id)}
-                      className="mt-0.5 w-4 h-4 rounded accent-brand-600 cursor-pointer shrink-0"
-                    />
+                    <Checkbox checked={value.userIds.includes(m.id)} onChange={() => toggleUser(m.id)} />
                     <span className="min-w-0">
                       <span className="font-medium">{m.name || m.email}</span>
                       {m.name && <span className="block text-2xs text-slate-400 truncate">{m.email}</span>}

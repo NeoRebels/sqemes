@@ -42,6 +42,13 @@ export interface LegalDocument {
 }
 
 /**
+ * **`terms` is at `1.2` since 2026-08-30; `privacy` stays at `1.1`.** They version independently, and
+ * this is the first time that mattered: § 16 of the Terms still described Sqemes as open source under
+ * AGPL-3.0, three days after the licence moved to the Sustainable Use License (SQEM-281/290). That is
+ * a change to what a customer is promised, so it re-gates. The privacy policy did not change, so
+ * asking those same people to re-accept it would train them to click past the screen — which is the
+ * one outcome that makes this mechanism worthless.
+ *
  * **`1.1` since 2026-08-27 — the rewritten texts are live, verified before bumping.**
  *
  * `1.0` shipped on 2026-08-25 while the *previous* wording was still at those URLs, so everyone who
@@ -67,7 +74,7 @@ export interface LegalDocument {
  * `tests/unit/legal.test.ts` pins that invariant.
  */
 export const LEGAL_DOCUMENTS: LegalDocument[] = [
-  { id: 'terms',   label: 'Terms and Conditions', url: 'https://sqemes.com/terms',   version: '1.1' },
+  { id: 'terms',   label: 'Terms and Conditions', url: 'https://sqemes.com/terms',   version: '1.2' },
   { id: 'privacy', label: 'Privacy Policy',       url: 'https://sqemes.com/privacy', version: '1.1' },
 ];
 

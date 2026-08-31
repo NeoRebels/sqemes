@@ -496,6 +496,49 @@ Deno.serve(async (req) => {
     canAccessTemplate = (templateId: string) => !restricted.has(templateId);
   }
 
+  // SQEM-291 — the same question for context files, and it is not answered by the line above.
+  //
+  // `resolveContextFiles` is safe already: it only ever runs for a template the caller reached, so
+  // the file rides along with something they may see. **`resources/list` and `resources/read` are
+  // not** — they addressed the whole workspace by id, so a model could enumerate the names of every
+  // file in it and read any of them, including those attached to templates the caller cannot open.
+  //
+  // Enumeration is the sharper half: nobody asked for that list, and a file name alone can be the
+  // disclosure ("Q3-layoffs.xlsx").
+  //
+  // Built as a set once, not a check per file: `resources/list` would otherwise make one round trip
+  // per row. The uploader clause mirrors `can_access_file()` — an API-key connection has no user, so
+  // `mcpUserId` is null and nothing is claimed as uploaded by anybody.
+  const accessibleFileIds: Set<string> = await (async () => {
+    const { data: rows } = await adminClient
+      .from('prompts')
+      .select('id, context_file_ids, skill_ids')
+      .eq('workspace_id', workspaceId);
+    type Row = { id: string; context_file_ids: string[] | null; skill_ids: string[] | null };
+    const all = (rows as Row[] | null) || [];
+    const byId = new Map(all.map(r => [r.id, r]));
+    const ids = new Set<string>();
+    for (const r of all) {
+      if (!canAccessTemplate(r.id)) continue;
+      for (const fid of r.context_file_ids || []) ids.add(fid);
+      // SQEM-291b — files reached through an embedded skill. `prompts/get` already inlines these
+      // with the service role (line ~637) because the parent grants the skill; without the same
+      // reach here, `resources/read` would refuse a file the composed prompt had just quoted.
+      for (const sid of r.skill_ids || []) {
+        for (const fid of byId.get(sid)?.context_file_ids || []) ids.add(fid);
+      }
+    }
+    if (mcpUserId) {
+      const { data: own } = await adminClient
+        .from('workspace_files')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .eq('created_by', mcpUserId);
+      for (const f of (own as { id: string }[] | null) || []) ids.add(f.id);
+    }
+    return ids;
+  })();
+
   // 3. Route methods
 
   if (method === 'ping') {
@@ -649,7 +692,8 @@ Deno.serve(async (req) => {
       .eq('workspace_id', workspaceId)
       .order('name');
 
-    const resources = (files || []).map((f: any) => ({
+    // SQEM-291 — filtered, not just fetched. Listing a name is a disclosure of its own.
+    const resources = (files || []).filter((f: any) => accessibleFileIds.has(f.id)).map((f: any) => ({
       uri: `sqemes://files/${f.id}`,
       name: f.name,
       mimeType: f.mime_type,
@@ -665,6 +709,11 @@ Deno.serve(async (req) => {
     if (!uri) return rpcError(id, -32602, 'Missing URI');
 
     const fileId = uri.replace(/^sqemes:\/\/files\//, '');
+
+    // SQEM-291 — checked before the row is fetched, and answered with "not found" rather than
+    // "forbidden". A distinct denial would confirm that the id exists, which is the thing the caller
+    // is not entitled to know here.
+    if (!accessibleFileIds.has(fileId)) return rpcError(id, -32602, `Resource not found: ${uri}`);
 
     const { data: file } = await adminClient
       .from('workspace_files')
@@ -1045,7 +1094,11 @@ Deno.serve(async (req) => {
         .eq('workspace_id', workspaceId)
         .order('name');
 
-      const result = (files || []).map((f: any) => ({
+      // SQEM-291 — the third way out, and the one easiest to miss: `resources/list` and
+      // `resources/read` are the MCP resource surface, but `list_files` is a *tool* and reaches the
+      // same rows by a different route. Closing two of three leaves the door open while the diff
+      // looks complete.
+      const result = (files || []).filter((f: any) => accessibleFileIds.has(f.id)).map((f: any) => ({
         id:       f.id,
         name:     f.name,
         mimeType: f.mime_type,
@@ -1476,6 +1529,12 @@ Deno.serve(async (req) => {
         .eq('workspace_id', workspaceId)
         .eq('id', fileId)
         .maybeSingle();
+      // SQEM-291 — the `fileId` comes from the caller, so a foreign one can be passed here. Without
+      // the visibility check this branch answers with a name and a MIME type for a file the caller
+      // cannot otherwise see: an idempotency shortcut that doubles as a lookup.
+      if (existing && !accessibleFileIds.has(fileId)) {
+        return rpcError(id, -32602, `File not found: ${fileId}`);
+      }
       if (existing) {
         return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
           id: existing.id, name: existing.name, mimeType: existing.mime_type, alreadyRegistered: true,
@@ -1531,7 +1590,14 @@ Deno.serve(async (req) => {
       if (replaceWith && replaceWith === fileId)
         return rpcError(id, -32602, 'replaceWith must be a different file than the one being deleted');
 
-      // 1. The file must exist in this workspace.
+      // 1. The file must exist in this workspace **and be one this caller can see**.
+      //
+      // SQEM-291 — deleting is a write, but the leak here is a read: the two answers "File not
+      // found" and "deleted" differ, so without this check the tool doubles as a way to test whether
+      // a given id exists in the workspace. Same wording either way, so an invisible file is
+      // indistinguishable from an absent one.
+      if (!accessibleFileIds.has(fileId)) return rpcError(id, -32602, `File not found: ${fileId}`);
+
       const { data: file } = await adminClient
         .from('workspace_files')
         .select('id, name, storage_path')
@@ -1549,7 +1615,8 @@ Deno.serve(async (req) => {
           .eq('workspace_id', workspaceId)
           .eq('id', replaceWith)
           .maybeSingle();
-        if (!rep) return rpcError(id, -32602, `replaceWith file not found: ${replaceWith}`);
+        if (!rep || !accessibleFileIds.has(replaceWith))
+          return rpcError(id, -32602, `replaceWith file not found: ${replaceWith}`);
         replacement = rep;
       }
 

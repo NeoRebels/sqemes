@@ -21,7 +21,7 @@ const client = supabase as unknown as AccessClient;
  * admins and editors, who are granted by `can_access_template` itself). Without it, "only me" and
  * "everyone" would be indistinguishable on read — they are opposites.
  */
-export type TemplateAccess = { roles: UserRole[]; userIds: string[]; hasRules: boolean };
+export type TemplateAccess = { roles: UserRole[]; userIds: string[]; groupIds?: string[]; hasRules: boolean };
 
 /**
  * The set of template ids in a workspace that have ANY access rule (i.e. are restricted, not
@@ -41,13 +41,16 @@ export async function fetchRestrictedTemplateIds(workspaceId: string): Promise<S
 export async function fetchTemplateAccess(templateId: string): Promise<TemplateAccess> {
   const { data, error } = await client
     .from('template_access')
-    .select('role, user_id')
+    .select('role, user_id, group_id')
     .eq('template_id', templateId);
   if (error) throw error;
-  const rows = (data || []) as { role: UserRole | null; user_id: string | null }[];
+  const rows = (data || []) as { role: UserRole | null; user_id: string | null; group_id: string | null }[];
   return {
     roles: rows.filter(r => r.role != null).map(r => r.role as UserRole),
     userIds: rows.filter(r => r.user_id != null).map(r => r.user_id as string),
+    groupIds: rows.filter(r => r.group_id != null).map(r => r.group_id as string),
+    // ⚠️ Still "any row at all", including the principal-less one that means "only me". A row naming
+    // a group counts here exactly like a row naming a person (SQEM-292).
     hasRules: rows.length > 0,
   };
 }
@@ -75,6 +78,8 @@ export async function setTemplateAccess(
   const rows = [
     ...access.roles.map(role => ({ template_id: templateId, workspace_id: workspaceId, role })),
     ...access.userIds.map(user_id => ({ template_id: templateId, workspace_id: workspaceId, user_id })),
+    // SQEM-292 — group rows, the third principal. One row per group, same shape as the others.
+    ...(access.groupIds ?? []).map(group_id => ({ template_id: templateId, workspace_id: workspaceId, group_id })),
   ];
   // Restricted but nobody named — the one row that means "only me".
   const ins = await client.from('template_access').insert(

@@ -450,7 +450,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.10.11       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.11.3        # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### 3. Check for new env vars

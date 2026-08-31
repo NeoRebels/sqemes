@@ -19,6 +19,7 @@ import { BrandVoiceForm } from '../components/BrandVoiceForm';
 import { TemplateAccessControl, seedFromWorkspaceDefault, accessToValue, accessValueToAccess, unrepresentableRoleGrants, type TemplateAccessValue } from '../components/TemplateAccessControl';
 import PersonCard from '../components/ui/PersonCard';
 import { fetchTemplateAccess, setTemplateAccess } from '../lib/api/templateAccess';
+import { fetchGroups } from '../lib/api/groups';
 import { compileAssistantInstruction, defaultBrandConfig } from '../lib/compileBrandVoice';
 import EditorTestPanel from '../components/EditorTestPanel';
 import FullScreenExit from '../components/ui/FullScreenExit';
@@ -89,6 +90,9 @@ const TemplateEditor = () => {
   // SQEM-211 — "restricted by default" seeds "Only me": nobody else has been picked yet, and that
   // is a state the control can show. It used to seed a role row the editor can no longer represent.
   const [access, setAccess] = useState<TemplateAccessValue>(() => seedFromWorkspaceDefault(workspace?.defaultTemplateAccess ?? []));
+  // SQEM-292 — the workspace's groups, so the access control can offer them. Everyone in the
+  // workspace may read them (RLS); only admins may change them, which happens in Settings.
+  const [groups, setGroups] = useState<{ id: string; name: string; memberIds: string[] }[]>([]);
   // SQEM-238 — role grants stored on this template that the access list cannot render. Kept apart
   // from `access` because they are not part of the choice: they describe what is stored today.
   const [legacyRoles, setLegacyRoles] = useState<UserRole[]>([]);
@@ -190,11 +194,20 @@ const TemplateEditor = () => {
       // SQEM-211 — members are passed so a legacy `role=member` row resolves into the people it
       // currently covers, instead of silently disappearing from a control that no longer shows roles.
       fetchTemplateAccess(id).then(a => {
-        setAccess(accessToValue(a.roles, a.userIds, a.hasRules, workspace?.members ?? []));
+        setAccess(accessToValue(a.roles, a.userIds, a.hasRules, workspace?.members ?? [], a.groupIds ?? []));
         setLegacyRoles(unrepresentableRoleGrants(a.roles));
       }).catch(() => {});
     }
   }, [id, isLibrary, workspace?.members]);
+
+  // SQEM-292 — load the groups the access control offers. Separate from the rules above because it
+  // is about the workspace, not this template: a new template has no rules yet but still needs the
+  // list. Failure is silent by design — the People tab still works, and a toast about groups while
+  // somebody is writing a template would interrupt the wrong task.
+  useEffect(() => {
+    if (isLibrary || !workspace?.id) return;
+    fetchGroups(workspace.id).then(setGroups).catch(() => {});
+  }, [isLibrary, workspace?.id]);
 
   const handleSave = async () => {
     if (!formData.title.trim()) {
@@ -725,6 +738,11 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                 value={access}
                 onChange={v => { setAccess(v); setIsDirty(true); }}
                 members={workspace?.members}
+                groups={groups}
+                /* SQEM-292 — the "create your first group" link is only offered to admins: RLS
+                   rejects the write from anyone else, and a button that fails is worse than its
+                   absence. Editors get the reason instead. */
+                onCreateGroup={currentUser?.role === 'admin' ? () => navigate('/settings', { state: { initialTab: 'team' } }) : undefined}
                 allowPrivate
                 legacyRoles={legacyRoles}
                 privateDisabledReason={

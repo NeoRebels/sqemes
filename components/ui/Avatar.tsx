@@ -100,7 +100,18 @@ export function Avatar({
         aria-label={label || undefined}
         role={label ? 'img' : undefined}
         className={`${className} ${rounded} ${tintFor(label)} inline-flex items-center justify-center font-bold select-none shrink-0`}
-        style={{ fontSize: '0.4em' }}
+        // SQEM-296 — a fixed 1rem, deliberately not `em`.
+        //
+        // This was `0.4em`, which reads as "40% of the circle" and is not what `em` means: it
+        // resolves against the *inherited* text size, which no avatar sets. Every call site is
+        // inside body or `text-sm` copy, so the initials came out at roughly 6px — legible only
+        // because two capitals are hard to mistake. The 96px profile avatar in Settings was the
+        // same 6px as the 32px one in the sidebar; the unit never saw the box it sat in.
+        //
+        // A single value is enough because there is one avatar component and five call sites.
+        // If a size ever genuinely needs its own, give it a prop — do not reach back for `em`,
+        // which will silently drift again the moment someone wraps a call site in `text-xs`.
+        style={{ fontSize: '1rem' }}
       >
         {initialsOf(label)}
       </span>

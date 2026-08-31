@@ -16,6 +16,7 @@ import { ProviderIcon } from '../components/ProviderIcon';
 import McpIcon from '../components/McpIcon';
 import ConnectorsCard from '../components/ConnectorsCard';
 import Card from '../components/ui/Card';
+import AccessGroupsCard from '../components/AccessGroupsCard';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import AboutSection from '../components/AboutSection';
@@ -267,7 +268,17 @@ const Settings = () => {
       setNewKeyScope(DEFAULT_KEY_SCOPE);
       await loadSqemesApiKeys();
     } catch (err: any) {
-      showToast(err.message || 'Failed to generate key', 'error');
+      // SQEM-293 — a denied insert surfaces as "new row violates row-level security policy for table
+      // …", which tells the person nothing they can act on: not that a permission is missing, not
+      // who to ask. Translate the one case we can recognise and pass everything else through
+      // unchanged rather than guessing at it.
+      const denied = /row-level security/i.test(err?.message ?? '');
+      showToast(
+        denied
+          ? 'Could not create the key — your role does not allow it here. Ask a workspace admin.'
+          : (err.message || 'Failed to generate key'),
+        'error',
+      );
     } finally {
       setIsGeneratingKey(false);
     }
@@ -1151,6 +1162,16 @@ const Settings = () => {
                   </table>
                 </div>
               </Card>
+            )}
+
+            {/* SQEM-292 — Access groups. Admins only, and that is enforced twice: the card is hidden
+                here, and the RLS policies reject writes from anyone else. Hiding alone would be a
+                suggestion; the policy is the rule.
+
+                It lives in the Team tab rather than General because a group is a set of people —
+                whoever is looking after who-is-in-what is already on this screen. */}
+            {can(currentUser, workspace, 'team:manage') && (
+              <AccessGroupsCard workspaceId={workspace.id} members={workspace.members} className="mt-6" />
             )}
           </>)}
 
