@@ -1,5 +1,5 @@
 // SQEM-161 (Phase 1 of SQEM-160) — the serialize + apply core for template portability. Turns templates
-// (+ their embedded skills + all referenced context-file bytes) into a portable `.sqemes.zip` bundle, and
+// (+ all referenced context-file bytes) into a portable `.sqemes.zip` bundle, and
 // applies a bundle back into a workspace with fresh ids. Client-side (JSZip). Reused later by share links
 // (Phase 2) and the UGC marketplace (Phase 3).
 import JSZip from 'jszip';
@@ -10,13 +10,13 @@ import { BUNDLE_SCHEMA, sanitizeName, readBundle, downloadBlob } from './bundleF
 import type { BundleFile, BundleTemplate, BundleManifest } from './bundleFormat';
 export { BUNDLE_SCHEMA, readBundle, downloadBlob };
 export type { BundleFile, BundleTemplate, BundleManifest };
-import { fetchResolvedSkills, createPrompt } from './api/prompts';
+import { createPrompt } from './api/prompts';
 import { getWorkspaceFileSignedUrl, uploadWorkspaceFile } from './api/files';
 
 
 // ---- Export ----------------------------------------------------------------------------------------
 
-/** Serialize the given templates (+ embedded skills + referenced files) into a `.sqemes.zip` blob. */
+/** Serialize the given templates (+ referenced files) into a `.sqemes.zip` blob. */
 export async function exportTemplatesToZip(templates: Prompt[], allFiles: WorkspaceFile[]): Promise<Blob> {
   return (await buildBundle(templates, allFiles)).blob;
 }
@@ -26,9 +26,7 @@ export async function buildBundle(templates: Prompt[], allFiles: WorkspaceFile[]
   const zip = new JSZip();
   const fileById = new Map(allFiles.map(f => [f.id, f]));
   const fileRefs = new Map<string, string>();  // fileId → ref
-  const skillRefs = new Map<string, string>(); // skillId → ref
   const bundleFiles: BundleFile[] = [];
-  const bundleSkills: BundleTemplate[] = [];
 
   // Fetch + zip a referenced file's bytes; dedupe. Returns its ref, or null if it can't be resolved.
   const ensureFile = async (fileId: string): Promise<string | null> => {
@@ -54,38 +52,20 @@ export async function buildBundle(templates: Prompt[], allFiles: WorkspaceFile[]
     return out;
   };
 
-  const ensureSkill = async (id: string, title: string, content: string, contextFileIds: string[]): Promise<string> => {
-    if (skillRefs.has(id)) return skillRefs.get(id)!;
-    const ref = `s${bundleSkills.length + 1}`;
-    skillRefs.set(id, ref);
-    bundleSkills.push({
-      ref, kind: 'skill', title, description: '', tag: null, variables: [], content,
-      contextFileRefs: await resolveFileRefs(contextFileIds), skillRefs: [],
-    });
-    return ref;
-  };
-
   const bundleTemplates: BundleTemplate[] = [];
   for (const t of templates) {
     const contextFileRefs = await resolveFileRefs(t.contextFileIds || []);
-    const tSkillRefs: string[] = [];
-    if ((t.skillIds || []).length) {
-      // Resolve embedded skills across access boundaries (same path the launch flow uses).
-      let resolved: { id: string; title: string; content: string; contextFileIds: string[] }[] = [];
-      try { resolved = await fetchResolvedSkills(t.id); } catch { /* graceful: export without skills */ }
-      for (const s of resolved) tSkillRefs.push(await ensureSkill(s.id, s.title, s.content, s.contextFileIds));
-    }
     bundleTemplates.push({
       ref: `t${bundleTemplates.length + 1}`,
       kind: t.kind, title: t.title, description: t.description, tag: t.tag ?? null,
       variables: t.variables || [], content: t.content, systemInstruction: t.systemInstruction,
-      model: t.model, brandConfig: t.brandConfig, contextFileRefs, skillRefs: tSkillRefs,
+      model: t.model, brandConfig: t.brandConfig, contextFileRefs,
     });
   }
 
   const manifest: BundleManifest = {
     schema: BUNDLE_SCHEMA, exportedAt: new Date().toISOString(), generator: 'sqemes',
-    templates: bundleTemplates, skills: bundleSkills, files: bundleFiles,
+    templates: bundleTemplates, files: bundleFiles,
   };
   zip.file('manifest.json', JSON.stringify(manifest, null, 2));
   return { blob: await zip.generateAsync({ type: 'blob' }), manifest };
@@ -97,7 +77,7 @@ export async function buildBundle(templates: Prompt[], allFiles: WorkspaceFile[]
 
 /** Read + validate a `.sqemes.zip` before showing the confirmation preview. */
 
-function buildPrompt(b: BundleTemplate, workspaceId: string, userId: string, contextFileIds: string[], skillIds: string[]): Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'> {
+function buildPrompt(b: BundleTemplate, workspaceId: string, userId: string, contextFileIds: string[]): Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'> {
   return {
     workspaceId,
     kind: (b.kind || 'prompt') as PromptKind,
@@ -108,7 +88,6 @@ function buildPrompt(b: BundleTemplate, workspaceId: string, userId: string, con
     content: b.content || '',
     systemInstruction: b.systemInstruction,
     contextFileIds,
-    skillIds,
     model: b.model,
     createdBy: userId,
     usageCount: 0,
@@ -118,12 +97,11 @@ function buildPrompt(b: BundleTemplate, workspaceId: string, userId: string, con
   };
 }
 
-/** Apply a validated bundle into a workspace: create files → skills → templates with fresh, remapped ids. */
+/** Apply a validated bundle into a workspace: create files → templates with fresh, remapped ids. */
 export async function importBundle(
   zip: JSZip, manifest: BundleManifest, workspaceId: string, userId: string,
-): Promise<{ templates: number; skills: number; files: WorkspaceFile[] }> {
+): Promise<{ templates: number; files: WorkspaceFile[] }> {
   const fileMap = new Map<string, string>();   // BundleFile.ref → new workspace_files id
-  const skillMap = new Map<string, string>();  // skill ref → new prompt id
   const createdFiles: WorkspaceFile[] = [];
 
   for (const bf of manifest.files || []) {
@@ -137,17 +115,11 @@ export async function importBundle(
 
   const mapFiles = (refs?: string[]) => (refs || []).map(r => fileMap.get(r)).filter(Boolean) as string[];
 
-  for (const bs of manifest.skills || []) {
-    const created = await createPrompt(buildPrompt(bs, workspaceId, userId, mapFiles(bs.contextFileRefs), []), workspaceId);
-    skillMap.set(bs.ref, created.id);
-  }
-
   let templates = 0;
   for (const bt of manifest.templates || []) {
-    const skillIds = (bt.skillRefs || []).map(r => skillMap.get(r)).filter(Boolean) as string[];
-    await createPrompt(buildPrompt(bt, workspaceId, userId, mapFiles(bt.contextFileRefs), skillIds), workspaceId);
+    await createPrompt(buildPrompt(bt, workspaceId, userId, mapFiles(bt.contextFileRefs)), workspaceId);
     templates++;
   }
 
-  return { templates, skills: (manifest.skills || []).length, files: createdFiles };
+  return { templates, files: createdFiles };
 }

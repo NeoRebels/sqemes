@@ -1,0 +1,40 @@
+-- ============================================================
+-- SQEM-298 phase 2 — `prompts.skill_ids` and the last thing that read it
+-- ============================================================
+--
+-- Phase 1 removed every writer and every reader on our side: the editor's picker went in July
+-- (SQEM-167), the launch flow, the MCP server, the bundle format and `can_access_file()` followed
+-- on 2026-09-01. What remained was the column itself and `supabase/functions/resolve-template-skills`,
+-- and they remained for one reason only — the Chrome extension named `skill_ids` in **every**
+-- template query it made, so dropping the column would have answered all of them with a PostgREST
+-- 400 and stopped the extension loading templates at all. Not just skills. Everything.
+--
+-- Extension 2.6.4 (published to the Chrome Web Store on 2026-09-01) no longer names the column.
+--
+-- ⛔ **The owner decided explicitly to proceed on publication rather than on rollout**, with the
+-- concern stated and overruled: an installed extension older than 2.6.4 goes blind the moment this
+-- migration runs — every template query 400s, not only the skill path. Chrome updates extensions on
+-- its own schedule, so "published" is not "installed". The call rests on the size and reachability
+-- of the user base, which the owner knows and this file does not. Recorded here because the next
+-- person to read this migration will otherwise reconstruct the risk and assume it was missed.
+--
+-- The data itself was gone long before any of this: `20260621000000_clear_skill_ids.sql` emptied the
+-- column on every database in June 2026. There is nothing to preserve and nothing to migrate.
+--
+-- ⚠️ **The GIN index is already gone** — phase 1 dropped `prompts_skill_ids_gin` when the
+-- `can_access_file()` branch that needed it disappeared. `drop column` would take it along anyway;
+-- this note exists so nobody looks for a drop that is missing here and assumes it was forgotten.
+--
+-- ⚠️ **`resolve-template-skills` is not removed by this file and cannot be.** A migration cannot
+-- delete an edge function; deleting the directory only stops the workflow updating it.
+--
+-- ⛔ **Whether the deployed function then disappears is NOT predictable from the workflow — check.**
+-- This comment first asserted it would stay live until deleted by hand, because `supabase functions
+-- deploy` does not prune (the CLI has `--prune`; neither workflow passes it). Verified 2026-09-01:
+-- it was gone from **both** projects with nobody deleting it, most likely removed by the Supabase
+-- Branching integration. That is inference, not proof — which is exactly why the instruction is to
+-- look (`npx supabase functions list --project-ref <ref>`) rather than to believe either version.
+-- See `pm/PRODUCTION_PROMOTION.md` in the source repository (that file is not part of the public
+-- self-host export — SQEM-279).
+
+alter table public.prompts drop column if exists skill_ids;

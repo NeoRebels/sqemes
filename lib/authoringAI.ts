@@ -1,20 +1,74 @@
 import { supabase } from './supabase';
 import { waitForJobResult } from './realtimeJob';
 import { AVAILABLE_MODELS } from '../constants';
-
-const IMAGE_MODEL_PATTERNS = ['image', 'dall-e', 'aurora'];
+import { isImageModel } from './enabledModels';
+import type { Workspace } from '../types';
 
 /**
  * First enabled *text* (non-image) model id for the workspace's configured keys,
- * or null when no provider key is set. Mirrors the selection used by Enhance.
+ * or null when no provider key is set.
+ *
+ * ⚠️ **This is the fallback, not the setting** (SQEM-311). It answers "which model, if nobody
+ * chose?" — and the answer is the first entry in `AVAILABLE_MODELS` with a key, which is **list
+ * order, not a judgement**: that list is sorted by provider (SQEM-278), not by how well a model
+ * writes. Use `authoringModelId()` at call sites; this one exists so that function has something to
+ * fall back to.
  */
 export function firstTextModelId(apiKeys: Record<string, string | undefined>): string | null {
   const enabled = AVAILABLE_MODELS.filter(m => {
     const key = apiKeys[m.provider];
     return key && key.length > 0;
   });
-  const textModel = enabled.find(m => !IMAGE_MODEL_PATTERNS.some(p => m.id.toLowerCase().includes(p)));
-  return textModel?.id ?? null;
+  return enabled.find(m => !isImageModel(m.id))?.id ?? null;
+}
+
+/** Why the workspace's authoring model is what it is — the UI needs the reason, not just the id. */
+export type AuthoringModelState = {
+  /** What the workspace stored, even when it cannot be used right now. */
+  chosenId: string | null;
+  /** What will actually run. Null ⇒ no BYOK text model at all (funded credits, or nothing). */
+  effectiveId: string | null;
+  /**
+   * `chosen` — the stored choice is in effect.
+   * `auto` — nothing was chosen; the first text model with a key is used.
+   * `unavailable` — something *was* chosen and cannot be used: retired from the catalogue, or its
+   *   provider key is gone. **The two are one status on purpose** — the fix is the same (choose
+   *   again) and distinguishing them would put the catalogue's history in the UI.
+   * `none` — no text model is available at all.
+   */
+  status: 'chosen' | 'auto' | 'unavailable' | 'none';
+};
+
+/**
+ * SQEM-311 — the model that does AI authoring for this workspace: enhance, generated descriptions,
+ * both wizards, "Adapt to brand", the website analysis.
+ *
+ * ⛔ **A stored id is validated on every read, never trusted.** Three ordinary things invalidate it
+ * and all three look identical from the outside — *it just used something else*:
+ *
+ * 1. the model is retired from `AVAILABLE_MODELS` (SQEM-278 removed nine in one go);
+ * 2. the provider's API key is deleted after the choice was made;
+ * 3. the workspace has no BYOK key at all and runs on funded credits, where **the server picks** and
+ *    a selection here would be pretending to control something it does not.
+ *
+ * Falling back silently would reproduce the very problem this ticket exists to fix — a model chosen
+ * by accident with nothing saying so. Hence `status`: the caller can show it.
+ */
+export function authoringModelState(workspace: Pick<Workspace, 'apiKeys' | 'authoringModelId'>): AuthoringModelState {
+  const chosenId = workspace.authoringModelId ?? null;
+  const auto = firstTextModelId(workspace.apiKeys);
+  if (!auto) return { chosenId, effectiveId: null, status: 'none' };
+  if (!chosenId) return { chosenId: null, effectiveId: auto, status: 'auto' };
+
+  const model = AVAILABLE_MODELS.find(m => m.id === chosenId);
+  const keyed = !!model && !!workspace.apiKeys[model.provider as keyof Workspace['apiKeys']];
+  if (!model || !keyed || isImageModel(chosenId)) return { chosenId, effectiveId: auto, status: 'unavailable' };
+  return { chosenId, effectiveId: chosenId, status: 'chosen' };
+}
+
+/** The id to send. Shorthand for `authoringModelState(...).effectiveId`. */
+export function authoringModelId(workspace: Pick<Workspace, 'apiKeys' | 'authoringModelId'>): string | null {
+  return authoringModelState(workspace).effectiveId;
 }
 
 export interface AuthoringAIParams {

@@ -207,6 +207,16 @@ function deriveTitle(body: string, fallback: string): string {
  * Pack a skill folder. Separated from the network on purpose: the round-trip test packs and unpacks
  * without touching storage, which is what makes the invariant testable at all.
  */
+// ⚠️ SQEM-302 — **no production caller left.** The export switched to the Sqemes bundle, so this
+// writer is now reached only by `tests/unit/skillBundle.test.ts`, where it builds fixtures for the
+// *reader* that the import path still needs.
+//
+// ⛔ Deliberately kept rather than deleted in that ticket, and the reason is not sentiment: removing
+// it would take the round-trip coverage off `readSkillZip` in a change that is about export. But a
+// function whose only caller is its own test is dead production code, and a round-trip where both
+// halves are ours can pass while both are wrong. **The better end state is fixtures built with JSZip
+// directly** — then this goes, and the reader is tested against what an Agent Skill folder actually
+// looks like rather than against our own writer.
 export async function buildSkillZip(b: SkillBundle): Promise<Blob> {
   const zip = new JSZip();
   zip.file(SKILL_ENTRY, buildSkillMd(b));

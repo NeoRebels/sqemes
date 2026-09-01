@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { useWorkspace, useUI, usePrompts } from '../store';
-import { firstTextModelId } from '../lib/authoringAI';
+import { authoringModelId } from '../lib/authoringAI';
 import { generateStarterLibrary, type TemplateDraft } from '../lib/wizardGeneration';
 import { BrandProfileForm, EMPTY_BRAND_FORM, type BrandFormValue } from './BrandProfileForm';
+import { brandIsComplete } from '../lib/brand';
 import type { Prompt } from '../types';
 import { Wand2, Sparkles, Key, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
+import Checkbox from './ui/Checkbox';
+import { describeAIError } from '../lib/aiErrors';
 
 const KIND_BADGE: Record<string, { label: string; cls: string }> = {
   assistant: { label: 'Assistant', cls: 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20' },
@@ -36,7 +39,7 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
   const navigate = useNavigate();
 
   // BYOK text model if one exists; otherwise null → route to Sqemes-funded credits.
-  const modelId = firstTextModelId(workspace.apiKeys);
+  const modelId = authoringModelId(workspace);
   // AI is usable when there's a BYOK model OR Sqemes-funded AI is available (Cloud, keyless).
   const canUseAI = !!modelId || !!workspace.fundedAvailable;
 
@@ -49,7 +52,10 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
 
-  const canGenerate = canUseAI && brand.brandName.trim().length > 0 && brand.whatItDoes.trim().length > 0;
+  // SQEM-308 — the same predicate the rest of the product uses. This tested `brandName` and
+  // `whatItDoes` and let `audience` through empty, which made onboarding stricter than the
+  // marketplace and looser than the form's own required marks. Three answers to one question.
+  const canGenerate = canUseAI && brandIsComplete(brand);
 
   const handleGenerate = async () => {
     if (!canUseAI || !canGenerate) return;
@@ -77,7 +83,7 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
         // credits does not get better by retrying, so don't tell the user to try again for those.
         showToast(
           failures.length > 0
-            ? `Couldn't generate your starter templates: ${failures[0].message}`
+            ? `Couldn't generate your starter templates. ${describeAIError(failures[0], 'Try again in a moment.')}`
             : "The AI didn't return anything usable. Try again, or browse the Marketplace for ready-made templates.",
           'error',
         );
@@ -127,7 +133,6 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
         systemInstruction: d.systemInstruction,
         brandConfig: d.brandConfig,
         contextFileIds: [],
-        skillIds: [],
         // SQEM-265 — the wizard writes whole templates and the person only picks which to keep.
         // That is generation under EU AI Act Art. 50(2), unlike the editor's Enhance, which works
         // on text the person wrote and is covered by the editing exemption.
@@ -187,7 +192,7 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
             return (
               <div key={i} className={`border rounded-xl p-3 transition-colors ${isSel ? 'border-slate-200 dark:border-slate-600' : 'border-slate-100 dark:border-slate-700 opacity-60'}`}>
                 <div className="flex items-start gap-3">
-                  <input type="checkbox" checked={isSel} onChange={() => setSelected(s => toggle(s, i))} className="mt-1.5 w-4 h-4 accent-brand-600 shrink-0" />
+                  <Checkbox checked={isSel} onChange={() => setSelected(s => toggle(s, i))} className="mt-1.5" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className={`text-2xs font-bold px-2 py-0.5 rounded-md ${badge.cls}`}>{badge.label}</span>

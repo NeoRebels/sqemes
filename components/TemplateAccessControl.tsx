@@ -137,10 +137,24 @@ export function unrepresentableRoleGrants(roles: UserRole[]): UserRole[] {
  */
 export function accessValueToAccess(
   v: TemplateAccessValue,
+  ownerId?: string | null,
 ): { roles: UserRole[]; userIds: string[]; groupIds: string[]; hasRules: boolean } {
   if (v.mode === 'everyone') return { roles: [], userIds: [], groupIds: [], hasRules: false };
   if (v.mode === 'private') return { roles: [], userIds: [], groupIds: [], hasRules: true };
-  return { roles: [], userIds: v.userIds, groupIds: v.groupIds ?? [], hasRules: true };
+  // SQEM-300 — never persist a row for the owner. `can_access_template` tests
+  // `created_by = auth.uid()` first and unconditionally, so such a row grants nothing that is not
+  // already true, and a row that grants nothing is a row somebody will later try to reason about.
+  // Stripping it on the way out also clears any that were written before this rule existed.
+  //
+  // ⛔ **`ownerId` null strips nobody, and that is the correct answer rather than a fallback.**
+  // With no `created_by` the creator branch matches nobody (SQEM-240), so nobody holds implicit
+  // access and every name in the list is doing real work.
+  return {
+    roles: [],
+    userIds: ownerId ? v.userIds.filter(id => id !== ownerId) : v.userIds,
+    groupIds: v.groupIds ?? [],
+    hasRules: true,
+  };
 }
 
 export function TemplateAccessControl({
@@ -154,6 +168,7 @@ export function TemplateAccessControl({
   allowPrivate = false,
   legacyRoles = [],
   privateDisabledReason,
+  ownerId,
 }: {
   value: TemplateAccessValue;
   onChange: (v: TemplateAccessValue) => void;
@@ -179,6 +194,14 @@ export function TemplateAccessControl({
    *  hide the template from everyone including the person making it. Shown, not hidden — a control
    *  that silently lacks an option teaches nothing. */
   privateDisabledReason?: string;
+  /** SQEM-300 — the template's owner, left out of the people list because they hold access
+   *  unconditionally: offering the tick implies it could be *un*ticked, which is the one thing it
+   *  cannot do. The owner is still shown, just as the owner (SQEM-241), not as a choice.
+   *
+   *  ⚠️ **This is the owner, not the viewer.** They are the same person while creating a template
+   *  and need not be while editing one; filtering on the viewer would hide the wrong row and leave
+   *  the real owner tickable — the same defect, harder to see. Null lists everybody. */
+  ownerId?: string | null;
 }) {
   const [memberSearch, setMemberSearch] = useState('');
 
@@ -187,11 +210,11 @@ export function TemplateAccessControl({
     // SQEM-211 — "Restrict access" starts with nobody ticked: it asks rather than assuming. That
     // state is identical to "Only me" (same principal-less row), which is fine — "Only me" stays
     // as the one-click version that explains itself.
-    onChange(mode === 'restricted' ? { mode, userIds: value.userIds } : { mode, userIds: [] });
+    onChange(mode === 'restricted' ? { mode, userIds: selectedUserIds } : { mode, userIds: [] });
   };
   const toggleUser = (userId: string) => {
-    const has = value.userIds.includes(userId);
-    onChange({ ...value, mode: 'restricted', userIds: has ? value.userIds.filter(u => u !== userId) : [...value.userIds, userId] });
+    const has = selectedUserIds.includes(userId);
+    onChange({ ...value, mode: 'restricted', userIds: has ? selectedUserIds.filter(u => u !== userId) : [...selectedUserIds, userId] });
   };
 
   const optionClass = (active: boolean) =>
@@ -206,7 +229,22 @@ export function TemplateAccessControl({
   // granted them regardless, so a tick beside their name changed nothing while implying it did. That
   // reason is gone — they have no automatic access any more, so omitting them would make it
   // impossible to grant an admin access to a restricted template at all.
-  const grantableMembers = useMemo(() => members ?? [], [members]);
+  // SQEM-292 — everyone in the workspace, not only members: with the automatic admin/editor grant
+  // gone, an admin has to be nameable like anyone else.
+  // SQEM-300 — minus the owner, who cannot be granted what they already have.
+  const grantableMembers = useMemo(
+    () => (members ?? []).filter(m => !ownerId || m.id !== ownerId),
+    [members, ownerId],
+  );
+  // What the control shows as chosen. Derived rather than read straight off `value`, so a row
+  // written before SQEM-300 cannot make the counter disagree with the ticks below it — there would
+  // be no member left to render for it.
+  //
+  // ⚠️ Deliberately not `useMemo`: a conditional that returns `value.userIds` unchanged on one
+  // branch is memoization the React Compiler cannot preserve, and it fails the lint as an error
+  // rather than a warning. An unconditional filter over a handful of ids is cheaper than the hand-
+  // written cache would have been, and the compiler memoizes it itself.
+  const selectedUserIds = value.userIds.filter(id => id !== ownerId);
   // SQEM-292 — groups first: it is the option that keeps working as the team changes, and the one a
   // workspace should reach for by default. People stays one click away for the genuine exceptions.
   const [tab, setTab] = useState<'groups' | 'people'>(
@@ -218,7 +256,7 @@ export function TemplateAccessControl({
     onChange({
       ...value,
       mode: 'restricted',
-      userIds: value.userIds,
+      userIds: selectedUserIds,
       groupIds: has ? selectedGroupIds.filter(g => g !== groupId) : [...selectedGroupIds, groupId],
     });
   };
@@ -314,7 +352,7 @@ export function TemplateAccessControl({
                 >
                   {t === 'groups' ? 'Groups' : 'People'}
                   {t === 'groups' && selectedGroupIds.length > 0 && ` (${selectedGroupIds.length})`}
-                  {t === 'people' && value.userIds.length > 0 && ` (${value.userIds.length})`}
+                  {t === 'people' && selectedUserIds.length > 0 && ` (${selectedUserIds.length})`}
                 </button>
               ))}
             </div>
@@ -379,7 +417,7 @@ export function TemplateAccessControl({
               <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
                 {filteredMembers.map(m => (
                   <label key={m.id} className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200 cursor-pointer select-none">
-                    <Checkbox checked={value.userIds.includes(m.id)} onChange={() => toggleUser(m.id)} />
+                    <Checkbox checked={selectedUserIds.includes(m.id)} onChange={() => toggleUser(m.id)} />
                     <span className="min-w-0">
                       <span className="font-medium">{m.name || m.email}</span>
                       {m.name && <span className="block text-2xs text-slate-400 truncate">{m.email}</span>}
@@ -393,20 +431,27 @@ export function TemplateAccessControl({
             </div>
           )}
 
-          {/* SQEM-211 — the trade this control makes, stated where the decision is made. A role
-              grant covered whoever joined later; a list of names does not, and that failure is
-              silent: someone joins, cannot see the template, and nobody knows why.
+          {/* SQEM-211 — the trade this control makes, stated where the decision is made. A list of
+              names does not cover whoever joins later, and that failure is silent: someone joins,
+              cannot see the template, and nobody knows why. Groups exist to answer exactly that,
+              which is why the sentence now names both and says which one follows the team.
 
-              SQEM-238 — the second sentence is conditional, because with nobody ticked it is not
-              true. "Restricted, nobody named" is stored as the principal-less row, and since
-              SQEM-212 that row means the creator alone — admins and editors included in the
-              exclusion. Promising them access there was the same class of untruth this ticket
-              fixes, just one step further along. */}
+              ⚠️ SQEM-300 — this line said "Admins, editors & the creator always have access" until
+              2026-08-31, one day after SQEM-292 stopped that being true. It shipped to production
+              and into self-host v1.11.3 saying the opposite of what the database does — the worst
+              kind of stale copy, because it describes access and a reader has no way to check it.
+              **A sentence about who can see something has to be re-read whenever the rule changes,
+              not only when the sentence changes.**
+
+              SQEM-238 — the wording stays conditional, because with nobody named it would not be
+              true. "Restricted, nobody named" is stored as the principal-less row and means the
+              creator alone. ⛔ The condition now counts **groups as well**: a template with a group
+              and no individuals was being described as "the same as Only me", which is exactly the
+              untruth this comment was written about. */}
           <p className="text-2xs text-slate-400 dark:text-slate-500 pt-1">
-            Access is per person — people who join later don&apos;t get it automatically.{' '}
-            {value.userIds.length > 0
-              ? 'Admins, editors & the creator always have access.'
-              : 'With nobody picked this is the same as Only me — the creator alone.'}
+            {selectedUserIds.length > 0 || selectedGroupIds.length > 0
+              ? 'Only the people and groups named here, plus whoever created the template. Naming a person is per person — somebody who joins later does not get it automatically; a group does follow the team.'
+              : 'Nobody is named yet, so this is the same as Only me — the creator alone.'}
           </p>
         </div>
       )}

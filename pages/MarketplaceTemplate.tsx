@@ -13,15 +13,17 @@ import {
   fetchPublicListingBundle,
 } from '../lib/api/library';
 import { adaptToBrand } from '../lib/adaptTemplate';
-import { firstTextModelId } from '../lib/authoringAI';
+import { authoringModelId } from '../lib/authoringAI';
 import { IS_SELF_HOSTED, MARKETPLACE_ENABLED } from '../lib/env';
-import { canDownloadAsSkill, listingToSkillZip } from '../lib/listingSkillZip';
+import { listingToBundle } from '../lib/listingBundle';
 import { downloadBlob } from '../lib/bundleFormat';
 import { toSlug } from '../lib/skillBundle';
 import type { LibraryTemplate, Step, Prompt } from '../types';
 import Modal from '../components/ui/Modal';
 import ListingView, { ListingLoading, ListingUnavailable } from '../components/marketplace/ListingView';
 import { Flag, Loader2 } from 'lucide-react';
+import { brandIsComplete } from '../lib/brand';
+import { describeAIError } from '../lib/aiErrors';
 
 const REPORT_REASONS = ['Spam or low quality', 'Malicious or unsafe content', 'Copyright / not yours to share', 'Other'];
 
@@ -39,9 +41,12 @@ export default function MarketplaceTemplate() {
   const [downloading, setDownloading] = useState(false);
 
   // SQEM-165 — "Adapt to brand" (moved here from the card) needs a brand profile + an AI model.
-  const modelId = firstTextModelId(workspace.apiKeys);
+  const modelId = authoringModelId(workspace);
   const canUseAI = !!modelId || !!workspace.fundedAvailable;
-  const hasBrand = !!workspace.brandProfile?.brandName?.trim();
+  // SQEM-308 — the shared predicate. This used to test `brandName` alone, so "Adapt to brand" was
+  // offered with two of the three required fields empty; what came back sounded like the brand and
+  // knew nothing about it.
+  const hasBrand = brandIsComplete(workspace.brandProfile);
   const canAdapt = canUseAI && hasBrand;
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState(REPORT_REASONS[0]);
@@ -84,15 +89,20 @@ export default function MarketplaceTemplate() {
     }
   };
 
-  // SQEM-258 — the listing's payload is a `.sqemes.zip`; an Agent Skill is a folder. The conversion
-  // lives in `lib/listingSkillZip.ts`, and the bundle comes over the public endpoint so this path is
-  // identical to the one the public page uses — one behaviour to reason about, not two.
+  // SQEM-302 — the listing's payload already *is* a `.sqemes.zip`, so for a user-contributed listing
+  // this hands over the stored bytes untouched; a curated listing has none and gets one assembled in
+  // `lib/listingBundle.ts`. The bundle comes over the public endpoint, so this path is identical to
+  // the one the public page uses — one behaviour to reason about, not two.
+  //
+  // ⚠️ Until SQEM-302 this converted the bundle into an Agent Skill folder, and the button was shown
+  // only for skills — a prompt's variables and an assistant's brand config have no place in a
+  // SKILL.md. The bundle expresses all three kinds, so that restriction lost its reason and went.
   const handleDownload = async () => {
     if (!listing) return;
     setDownloading(true);
     try {
       const bundle = await fetchPublicListingBundle(listing);
-      downloadBlob(await listingToSkillZip(listing, bundle), `${toSlug(listing.title)}.zip`);
+      downloadBlob(await listingToBundle(listing, bundle), `${toSlug(listing.title)}.sqemes.zip`);
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Download failed', 'error');
     } finally {
@@ -121,7 +131,6 @@ export default function MarketplaceTemplate() {
         content: isAssistant ? '' : adapted,
         systemInstruction: isAssistant ? adapted : listing.systemInstruction,
         contextFileIds: [],
-        skillIds: [],
         createdAt: now,
         updatedAt: now,
         createdBy: currentUser.id,
@@ -134,7 +143,7 @@ export default function MarketplaceTemplate() {
         navigate(`/prompts/${created.id}/edit`);
       }
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Adaptation failed', 'error');
+      showToast(describeAIError(e, 'Adaptation failed'), 'error');
     } finally {
       setAdapting(false);
     }
@@ -174,7 +183,7 @@ export default function MarketplaceTemplate() {
       adaptLabel={hasBrand ? 'Adapt to brand' : 'Set up brand'}
       adaptDisabled={hasBrand && !canAdapt}
       adaptTitle={!hasBrand ? 'Set up your brand profile to adapt' : !canUseAI ? 'Connect an AI provider key to adapt' : 'Adapt this template to your brand'}
-      onDownload={canDownloadAsSkill(listing) ? handleDownload : undefined}
+      onDownload={handleDownload}
       downloading={downloading}
     >
       {/* Report modal */}

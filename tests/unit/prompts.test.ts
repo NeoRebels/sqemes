@@ -25,7 +25,6 @@ describe('rowToPrompt', () => {
       content: null,
       system_instruction: null,
       context_file_ids: [],
-      skill_ids: [],
       model: null,
       created_at: '2024-01-01T00:00:00Z',
       updated_at: '2024-01-02T00:00:00Z',
@@ -65,7 +64,6 @@ describe('rowToPrompt', () => {
       content: null,
       system_instruction: null,
       context_file_ids: null,
-      skill_ids: null,
       model: null,
       created_at: '',
       updated_at: '',
@@ -81,7 +79,6 @@ describe('rowToPrompt', () => {
     expect(prompt.variables).toEqual([]);
     expect(prompt.content).toBe('');
     expect(prompt.contextFileIds).toEqual([]);
-    expect(prompt.skillIds).toEqual([]);
     expect(prompt.createdBy).toBe('');
   });
 });

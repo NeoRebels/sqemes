@@ -27,14 +27,35 @@ import {
 // SQEM-150/153/154/157/159 — one-click "apps". `id` matches the backend app registry; `provider`+`name`
 // is the connected/dedup key. `auth: 'oauth'` (redirect) or 'token' (paste a static token). Token apps
 // carry `tokenLabel`/`help`, `needsShop` (Shopify), and a `placeholder`.
-type OAuthApp = { id: string; provider: string; name: string; description: string; auth: 'oauth'; Icon: ComponentType<{ className?: string }> };
-type TokenAppUI = { id: string; provider: string; name: string; description: string; auth: 'token'; Icon: ComponentType<{ className?: string }>; tokenLabel: string; placeholder: string; help: string; needsShop?: boolean };
+type OAuthApp = { id: string; provider: string; name: string; description: string; auth: 'oauth'; Icon: ComponentType<{ className?: string }>; unavailable?: string };
+type TokenAppUI = { id: string; provider: string; name: string; description: string; auth: 'token'; Icon: ComponentType<{ className?: string }>; tokenLabel: string; placeholder: string; help: string; needsShop?: boolean; unavailable?: string };
+
+/**
+ * SQEM-274 — why the five Google tiles cannot be connected yet.
+ *
+ * Our Google OAuth app sits at publishing status **Testing**, where only registered test users may
+ * authorise — at most a hundred. That is the delivery state of an app that was never published, not
+ * a defect in our code: `connector-oauth-start`, the callback and the scopes were all checked on
+ * 2026-08-25 and are correct.
+ *
+ * ⛔ **Until this ticket, the tiles were connectable and led straight into a Google warning page
+ * carrying our name.** That is the worst of the three options: the customer experiences a failure
+ * that looks like ours. Hiding the tiles was the other candidate and was rejected — it also hides
+ * that the feature is coming. **Saying so is better than either failing or pretending.**
+ *
+ * Removing this line is the whole of the UI work once Google approves the app. Gmail and Drive need
+ * more than approval — their scopes are *restricted*, which additionally requires the annual, paid
+ * CASA audit; Calendar, Docs and Sheets are *sensitive* and need only the review. `drive.file`, which
+ * Docs and Sheets use, is deliberately not restricted.
+ */
+const GOOGLE_PENDING_REVIEW = 'Awaiting Google’s review — not connectable yet';
+
 const OAUTH_APPS: (OAuthApp | TokenAppUI)[] = [
-  { id: 'google-gmail', provider: 'google', name: 'Gmail', description: 'Read & draft your email', auth: 'oauth', Icon: GmailIcon },
-  { id: 'google-calendar', provider: 'google', name: 'Google Calendar', description: 'Read your events & schedule', auth: 'oauth', Icon: GoogleCalendarIcon },
-  { id: 'google-drive', provider: 'google', name: 'Google Drive', description: 'Search & read your files', auth: 'oauth', Icon: GoogleDriveIcon },
-  { id: 'google-docs', provider: 'google', name: 'Google Docs', description: 'Read your documents', auth: 'oauth', Icon: GoogleDocsIcon },
-  { id: 'google-sheets', provider: 'google', name: 'Google Sheets', description: 'Read your spreadsheets', auth: 'oauth', Icon: GoogleSheetsIcon },
+  { id: 'google-gmail', provider: 'google', name: 'Gmail', description: 'Read & draft your email', auth: 'oauth', Icon: GmailIcon, unavailable: GOOGLE_PENDING_REVIEW },
+  { id: 'google-calendar', provider: 'google', name: 'Google Calendar', description: 'Read your events & schedule', auth: 'oauth', Icon: GoogleCalendarIcon, unavailable: GOOGLE_PENDING_REVIEW },
+  { id: 'google-drive', provider: 'google', name: 'Google Drive', description: 'Search & read your files', auth: 'oauth', Icon: GoogleDriveIcon, unavailable: GOOGLE_PENDING_REVIEW },
+  { id: 'google-docs', provider: 'google', name: 'Google Docs', description: 'Read your documents', auth: 'oauth', Icon: GoogleDocsIcon, unavailable: GOOGLE_PENDING_REVIEW },
+  { id: 'google-sheets', provider: 'google', name: 'Google Sheets', description: 'Read your spreadsheets', auth: 'oauth', Icon: GoogleSheetsIcon, unavailable: GOOGLE_PENDING_REVIEW },
   { id: 'microsoft-outlook', provider: 'microsoft', name: 'Outlook', description: 'Read & draft your email', auth: 'oauth', Icon: OutlookIcon },
   { id: 'microsoft-calendar', provider: 'microsoft', name: 'Outlook Calendar', description: 'Read your events & schedule', auth: 'oauth', Icon: OutlookCalendarIcon },
   { id: 'microsoft-onedrive', provider: 'microsoft', name: 'OneDrive', description: 'Search & read your files', auth: 'oauth', Icon: OneDriveIcon },
@@ -217,7 +238,7 @@ export default function ConnectorsCard({
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Plug className="w-5 h-5 text-violet-500" />
+            <Plug className="w-5 h-5 text-brand-500" />
             Connectors
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -226,7 +247,7 @@ export default function ConnectorsCard({
         </div>
         <button
           onClick={openAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-violet-200 dark:shadow-none shrink-0"
+          className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none shrink-0"
         >
           <Plus className="w-4 h-4" /> Add connector
         </button>
@@ -272,7 +293,7 @@ export default function ConnectorsCard({
     <Card className="p-6 md:p-8">
       <div className="mb-6">
         <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <LayoutGrid className="w-5 h-5 text-violet-500" />
+          <LayoutGrid className="w-5 h-5 text-brand-500" />
           Apps
         </h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -283,7 +304,7 @@ export default function ConnectorsCard({
       </div>
       {IS_SELF_HOSTED ? (
         /* Self-host: the managed one-click apps need Cloud OAuth infra — show a CTA, not broken tiles. */
-        <div className="rounded-2xl border border-violet-100 dark:border-violet-900/40 bg-gradient-to-br from-violet-50 to-white dark:from-violet-900/20 dark:to-slate-800/50 p-6 text-center">
+        <div className="rounded-2xl border border-brand-100 dark:border-brand-900/40 bg-gradient-to-br from-brand-50 to-white dark:from-brand-900/20 dark:to-slate-800/50 p-6 text-center">
           <div className="flex items-center justify-center gap-1.5 mb-4">
             {OAUTH_APPS.map(app => (
               <div key={app.id} className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-sm">
@@ -299,7 +320,7 @@ export default function ConnectorsCard({
             href="https://sqemes.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-violet-200 dark:shadow-none"
+            className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none"
           >
             Explore Sqemes Cloud <ArrowUpRight className="w-4 h-4" />
           </a>
@@ -309,9 +330,16 @@ export default function ConnectorsCard({
         {OAUTH_APPS.map(app => {
           const appConnector = connectors.find(c => c.provider === app.provider && c.name === app.name);
           const connected = !!appConnector;
+          // SQEM-274 — an app we cannot authorise yet. The tile stays, so the person can see the
+          // feature exists and is coming; only the action that would fail is taken away.
+          //
+          // ⚠️ **Disconnect keeps working.** An existing connection still functions — the token is
+          // already issued — so someone who connected while the app was in Testing must remain able
+          // to remove it. Blocking every button would trap a connector nobody could get rid of.
+          const blocked = !!app.unavailable;
           return (
             <div key={app.id} className="flex items-center justify-between gap-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
-              <div className="flex items-center gap-3 min-w-0">
+              <div className={`flex items-center gap-3 min-w-0 ${blocked && !connected ? 'opacity-60' : ''}`}>
                 <div className="relative shrink-0">
                   <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center">
                     <app.Icon className="w-6 h-6" />
@@ -324,16 +352,23 @@ export default function ConnectorsCard({
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{app.name}</p>
-                  <p className={`text-xs mt-0.5 truncate ${connected ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-slate-400 dark:text-slate-500'}`}>
-                    {connected ? 'Connected' : app.description}
+                  {/* SQEM-274 — the reason replaces the description rather than sitting beside it.
+                      A tile that reads "Read & draft your email" next to a dead button describes a
+                      capability the person cannot have; the sentence they need is why not. */}
+                  <p className={`text-xs mt-0.5 truncate ${
+                    connected ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                      : blocked ? 'text-amber-600 dark:text-amber-400 font-semibold'
+                      : 'text-slate-400 dark:text-slate-500'}`}>
+                    {connected ? 'Connected' : blocked ? app.unavailable : app.description}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={() => (app.auth === 'token' ? openTokenModal(app) : connectApp(app.id))}
-                  disabled={connectingApp === app.id}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5 ${connected ? 'text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600' : 'text-white bg-violet-600 hover:bg-violet-700'}`}
+                  disabled={connectingApp === app.id || blocked}
+                  title={blocked ? app.unavailable : undefined}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 ${connected ? 'text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600' : 'text-white bg-brand-600 hover:bg-brand-700'}`}
                 >
                   {connectingApp === app.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : connected ? 'Reconnect' : 'Connect'}
                 </button>
@@ -362,26 +397,26 @@ export default function ConnectorsCard({
 
         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Name</label>
         <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. My Shopify store"
-          className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all placeholder:text-slate-400" />
+          className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400" />
 
         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">MCP URL</label>
         <input value={mcpUrl} onChange={e => { setMcpUrl(e.target.value); setProbe(null); }} placeholder="https://…/mcp"
-          className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-mono outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all placeholder:text-slate-400" />
+          className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-mono outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400" />
 
         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Bearer token <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
         <input value={token} onChange={e => { setToken(e.target.value); setProbe(null); }} type="password" placeholder="Leave empty for a no-auth connector"
-          className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all placeholder:text-slate-400" />
+          className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400" />
 
         {canShare && (
           <label className="flex items-start gap-2.5 mb-4 text-sm text-slate-700 dark:text-slate-200 cursor-pointer select-none">
-            <input type="checkbox" checked={shared} onChange={e => setShared(e.target.checked)} className="mt-0.5 w-4 h-4 rounded accent-violet-600 cursor-pointer shrink-0" />
+            <input type="checkbox" checked={shared} onChange={e => setShared(e.target.checked)} className="mt-0.5 w-4 h-4 rounded accent-brand-600 cursor-pointer shrink-0" />
             <span>Share with the whole workspace<span className="block text-2xs text-slate-400">Off = personal to you. Shared connectors need admin/editor.</span></span>
           </label>
         )}
 
         {/* Test connection */}
         <div className="mb-4">
-          <button onClick={runProbe} disabled={probing || !mcpUrl.trim()} className="text-xs font-bold text-violet-600 hover:text-violet-700 disabled:opacity-50 flex items-center gap-1.5">
+          <button onClick={runProbe} disabled={probing || !mcpUrl.trim()} className="text-xs font-bold text-brand-600 hover:text-brand-700 disabled:opacity-50 flex items-center gap-1.5">
             {probing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Testing…</> : <><Check className="w-3.5 h-3.5" /> Test connection</>}
           </button>
           {probe && (
@@ -407,7 +442,7 @@ export default function ConnectorsCard({
         <div className="flex gap-2">
           <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
           <button onClick={handleAdd} disabled={saving || !name.trim() || !/^https:\/\//i.test(mcpUrl.trim())}
-            className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
             {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Adding…</> : 'Add connector'}
           </button>
         </div>
@@ -427,17 +462,17 @@ export default function ConnectorsCard({
               <>
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Shop domain</label>
                 <input value={tokenShop} onChange={e => setTokenShop(e.target.value)} placeholder="your-store.myshopify.com"
-                  className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-mono outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all placeholder:text-slate-400" />
+                  className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-mono outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400" />
               </>
             )}
 
             <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">{tokenApp.tokenLabel}</label>
             <input value={tokenValue} onChange={e => setTokenValue(e.target.value)} type="password" placeholder={tokenApp.placeholder}
-              className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all placeholder:text-slate-400" />
+              className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400" />
 
             {canShare && (
               <label className="flex items-start gap-2.5 mb-4 text-sm text-slate-700 dark:text-slate-200 cursor-pointer select-none">
-                <input type="checkbox" checked={tokenShared} onChange={e => setTokenShared(e.target.checked)} className="mt-0.5 w-4 h-4 rounded accent-violet-600 cursor-pointer shrink-0" />
+                <input type="checkbox" checked={tokenShared} onChange={e => setTokenShared(e.target.checked)} className="mt-0.5 w-4 h-4 rounded accent-brand-600 cursor-pointer shrink-0" />
                 <span>Share with the whole workspace<span className="block text-2xs text-slate-400">Off = personal to you. Shared connectors need admin/editor.</span></span>
               </label>
             )}
@@ -445,7 +480,7 @@ export default function ConnectorsCard({
             <div className="flex gap-2">
               <button onClick={() => setTokenApp(null)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
               <button onClick={connectToken} disabled={tokenSaving || !tokenValue.trim() || (tokenApp.needsShop && !tokenShop.trim())}
-                className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {tokenSaving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Connecting…</> : 'Connect'}
               </button>
             </div>

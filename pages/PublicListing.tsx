@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import { fetchPublicListingDetail, fetchPublicListingBundle } from '../lib/api/library';
-import { canDownloadAsSkill, listingToSkillZip } from '../lib/listingSkillZip';
+import { listingToBundle } from '../lib/listingBundle';
 import { downloadBlob } from '../lib/bundleFormat';
 import { toSlug } from '../lib/skillBundle';
 import type { LibraryTemplate } from '../types';
@@ -42,7 +42,7 @@ export default function PublicListing() {
     setError(null);
     try {
       const bundle = await fetchPublicListingBundle(listing);
-      downloadBlob(await listingToSkillZip(listing, bundle), `${toSlug(listing.title)}.zip`);
+      downloadBlob(await listingToBundle(listing, bundle), `${toSlug(listing.title)}.sqemes.zip`);
     } catch (e) {
       // No store here, so no toast: the message goes on the page, where it cannot be missed.
       setError(e instanceof Error ? e.message : 'Download failed');
@@ -76,7 +76,7 @@ export default function PublicListing() {
       score={listing.score ?? 0}
       // No onVote / onReport / onCopy / onAdapt: each needs an account, and a disabled control is a
       // rejection. The offer below carries them instead.
-      onDownload={canDownloadAsSkill(listing) ? handleDownload : undefined}
+      onDownload={handleDownload}
       downloading={downloading}
       offer={
         <div className="mt-6 rounded-2xl border border-brand-100 dark:border-brand-900/40 bg-brand-50/60 dark:bg-brand-900/10 p-5">

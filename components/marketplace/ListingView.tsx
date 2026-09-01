@@ -10,7 +10,7 @@ import type { LibraryTemplate, Step, Variable } from '../../types';
 import KindBadge from '../ui/KindBadge';
 import FullScreenExit from '../ui/FullScreenExit';
 import sqemesIcon from '../../assets/sqemes-icon.svg';
-import { FilePlus, Flag, Loader2, FileText, Wand2, ArrowUpRight, Sparkles, Flame, Snowflake, Download } from 'lucide-react';
+import { FilePlus, Flag, Loader2, FileText, ArrowUpRight, Sparkles, Flame, Snowflake, Download } from 'lucide-react';
 
 export type ListingViewProps = {
   listing: LibraryTemplate;
@@ -102,9 +102,6 @@ export default function ListingView({
           {fileNames.length > 0 && (
             <span className="inline-flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-500"><FileText className="w-4 h-4" /> {fileNames.length} file{fileNames.length === 1 ? '' : 's'}</span>
           )}
-          {!!listing.preview?.skillCount && (
-            <span className="inline-flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-500"><Wand2 className="w-4 h-4" /> {listing.preview.skillCount} skill{listing.preview.skillCount === 1 ? '' : 's'}</span>
-          )}
 
           {onReport && (
             <button onClick={onReport} className="inline-flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-500 hover:text-red-500 font-semibold transition-colors">
@@ -121,21 +118,24 @@ export default function ListingView({
             </button>
           )}
           {onAdapt && (
-            <button onClick={onAdapt} disabled={copying || adapting || adaptDisabled} title={adaptTitle} className="inline-flex items-center gap-2 px-5 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            <button onClick={onAdapt} disabled={copying || adapting || adaptDisabled} title={adaptTitle} className="inline-flex items-center gap-2 px-5 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed">
               {adapting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} {adaptLabel}
             </button>
           )}
           {/* A text link, not a third button: it is an alternative to taking the template in, not a
-              competing primary action. Only rendered for skills — a prompt's variables and an
-              assistant's brand config cannot be expressed as a SKILL.md (SQEM-236). */}
+              competing primary action.
+              SQEM-302 — shown for every listing now. It used to be skills only, because the download
+              was an Agent Skill folder and a prompt's variables or an assistant's brand config
+              cannot be expressed as a SKILL.md. The Sqemes bundle expresses all three kinds, so the
+              restriction lost the reason it was built on. */}
           {onDownload && (
             <button
               onClick={onDownload}
               disabled={downloading}
-              title={fileNames.length ? `SKILL.md and ${fileNames.length} file${fileNames.length === 1 ? '' : 's'}` : 'SKILL.md — this listing carries no files'}
+              title={fileNames.length ? `A .sqemes.zip with ${fileNames.length} file${fileNames.length === 1 ? '' : 's'}` : 'A .sqemes.zip — this listing carries no files'}
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 underline underline-offset-4 decoration-slate-300 dark:decoration-slate-600 hover:decoration-brand-400 transition-colors disabled:opacity-50 disabled:no-underline"
             >
-              {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Download as an agent zip folder
+              {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Download Template
             </button>
           )}
         </div>
@@ -143,7 +143,7 @@ export default function ListingView({
         {offer}
 
         {/* What you get — transparency */}
-        {(listing.preview?.skillCount || fileNames.length) ? (
+        {fileNames.length ? (
           <div className="mt-8 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-soft p-5">
             <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-3">What comes with this copy</h2>
             {fileNames.length > 0 && (
@@ -158,7 +158,6 @@ export default function ListingView({
                 ))}
               </div>
             )}
-            {!!listing.preview?.skillCount && <p className="text-xs text-slate-400 mt-2">Includes {listing.preview.skillCount} embedded skill{listing.preview.skillCount === 1 ? '' : 's'}, resolved into your copy.</p>}
           </div>
         ) : null}
 

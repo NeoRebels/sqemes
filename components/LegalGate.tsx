@@ -3,6 +3,7 @@ import { FileText, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { IS_SELF_HOSTED } from '../lib/env';
 import Button from './ui/Button';
+import Checkbox from './ui/Checkbox';
 import {
   LEGAL_DOCUMENTS,
   publishedDocuments,
@@ -128,12 +129,7 @@ const LegalGateActive = ({
         {/* One checkbox, and it starts unticked. A pre-ticked box is not agreement — the same rule
             that applies to consent under the GDPR applies to the impression this screen gives. */}
         <label className="flex items-start gap-3 mb-6 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={e => setChecked(e.target.checked)}
-            className="mt-0.5 w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-          />
+          <Checkbox checked={checked} onChange={() => setChecked(!checked)} />
           <span className="text-sm text-slate-700 dark:text-slate-200">
             I have read and agree to the {pending.length > 1 ? 'documents' : 'document'} above.
           </span>

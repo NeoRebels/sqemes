@@ -28,6 +28,13 @@ export interface Workspace {
   cancelAtPeriodEnd?: boolean;
   /** SQEM-082 — Sqemes-funded AI available (Cloud has MISTRAL_API_KEY). From getApiKeyStatus, not the DB row. */
   fundedAvailable?: boolean;
+  /**
+   * SQEM-311 — the model used for AI *authoring* (enhance, descriptions, both wizards, brand
+   * adaptation). Null/absent ⇒ pick the first text model with a key, which is what happened
+   * unconditionally before this existed. Validated against `AVAILABLE_MODELS` on read — see
+   * `authoringModelState()`; never trusted just because it is stored.
+   */
+  authoringModelId?: string | null;
   apiKeys: {
     gemini?: string;
     openai?: string;
@@ -111,7 +118,6 @@ export interface Prompt {
   content: string;
   systemInstruction?: string;
   contextFileIds: string[];
-  skillIds: string[];
   model?: string;
   /**
    * SQEM-265 — set when the setup wizard created this template from AI output (EU AI Act
@@ -176,7 +182,7 @@ export interface LibraryTemplate {
   hasBundle?: boolean;           // whether a bundle exists — set from bundle_path (Cloud) or has_bundle (self-host public feed, SQEM-178)
   source?: string;               // 'cloud' | 'self-host' — where a submission came from (SQEM-179/180)
   publisherName?: string | null; // attributed publisher display name for self-host submissions (SQEM-180)
-  preview?: { fileNames?: string[]; fileCount?: number; skillCount?: number };
+  preview?: { fileNames?: string[]; fileCount?: number };
   // SQEM-169 — votes + scan verdict
   score?: number;                // net votes (up - down)
   voteCount?: number;

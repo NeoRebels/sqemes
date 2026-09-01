@@ -192,3 +192,43 @@ describe('accessValueToAccess — groups (SQEM-292)', () => {
       .toEqual({ roles: [], userIds: [], groupIds: ['g-1'], hasRules: true });
   });
 });
+
+// SQEM-300 — the owner is never persisted into their own access list.
+//
+// `can_access_template` tests `created_by = auth.uid()` first and unconditionally, so such a row
+// grants nothing that is not already true. The tick was worse than useless: being listed implies
+// it could be un-ticked, which is the one thing it cannot do.
+describe('accessValueToAccess — the owner is stripped', () => {
+  const restricted = (userIds: string[], groupIds: string[] = []) =>
+    ({ mode: 'restricted', userIds, groupIds }) as const;
+
+  it('drops a row naming the owner and keeps everyone else', () => {
+    expect(accessValueToAccess(restricted(['owner-1', 'member-1']), 'owner-1'))
+      .toEqual({ roles: [], userIds: ['member-1'], groupIds: [], hasRules: true });
+  });
+
+  it('clears a stale owner-only row without changing what the template means', () => {
+    // Before and after are the same thing: rows exist, nobody but the creator is named.
+    expect(accessValueToAccess(restricted(['owner-1']), 'owner-1'))
+      .toEqual({ roles: [], userIds: [], groupIds: [], hasRules: true });
+  });
+
+  // ⛔ Not a fallback — the correct answer. With no `created_by` the creator branch matches nobody
+  // (SQEM-240), so no one holds implicit access and every name in the list is doing real work.
+  it('strips nobody when the template has no owner', () => {
+    expect(accessValueToAccess(restricted(['member-1', 'member-2']), null))
+      .toEqual({ roles: [], userIds: ['member-1', 'member-2'], groupIds: [], hasRules: true });
+    expect(accessValueToAccess(restricted(['member-1']), undefined).userIds).toEqual(['member-1']);
+  });
+
+  it('leaves groups alone — a group is never the owner', () => {
+    expect(accessValueToAccess(restricted(['owner-1'], ['g1']), 'owner-1'))
+      .toEqual({ roles: [], userIds: [], groupIds: ['g1'], hasRules: true });
+  });
+
+  it('does not touch the other two modes', () => {
+    expect(accessValueToAccess({ mode: 'everyone', userIds: [], groupIds: [] }, 'owner-1').hasRules).toBe(false);
+    expect(accessValueToAccess({ mode: 'private', userIds: [], groupIds: [] }, 'owner-1'))
+      .toEqual({ roles: [], userIds: [], groupIds: [], hasRules: true });
+  });
+});

@@ -3,6 +3,7 @@ import { Search, X, Loader2, Image, FileText, FileSpreadsheet, File } from 'luci
 import Modal from './ui/Modal';
 import { SUPPORTED_MIME_TYPES, isImageType, fileTypeLabel } from '../lib/uploadTypes';
 import type { WorkspaceFile } from '../types';
+import Checkbox from './ui/Checkbox';
 
 // SQEM-080 — pick workspace files to attach to a chat message. Only shows files
 // chat can attach inline; the caller fetches + attaches the chosen ones.
@@ -89,7 +90,12 @@ export function WorkspaceFilePickerModal({
                     onClick={() => toggle(f.id)}
                     className={`w-full text-left px-2.5 py-2 flex items-center gap-2.5 rounded-lg transition-colors ${isSel ? 'bg-brand-50 dark:bg-brand-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                   >
-                    <input type="checkbox" checked={isSel} readOnly className="w-4 h-4 rounded accent-brand-600 pointer-events-none shrink-0" />
+                    {/* SQEM-294 — display only: the surrounding label carries the click, so this must not take
+                        one of its own. ⛔ Not `disabled` — that is the primitive's way of saying "you may
+                        not", greys the box out and would tell the person the file cannot be picked. It
+                        can; the click simply belongs to the row. `pointer-events-none` says exactly that
+                        and nothing more. */}
+                    <Checkbox checked={isSel} onChange={() => {}} align="center" className="pointer-events-none" />
                     <TypeIcon mimeType={f.mimeType} className="w-4 h-4 text-slate-400 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{f.name}</p>

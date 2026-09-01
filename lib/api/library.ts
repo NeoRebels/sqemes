@@ -269,7 +269,7 @@ export async function publishToMarketplace(input: {
 
   // SQEM-169 — heuristic injection scan (advisory; shown to admins in the review queue).
   const { scanForInjection } = await import('../injectionScan');
-  const scan = scanForInjection(template.content, template.systemInstruction, template.description, ...(manifest.skills || []).map(s => s.content));
+  const scan = scanForInjection(template.content, template.systemInstruction, template.description);
 
   const path = `${workspaceId}/${crypto.randomUUID()}/bundle.sqemes.zip`;
   const { error: upErr } = await supabase.storage.from('library-files').upload(path, blob, { contentType: 'application/zip' });
@@ -278,7 +278,6 @@ export async function publishToMarketplace(input: {
   const preview = {
     fileNames: (manifest.files || []).map(f => f.name),
     fileCount: (manifest.files || []).length,
-    skillCount: (manifest.skills || []).length,
   };
   const { data, error } = await client.from('library_templates').insert({
     workspace_id: workspaceId,

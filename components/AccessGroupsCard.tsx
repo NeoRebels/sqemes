@@ -6,8 +6,13 @@
 //
 // ⚠️ **Admins only, and the card being hidden is the weaker half of that.** The RLS policies reject
 // writes from anyone else, so hiding it here is a courtesy to editors rather than the enforcement.
+//
+// SQEM-304 — it sits in Settings → **General**, under *Template Access*. It began in the Team tab on
+// the grounds that a group is a set of people; that is what one is made of, not what it is for. A
+// group exists to grant template access and appears nowhere else, so it belongs beside the setting
+// that makes it useful.
 import { useEffect, useState } from 'react';
-import { Users, Plus, Trash2, Pencil, Check, X, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Pencil, Check, X, Loader2 } from 'lucide-react';
 import Card from './ui/Card';
 import Button from './ui/Button';
 import { Input } from './ui/Input';
@@ -113,17 +118,18 @@ export default function AccessGroupsCard({
   };
 
   return (
-    /* The Team tab stacks cards with an explicit `mt-*` rather than a `space-y` container, so the
-       gap is the caller's to set — see the Invitations card above. */
+    /* SQEM-304 — the gap stays the caller's to set. The General tab, where this now lives, spaces
+       its cards with `space-y-6` and passes nothing; the Team tab it came from stacks with explicit
+       `mt-*`. Keeping the prop means the card does not have to know which kind of parent it is in. */
     <Card className={`p-6 md:p-8 animate-fade-in ${className}`}>
-      <div className="flex items-start gap-3 mb-1">
-        <Users className="w-5 h-5 text-brand-500 mt-0.5 shrink-0" />
-        <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Access Groups</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Name a set of people once, then grant a template to the group instead of to each person. Adding somebody to a group gives them everything that group can reach.
-          </p>
-        </div>
+      {/* SQEM-300 — no icon. It was written for "Team Members" directly above, which has none; after
+          SQEM-304 the neighbour is "Template Access", which has none either. The reason held through
+          the move, which is the useful kind of reason. */}
+      <div className="mb-1">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Access Groups</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          Name a set of people once, then grant a template to the group instead of to each person. Adding somebody to a group gives them everything that group can reach.
+        </p>
       </div>
 
       <div className="flex gap-2 mt-5 mb-4">

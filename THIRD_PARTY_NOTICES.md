@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Generated 2026-08-31 from the production dependency tree. **Do not edit by hand** — it is rebuilt
+Generated 2026-09-01 from the production dependency tree. **Do not edit by hand** — it is rebuilt
 by `scripts/build-public-export.sh` on every release, which is what keeps it from going stale.
 
 Sqemes itself is licensed under the Sustainable Use License from v1.11.0 (AGPL-3.0 for v1.10.0 to

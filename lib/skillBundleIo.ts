@@ -1,4 +1,8 @@
-// SQEM-243 — the workspace half of the skill bundle: fetch bytes out, put bytes in.
+// SQEM-243 — the workspace half of the skill bundle.
+//
+// ⚠️ SQEM-302 — **the "bytes out" half is gone.** The export switched to the Sqemes bundle, so what
+// remains here is import only: an Agent Skill folder somebody uploads still lands in the workspace,
+// which was the explicit condition on that change.
 //
 // ⚠️ **This exists so `lib/skillBundle.ts` can stay pure.** It originally lived there, and CI caught
 // the mistake within the hour: importing this module pulls in `lib/api/*` → `lib/supabase`, which
@@ -11,35 +15,10 @@
 // to `vi.mock('../../lib/supabase')` to get off the ground. **Keep the split.** Anything here that
 // does not touch the network or the database belongs on the other side of the line.
 import type { Prompt, WorkspaceFile } from '../types';
-import { getWorkspaceFileSignedUrl, uploadWorkspaceFile } from './api/files';
+import { uploadWorkspaceFile } from './api/files';
 import { createPrompt } from './api/prompts';
-import { buildSkillZip, commonRootDir, workspacePathFor, type SkillBundle } from './skillBundle';
+import { workspacePathFor, type SkillBundle } from './skillBundle';
 
-/**
- * Fetch a skill's files and pack the folder.
- *
- * SQEM-251 — the stored names are workspace paths (`<slug>/references/x.md`); inside the bundle they
- * must be skill-relative again, or the zip carries a folder named after the skill *inside* the skill.
- * The prefix comes off with `commonRootDir`, the same rule `readSkillZip` applies on the way in.
- */
-export async function exportSkillToZip(skill: Prompt, allFiles: WorkspaceFile[]): Promise<Blob> {
-  const byId = new Map(allFiles.map(f => [f.id, f]));
-  const attached = (skill.contextFileIds || []).map(id => byId.get(id)).filter((f): f is WorkspaceFile => !!f);
-  const root = commonRootDir(attached.map(f => f.name));
-  const strip = (name: string) => (root ? name.slice(root.length + 1) : name);
-
-  const files: SkillBundle['files'] = [];
-  for (const f of attached) {
-    try {
-      const resp = await fetch(await getWorkspaceFileSignedUrl(f.storagePath));
-      if (!resp.ok) continue;
-      files.push({ name: strip(f.name), blob: await resp.blob(), mimeType: f.mimeType });
-    } catch { /* unreachable file: export the rest rather than nothing */ }
-  }
-  return buildSkillZip({ title: skill.title, description: skill.description || '', content: skill.content || '', files });
-}
-
-/** Apply an unpacked skill folder to a workspace: upload the files, then create the skill. */
 export async function importSkillBundle(
   b: SkillBundle, workspaceId: string, userId: string,
 ): Promise<{ skillId: string; files: WorkspaceFile[] }> {
@@ -68,7 +47,6 @@ export async function importSkillBundle(
     tag: null,
     variables: [],
     contextFileIds: created.map(f => f.id),
-    skillIds: [],
     createdBy: userId,
     isFavorite: false,
     usageCount: 0,

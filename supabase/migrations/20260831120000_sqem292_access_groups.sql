@@ -31,8 +31,17 @@
 --
 -- `template_access` gains `group_id` as a third principal rather than a table of its own. A separate
 -- table would mean access is answered in two places, and `can_access_template()` and
--- `mcp_accessible_template_ids()` would both have to know both — the exact drift `pm/DOCUMENTATION.md`
--- already warns about for those two functions.
+-- `mcp_accessible_template_ids()` would both have to know both. Those two already answer the same
+-- question for different callers — the app and Chat go through RLS, MCP goes through the id list —
+-- so they must be changed together or they drift apart silently, and nothing fails loudly when they
+-- do: one channel simply starts showing a template the other hides.
+--
+-- (SQEM-299 — this sentence used to point at an internal document by name. That document is pruned
+-- from the public export while this migration is not, so a self-hoster read a reference to something
+-- they do not have. Edited on 2026-08-31 with the owner's explicit authorisation, since the migration
+-- had already reached production; a comment only, no SQL touched, and Supabase tracks migrations by
+-- version rather than by content. **A reason beats a reference** — which is why the warning is now
+-- spelled out here instead of cited.)
 --
 -- The legacy `role` column stays and is still read. It is no longer written by the app (SQEM-211),
 -- and the rows that exist are candidates for becoming groups — but **not automatically**: a group

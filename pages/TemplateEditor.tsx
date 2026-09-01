@@ -7,7 +7,7 @@ import { Prompt, Variable, VariableType, PromptKind, WorkspaceFile, TemplateCate
 import { fetchPromptDetail } from '../lib/api/prompts';
 import { fetchLibraryTemplateDetail } from '../lib/api/library';
 import { AVAILABLE_MODELS, TEMPLATE_CATEGORIES, KIND_HELP } from '../constants';
-import { runAuthoringAI } from '../lib/authoringAI';
+import { runAuthoringAI, authoringModelId } from '../lib/authoringAI';
 import { Save, Plus, Trash2, Settings, Edit, ChevronDown, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Bot, Wand2, FlaskConical, UserRound } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -59,7 +59,6 @@ const TemplateEditor = () => {
     variables: [],
     content: '',
     contextFileIds: [],
-    skillIds: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     createdBy: currentUser?.id || '',
@@ -133,7 +132,6 @@ const TemplateEditor = () => {
     content: stripHtml((t.steps?.[0]?.content as string) ?? ''),
     systemInstruction: t.systemInstruction,
     contextFileIds: [],
-    skillIds: [],
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
     createdBy: t.createdBy,
@@ -241,7 +239,7 @@ const TemplateEditor = () => {
     // SQEM-142 / SQEM-143 — persist the access rules (roles + users; empty = open). Non-fatal.
     if (savedId) {
       try {
-        await setTemplateAccess(savedId, workspace.id, accessValueToAccess(access));
+        await setTemplateAccess(savedId, workspace.id, accessValueToAccess(access, formData.createdBy || null));
         // SQEM-238 — the old role grant is gone now; the warning must go with it, or it keeps
         // warning about a rule that no longer exists.
         setLegacyRoles([]);
@@ -425,9 +423,10 @@ const TemplateEditor = () => {
     }
     setIsEnhancing(true);
     try {
-      const IMAGE_MODEL_PATTERNS = ['image', 'dall-e', 'aurora'];
-      const textModel = enabledModels.find(m => !IMAGE_MODEL_PATTERNS.some(p => m.id.toLowerCase().includes(p)));
-      // No BYOK text model → runAuthoringAI routes to Sqemes-funded credits (keyless, Cloud-only).
+      // SQEM-311 — the workspace's chosen authoring model, or the first text model with a key.
+      // This used to redo the image-model filter inline; that rule now has one home.
+      // No BYOK text model → null, and runAuthoringAI routes to Sqemes-funded credits (Cloud-only).
+      const modelId = authoringModelId(workspace);
 
       const systemInstruction = `You are an expert in Prompt Engineering. Your task is to transform the prompt template inside <prompt_template> tags into a structured, high-performance instruction set for an AI model — without changing what the prompt is asking for.
 
@@ -444,7 +443,7 @@ Output only the refined prompt text, with no surrounding explanation or commenta
 
       const enhanced = await runAuthoringAI({
         workspaceId: workspace.id,
-        modelId: textModel?.id ?? null,
+        modelId,
         systemInstruction,
         prompt: `<prompt_template>\n${textContent}\n</prompt_template>`,
         temperature: 1,
@@ -466,16 +465,15 @@ Output only the refined prompt text, with no surrounding explanation or commenta
     if (!textContent) return;
     setIsGeneratingDescription(true);
     try {
-      const IMAGE_MODEL_PATTERNS = ['image', 'dall-e', 'aurora'];
-      const textModel = enabledModels.find(m => !IMAGE_MODEL_PATTERNS.some(p => m.id.toLowerCase().includes(p)));
-      // No BYOK text model → runAuthoringAI routes to Sqemes-funded credits (keyless, Cloud-only).
+      // SQEM-311 — see the note in handleEnhance.
+      const modelId = authoringModelId(workspace);
 
       const kindLabel = formData.kind === 'skill' ? 'skill' : formData.kind === 'assistant' ? 'assistant' : 'prompt template';
       const systemInstruction = `You are helping build a library of AI ${kindLabel}s. Write a concise 1-2 sentence description of the ${kindLabel} below. The description should explain what it does and when to use it${formData.kind === 'skill' ? ', including any key inputs an AI agent should know about' : ''}. Output only the description text — no labels, quotes, or extra commentary.`;
 
       const generated = await runAuthoringAI({
         workspaceId: workspace.id,
-        modelId: textModel?.id ?? null,
+        modelId,
         systemInstruction,
         prompt: textContent,
         temperature: 0.3,
@@ -739,6 +737,11 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                 onChange={v => { setAccess(v); setIsDirty(true); }}
                 members={workspace?.members}
                 groups={groups}
+                /* SQEM-300 — the owner is not offered in the people list: `can_access_template`
+                   grants them access by `created_by` before any rule is read, so the tick would be
+                   one that cannot be un-ticked. Empty while a template is still loading, which is
+                   the safe direction — nobody is filtered and the list stays complete. */
+                ownerId={formData.createdBy || null}
                 /* SQEM-292 — the "create your first group" link is only offered to admins: RLS
                    rejects the write from anyone else, and a button that fails is worse than its
                    absence. Editors get the reason instead. */
@@ -770,9 +773,9 @@ Output only the refined prompt text, with no surrounding explanation or commenta
               </div>
             )}
 
-            {/* SQEM-167 — skills are applied directly (extension / Chat / MCP), not embedded into
-                prompts/assistants, so the editor no longer has a skill picker. skillIds stays legacy-read
-                for any existing templates (resolvers untouched). */}
+            {/* SQEM-167/298 — skills are applied directly (extension / Chat / MCP), never embedded
+                into prompts or assistants. SQEM-167 removed the picker; SQEM-298 removed everything
+                behind it, so there is no longer a legacy read to preserve either. */}
 
             {/* Variables — prompt kind only */}
             {formData.kind === 'prompt' && <div>

@@ -14,8 +14,15 @@ export type EnabledModel = {
 // is also what's stored/shown as the model on funded chat replies.
 export const FUNDED_MODEL_ID = 'sqemes-ai-model';
 
+// SQEM-311 — exported so `authoringAI.ts` stops keeping its own copy. There were three identical
+// definitions of this rule in the repo; a predicate that lives in three places is three predicates,
+// and the next model whose name breaks the pattern would have had to be fixed in all of them.
+//
+// ⚠️ It is a **pattern** match, not a list of ids, and that is on purpose: image models are named
+// with `image` / `dall-e` / `aurora` by every provider we carry, and a list would need editing for
+// each new one — silently offering an image model for text work until somebody noticed.
 const IMAGE_MODEL_PATTERNS = ['image', 'dall-e', 'aurora'];
-const isImageModel = (id: string) => IMAGE_MODEL_PATTERNS.some(p => id.toLowerCase().includes(p));
+export const isImageModel = (id: string) => IMAGE_MODEL_PATTERNS.some(p => id.toLowerCase().includes(p));
 
 export const isFundedModel = (id: string | undefined): boolean => id === FUNDED_MODEL_ID;
 

@@ -20,6 +20,7 @@ import { planTagChange, tagChangeSummary, tagsOnSelection } from '../lib/fileTag
 import { collectWorkspaceTags } from '../lib/workspaceTags';
 import { FILE_ACCEPT_STRING, isImageType, fileTypeLabel, MAX_FILE_SIZE_MB } from '../lib/uploadTypes';
 import type { WorkspaceFile } from '../types';
+import Checkbox from '../components/ui/Checkbox';
 
 // ---- helpers ----
 
@@ -199,14 +200,22 @@ const FileRow = ({
             <FileIcon mimeType={file.mimeType} className="w-5 h-5 text-brand-500" />
           </div>
         )}
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={() => onToggleSelect(file.id)}
+        {/* SQEM-294 — the wrapper carries the click guard the raw input used to have. Without it a
+            tick would bubble to the card and open the file, which is the opposite of selecting it.
+            The primitive takes no `onClick` on purpose: a checkbox that swallows clicks is a
+            behaviour of *this* list, not of every checkbox. */}
+        <span
           onClick={e => e.stopPropagation()}
-          aria-label={`Select ${file.name}`}
-          className={`absolute -top-1.5 -left-1.5 w-4 h-4 rounded accent-brand-600 cursor-pointer bg-white dark:bg-slate-800 shadow transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
-        />
+          className={`absolute -top-1.5 -left-1.5 transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'}`}
+        >
+          <Checkbox
+            checked={selected}
+            onChange={() => onToggleSelect(file.id)}
+            align="center"
+            aria-label={`Select ${file.name}`}
+            className="bg-white dark:bg-slate-800 shadow"
+          />
+        </span>
       </div>
 
       {/* Main */}

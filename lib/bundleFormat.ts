@@ -31,14 +31,22 @@ export type BundleTemplate = {
   model?: string;
   brandConfig?: AssistantBrandConfig;
   contextFileRefs: string[]; // → BundleFile.ref
-  skillRefs: string[];       // → BundleTemplate.ref in `skills`
 };
+// ⚠️ SQEM-298 — `skills` and `skillRefs` are gone from this format, not deprecated.
+//
+// They carried skills *embedded into another template* via `prompts.skill_ids`, which SQEM-167 took
+// out of the editor and SQEM-047 had already emptied by migration on every database that runs the
+// chain. The field was therefore always `[]` in anything we ever wrote.
+//
+// ⛔ **The reader went with the writer**, which is only correct because of a fact the owner
+// confirmed on 2026-08-31: **no bundle has ever been downloaded**, so there is no file in the world
+// carrying a populated `skills` to be compatible with. Keeping a reader for a shape that was never
+// shipped is ceremony. That premise expires — see the note in `templateBundle.ts`.
 export type BundleManifest = {
   schema: string;
   exportedAt?: string;
   generator?: string;
   templates: BundleTemplate[];
-  skills: BundleTemplate[];
   files: BundleFile[];
 };
 

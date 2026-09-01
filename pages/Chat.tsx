@@ -34,6 +34,7 @@ import TemplateLaunchModal, { type ContextImage } from '../components/TemplateLa
 import ChatSearchModal from '../components/ChatSearchModal';
 import Avatar from '../components/ui/Avatar';
 import FullScreenExit from '../components/ui/FullScreenExit';
+import Checkbox from '../components/ui/Checkbox';
 
 
 // ---------------------------------------------------------------------------
@@ -1295,11 +1296,10 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                           <span className="text-sm text-slate-700 dark:text-slate-200">Upload from device</span>
                         </button>
                         <label className="flex items-center gap-2 px-3 py-2 mt-1 border-t border-slate-100 dark:border-slate-700 cursor-pointer">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={saveToWorkspace}
-                            onChange={e => setSaveToWorkspace(e.target.checked)}
-                            className="w-4 h-4 rounded accent-brand-600 cursor-pointer shrink-0"
+                            onChange={() => setSaveToWorkspace(!saveToWorkspace)}
+                            align="center"
                           />
                           <span className="text-xs text-slate-600 dark:text-slate-400">Save uploads to workspace</span>
                         </label>
@@ -1322,11 +1322,11 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                         onClick={() => setConnectorMenuOpen(o => !o)}
                         disabled={enabledModels.length === 0}
                         title="Connectors"
-                        className={`relative p-3 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed ${enabledConnectorIds.length ? 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20'}`}
+                        className={`relative p-3 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed ${enabledConnectorIds.length ? 'text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20'}`}
                       >
                         <Plug className="w-4 h-4" />
                         {enabledConnectorIds.length > 0 && (
-                          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-violet-600 text-white text-2xs font-bold flex items-center justify-center">{enabledConnectorIds.length}</span>
+                          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-brand-600 text-white text-2xs font-bold flex items-center justify-center">{enabledConnectorIds.length}</span>
                         )}
                       </button>
                       {connectorMenuOpen && (
@@ -1340,7 +1340,7 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                                   type="checkbox"
                                   checked={on}
                                   onChange={() => setEnabledConnectorIds(prev => on ? prev.filter(id => id !== c.id) : [...prev, c.id])}
-                                  className="w-4 h-4 rounded accent-violet-600 cursor-pointer shrink-0"
+                                  className="w-4 h-4 rounded accent-brand-600 cursor-pointer shrink-0"
                                 />
                                 <span className="min-w-0">
                                   <span className="block text-sm text-slate-700 dark:text-slate-200 truncate">{c.name}</span>
@@ -1376,7 +1376,7 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                     onClick={handleEnhanceInput}
                     disabled={isEnhancing || isLoading || !input.trim() || enabledModels.length === 0}
                     title="Enhance with AI"
-                    className="p-3 text-violet-500 hover:text-violet-700 hover:bg-violet-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                    className="p-3 text-brand-500 hover:text-brand-700 hover:bg-brand-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                   >
                     {isEnhancing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                   </button>

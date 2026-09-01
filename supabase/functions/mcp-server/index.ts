@@ -512,21 +512,14 @@ Deno.serve(async (req) => {
   const accessibleFileIds: Set<string> = await (async () => {
     const { data: rows } = await adminClient
       .from('prompts')
-      .select('id, context_file_ids, skill_ids')
+      .select('id, context_file_ids')
       .eq('workspace_id', workspaceId);
-    type Row = { id: string; context_file_ids: string[] | null; skill_ids: string[] | null };
+    type Row = { id: string; context_file_ids: string[] | null };
     const all = (rows as Row[] | null) || [];
-    const byId = new Map(all.map(r => [r.id, r]));
     const ids = new Set<string>();
     for (const r of all) {
       if (!canAccessTemplate(r.id)) continue;
       for (const fid of r.context_file_ids || []) ids.add(fid);
-      // SQEM-291b — files reached through an embedded skill. `prompts/get` already inlines these
-      // with the service role (line ~637) because the parent grants the skill; without the same
-      // reach here, `resources/read` would refuse a file the composed prompt had just quoted.
-      for (const sid of r.skill_ids || []) {
-        for (const fid of byId.get(sid)?.context_file_ids || []) ids.add(fid);
-      }
     }
     if (mcpUserId) {
       const { data: own } = await adminClient
@@ -619,7 +612,7 @@ Deno.serve(async (req) => {
 
     const { data: templates } = await adminClient
       .from('prompts')
-      .select('id, title, description, content, system_instruction, variables, skill_ids, context_file_ids, kind')
+      .select('id, title, description, content, system_instruction, variables, context_file_ids, kind')
       .eq('workspace_id', workspaceId)
       .or('published.eq.true,kind.eq.skill'); // SQEM-110/210 — vestigial guard, see above
 
@@ -632,33 +625,12 @@ Deno.serve(async (req) => {
       resolvedInputs[v.name] = args[v.name] ?? v.defaultValue ?? '';
     }
 
-    const skillParts: string[] = [];
-    if (template.skill_ids?.length > 0) {
-      const { data: skills } = await adminClient
-        .from('prompts')
-        .select('id, title, content, context_file_ids')
-        .eq('workspace_id', workspaceId)
-        .in('id', template.skill_ids);
-
-      for (const skill of (skills || [])) {
-        let skillText = `<skill: ${toSlug(skill.title)}>\n${skill.content || ''}\n</skill>`;
-
-        const skillFiles = await resolveContextFiles(adminClient, workspaceId, skill.context_file_ids);
-        for (const block of renderContextBlocks(skillFiles)) {
-          skillText += `\n\n${block}`;
-        }
-
-        skillParts.push(skillText);
-      }
-    }
-
     const resolvedContext = await resolveContextFiles(adminClient, workspaceId, template.context_file_ids);
     const contextParts: string[] = renderContextBlocks(resolvedContext);
 
     const renderedContent = substituteVariables(template.content || '', resolvedInputs);
 
     const parts: string[] = [];
-    if (skillParts.length > 0) parts.push(skillParts.join('\n\n'));
     if (contextParts.length > 0) parts.push(contextParts.join('\n\n'));
     if (renderedContent) parts.push(renderedContent);
 

@@ -47,6 +47,59 @@ export const KIND_HELP: Record<'prompt' | 'assistant' | 'skill', string> = {
 // Business customers with a valid VAT ID are reverse-charged at checkout and pay less than the number
 // shown. That is why the line says *includes*, not *plus* — and why it names the exception rather
 // than pretending everyone pays the same.
+/**
+ * SQEM-303 — the system prompt a person pastes into ChatGPT or Claude so their Sqemes library is
+ * consulted on every request, not only when they remember to ask.
+ *
+ * ⛔ **It does nothing on its own.** It instructs a model to use tools it can only reach through a
+ * configured MCP connection. That is why the UI shows it inside the MCP card and not as a feature
+ * of its own — a copied text that silently achieves nothing is worse than no text.
+ *
+ * ⚠️ **Under 3,000 characters, and that is a hard external limit, not a style preference.** Claude's
+ * *organization instructions* — the only setting either vendor documents that applies to **every**
+ * conversation for **every** member (Team and Enterprise, admins only) — cap at 3,000. Longer and
+ * the org-wide use, which is the whole point for a team, becomes impossible. `tests/unit/
+ * systemPrompt.test.ts` pins it.
+ *
+ * ⚠️ **The last paragraph is load-bearing.** Claude's organization instructions take **precedence**
+ * over a person's own; individual instructions only fill what the org text does not address. Since
+ * this text will often *be* the org instruction, it has to yield explicitly — otherwise we would be
+ * overriding what someone deliberately set for themselves, from a settings page they never saw.
+ *
+ * ⛔ **No product URL and no workspace name.** The MCP endpoint on a self-hosted instance is the
+ * operator's own, and this string ships to self-host with everything else.
+ *
+ * The tool names are real (`search_templates`, `get_template` in `supabase/functions/mcp-server`).
+ * If they are ever renamed, this text is a caller and must be renamed with them.
+ *
+ * ⚠️ **On several matches it asks rather than picks** (owner's decision, 2026-08-31; the first draft
+ * said *pick the most specific one*). A template is this organisation's agreed way of doing the work,
+ * so choosing the wrong one silently produces something that looks sanctioned and is not — and the
+ * person who could tell them apart in a second is the one already sitting there. **The instruction
+ * to wait is the load-bearing half:** without it a model asks the question and answers anyway, which
+ * is worse than not asking, because it now looks as though the choice was confirmed.
+ */
+export const MCP_SYSTEM_PROMPT = `Before you write, draft, plan, review or rewrite anything substantial \u2014 an email, a specification, a message, a review, a piece of code \u2014 first search the connected Sqemes template library for a matching template, and follow it if one exists.
+
+Sqemes holds this organisation's agreed way of doing recurring work. A template there is not a suggestion: it encodes the structure, tone and wording that have already been decided, so reusing one is better than improvising something equivalent.
+
+How to use it:
+1. Search with a keyword from the request (the search_templates tool).
+2. If exactly one template matches, load it with get_template and follow it.
+3. If several match, ask which one fits best before you continue. Name them, give each a one-line difference, and wait for the answer \u2014 do not choose for them.
+4. If nothing matches, carry on normally. Do not force a poor fit, and do not mention the library.
+
+Whenever you use a template, say which one.
+
+Templates come in three kinds and are used differently:
+- A prompt is a task with {{variables}}. Fill them from the request; ask only for what you genuinely cannot infer.
+- An assistant is a persona with a system instruction and context files. Adopt it for the rest of the task.
+- A skill is a reusable block of company knowledge. Apply it in addition to whatever else you are doing.
+
+Do not paste a template's contents into your reply unless you are asked for it. Use it, then answer.
+
+This instruction adds to whatever else you have been told; it does not replace it. Where it conflicts with a more specific instruction from the person you are talking to, follow theirs.`;
+
 export const VAT_NOTE = 'Includes VAT. Business customers with a valid VAT ID are charged net.';
 
 // SQEM-057 — `price` is the monthly (billed-monthly) price; `priceYearly` is the

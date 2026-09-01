@@ -15,7 +15,6 @@ export type PromptRow = {
   content?: string;
   system_instruction?: string | null;
   context_file_ids?: string[];
-  skill_ids?: string[];
   model?: string | null;
   created_by: string | null;
   usage_count: number;
@@ -42,7 +41,6 @@ export function rowToPrompt(row: PromptRow, favoriteIds?: Set<string>): Prompt {
     content,
     systemInstruction: row.system_instruction ?? undefined,
     contextFileIds: row.context_file_ids || [],
-    skillIds: row.skill_ids || [],
     model: row.model ?? undefined,
     aiGeneratedAt: row.ai_generated_at ?? null,
     createdAt: row.created_at,
@@ -69,7 +67,6 @@ function promptToRow(prompt: Partial<Prompt>, workspaceId: string) {
   if (prompt.content !== undefined) row.content = prompt.content;
   if (prompt.systemInstruction !== undefined) row.system_instruction = prompt.systemInstruction || null;
   if (prompt.contextFileIds !== undefined) row.context_file_ids = prompt.contextFileIds;
-  if (prompt.skillIds !== undefined) row.skill_ids = prompt.skillIds;
   if (prompt.model !== undefined) row.model = prompt.model || null;
   if (prompt.createdBy) row.created_by = prompt.createdBy;
   if (prompt.usageCount !== undefined) row.usage_count = prompt.usageCount;
@@ -79,7 +76,7 @@ function promptToRow(prompt: Partial<Prompt>, workspaceId: string) {
   return row;
 }
 
-const PROMPT_SELECT = 'id, workspace_id, kind, title, description, tag, steps, content, system_instruction, brand_config, context_file_ids, skill_ids, model, variables, created_at, updated_at, usage_count, published, source_template_id, created_by';
+const PROMPT_SELECT = 'id, workspace_id, kind, title, description, tag, steps, content, system_instruction, brand_config, context_file_ids, model, variables, created_at, updated_at, usage_count, published, source_template_id, created_by';
 
 export async function fetchPrompts(workspaceId: string, userId: string) {
   const [promptsResult, favoritesResult] = await Promise.all([
@@ -242,7 +239,6 @@ export async function duplicatePrompt(prompt: Prompt, workspaceId: string, userI
     content: prompt.content,
     system_instruction: prompt.systemInstruction || null,
     context_file_ids: prompt.contextFileIds || [],
-    skill_ids: prompt.skillIds || [],
     model: prompt.model || null,
     created_by: userId || null,
     usage_count: 0,
@@ -282,28 +278,4 @@ export async function duplicatePrompt(prompt: Prompt, workspaceId: string, userI
   }
 
   return created;
-}
-
-/** The fields of an embedded skill the launch flow needs to compose its `<skill: …>` block. */
-export type ResolvedSkill = { id: string; title: string; content: string; contextFileIds: string[] };
-
-/**
- * SQEM-144 — resolve a template's embedded skills transparently via the `resolve-template-skills`
- * edge function (service role, authorized by access to THIS template). A skill restricted away
- * from the caller is still returned as long as it is embedded in a template the caller can access,
- * so the composed prompt never silently loses skill context. Callers should fall back to the
- * client store if this throws (graceful degradation — worst case is the prior RLS-filtered set).
- */
-export async function fetchResolvedSkills(templateId: string): Promise<ResolvedSkill[]> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('Not authenticated');
-  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-template-skills`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-    body: JSON.stringify({ templateId }),
-  });
-  if (!res.ok) throw new Error(`resolve-template-skills returned ${res.status}`);
-  const json = await res.json();
-  return ((json.skills ?? []) as { id: string; title: string; content: string; context_file_ids: string[] | null }[])
-    .map(s => ({ id: s.id, title: s.title, content: s.content, contextFileIds: s.context_file_ids ?? [] }));
 }

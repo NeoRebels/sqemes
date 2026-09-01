@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useUI, useWorkspace } from '../store';
 import { can } from '../lib/permissions';
 import { useLocation, useNavigate } from 'react-router';
-import { PLANS, TRIAL_DAYS, VAT_NOTE } from '../constants';
+import { PLANS, TRIAL_DAYS, VAT_NOTE, MCP_SYSTEM_PROMPT } from '../constants';
 import { hasActiveSubscription, isTrialing } from '../lib/subscription';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { fetchCanPublish, setPublisherToken } from '../lib/api/library';
@@ -17,6 +17,7 @@ import McpIcon from '../components/McpIcon';
 import ConnectorsCard from '../components/ConnectorsCard';
 import Card from '../components/ui/Card';
 import AccessGroupsCard from '../components/AccessGroupsCard';
+import AuthoringModelCard from '../components/AuthoringModelCard';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import AboutSection from '../components/AboutSection';
@@ -100,11 +101,12 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
   const snippet = `{\n  "mcpServers": {\n    "sqemes": {\n      "url": "${mcpUrl}",\n      "headers": {\n        "Authorization": "Bearer sqm_live_YOUR_KEY"\n      }\n    }\n  }\n}`;
   const [mcpUrlCopied, setMcpUrlCopied] = useState(false);
   const [snippetCopied, setSnippetCopied] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
   return (
     <Card className="p-6 md:p-8 relative overflow-hidden">
       <div className="mb-6">
         <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <McpIcon className="w-5 h-5 text-violet-500" />
+          <McpIcon className="w-5 h-5 text-brand-500" />
           MCP Server
         </h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -122,7 +124,7 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
           </div>
           <button
             onClick={onUpgrade}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-violet-200 dark:shadow-none"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none"
           >
             Upgrade plan
           </button>
@@ -136,7 +138,7 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
               <button
                 type="button"
                 onClick={async () => { await copyToClipboard(mcpUrl); setMcpUrlCopied(true); setTimeout(() => setMcpUrlCopied(false), 2000); }}
-                className="shrink-0 text-slate-400 hover:text-violet-500 transition-colors"
+                className="shrink-0 text-slate-400 hover:text-brand-500 transition-colors"
                 title="Copy URL"
               >
                 {mcpUrlCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -157,6 +159,46 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
               </button>
             </div>
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Replace <code className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded">sqm_live_YOUR_KEY</code> with one of your API keys above.</p>
+          </div>
+
+          {/* SQEM-303 — the system prompt lives here, inside the MCP card, and not as a feature of
+              its own. It instructs a model to use tools it can only reach through the connection set
+              up directly above; on its own it achieves nothing. Somewhere else in the product it
+              would be a text people copy and then wonder why nothing changed. */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">System prompt (optional)</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+              The server already asks connected clients to check your library first. Add this where your
+              AI tool keeps its standing instructions and it also applies in clients that ignore that,
+              and to everyone at once.
+            </p>
+            <div className="relative bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl p-4">
+              <pre className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap max-h-44 overflow-y-auto pr-8">{MCP_SYSTEM_PROMPT}</pre>
+              <button
+                type="button"
+                onClick={async () => { await copyToClipboard(MCP_SYSTEM_PROMPT); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 2000); }}
+                className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-brand-500 transition-colors"
+                title="Copy system prompt"
+              >
+                {promptCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            {/* Two places, not one — and they are genuinely different settings, so naming only the
+                personal one would leave a team lead to discover the other by accident. */}
+            <dl className="mt-2.5 space-y-1.5 text-xs text-slate-400 dark:text-slate-500">
+              <div>
+                <dt className="inline font-bold text-slate-500 dark:text-slate-400">Just for you: </dt>
+                <dd className="inline">ChatGPT → Settings → Personalization → Custom instructions. Claude → Settings → your own instructions.</dd>
+              </div>
+              <div>
+                <dt className="inline font-bold text-slate-500 dark:text-slate-400">Everyone at once: </dt>
+                {/* Checked against both vendors' own documentation on 2026-08-31. Claude states that
+                    organization instructions apply "in every conversation across your organization";
+                    OpenAI documents nothing equivalent, so this says what its nearest option actually
+                    does — applied when judged relevant — rather than implying it is the same thing. */}
+                <dd className="inline">on Claude Team or Enterprise an admin can set it under Organization and access, and it then applies to every conversation in the organisation. ChatGPT has no documented setting that reaches every chat; a shared Skill is the closest, and it is applied when the model judges it relevant.</dd>
+              </div>
+            </dl>
           </div>
         </div>
       )}
@@ -363,6 +405,10 @@ const Settings = () => {
       },
     });
     setBpDirty(false);
+    // SQEM-310 — the four other save buttons on this page confirm; this one did not. It matters more
+    // here than elsewhere: the Template Wizard button reads "Set up brand" until the required fields
+    // are filled, so somebody who saves and sees nothing cannot tell whether it was enough.
+    showToast('Brand updated successfully', 'success');
   };
 
   // Buffered profile fields (only saved on button click)
@@ -776,17 +822,17 @@ const Settings = () => {
                     </div>
                   )}
                   {isSqemesAdmin && (
-                    <div className="flex items-center justify-between p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/50 rounded-xl">
+                    <div className="flex items-center justify-between p-4 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800/50 rounded-xl">
                       <div className="flex items-center gap-3">
-                        <Shield className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+                        <Shield className="w-5 h-5 text-brand-600 dark:text-brand-400" />
                         <div>
-                          <p className="text-sm font-bold text-violet-900 dark:text-violet-300">Managed Workspace</p>
-                          <p className="text-xs text-violet-600 dark:text-violet-400 mt-0.5">Unlimited seats, no plan restrictions</p>
+                          <p className="text-sm font-bold text-brand-900 dark:text-brand-300">Managed Workspace</p>
+                          <p className="text-xs text-brand-600 dark:text-brand-400 mt-0.5">Unlimited seats, no plan restrictions</p>
                         </div>
                       </div>
                       <button
                         onClick={() => setWorkspaceManaged(workspace.id, !workspace.isManaged)}
-                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none ${workspace.isManaged ? 'bg-violet-600' : 'bg-slate-200 dark:bg-slate-600'}`}
+                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none ${workspace.isManaged ? 'bg-brand-600' : 'bg-slate-200 dark:bg-slate-600'}`}
                         title={workspace.isManaged ? 'Disable managed mode' : 'Enable managed mode'}
                       >
                         <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${workspace.isManaged ? 'translate-x-6' : 'translate-x-0'}`} />
@@ -819,6 +865,16 @@ const Settings = () => {
                   </div>
                 </div>
               </Card>
+
+              {/* SQEM-311 — which model does the writing. Deliberately NOT gated on Cloud: self-host is
+                  BYOK-only, so there is no funded fallback there and the choice matters more, not less. */}
+              {can(currentUser, workspace, 'api-keys:manage') && (
+                <AuthoringModelCard
+                  workspace={workspace}
+                  onChange={modelId => updateWorkspace({ authoringModelId: modelId })}
+                  onOpenApiKeys={() => setActiveTab('api')}
+                />
+              )}
 
               {/* SQEM-183 — self-host marketplace publisher token (Cloud publishes directly; self-host only) */}
               {IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
@@ -874,6 +930,26 @@ const Settings = () => {
                     onChange={v => updateWorkspace({ defaultTemplateAccess: valueToWorkspaceDefault(v) })}
                   />
                 </Card>
+              )}
+
+              {/* SQEM-292/304 — Access groups. Admins only, enforced twice: the card is hidden here,
+                  and the RLS policies reject writes from anyone else. Hiding alone would be a
+                  suggestion; the policy is the rule.
+
+                  SQEM-304 — moved here from the Team tab. It sat there because *a group is a set of
+                  people*, which describes what one is made of, not what it is for: a group exists to
+                  grant template access and appears nowhere else in the product. Whoever creates one
+                  is thinking about a template, so it belongs beside the setting that makes it useful.
+
+                  ⛔ **Its own condition, deliberately outside the `!IS_SELF_HOSTED` block above.**
+                  Access groups are not Cloud-only — the migration ships with the bundle and the
+                  policies apply there identically. Folding this into that block would take group
+                  management away from every self-hosted instance, and it would look perfectly
+                  correct on Cloud while doing it.
+
+                  No `mt-*` here: this tab spaces its cards with `space-y-6`, unlike the Team tab. */}
+              {can(currentUser, workspace, 'team:manage') && (
+                <AccessGroupsCard workspaceId={workspace.id} members={workspace.members} />
               )}
 
               {/* SQEM-170 — Content Governance is a Cloud-only feature */}
@@ -1164,15 +1240,6 @@ const Settings = () => {
               </Card>
             )}
 
-            {/* SQEM-292 — Access groups. Admins only, and that is enforced twice: the card is hidden
-                here, and the RLS policies reject writes from anyone else. Hiding alone would be a
-                suggestion; the policy is the rule.
-
-                It lives in the Team tab rather than General because a group is a set of people —
-                whoever is looking after who-is-in-what is already on this screen. */}
-            {can(currentUser, workspace, 'team:manage') && (
-              <AccessGroupsCard workspaceId={workspace.id} members={workspace.members} className="mt-6" />
-            )}
           </>)}
 
           {/* --- Plans Tab --- */}
@@ -1180,20 +1247,20 @@ const Settings = () => {
             <Card className="p-6 md:p-8 animate-fade-in">
               {workspace.isManaged ? (
                 <div className="flex flex-col items-center text-center py-8">
-                  <div className="w-16 h-16 bg-violet-100 rounded-2xl flex items-center justify-center mb-4">
-                    <Shield className="w-8 h-8 text-violet-600" />
+                  <div className="w-16 h-16 bg-brand-100 rounded-2xl flex items-center justify-center mb-4">
+                    <Shield className="w-8 h-8 text-brand-600" />
                   </div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Managed Workspace</h2>
                   <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm">
                     This workspace is managed by sqemes. You have unlimited seats and full access to all features — no subscription required.
                   </p>
                   <div className="mt-6 flex gap-6 text-center">
-                    <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/50 rounded-xl px-6 py-4">
-                      <p className="text-2xl font-bold text-violet-700 dark:text-violet-400">∞</p>
+                    <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/50 rounded-xl px-6 py-4">
+                      <p className="text-2xl font-bold text-brand-700 dark:text-brand-400">∞</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Team Members</p>
                     </div>
-                    <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/50 rounded-xl px-6 py-4">
-                      <p className="text-2xl font-bold text-violet-700 dark:text-violet-400">€0</p>
+                    <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/50 rounded-xl px-6 py-4">
+                      <p className="text-2xl font-bold text-brand-700 dark:text-brand-400">€0</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Monthly Cost</p>
                     </div>
                   </div>
@@ -1375,7 +1442,10 @@ const Settings = () => {
                     </p>
                   </div>
                   <Button onClick={handleSaveKeys} className="px-5 py-2 shadow-lg shadow-brand-200">
-                    <Save className="w-4 h-4" /> <span className="hidden sm:inline">Save Changes</span>
+                    {/* SQEM-301 — "Save", and the label is no longer hidden on small screens. It
+                        was `hidden sm:inline` because "Save Changes" did not fit; at four characters
+                        it does, and an icon-only button had no accessible name at all. */}
+                    <Save className="w-4 h-4" /> Save
                   </Button>
                 </div>
                 
@@ -1478,7 +1548,7 @@ const Settings = () => {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <Zap className="w-5 h-5 text-violet-500" />
+                      <Zap className="w-5 h-5 text-brand-500" />
                       Public API Keys
                     </h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -1489,7 +1559,7 @@ const Settings = () => {
                     onClick={() => { setNewKeyName(''); setNewKeyScope(DEFAULT_KEY_SCOPE); setNewKeyBindToMe(true); setShowGenerateKeyModal(true); }}
                     disabled={!hasMcpAccess}
                     title={!hasMcpAccess ? 'Upgrade to Team or Business to generate MCP keys' : undefined}
-                    className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-violet-200 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                    className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                   >
                     <Plus className="w-4 h-4" /> Generate Key
                   </button>
@@ -1532,7 +1602,7 @@ const Settings = () => {
                               )}
                             <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300">read</span>
                             {writeScopes.map(s => (
-                              <span key={s} className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">{s}</span>
+                              <span key={s} className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300">{s}</span>
                             ))}
                             {displayExpiry && (
                               <span className={`text-2xs font-bold px-1.5 py-0.5 rounded-md ${expired ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'}`}>
@@ -1550,7 +1620,7 @@ const Settings = () => {
                         <div className="flex items-center gap-1 shrink-0">
                           <button
                             onClick={() => openEditKeyScope(k)}
-                            className="p-2 text-slate-400 dark:text-slate-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors"
+                            className="p-2 text-slate-400 dark:text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors"
                             title="Edit connection"
                           >
                             <SlidersHorizontal className="w-4 h-4" />
@@ -1804,7 +1874,7 @@ const Settings = () => {
           onChange={e => setNewKeyName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleGenerateKey()}
           placeholder="e.g. Production, Zapier, n8n"
-          className="w-full p-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all mb-5 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+          className="w-full p-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all mb-5 placeholder:text-slate-400 dark:placeholder:text-slate-500"
           autoFocus
         />
         <div className="mb-5">
@@ -1818,7 +1888,7 @@ const Settings = () => {
               <button
                 type="button"
                 onClick={() => setNewKeyBindToMe(true)}
-                className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl border text-sm text-left transition-all ${newKeyBindToMe ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-slate-900 dark:text-slate-100' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl border text-sm text-left transition-all ${newKeyBindToMe ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-slate-900 dark:text-slate-100' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
               >
                 <User className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>
@@ -1829,7 +1899,7 @@ const Settings = () => {
               <button
                 type="button"
                 onClick={() => setNewKeyBindToMe(false)}
-                className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl border text-sm text-left transition-all ${!newKeyBindToMe ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-slate-900 dark:text-slate-100' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl border text-sm text-left transition-all ${!newKeyBindToMe ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-slate-900 dark:text-slate-100' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
               >
                 <Users className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>
@@ -1847,7 +1917,7 @@ const Settings = () => {
           <button
             onClick={handleGenerateKey}
             disabled={!newKeyName.trim() || isGeneratingKey}
-            className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isGeneratingKey ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</> : 'Generate Key'}
           </button>
@@ -1864,7 +1934,7 @@ const Settings = () => {
           value={editKeyName}
           onChange={e => setEditKeyName(e.target.value)}
           placeholder="e.g. Production, Zapier, n8n"
-          className="w-full p-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all mb-5 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+          className="w-full p-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all mb-5 placeholder:text-slate-400 dark:placeholder:text-slate-500"
         />
         <ApiKeyScopeFields value={editKeyScope} onChange={setEditKeyScope} />
         <div className="flex gap-2 mt-6">
@@ -1872,7 +1942,7 @@ const Settings = () => {
           <button
             onClick={handleSaveKeyScope}
             disabled={isSavingScope || !editKeyName.trim()}
-            className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isSavingScope ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...</> : 'Save changes'}
           </button>

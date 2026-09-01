@@ -6,12 +6,12 @@ import { IS_SELF_HOSTED } from '../lib/env';
 import { fetchRestrictedTemplateIds } from '../lib/api/templateAccess';
 import { exportTemplatesToZip, downloadBlob, readBundle, importBundle, type BundleManifest } from '../lib/templateBundle';
 import { importErrorMessage, readSkillZip, toSlug, type SkillBundle } from '../lib/skillBundle';
-import { exportSkillToZip, importSkillBundle } from '../lib/skillBundleIo';
+import { importSkillBundle } from '../lib/skillBundleIo';
 import { publishToMarketplace, submitToMarketplaceViaProxy, fetchCanPublish } from '../lib/api/library';
 import { TEMPLATE_CATEGORIES, KIND_HELP } from '../constants';
 import type JSZip from 'jszip';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Search, Plus, Play, Edit, Trash2, Copy, Star, Bot, PenTool, Wand2, Loader2, Store, Lock, Upload, Package, FolderDown } from 'lucide-react';
+import { Search, Plus, Play, Edit, Trash2, Copy, Star, Bot, PenTool, Wand2, Sparkles, Loader2, Store, Lock, Upload, Package, FolderDown } from 'lucide-react';
 import Card from '../components/ui/Card';
 import TemplateCard from '../components/ui/TemplateCard';
 import Modal from '../components/ui/Modal';
@@ -24,6 +24,9 @@ import TagFilter from '../components/ui/TagFilter';
 import TagEditor from '../components/ui/TagEditor';
 import KindBadge from '../components/ui/KindBadge';
 import { Prompt, PromptKind, TemplateCategory } from '../types';
+import Checkbox from '../components/ui/Checkbox';
+import TemplateWizardModal from '../components/TemplateWizardModal';
+import { brandIsComplete } from '../lib/brand';
 
 const PromptSkeleton = () => (
   <Card className="animate-pulse p-4 flex flex-col gap-3">
@@ -85,11 +88,11 @@ const PromptCard = memo(function PromptCard({
         onClick={(e) => e.stopPropagation()}
         className="absolute top-1 left-1 z-20 p-1.5 cursor-pointer"
       >
-        <input
-          type="checkbox"
+        <Checkbox
           checked={selected}
           onChange={() => onToggleSelect(prompt.id)}
-          className={`block w-4 h-4 rounded accent-brand-600 cursor-pointer bg-white dark:bg-slate-800 shadow transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+          align="center"
+          className={`bg-white dark:bg-slate-800 shadow transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
         />
       </label>
     )}
@@ -140,18 +143,19 @@ const PromptCard = memo(function PromptCard({
         >
           <Copy className="w-4 h-4" />
         </button>
-        {/* SQEM-243 — a skill leaves as the folder format the rest of the world uses: SKILL.md plus
-            its files, at their paths. Skills only, because a prompt's variables and an assistant's
-            brand config have no place in that format — those keep the .sqemes.zip (SQEM-236). */}
-        {prompt.kind === 'skill' && (
-          <button
-            onClick={(e) => { e.preventDefault(); onExportSkill(prompt); }}
-            className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-            title="Download as an Agent Skill folder (.zip)"
-          >
-            <FolderDown className="w-4 h-4" />
-          </button>
-        )}
+        {/* SQEM-302 — one template leaves as a `.sqemes.zip`, the same format the multi-select export
+            has always produced. Until now this wrote an Agent Skill folder and was shown for skills
+            only, because a prompt's variables and an assistant's brand config have no place in a
+            SKILL.md. The bundle carries all three kinds, so the restriction lost its reason and the
+            button belongs on every card.
+            ⚠️ Import is untouched: an Agent Skill folder can still be uploaded (SQEM-243). */}
+        <button
+          onClick={(e) => { e.preventDefault(); onExportSkill(prompt); }}
+          className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+          title="Download Template (.sqemes.zip)"
+        >
+          <FolderDown className="w-4 h-4" />
+        </button>
         {/* SQEM-178/181 — self-host shows Publish only when a publisher token is configured (Phase B). */}
         {showPublish && (
           <button
@@ -239,6 +243,34 @@ const Templates = () => {
   );
 
   const canEdit = can(currentUser, workspace, 'prompts:edit');
+  // SQEM-308 — the Template Wizard, and the one condition it stands on.
+  //
+  // ⛔ Not rendered on self-host at all. It generates from the brand profile, which self-host does
+  // not have in this form — and offering "Set up brand" there would send an operator to a page that
+  // cannot help them, which is worse than the feature being absent.
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const hasBrand = brandIsComplete(workspace?.brandProfile);
+  const wizardButton = !IS_SELF_HOSTED && canEdit ? (
+    hasBrand ? (
+      <button
+        onClick={() => setWizardOpen(true)}
+        className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 px-5 py-2.5 rounded-xl font-medium text-sm transition-all"
+      >
+        <Sparkles className="w-4 h-4" /> Template Wizard
+      </button>
+    ) : (
+      /* The same slot, saying what is missing rather than sitting there disabled. A disabled button
+         with a tooltip asks the person to hover to find out why; this one just tells them. */
+      <Link
+        to="/settings"
+        state={{ initialTab: 'brand' }}
+        title="The Template Wizard writes in your brand's voice — it needs the brand set up first"
+        className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 px-5 py-2.5 rounded-xl font-medium text-sm transition-all"
+      >
+        <Sparkles className="w-4 h-4" /> Set up brand
+      </Link>
+    )
+  ) : null;
 
   const filteredPrompts = useMemo(() => {
     const lowerSearch = searchTerm.toLowerCase();
@@ -338,12 +370,13 @@ const Templates = () => {
     }
   };
 
-  // SQEM-243 — one skill leaves as the folder format everyone else speaks.
-  const handleExportSkill = async (skill: Prompt) => {
+  // SQEM-302 — one template, the same bundle the multi-select export writes. Two entry points, one
+  // format: the person who clicks a card and the person who ticks a checkbox get the same file.
+  const handleExportSkill = async (template: Prompt) => {
     setExporting(true);
     try {
-      downloadBlob(await exportSkillToZip(skill, workspaceFiles), `${toSlug(skill.title)}.zip`);
-      showToast('Exported as an Agent Skill folder', 'success');
+      downloadBlob(await exportTemplatesToZip([template], workspaceFiles), `${toSlug(template.title)}.sqemes.zip`);
+      showToast('Template downloaded', 'success');
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Export failed', 'error');
     } finally {
@@ -423,9 +456,9 @@ const Templates = () => {
     if (!importBundleData || !workspace?.id) return;
     setImporting(true);
     try {
-      const { templates, skills, files } = await importBundle(importBundleData.zip, importBundleData.manifest, workspace.id, currentUser.id);
+      const { templates, files } = await importBundle(importBundleData.zip, importBundleData.manifest, workspace.id, currentUser.id);
       files.forEach(addWorkspaceFile); // prompts arrive via the store's realtime subscription
-      showToast(`Imported ${templates} template${templates === 1 ? '' : 's'}${skills ? ` + ${skills} skill${skills === 1 ? '' : 's'}` : ''}`, 'success');
+      showToast(`Imported ${templates} template${templates === 1 ? '' : 's'}`, 'success');
       setImportBundleData(null);
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Import failed', 'error');
@@ -451,6 +484,7 @@ const Templates = () => {
             >
               <Upload className="w-4 h-4" /> Import
             </button>
+            {wizardButton}
             <Link to="/prompts/new" className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-brand-200 hover:shadow-brand-300 dark:shadow-none dark:hover:shadow-none flex-1 sm:flex-none justify-center">
               <Plus className="w-5 h-5" /> New Template
             </Link>
@@ -545,6 +579,7 @@ const Templates = () => {
               <Link to="/library" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">
                 <Store className="w-4 h-4" /> Browse Marketplace
               </Link>
+              {wizardButton}
             </div>
           ) : undefined}
         />
@@ -628,7 +663,7 @@ const Templates = () => {
               <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Publish to Marketplace</h3>
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-              Publish <span className="font-semibold">{publishTarget.title}</span> (incl. its skills + context files) as a
+              Publish <span className="font-semibold">{publishTarget.title}</span> (incl. its context files) as a
               snapshot others can copy. It&apos;s <span className="font-semibold">submitted for review</span> and goes live once approved.
               {publishTarget.kind === 'skill' && <span className="block mt-1 text-amber-600 dark:text-amber-400">Skills get extra review before they go live.</span>}
             </p>
@@ -664,10 +699,12 @@ const Templates = () => {
         </div>
       </Modal>
 
+      {wizardOpen && <TemplateWizardModal open onClose={() => setWizardOpen(false)} />}
+
       {/* Import preview (SQEM-161) — transparency before applying a third-party bundle */}
       <Modal open={!!importBundleData} onClose={() => !importing && setImportBundleData(null)} size="sm" className="p-6">
         {importBundleData && (() => {
-          const { templates, skills, files } = importBundleData.manifest;
+          const { templates, files } = importBundleData.manifest;
           const totalBytes = (files || []).reduce((s, f) => s + (f.sizeBytes || 0), 0);
           const mb = (totalBytes / (1024 * 1024));
           return (
@@ -682,7 +719,6 @@ const Templates = () => {
               </p>
               <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 p-4 mb-4 text-sm">
                 <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Templates</span><span className="font-bold text-slate-800 dark:text-slate-100">{(templates || []).length}</span></div>
-                <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Embedded skills</span><span className="font-bold text-slate-800 dark:text-slate-100">{(skills || []).length}</span></div>
                 <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Context files</span><span className="font-bold text-slate-800 dark:text-slate-100">{(files || []).length}{totalBytes ? ` · ${mb < 0.1 ? '<0.1' : mb.toFixed(1)} MB` : ''}</span></div>
               </div>
               {(templates || []).length > 0 && (
@@ -705,7 +741,7 @@ const Templates = () => {
       </Modal>
 
       {/* SQEM-243 — the same confirmation for an Agent Skill folder. Its own modal rather than a
-          branch inside the one above: a skill bundle has no templates/skills/files split to report,
+          branch inside the one above: a skill bundle has no templates/files split to report,
           and folding two shapes into one dialog is how a preview stops previewing anything. */}
       <Modal open={!!importSkillData} onClose={() => !importing && setImportSkillData(null)} size="sm" className="p-6">
         {importSkillData && (() => {

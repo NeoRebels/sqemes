@@ -250,7 +250,6 @@ export type Database = {
           content: string;
           system_instruction: string | null;
           context_file_ids: string[];
-          skill_ids: string[];
           model: string | null;
           created_by: string | null;
           usage_count: number;
@@ -273,7 +272,6 @@ export type Database = {
           content?: string;
           system_instruction?: string | null;
           context_file_ids?: string[];
-          skill_ids?: string[];
           model?: string | null;
           created_by?: string | null;
           usage_count?: number;
@@ -296,7 +294,6 @@ export type Database = {
           content?: string;
           system_instruction?: string | null;
           context_file_ids?: string[];
-          skill_ids?: string[];
           model?: string | null;
           created_by?: string | null;
           usage_count?: number;

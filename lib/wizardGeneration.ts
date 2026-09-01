@@ -249,3 +249,77 @@ export async function generateStarterLibrary(b: BrandInput, ctx: GenContext): Pr
 
   return { drafts, failures };
 }
+
+// ---- Single template (SQEM-308) ---------------------------------------------------------------
+
+/**
+ * SQEM-308 — one template, from what the person says they want plus the brand.
+ *
+ * ⛔ **Deliberately here rather than in its own module.** The starter-library generators above solve
+ * the same problem for a different occasion, and the useful improvements — the brand summary, the
+ * JSON-array discipline, the variable extraction — are shared. A second generator beside this file
+ * would inherit none of them and drift from the day it was written.
+ *
+ * `fileContext` is the text of the documents the person attached. ⚠️ **It is material to understand,
+ * not the template's context files.** Somebody may attach a style guide so the model writes in that
+ * style; whether the guide itself belongs on the finished template is a different question, and the
+ * generation answers it (owner's decision, 2026-09-01) by naming what it wants kept in `keepFiles`.
+ */
+export async function generateSingleTemplate(
+  kind: PromptKind,
+  goal: string,
+  fileContext: { name: string; text: string }[],
+  b: BrandInput,
+  ctx: GenContext,
+): Promise<TemplateDraft & { keepFiles: string[] }> {
+  const shape = kind === 'assistant'
+    ? '"instruction" (the system instruction, second person, no preamble)'
+    : '"content" (the body; use {{variable_name}} placeholders in snake_case wherever the user must supply something)';
+
+  const kindRule = {
+    prompt: 'A prompt is one task the person runs repeatedly. It must be specific enough to produce the same shape of result every time.',
+    assistant: 'An assistant is a persona: who it is, how it writes, what it must never do. Not a task.',
+    skill: 'A skill is a reusable block of company knowledge — a rule set, a policy, a way of doing something. Not a task and not a persona.',
+  }[kind];
+
+  const filesBlock = fileContext.length
+    ? `
+
+The person attached these documents as background. Use them to understand the subject. Then decide which, if any, the finished template should carry as context — list their exact names in "keepFiles", and leave it empty if none belong.
+
+${fileContext.map(f => `--- ${f.name} ---
+${f.text.slice(0, 8000)}`).join('\n\n')}`
+    : '';
+
+  const systemInstruction =
+    `You build one reusable template for a brand's team. ${kindRule} Write it so a colleague who was not in this conversation can use it. Return ONLY a JSON object — no prose, no code fences — with keys "title" (short), "description" (one sentence on when to use it), ${shape}, and "keepFiles" (array of attached document names the template should keep as context; empty array if none).`;
+
+  const raw = await runAuthoringAI({
+    ...ctx,
+    systemInstruction,
+    prompt: `${brandSummary(b)}
+
+What they want to achieve with this template:
+${goal}${filesBlock}`,
+    temperature: 0.7,
+  });
+
+  // Reuses the parser the starter generators already use — it was there, and writing a second one
+  // is how two functions that must agree start disagreeing.
+  const x = parseJsonObject(raw);
+  const content = String(x?.content ?? '');
+  const instruction = String(x?.instruction ?? '');
+  if (!x?.title || (!content && !instruction)) {
+    throw new Error('The model returned something this could not read as a template. Try describing the goal a little more concretely.');
+  }
+
+  return {
+    kind,
+    title: String(x.title).slice(0, 120),
+    description: String(x.description ?? '').slice(0, 300),
+    content,
+    systemInstruction: instruction || undefined,
+    variables: extractVariables(content),
+    keepFiles: Array.isArray(x.keepFiles) ? x.keepFiles.map(String) : [],
+  };
+}

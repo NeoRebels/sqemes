@@ -2,7 +2,7 @@ import { supabase } from '../supabase';
 import type { Prompt } from '../../types';
 import { rowToPrompt, type PromptRow } from './prompts';
 
-const ASSISTANT_SELECT = 'id, workspace_id, kind, title, description, tag, steps, content, system_instruction, context_file_ids, skill_ids, model, variables, created_at, updated_at, usage_count, published, source_template_id, created_by';
+const ASSISTANT_SELECT = 'id, workspace_id, kind, title, description, tag, steps, content, system_instruction, context_file_ids, model, variables, created_at, updated_at, usage_count, published, source_template_id, created_by';
 
 export async function fetchAssistants(workspaceId: string): Promise<Prompt[]> {
   const { data, error } = await supabase
@@ -32,7 +32,6 @@ export async function createAssistant(
       tags: [],
       variables: [],
       context_file_ids: [],
-      skill_ids: [],
       usage_count: 0,
     })
     .select();

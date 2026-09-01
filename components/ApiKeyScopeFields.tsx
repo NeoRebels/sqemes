@@ -91,7 +91,7 @@ export function ApiKeyScopeFields({
                 type="checkbox"
                 checked={value[cap.key]}
                 onChange={e => set({ [cap.key]: e.target.checked })}
-                className="mt-0.5 w-4 h-4 rounded accent-violet-600 cursor-pointer"
+                className="mt-0.5 w-4 h-4 rounded accent-brand-600 cursor-pointer"
               />
               <span className="text-sm text-slate-700 dark:text-slate-200 leading-tight">
                 {cap.label}
@@ -109,7 +109,7 @@ export function ApiKeyScopeFields({
         <select
           value={value.expiry}
           onChange={e => set({ expiry: e.target.value as KeyScopeValue['expiry'] })}
-          className="w-full p-2.5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+          className="w-full p-2.5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
         >
           <option value="never">Never</option>
           <option value="30">In 30 days</option>
@@ -122,7 +122,7 @@ export function ApiKeyScopeFields({
             value={value.customDate}
             min={new Date().toISOString().slice(0, 10)}
             onChange={e => set({ customDate: e.target.value })}
-            className="w-full mt-2 p-2.5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
+            className="w-full mt-2 p-2.5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
           />
         )}
       </div>
