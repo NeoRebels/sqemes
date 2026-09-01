@@ -309,13 +309,13 @@ async function runAndBroadcast(
     } else if (provider === 'claude') {
       result = await callClaude(apiKey, modelId, systemInstruction, messages, temperature, connectors);
     } else if (provider === 'deepseek') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.deepseek.com/v1/chat/completions', systemInstruction, messages, temperature));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.deepseek.com/v1/chat/completions', systemInstruction, messages, temperature, 'deepseek'));
     } else if (provider === 'mistral') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.mistral.ai/v1/chat/completions', systemInstruction, messages, temperature));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.mistral.ai/v1/chat/completions', systemInstruction, messages, temperature, 'mistral'));
     } else if (provider === 'grok') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.x.ai/v1/chat/completions', systemInstruction, messages, temperature));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.x.ai/v1/chat/completions', systemInstruction, messages, temperature, 'grok'));
     } else if (provider === 'openrouter') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://openrouter.ai/api/v1/chat/completions', systemInstruction, messages, temperature));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://openrouter.ai/api/v1/chat/completions', systemInstruction, messages, temperature, 'openrouter'));
     } else {
       result = `[${provider}] Model ${modelId} is not yet supported.`;
     }
@@ -616,13 +616,31 @@ async function callClaude(
   return data.content?.map((c: any) => c.text || '').join('') || 'No content generated.';
 }
 
+/**
+ * ⛔ **SQEM-321 — this is the twin of `execute-step`'s `callOpenAICompatible`, and it was left
+ * behind.** SQEM-316 taught that one to forward PDFs to `mistral` and `openrouter`; this one kept
+ * dropping every PDF, so **Chat** — the channel people actually attach documents in — answered from
+ * a document it had never been given.
+ *
+ * ⚠️ **The same mistake twice in one day, in the same shape.** SQEM-317 existed because SQEM-316
+ * fixed the wizard's upload path and not its attach path; then SQEM-316 itself turned out to have
+ * fixed one edge function and not the other. **Two files with the same job, the same structure and
+ * the same bug, and nothing in the repo connects them** — no shared module, no test, no type.
+ *
+ * ⛔ **If you change the provider/document handling here, change it in
+ * `supabase/functions/execute-step/index.ts` too.** The matrix behind both is in
+ * `pm/DOCUMENTATION.md` → AI Provider Integration **in the source repository** (that file is not
+ * part of the public self-host export — SQEM-279). The real fix is a shared module under
+ * `_shared/`; until somebody does that, this comment is the only thing linking them.
+ */
 async function callOpenAICompatible(
   apiKey: string,
   modelId: string,
   endpoint: string,
   systemInstruction: string | undefined,
   messages: ChatMessage[],
-  temperature: number
+  temperature: number,
+  provider?: string,
 ): Promise<{ content: string; totalTokens: number }> {
   const apiMessages: any[] = [];
 
@@ -630,15 +648,25 @@ async function callOpenAICompatible(
     apiMessages.push({ role: 'system', content: systemInstruction });
   }
 
+  // Only these two can take a document; for the others a PDF is still dropped. Verified against the
+  // providers' own docs on 2026-09-01 — grok takes images only, deepseek's schema has no file part.
+  const pdfShape = provider === 'mistral' || provider === 'openrouter' ? provider : null;
+
   for (const msg of messages) {
     if (typeof msg.content === 'string') {
       apiMessages.push({ role: msg.role, content: msg.content });
     } else {
       const content = msg.content
-        .filter((p: any) => !(p.inlineData && p.inlineData.mimeType === 'application/pdf'))
+        .filter((p: any) => !(p.inlineData && p.inlineData.mimeType === 'application/pdf' && !pdfShape))
         .map((p: any) => {
           if (p.inlineData) {
             if (p.inlineData.mimeType.startsWith('text/')) return decodeTextFile(p.inlineData);
+            if (p.inlineData.mimeType === 'application/pdf') {
+              const dataUrl = `data:application/pdf;base64,${p.inlineData.data}`;
+              return pdfShape === 'mistral'
+                ? { type: 'document_url', document_url: dataUrl }
+                : { type: 'file', file: { filename: 'document.pdf', file_data: dataUrl } };
+            }
             return { type: 'image_url', image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` } };
           }
           return { type: 'text', text: p.text || String(p) };

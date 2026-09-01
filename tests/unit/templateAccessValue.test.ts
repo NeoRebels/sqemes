@@ -157,10 +157,23 @@ describe('workspace default (two states)', () => {
   });
 
   it('reads any stored role as "restricted by default" — the array is a marker, not a grantee list', () => {
-    // SQEM-292 — `private`, not `restricted`: the setting now says what it produces. It always
-    // produced Only me (see seedFromWorkspaceDefault); it just used to be labelled otherwise.
-    expect(workspaceDefaultToValue(['member'])).toEqual({ mode: 'private', userIds: [], groupIds: [] });
-    expect(workspaceDefaultToValue(['editor'])).toEqual({ mode: 'private', userIds: [], groupIds: [] });
+    // ⛔ SQEM-319 — `restricted`, and this test used to pin `private` (SQEM-292). That value matched
+    // **no rendered button**: Settings omits `allowPrivate` on purpose (SQEM-210), so the setting
+    // showed nothing selected while saving correctly. A green test over an invisible state.
+    //
+    // The fix separates two things SQEM-292 treated as one: the *default* says how new templates
+    // start, the *template* says what it is right now. `seedFromWorkspaceDefault` still answers the
+    // second with `private`, and is still right — see the test below.
+    expect(workspaceDefaultToValue(['member'])).toEqual({ mode: 'restricted', userIds: [], groupIds: [] });
+    expect(workspaceDefaultToValue(['editor'])).toEqual({ mode: 'restricted', userIds: [], groupIds: [] });
+  });
+
+  // The round trip the owner actually performed: click "Restricted by default", reload, see it lit.
+  it('survives the round trip through storage', () => {
+    const stored = valueToWorkspaceDefault({ mode: 'restricted', userIds: [] });
+    expect(workspaceDefaultToValue(stored).mode).toBe('restricted');
+    const open = valueToWorkspaceDefault({ mode: 'everyone', userIds: [] });
+    expect(workspaceDefaultToValue(open).mode).toBe('everyone');
   });
 
   it('persists the two states as empty / non-empty', () => {

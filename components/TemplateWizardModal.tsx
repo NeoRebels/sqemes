@@ -10,8 +10,13 @@ import Modal from './ui/Modal';
 import SegmentedTabs, { type SegmentedTab } from './ui/SegmentedTabs';
 import { WorkspaceFilePickerModal } from './WorkspaceFilePickerModal';
 import { useWorkspace, useUI, usePrompts, useData } from '../store';
-import { authoringModelId } from '../lib/authoringAI';
-import { generateSingleTemplate } from '../lib/wizardGeneration';
+import { authoringModelId, hasAuthoringAlternatives } from '../lib/authoringAI';
+import { generateSingleTemplate, pickHelpfulFiles } from '../lib/wizardGeneration';
+import { classifyUpload, readFileAsText, readFileAsBase64, resolveVisibleFiles, generatedFileName } from '../lib/wizardUploads';
+import { seedFromWorkspaceDefault, accessValueToAccess } from './TemplateAccessControl';
+import { setTemplateAccess } from '../lib/api/templateAccess';
+import { deletePrompt as deletePromptApi } from '../lib/api/prompts';
+import { AVAILABLE_MODELS } from '../constants';
 import { describeAIError } from '../lib/aiErrors';
 import { getWorkspaceFileSignedUrl, uploadWorkspaceFile } from '../lib/api/files';
 import sqemesIcon from '../assets/sqemes-icon.svg';
@@ -33,59 +38,132 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
   const [kind, setKind] = useState<PromptKind>('prompt');
   const [goal, setGoal] = useState('');
   const [files, setFiles] = useState<WorkspaceFile[]>([]);
+  // SQEM-315 — uploaded documents, held only in memory. Deliberately NOT `WorkspaceFile[]`:
+  // the type would invite somebody to merge the two lists again, and the merge is the bug.
+  const [uploads, setUploads] = useState<{ name: string; text: string }[]>([]);
+  // SQEM-316 — PDFs and images travel as model parts, not as text. Same rule: never stored.
+  const [binaries, setBinaries] = useState<{ name: string; mimeType: string; data: string }[]>([]);
   const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState(false);
+  // SQEM-317 — what is happening right now. ⛔ Still no progress bar (SQEM-308: we do not know
+  // the duration, and a bar stuck at 90 % is the worse lie). A stage name claims no duration —
+  // it is the difference between "slow" and "hung".
+  const [stage, setStage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
 
   // ⛔ Only reset on a *successful* close. A failed run keeps everything: the goal is the work the
   // person put in, and throwing it away to show them an error is the worst possible trade.
   const closeAndReset = () => {
-    setKind('prompt'); setGoal(''); setFiles([]); setError(null);
+    setKind('prompt'); setGoal(''); setFiles([]); setUploads([]); setBinaries([]); setError(null);
     onClose();
   };
+
+  /** A Blob to base64 without the `data:` prefix — the shape `inlineData` wants. */
+  const blobToBase64 = (b: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => { const v = String(r.result ?? ''); const i = v.indexOf(','); resolve(i >= 0 ? v.slice(i + 1) : v); };
+      r.onerror = () => reject(new Error('unreadable'));
+      r.readAsDataURL(b);
+    });
 
   const attach = (picked: WorkspaceFile[]) => {
     setFiles(prev => [...prev, ...picked.filter(p => !prev.some(f => f.id === p.id))]);
     setPicking(false);
   };
 
+  // SQEM-315 — an uploaded document is **material, and is never stored**. It is read here in the
+  // browser and the bytes never leave it.
+  //
+  // ⛔ Not "upload then delete": every path that does not reach the delete — cancel, a failed
+  // generation, a closed tab — would leave the file in the library. The only version of "not kept"
+  // that holds is not sending it.
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files ?? []);
     e.target.value = '';
-    if (!picked.length || !workspace) return;
-    try {
-      for (const f of picked) {
-        const created = await uploadWorkspaceFile(workspace.id, f, []);
-        addWorkspaceFile(created);
-        setFiles(prev => [...prev, created]);
+    if (!picked.length) return;
+    // SQEM-316 — what is possible depends on which model will read it, so the provider is part of
+    // the question. ⛔ Asked *here*, at pick time: finding out after a minute of generation that the
+    // document was never usable is the expensive way to learn it.
+    const provider = AVAILABLE_MODELS.find(m => m.id === authoringModelId(workspace ?? null))?.provider
+      ?? (workspace && !authoringModelId(workspace) ? 'sqemes' : null);
+
+    for (const f of picked) {
+      const verdict = classifyUpload(f, provider);
+      if (verdict.ok === false) { showToast(verdict.reason, 'error'); continue; }
+      try {
+        if (verdict.binary) {
+          const data = await readFileAsBase64(f);
+          setBinaries(prev => [...prev.filter(b => b.name !== f.name), { name: f.name, mimeType: f.type || 'application/pdf', data }]);
+        } else {
+          const text = (await readFileAsText(f)).trim();
+          if (text) setUploads(prev => [...prev.filter(u => u.name !== f.name), { name: f.name, text }]);
+        }
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : `${f.name} could not be read.`, 'error');
       }
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Upload failed — try a smaller file or a different format.', 'error');
     }
   };
 
-  /** The attached documents' text, for the model to read. Binaries are skipped rather than failing. */
-  const readAttachments = async () => {
-    const out: { name: string; text: string }[] = [];
-    for (const f of files) {
+  /**
+   * The attached workspace files' contents, so they shape the template as well as ride along.
+   *
+   * ⛔ **SQEM-317 — this used to run `res.text()` over everything, including PDFs.** An *uploaded*
+   * PDF was handled properly while an *attached* one arrived as decoded binary in the same prompt:
+   * a contradiction SQEM-316 created by fixing only one of the two paths. PDFs are in the upload
+   * allowlist, so it was the normal case, not an edge one.
+   *
+   * ⚠️ **Mojibake is worse than omitting the file.** It costs tokens, confuses the model, and reads
+   * as the model being bad at its job rather than as a defect of ours.
+   *
+   * A file whose contents cannot be used **stays attached regardless** — that is the promise from
+   * SQEM-315; only its influence on the writing is lost.
+   */
+  const readAttachments = async (provider: string | null) => {
+    // SQEM-318 — in parallel. These used to be sequential round trips *before* the first model call
+    // even started; five attachments meant five waits stacked end to end.
+    // ⚠️ Unthrottled on purpose, and only defensible because the set is bounded: a person picked it.
+    // Over an unbounded list `Promise.all` would be the wrong answer.
+    const results = await Promise.all(files.map(async f => {
       try {
+        const verdict = classifyUpload({ name: f.name, type: f.mimeType, size: f.sizeBytes }, provider);
+        if (verdict.ok === false) return null;       // attached anyway; its contents just cannot help
         const res = await fetch(await getWorkspaceFileSignedUrl(f.storagePath));
-        const text = await res.text();
-        if (text.trim()) out.push({ name: f.name, text: text.trim() });
-      } catch { /* a file we cannot read is context we do without, not a failed run */ }
-    }
-    return out;
+        if (verdict.binary) {
+          return { kind: 'binary' as const, name: f.name, mimeType: f.mimeType, data: await blobToBase64(await res.blob()) };
+        }
+        const t = (await res.text()).trim();
+        return t ? { kind: 'text' as const, name: f.name, text: t } : null;
+      } catch {
+        return null;                                  // unreadable is context we do without
+      }
+    }));
+    return {
+      text: results.filter((r): r is { kind: 'text'; name: string; text: string } => r?.kind === 'text'),
+      binary: results.filter((r): r is { kind: 'binary'; name: string; mimeType: string; data: string } => r?.kind === 'binary'),
+    };
   };
 
   const run = async () => {
     if (!workspace?.brandProfile || !currentUser || !goal.trim()) return;
     setBusy(true); setError(null);
+    setStage(files.length ? 'Reading your documents' : 'Reading your brand');
+    const provider = AVAILABLE_MODELS.find(m => m.id === authoringModelId(workspace))?.provider
+      ?? (authoringModelId(workspace) ? null : 'sqemes');
     try {
+      const attachments = await readAttachments(provider);
+      setStage(`Writing your ${KINDS.find(k => k.value === kind)?.label.toLowerCase()}`);
       const draft = await generateSingleTemplate(
         kind,
         goal.trim(),
-        await readAttachments(),
+        attachments.text,
+        uploads,
+        // The workspace's own files as index data — name, tags, type, size, no content.
+        // ⛔ This list comes from a plain `select('*')`, so RLS has already limited it to what this
+        // person may see. That is the access answer; a second one here would be a second place to
+        // get wrong. Only offered when there is source material to relate them to.
+        (uploads.length || binaries.length) ? workspaceFiles.map(f => ({ name: f.name, tags: f.tags, mimeType: f.mimeType, sizeBytes: f.sizeBytes })) : [],
         {
           brandName: workspace.brandProfile.brandName,
           whatItDoes: workspace.brandProfile.whatItDoes,
@@ -94,13 +172,72 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
           useCase: workspace.brandProfile.useCase,
         },
         { workspaceId: workspace.id, modelId: authoringModelId(workspace) },
+        [...binaries, ...attachments.binary],
       );
 
-      // The generation decides which attachments the template keeps (owner's decision, 2026-09-01):
-      // an attachment may be background to understand, not context to carry. Matched by name, and
-      // an unmatched name is simply dropped — the model naming a file we do not have is not a
-      // reason to fail a template the person can already see.
-      const keep = files.filter(f => draft.keepFiles.includes(f.name)).map(f => f.id);
+      // SQEM-315 — three sources of context files, and only one of them is a judgement.
+      //
+      // 1. **Attached: kept unconditionally.** Somebody chose these deliberately; the generation
+      //    does not get to drop them. (This reverses the 2026-09-01 "the generation decides" rule,
+      //    which now governs only what the model *finds*.)
+      const attachedIds = files.map(f => f.id);
+
+      // 2. **Written by the model** from the uploaded material. These are real workspace files —
+      //    the upload was not kept, its distilled result is.
+      const writtenIds: string[] = [];
+      // SQEM-318 — the model names the file, we impose the rules it cannot know: no path segments,
+      // always `.md`, and no silent collision. Sequential on purpose — each name must see the ones
+      // already taken, including the ones this very run created.
+      const takenNames = workspaceFiles.map(f => f.name);
+      for (const nf of draft.newFiles) {
+        try {
+          const name = generatedFileName(nf.name, takenNames);
+          takenNames.push(name);
+          const created = await uploadWorkspaceFile(
+            workspace.id,
+            new File([nf.content], name, { type: 'text/markdown' }),
+            [],
+          );
+          addWorkspaceFile(created);
+          writtenIds.push(created.id);
+        } catch {
+          // A context file that cannot be saved must not cost the template the person is waiting
+          // for. It is missing, not fatal — and the editor shows exactly what did land.
+        }
+      }
+
+      // 3. **Existing workspace files the model shortlisted**, confirmed by a second pass that
+      //    actually reads them. ⛔ Resolved against the same RLS-filtered list and nothing else: a
+      //    name that is not in it is discarded, never looked up. A model naming a file it should
+      //    not see must not become a lookup that finds it.
+      // ⛔ SQEM-317 — stage two runs *after* the template is written, so a timeout, a 503 or broken
+      // JSON here used to throw away finished work. **A secondary step must never destroy the
+      // primary result.** It degrades to "no files found" and everything else is saved.
+      let foundIds: string[] = [];
+      try {
+      if (draft.inspectFiles.length) {
+        setStage('Looking through your files');
+        const shortlist = resolveVisibleFiles(draft.inspectFiles, workspaceFiles);
+        // SQEM-318 — likewise parallel; the model shortlisted a handful, not a library.
+        const loaded = (await Promise.all(shortlist.map(async f => {
+          try {
+            const res = await fetch(await getWorkspaceFileSignedUrl(f.storagePath));
+            const text = (await res.text()).trim();
+            return text ? { name: f.name, text } : null;
+          } catch {
+            return null;                              // unreadable candidate — simply not a candidate
+          }
+        }))).filter((x): x is { name: string; text: string } => x !== null);
+        const keepNames = await pickHelpfulFiles(goal.trim(), loaded, {
+          workspaceId: workspace.id,
+          modelId: authoringModelId(workspace),
+        });
+        foundIds = resolveVisibleFiles(keepNames, workspaceFiles).map(f => f.id);
+      }
+      } catch { /* see above — the template survives */ }
+
+      setStage('Saving');
+      const keep = Array.from(new Set([...attachedIds, ...writtenIds, ...foundIds]));
 
       const now = new Date().toISOString();
       const created = await addPrompt({
@@ -122,14 +259,47 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
       } as Prompt);
 
       if (!created) throw new Error('The template was generated but could not be saved. Try again.');
+
+      // ⛔ SQEM-318 — the workspace's access default applies here too, and it did not before.
+      //
+      // Only `TemplateEditor` read `defaultTemplateAccess`; the wizard wrote no `template_access`
+      // rows at all — and no rows means **open to everyone**. A workspace set to "new templates
+      // start restricted" was getting wizard templates the whole team could see, with nothing on
+      // screen saying otherwise.
+      //
+      // ⚠️ **The rollback is copied from `duplicatePrompt` (SQEM-246), and only fires where it must.**
+      // An open default produces no rules, so there is nothing to apply and nothing at risk. A
+      // restricted default that fails to apply leaves a template **more open than intended** — and a
+      // template that stays visible behind a toast nobody reads is exactly the case that ticket was
+      // written for. Better to lose a generated template than to publish one by accident.
+      const defaultAccess = accessValueToAccess(
+        seedFromWorkspaceDefault(workspace.defaultTemplateAccess ?? []),
+        currentUser.id,
+      );
+      if (defaultAccess.hasRules) {
+        try {
+          await setTemplateAccess(created.id, workspace.id, defaultAccess);
+        } catch (accessErr) {
+          await deletePromptApi(created.id).catch(() => { /* nothing better to try */ });
+          throw new Error(
+            `Generated, but the workspace's access default could not be applied — the template was removed rather than left open to everyone. ${accessErr instanceof Error ? accessErr.message : ''}`.trim(),
+          );
+        }
+      }
+
       closeAndReset();
       // Straight into the editor: the person has to see what was made, and — because the generation
       // chose the context files — which documents came along.
-      navigate(`/prompts/${created.id}`);
+      // SQEM-313 — `/edit`, and the suffix is the whole fix. `/prompts/:id` is `PromptRunnerRedirect`,
+      // a shim that catches links to the removed PromptRunner and sends them to Chat — so the wizard
+      // finished by opening the template in a chat instead of the editor. ⛔ It looked like success:
+      // no error, no 404, the template right there. The editor is also where the attached context
+      // files are visible, which SQEM-308 required and Chat cannot show.
+      navigate(`/prompts/${created.id}/edit`);
     } catch (err) {
-      setError(describeAIError(err, 'Generating the template failed.'));
+      setError(describeAIError(err, 'Generating the template failed.', { alternativesAvailable: hasAuthoringAlternatives(workspace) }));
     } finally {
-      setBusy(false);
+      setBusy(false); setStage('');
     }
   };
 
@@ -144,8 +314,8 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
            90 % is a worse lie than an honest pulse. */
         <div className="flex flex-col items-center justify-center py-14 text-center">
           <img src={sqemesIcon} alt="" className="w-14 h-14 animate-pulse" />
-          <p className="mt-5 text-sm font-bold text-slate-800 dark:text-slate-100">Writing your {KINDS.find(k => k.value === kind)?.label.toLowerCase()}…</p>
-          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">Reading your brand{files.length ? ` and ${files.length} document${files.length === 1 ? '' : 's'}` : ''}</p>
+          <p className="mt-5 text-sm font-bold text-slate-800 dark:text-slate-100">{stage || `Writing your ${KINDS.find(k => k.value === kind)?.label.toLowerCase()}`}…</p>
+          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">This can take a minute when documents are involved.</p>
         </div>
       ) : (
         <>
@@ -184,11 +354,13 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
             <input ref={uploadRef} type="file" multiple onChange={onUpload} className="hidden" />
           </div>
 
-          {/* ⚠️ Said plainly, because the two roles look identical: what is attached here is material
-              to read. Whether a document also belongs *on* the template is decided by the generation,
-              and the editor is where it can be corrected. */}
+          {/* ⛔ SQEM-315 — the two lists are shown apart because they now *do* different things, and
+              one sentence covering both was what made the old behaviour impossible to predict.
+              Attached files ride along; an upload is read and thrown away. Saying that here is the
+              difference between a person choosing the right button and finding out afterwards. */}
           {files.length > 0 && (
             <div className="mt-3">
+              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Attached — kept on the template</p>
               <div className="flex flex-wrap gap-1.5">
                 {files.map(f => (
                   <span key={f.id} className="inline-flex items-center gap-1 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-lg px-2 py-1 text-slate-600 dark:text-slate-300">
@@ -199,7 +371,24 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
                   </span>
                 ))}
               </div>
-              <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2">Read while writing your template. Which of them stay attached is decided as it is written — you can change that afterwards.</p>
+              <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2">These stay attached, and their contents also shape what gets written.</p>
+            </div>
+          )}
+
+          {(uploads.length > 0 || binaries.length > 0) && (
+            <div className="mt-3">
+              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Source material — not saved</p>
+              <div className="flex flex-wrap gap-1.5">
+                {[...uploads.map(u => ({ name: u.name })), ...binaries.map(b => ({ name: b.name }))].map(u => (
+                  <span key={u.name} className="inline-flex items-center gap-1 text-xs bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/50 rounded-lg px-2 py-1 text-brand-700 dark:text-brand-300">
+                    {u.name}
+                    <button type="button" onClick={() => { setUploads(prev => prev.filter(x => x.name !== u.name)); setBinaries(prev => prev.filter(x => x.name !== u.name)); }} className="text-brand-400 hover:text-red-500" aria-label={`Remove ${u.name}`}>
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2">Read, then discarded — these files are not added to your library. What the template needs from them is written into new context files, and existing files that help are attached.</p>
             </div>
           )}
 

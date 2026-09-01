@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { useWorkspace, useUI, usePrompts } from '../store';
-import { authoringModelId } from '../lib/authoringAI';
+import { authoringModelId, hasAuthoringAlternatives } from '../lib/authoringAI';
 import { generateStarterLibrary, type TemplateDraft } from '../lib/wizardGeneration';
 import { BrandProfileForm, EMPTY_BRAND_FORM, type BrandFormValue } from './BrandProfileForm';
 import { brandIsComplete } from '../lib/brand';
@@ -83,7 +83,7 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
         // credits does not get better by retrying, so don't tell the user to try again for those.
         showToast(
           failures.length > 0
-            ? `Couldn't generate your starter templates. ${describeAIError(failures[0], 'Try again in a moment.')}`
+            ? `Couldn't generate your starter templates. ${describeAIError(failures[0], 'Try again in a moment.', { alternativesAvailable: hasAuthoringAlternatives(workspace) })}`
             : "The AI didn't return anything usable. Try again, or browse the Marketplace for ready-made templates.",
           'error',
         );

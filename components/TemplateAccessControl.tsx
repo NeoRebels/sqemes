@@ -39,19 +39,29 @@ export type TemplateAccessValue = { mode: TemplateAccessMode; userIds: string[];
 /**
  * The workspace default → what the setting shows.
  *
- * ⚠️ **`private`, not `restricted`, and that is a correction (SQEM-292).** The setting used to
- * display "Restrict access" while `seedFromWorkspaceDefault` below created **Only me** — because at
- * the moment a template is created, nobody has been picked yet. Two names for one behaviour, and the
- * one on screen was the wrong one.
+ * ⛔ **`restricted` (SQEM-319), and the history matters because the previous answer was not wrong so
+ * much as half-applied.** SQEM-292 changed this to `private` for a sound reason: the setting used to
+ * say "Restrict access" while `seedFromWorkspaceDefault` created **Only me**, and once admins and
+ * editors lost automatic access, "restricted with nobody picked" would have meant *nobody at all*
+ * while promising a selection.
  *
- * It became worse than cosmetic once admins and editors lost automatic access: before, "restricted"
- * at least still meant *someone* (every admin and editor). Now it would mean nobody at all, while
- * promising a selection. **A default cannot offer a choice it has no way to collect** — there is no
- * person or group to pick for templates that do not exist yet.
+ * ⚠️ **But no `private` button is rendered here.** Settings deliberately omits `allowPrivate`
+ * (SQEM-210: "Only me" as a workspace-wide default would start every new template invisible to the
+ * team). So the value matched no visible option and **nothing lit up** — the owner reported the
+ * setting as broken while it was saving correctly all along. *Two names for one behaviour became no
+ * name at all*, which is strictly worse than what SQEM-292 set out to fix.
+ *
+ * **The resolution is not to undo SQEM-292 but to separate two things it treated as one.** The
+ * *default* and the *template* are different objects at different moments: the setting says how new
+ * templates **start**, the editor says what a template **is right now**. The button in this context
+ * is already labelled *"Restricted by default"* — the words were right, only the value disagreed.
+ *
+ * ⚠️ `seedFromWorkspaceDefault` below still returns `private`, and is still correct there: a
+ * template at the moment of creation genuinely is "only me", because nobody has been picked yet.
  */
 export function workspaceDefaultToValue(roles: UserRole[]): TemplateAccessValue {
   return roles.length
-    ? { mode: 'private', userIds: [], groupIds: [] }
+    ? { mode: 'restricted', userIds: [], groupIds: [] }
     : { mode: 'everyone', userIds: [], groupIds: [] };
 }
 /** The control's value → what to persist as the workspace default. */
@@ -169,6 +179,7 @@ export function TemplateAccessControl({
   legacyRoles = [],
   privateDisabledReason,
   ownerId,
+  multiSeat = false,
 }: {
   value: TemplateAccessValue;
   onChange: (v: TemplateAccessValue) => void;
@@ -202,6 +213,10 @@ export function TemplateAccessControl({
    *  and need not be while editing one; filtering on the viewer would hide the wrong row and leave
    *  the real owner tickable — the same defect, harder to see. Null lists everybody. */
   ownerId?: string | null;
+  /** SQEM-314 — the workspace can hold more than one person (Team/Business, or managed). Offers
+   *  "Restrict access" even while nobody else is there yet: on a multi-seat plan the absence of
+   *  colleagues is a matter of time, not a reason to withhold the control. */
+  multiSeat?: boolean;
 }) {
   const [memberSearch, setMemberSearch] = useState('');
 
@@ -263,7 +278,16 @@ export function TemplateAccessControl({
   // With nobody to grant — the normal state of a fresh workspace, where you are alone and an admin —
   // "Restrict access" could only produce the state "Only me" already covers. Groups count too: a
   // workspace with groups but one person can still restrict to a group meaningfully later.
-  const canRestrict = !members || grantableMembers.length > 0 || (groups?.length ?? 0) > 0;
+  //
+  // ⛔ **SQEM-314 — `multiSeat` overrides all of that, and it is the whole bug report.** Switching
+  // Solo → Team left this button hidden, because a plan change moves the *seat allowance* and not
+  // the member count: still alone, still nothing to grant, still no button. Somebody who has just
+  // paid for a multi-person plan is told nothing changed.
+  //
+  // On a multi-seat workspace the option belongs here **before** the people arrive — and there is
+  // something to do with it immediately, because an admin is offered "create your first group"
+  // right below. The redundancy argument above only holds where more people are impossible.
+  const canRestrict = !members || multiSeat || grantableMembers.length > 0 || (groups?.length ?? 0) > 0;
   const filteredMembers = useMemo(() => {
     const q = memberSearch.trim().toLowerCase();
     if (!q) return grantableMembers;

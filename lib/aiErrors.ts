@@ -31,8 +31,14 @@
  */
 function meaning(status: number): { headline: string; nextStep: string } | null {
   if (status === 429 || status === 503) {
-    // Genuinely nothing in their hands. Saying only that is the honest maximum.
-    return { headline: 'is busy right now', nextStep: 'This usually clears in a moment — try again shortly.' };
+    // ⛔ **No next step here, and the emptiness is the fix (SQEM-320).** It used to add "this usually
+    // clears in a moment — try again shortly", which said, in our words, exactly what the provider
+    // had already said in theirs. The headline said it a third time. **Three statements of one fact
+    // read as boilerplate and bury the one sentence that carries information** — the provider's.
+    //
+    // Where a real alternative exists, the caller supplies it (`alternativesAvailable` below);
+    // repeating "wait" is not an alternative.
+    return { headline: 'is busy right now', nextStep: '' };
   }
   if (status === 401 || status === 403) {
     // The one case with a real control behind it: provider keys do live in Settings.
@@ -82,7 +88,23 @@ function parse(message: string): { provider: string; status: number; detail: str
  * Falls back to the original message unchanged when this is not a provider error — a caller should
  * never end up showing less than it would have without this function.
  */
-export function describeAIError(err: unknown, fallback: string): string {
+export function describeAIError(
+  err: unknown,
+  fallback: string,
+  /**
+   * SQEM-320 — whether this workspace has another authoring model to switch to.
+   *
+   * ⛔ **The caller decides, this function words it, and that split is deliberate.** Answering it
+   * here would mean reaching into the workspace and its provider keys from a pure, testable
+   * function. The caller already holds both.
+   *
+   * ⚠️ **And the flag must be honest, not optimistic.** SQEM-310 removed "pick a different model in
+   * Settings" because no such setting existed; SQEM-311 built it. Pointing a workspace with one
+   * provider key — or one on funded credits — at that section would be the same defect relocated:
+   * a section that offers nothing. The test that forbids the old phrase still stands.
+   */
+  opts?: { alternativesAvailable?: boolean },
+): string {
   const raw = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
   if (!raw) return fallback;
 
@@ -94,6 +116,11 @@ export function describeAIError(err: unknown, fallback: string): string {
   const head = sense ? `${who} ${sense.headline}.` : `${who} returned an error (${parsed.status}).`;
   // The provider's sentence, verbatim and marked as theirs — so nobody wonders whose wording it is.
   const quoted = parsed.detail ? ` They said: “${parsed.detail}”` : '';
-  const next = sense ? ` ${sense.nextStep}` : '';
-  return `${head}${quoted}${next}`;
+  const next = sense?.nextStep ? ` ${sense.nextStep}` : '';
+  // Only for the transient cases, and only when there is genuinely something else to run on.
+  const transient = parsed.status === 429 || parsed.status === 503;
+  const alternative = transient && opts?.alternativesAvailable
+    ? ' You can switch the model under Settings → General → AI for authoring.'
+    : '';
+  return `${head}${quoted}${next}${alternative}`;
 }

@@ -277,7 +277,10 @@ const FileRow = ({
                 {usedBy.map(t => (
                   <Link
                     key={t.id}
-                    to={`/prompts/${t.id}`}
+                    // SQEM-313 — the editor, not the legacy `/prompts/:id` shim (which lands in Chat).
+                    // Someone opening "used in N templates" wants to see *where* the file hangs — and
+                    // that is the context-file list in the editor, the only place they can remove it.
+                    to={`/prompts/${t.id}/edit`}
                     onClick={() => setShowUsage(false)}
                     className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
                   >

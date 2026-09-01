@@ -265,13 +265,43 @@ export async function generateStarterLibrary(b: BrandInput, ctx: GenContext): Pr
  * style; whether the guide itself belongs on the finished template is a different question, and the
  * generation answers it (owner's decision, 2026-09-01) by naming what it wants kept in `keepFiles`.
  */
+/** A workspace file offered to the model for consideration — index data only, never content. */
+export type FileIndexEntry = { name: string; tags: string[]; mimeType: string; sizeBytes: number };
+
+/** A context file the model wrote itself, to be created and attached. */
+export type GeneratedFile = { name: string; content: string };
+
+/**
+ * SQEM-315 — the wizard's generation step.
+ *
+ * Two kinds of document reach it and they are **not** the same thing, which is the whole ticket:
+ *
+ * - `attached` — files already in the workspace that the person picked. They shape the template
+ *   **and** they are kept, unconditionally. The model is told so; it does not get a vote.
+ *   ⚠️ This reverses the 2026-09-01 decision that "the generation decides" — that rule now applies
+ *   only to what the model *finds*, never to what a person deliberately attached.
+ * - `uploaded` — a document handed over as material. It is never stored (see `wizardUploads.ts`).
+ *   From it the model may **write** new context files, and **shortlist** existing workspace files
+ *   worth inspecting.
+ *
+ * `fileIndex` is the workspace's files as the client already holds them — **name, tags, type, size,
+ * no content.** ⛔ That list is produced by a plain `select('*')` and is therefore already filtered
+ * by RLS to what this user may see. **Do not add a visibility check here.** A second place
+ * answering "who may see this file" is the pattern this project has recorded twice already
+ * (`can_access_template` / `mcp_accessible_template_ids`), and the second place is always the one
+ * that eventually grants too much.
+ */
 export async function generateSingleTemplate(
   kind: PromptKind,
   goal: string,
-  fileContext: { name: string; text: string }[],
+  attached: { name: string; text: string }[],
+  uploaded: { name: string; text: string }[],
+  fileIndex: FileIndexEntry[],
   b: BrandInput,
   ctx: GenContext,
-): Promise<TemplateDraft & { keepFiles: string[] }> {
+  /** SQEM-316 — PDFs and images from the upload path, sent as model parts rather than as text. */
+  binaries: { name: string; mimeType: string; data: string }[] = [],
+): Promise<TemplateDraft & { newFiles: GeneratedFile[]; inspectFiles: string[] }> {
   const shape = kind === 'assistant'
     ? '"instruction" (the system instruction, second person, no preamble)'
     : '"content" (the body; use {{variable_name}} placeholders in snake_case wherever the user must supply something)';
@@ -282,20 +312,56 @@ export async function generateSingleTemplate(
     skill: 'A skill is a reusable block of company knowledge — a rule set, a policy, a way of doing something. Not a task and not a persona.',
   }[kind];
 
-  const filesBlock = fileContext.length
-    ? `
+  /**
+   * SQEM-317 — how much of a document reaches the model, and saying so when it is not all of it.
+   *
+   * ⛔ **This was 8 000 characters — about 2 000 tokens — and the cut was silent.** For a feature
+   * whose whole point is "read this document", a 40-page manual arrived as its first two pages and
+   * the result merely looked thin. Nobody could tell: not the reader, and **not the model**, which
+   * judged a fragment as though it were the whole thing.
+   *
+   * ⚠️ The marker matters as much as the size. A model told it is reading an excerpt reasons
+   * differently from one that believes it has the document — it hedges instead of concluding.
+   */
+  const PER_DOC_CHARS = 40_000;
+  const body = (docs: { name: string; text: string }[]) =>
+    docs.map(f => {
+      const cut = f.text.length > PER_DOC_CHARS;
+      const text = cut ? f.text.slice(0, PER_DOC_CHARS) : f.text;
+      const note = cut ? `\n[Excerpt — the first ${PER_DOC_CHARS.toLocaleString('en')} of ${f.text.length.toLocaleString('en')} characters. Do not assume the rest agrees.]` : '';
+      return `--- ${f.name} ---\n${text}${note}`;
+    }).join('\n\n');
 
-The person attached these documents as background. Use them to understand the subject. Then decide which, if any, the finished template should carry as context — list their exact names in "keepFiles", and leave it empty if none belong.
-
-${fileContext.map(f => `--- ${f.name} ---
-${f.text.slice(0, 8000)}`).join('\n\n')}`
+  // Attached files are stated as settled, not offered as a choice. Asking the model whether to keep
+  // what somebody deliberately attached invites it to say no.
+  const attachedBlock = attached.length
+    ? `\n\nThese documents are already attached to the template and will stay attached. Use them to understand the subject and shape what you write.\n\n${body(attached)}`
     : '';
 
+  // A binary carries its own content as a part; here it only needs naming, so the model knows what
+  // the attached document *is* and that it is material rather than something to keep.
+  const binaryBlock = binaries.length
+    ? `\n\nAlso attached as source material, as documents you can read directly: ${binaries.map(b2 => b2.name).join(', ')}. They are NOT kept either — distil what the template needs from them into "newFiles" the same way.`
+    : '';
+
+  const uploadedBlock = uploaded.length
+    ? `\n\nThe person handed over these documents as source material. They are NOT kept. Distil what the template needs from them: write it into "newFiles" as one or more context files with a short filename and full content. Only write a file when the template genuinely needs to carry that knowledge — an empty array is a valid answer.\n\n${body(uploaded)}`
+    : '';
+
+  // ⚠️ Names, tags, type and size — no content. Sending every file's bytes is not an option: one
+  // skill import brings 150 of them. The model shortlists here and a second pass reads the few.
+  const indexBlock = (uploaded.length || binaries.length) && fileIndex.length
+    ? `\n\nThe workspace already contains these files. If any look like they could help with this task, list their exact names in "inspectFiles" and they will be read before a decision is made. List nothing if none look relevant.\n\n${fileIndex.map(f => `${f.name} [${f.tags.join(', ') || 'no tags'}] ${f.mimeType}, ${Math.round(f.sizeBytes / 1024)} KB`).join('\n')}`
+    : '';
+
+  const filesBlock = `${attachedBlock}${uploadedBlock}${binaryBlock}${indexBlock}`;
+
   const systemInstruction =
-    `You build one reusable template for a brand's team. ${kindRule} Write it so a colleague who was not in this conversation can use it. Return ONLY a JSON object — no prose, no code fences — with keys "title" (short), "description" (one sentence on when to use it), ${shape}, and "keepFiles" (array of attached document names the template should keep as context; empty array if none).`;
+    `You build one reusable template for a brand's team. ${kindRule} Write it so a colleague who was not in this conversation can use it. Return ONLY a JSON object — no prose, no code fences — with keys "title" (short), "description" (one sentence on when to use it), ${shape}, "newFiles" (array of {"name","content"} context files you wrote from the source material; empty array if none) and "inspectFiles" (array of existing workspace filenames worth reading; empty array if none).`;
 
   const raw = await runAuthoringAI({
     ...ctx,
+    attachments: binaries.map(b2 => ({ mimeType: b2.mimeType, data: b2.data })),
     systemInstruction,
     prompt: `${brandSummary(b)}
 
@@ -320,6 +386,41 @@ ${goal}${filesBlock}`,
     content,
     systemInstruction: instruction || undefined,
     variables: extractVariables(content),
-    keepFiles: Array.isArray(x.keepFiles) ? x.keepFiles.map(String) : [],
+    // A model that returns the wrong shape here costs a context file, not the template the person
+    // is already looking at — so both degrade to empty rather than throwing.
+    newFiles: Array.isArray(x.newFiles)
+      ? (x.newFiles as unknown[])
+          .map(f => ({ name: String((f as GeneratedFile)?.name ?? '').trim(), content: String((f as GeneratedFile)?.content ?? '') }))
+          .filter(f => f.name && f.content.trim())
+      : [],
+    inspectFiles: Array.isArray(x.inspectFiles) ? x.inspectFiles.map(String) : [],
   };
+}
+
+/**
+ * SQEM-315, second pass — which of the shortlisted workspace files actually help.
+ *
+ * ⛔ **This exists because a filename is a guess, not a finding.** The first pass sees names and
+ * tags only; `onboarding.md` could be anything. Attaching a document nobody read to a template
+ * somebody will rely on is the kind of wrong that shows up much later, in someone else's output.
+ *
+ * Costs a second model call. That was the owner's decision on 2026-09-01, against the cheaper
+ * one-pass version, and the reason is above.
+ */
+export async function pickHelpfulFiles(
+  goal: string,
+  candidates: { name: string; text: string }[],
+  ctx: GenContext,
+): Promise<string[]> {
+  if (!candidates.length) return [];
+  const raw = await runAuthoringAI({
+    ...ctx,
+    systemInstruction:
+      'You decide which documents a template should carry as context. Return ONLY a JSON object with one key "keep": an array of the exact filenames that genuinely help with the stated task. Be strict — a document that is merely on a related subject does not belong. An empty array is the right answer more often than not.',
+    prompt: `The task:
+${goal}\n\nCandidate documents:\n\n${candidates.map(f => `--- ${f.name} ---\n${f.text.slice(0, 40_000)}`).join('\n\n')}`,
+    temperature: 0.2,
+  });
+  const x = parseJsonObject(raw);
+  return Array.isArray(x?.keep) ? (x.keep as unknown[]).map(String) : [];
 }

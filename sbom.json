@@ -3,11 +3,11 @@
   "specVersion": "1.5",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-09-01T11:00:44.700Z",
+    "timestamp": "2026-09-01T15:27:08.127Z",
     "component": {
       "type": "application",
       "name": "sqemes",
-      "version": "1.11.4"
+      "version": "1.11.5"
     }
   },
   "components": [

@@ -66,3 +66,29 @@ describe('describeAIError', () => {
       .toContain('upstream connect error');
   });
 });
+
+// SQEM-320 — the message said the same thing three times: our headline, the provider's quote, and
+// our "try again shortly". Two of the three carried no information and made the whole thing read
+// as boilerplate, burying the one sentence that did.
+describe('transient errors say it once', () => {
+  it('does not repeat the provider back to itself', () => {
+    const out = describeAIError(gemini503, 'fallback');
+    expect(out).toContain('Please try again later');      // theirs, verbatim — the whole point
+    expect(out).not.toContain('try again shortly');       // ours, saying the same thing again
+  });
+
+  // ⛔ The condition that keeps SQEM-310's lesson intact. Having the setting is not the same as
+  // having a choice: a workspace with one provider key would be sent to a section offering nothing.
+  it('offers the model switch only when there is something to switch to', () => {
+    const without = describeAIError(gemini503, 'f', { alternativesAvailable: false });
+    expect(without).not.toContain('AI for authoring');
+
+    const with_ = describeAIError(gemini503, 'f', { alternativesAvailable: true });
+    expect(with_).toContain('AI for authoring');
+  });
+
+  it('never offers it for a key problem — a second model would fail the same way', () => {
+    const out = describeAIError(new Error('Claude API error (401): {"error":{"message":"bad key"}}'), 'f', { alternativesAvailable: true });
+    expect(out).not.toContain('AI for authoring');
+  });
+});

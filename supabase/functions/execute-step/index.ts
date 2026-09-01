@@ -250,13 +250,13 @@ async function runAndBroadcast(
     } else if (provider === 'claude') {
       result = await callClaude(apiKey, modelId, systemInstruction, promptContent, temperature);
     } else if (provider === 'deepseek') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.deepseek.com/v1/chat/completions', systemInstruction, promptContent, temperature));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.deepseek.com/v1/chat/completions', systemInstruction, promptContent, temperature, 'deepseek'));
     } else if (provider === 'mistral') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.mistral.ai/v1/chat/completions', systemInstruction, promptContent, temperature));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.mistral.ai/v1/chat/completions', systemInstruction, promptContent, temperature, 'mistral'));
     } else if (provider === 'grok') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.x.ai/v1/chat/completions', systemInstruction, promptContent, temperature));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.x.ai/v1/chat/completions', systemInstruction, promptContent, temperature, 'grok'));
     } else if (provider === 'openrouter') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://openrouter.ai/api/v1/chat/completions', systemInstruction, promptContent, temperature));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://openrouter.ai/api/v1/chat/completions', systemInstruction, promptContent, temperature, 'openrouter'));
     } else {
       result = `[${provider}] Model ${modelId} is not yet supported.`;
     }
@@ -458,13 +458,38 @@ async function callClaude(
   return data.content?.map((c: any) => c.text || '').join('') || 'No content generated.';
 }
 
+/**
+ * SQEM-316 — one transport, three different answers to "can this take a PDF?".
+ *
+ * ⛔ **This used to drop every PDF from the parts list, unconditionally and without a word.** The
+ * filter came in with the initial commit (2026-02-22) and carried no reason; by September 2026 it
+ * was simply wrong for two of the four providers behind this function. **An assumption about
+ * somebody else's API, written once and never dated, goes stale silently** — the model kept
+ * answering fluently about a document it had never been given.
+ *
+ * Verified 2026-09-01 against the providers' current docs:
+ *
+ * | provider   | PDF | shape |
+ * |------------|-----|-------|
+ * | mistral    | ✅  | `{type:'document_url', document_url:'data:application/pdf;base64,…'}` |
+ * | openrouter | ✅  | `{type:'file', file:{filename, file_data:'data:…'}}` — works on **any** model there; OpenRouter parses server-side when the model cannot |
+ * | grok       | ⛔  | images only; documents explicitly unsupported |
+ * | deepseek   | ⛔  | Chat Completions takes text; the schema has no file part at all |
+ *
+ * ⚠️ Images survive everywhere as `image_url` and are untouched by any of this.
+ *
+ * ⛔ **`supabase/functions/chat-message/index.ts` has a twin of this function, and SQEM-316 fixed
+ * only this one.** Chat kept dropping PDFs for a further day (SQEM-321). **Change both.** There
+ * is no shared module, no test and no type binding them — only this sentence and its counterpart.
+ */
 async function callOpenAICompatible(
   apiKey: string,
   modelId: string,
   endpoint: string,
   systemInstruction: string | undefined,
   promptContent: string | any[],
-  temperature: number
+  temperature: number,
+  provider?: string,
 ): Promise<{ content: string; totalTokens: number }> {
   const messages: any[] = [];
 
@@ -473,11 +498,20 @@ async function callOpenAICompatible(
   }
 
   if (Array.isArray(promptContent)) {
+    // Only these two can take a document here; for the others a PDF is still dropped, and the client
+    // refuses it before the request is ever made so nobody waits for an answer built on nothing.
+    const pdfShape = provider === 'mistral' || provider === 'openrouter' ? provider : null;
     const content = promptContent
-      .filter((p: any) => !(p.inlineData && p.inlineData.mimeType === 'application/pdf'))
+      .filter((p: any) => !(p.inlineData && p.inlineData.mimeType === 'application/pdf' && !pdfShape))
       .map((p: any) => {
         if (p.inlineData) {
           if (p.inlineData.mimeType.startsWith('text/')) return decodeTextFile(p.inlineData);
+          if (p.inlineData.mimeType === 'application/pdf') {
+            const dataUrl = `data:application/pdf;base64,${p.inlineData.data}`;
+            return pdfShape === 'mistral'
+              ? { type: 'document_url', document_url: dataUrl }
+              : { type: 'file', file: { filename: 'document.pdf', file_data: dataUrl } };
+          }
           return { type: 'image_url', image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` } };
         }
         return { type: 'text', text: p.text || String(p) };

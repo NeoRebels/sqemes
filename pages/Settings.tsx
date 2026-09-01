@@ -18,6 +18,7 @@ import ConnectorsCard from '../components/ConnectorsCard';
 import Card from '../components/ui/Card';
 import AccessGroupsCard from '../components/AccessGroupsCard';
 import AuthoringModelCard from '../components/AuthoringModelCard';
+import { isMultiSeat } from '../lib/templateAccessScope';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import AboutSection from '../components/AboutSection';
@@ -914,8 +915,13 @@ const Settings = () => {
                 </Card>
               )}
 
-              {/* SQEM-170 — Template Access (default) is a Cloud-only feature */}
-              {!IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
+              {/* SQEM-170 — Template Access (default) is a Cloud-only feature.
+                  SQEM-314 — and a Solo-plan one is a setting with nothing to set: it decides whether
+                  *new* templates start restricted, and with one seat there is nobody to restrict them
+                  from. ⚠️ Unlike the per-template control there is no "unless rules exist" escape
+                  here, and none is needed — this default is not a rule on anything, so hiding it
+                  hides no state. The templates it created keep their own control. */}
+              {!IS_SELF_HOSTED && isMultiSeat(workspace) && can(currentUser, workspace, 'team:manage') && (
                 <Card className="p-6 md:p-8">
                   <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Template Access</h2>
                   {/* SQEM-211 — this setting decides *whether* new templates start restricted, not

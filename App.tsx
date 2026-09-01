@@ -219,6 +219,11 @@ const AppRoutes = () => {
         {/* Full Screen Routes */}
         <Route path="/prompts/new" element={<TemplateEditor />} />
         <Route path="/prompts/:id/edit" element={<TemplateEditor />} />
+        {/* ⛔ NOT the editor route — that is `/prompts/:id/edit` above. This one is a shim that
+            catches links to the PromptRunner removed in SQEM-042 and sends them to Chat.
+            SQEM-313: two call sites navigated here meaning the editor, and neither failed
+            visibly — the template opened, just in the wrong place. If you are writing a link
+            to a template, you almost certainly want `/edit`. */}
         <Route path="/prompts/:id" element={<PromptRunnerRedirect />} />
         <Route path="/library/new" element={<TemplateEditor />} />
         <Route path="/library/:id/edit" element={<TemplateEditor />} />

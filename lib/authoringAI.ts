@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { waitForJobResult } from './realtimeJob';
 import { AVAILABLE_MODELS } from '../constants';
-import { isImageModel } from './enabledModels';
+import { isImageModel, buildEnabledModels } from './enabledModels';
 import type { Workspace } from '../types';
 
 /**
@@ -66,6 +66,24 @@ export function authoringModelState(workspace: Pick<Workspace, 'apiKeys' | 'auth
   return { chosenId, effectiveId: chosenId, status: 'chosen' };
 }
 
+/**
+ * SQEM-320 — is there another authoring model to switch to?
+ *
+ * ⛔ **Only answered here so it cannot be answered four different ways.** Four call sites frame
+ * provider errors (`describeAIError`), and each would otherwise inline its own version of "more than
+ * one model" — the pattern this project has written down twice already.
+ *
+ * ⚠️ **False is the safe answer, and the common one.** A workspace with a single provider key, or
+ * one running on funded credits, has nothing to switch to; pointing it at the authoring-model
+ * setting would send somebody to a section that offers nothing. That is exactly the defect SQEM-310
+ * removed and SQEM-311 only *partly* undid — the setting exists now, but having it is not the same
+ * as having a choice.
+ */
+export function hasAuthoringAlternatives(workspace: Pick<Workspace, 'apiKeys' | 'openrouterModels'> | null | undefined): boolean {
+  if (!workspace) return false;
+  return buildEnabledModels(workspace.apiKeys, workspace.openrouterModels).filter(m => !isImageModel(m.id)).length > 1;
+}
+
 /** The id to send. Shorthand for `authoringModelState(...).effectiveId`. */
 export function authoringModelId(workspace: Pick<Workspace, 'apiKeys' | 'authoringModelId'>): string | null {
   return authoringModelState(workspace).effectiveId;
@@ -78,6 +96,18 @@ export interface AuthoringAIParams {
   systemInstruction: string;
   prompt: string;
   temperature?: number;
+  /**
+   * SQEM-316 — documents to send alongside the prompt: PDFs and images, base64, no `data:` prefix.
+   *
+   * ⚠️ **`execute-step` has always accepted this** — its `promptContent` is typed `string | any[]`
+   * and Chat has been sending file parts through it for months. Authoring simply never offered the
+   * option, which is why the wizard could only refuse a PDF rather than read one.
+   *
+   * ⛔ **Whether a given provider can actually use a PDF is decided before this is called**, by
+   * `classifyUpload` in `lib/wizardUploads.ts`. Two providers drop them server-side without a word,
+   * and a template written from a document that never arrived is the expensive kind of wrong.
+   */
+  attachments?: { mimeType: string; data: string }[];
 }
 
 /**
@@ -94,6 +124,7 @@ export async function runAuthoringAI({
   systemInstruction,
   prompt,
   temperature = 1,
+  attachments = [],
 }: AuthoringAIParams): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
@@ -108,7 +139,19 @@ export async function runAuthoringAI({
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-    body: JSON.stringify({ workspaceId, modelId: modelId ?? undefined, systemInstruction, promptContent: prompt, temperature, jobId, funded }),
+    // Parts only when there is something to carry: a bare string is what every existing caller
+    // sends and what every provider branch handles most cheaply.
+    body: JSON.stringify({
+      workspaceId,
+      modelId: modelId ?? undefined,
+      systemInstruction,
+      promptContent: attachments.length
+        ? [{ text: prompt }, ...attachments.map(a => ({ inlineData: { mimeType: a.mimeType, data: a.data } }))]
+        : prompt,
+      temperature,
+      jobId,
+      funded,
+    }),
   });
 
   if (!res.ok) {

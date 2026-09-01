@@ -13,7 +13,7 @@ import {
   fetchPublicListingBundle,
 } from '../lib/api/library';
 import { adaptToBrand } from '../lib/adaptTemplate';
-import { authoringModelId } from '../lib/authoringAI';
+import { authoringModelId, hasAuthoringAlternatives } from '../lib/authoringAI';
 import { IS_SELF_HOSTED, MARKETPLACE_ENABLED } from '../lib/env';
 import { listingToBundle } from '../lib/listingBundle';
 import { downloadBlob } from '../lib/bundleFormat';
@@ -143,7 +143,7 @@ export default function MarketplaceTemplate() {
         navigate(`/prompts/${created.id}/edit`);
       }
     } catch (e) {
-      showToast(describeAIError(e, 'Adaptation failed'), 'error');
+      showToast(describeAIError(e, 'Adaptation failed', { alternativesAvailable: hasAuthoringAlternatives(workspace) }), 'error');
     } finally {
       setAdapting(false);
     }

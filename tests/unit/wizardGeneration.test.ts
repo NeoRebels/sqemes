@@ -10,7 +10,7 @@ vi.mock('../../lib/authoringAI', () => ({
   firstTextModelId: () => 'gpt-test',
 }));
 
-const { extractVariables, generateStarterLibrary } = await import('../../lib/wizardGeneration');
+const { extractVariables, generateStarterLibrary, generateSingleTemplate } = await import('../../lib/wizardGeneration');
 
 // SQEM-184 — the real {{placeholder}} → Variable[] extraction (kind=prompt auto-variables).
 describe('extractVariables', () => {
@@ -117,5 +117,37 @@ describe('generateStarterLibrary', () => {
     // The brand-voice assistant still comes back — it needs no JSON, only the role text.
     expect(drafts.map(d => d.kind)).toEqual(['assistant']);
     expect(failures).toEqual([]);
+  });
+});
+
+// SQEM-317 — the excerpt marker. A silent cut let the model judge a fragment as though it were the
+// whole document; 8 000 characters was about two pages of a manual, and nothing said so.
+describe('document truncation', () => {
+  const BRAND = { brandName: 'Acme', whatItDoes: 'sells widgets', audience: 'buyers', tone: 3 as const };
+  const CTX = { workspaceId: 'ws-1', modelId: 'gpt-test' };
+  const ok = JSON.stringify({ title: 'T', description: 'd', content: 'c', newFiles: [], inspectFiles: [] });
+
+  // ⛔ Block body — see the note in the block above. An expression body returns the mock, Vitest
+  //    treats that as a teardown callback and calls it with no arguments after every test.
+  //    I walked into this exact trap while adding these tests, three lines below where it is written.
+  beforeEach(() => { runAuthoringAI.mockReset(); });
+
+  const promptFor = async (text: string) => {
+    let seen = '';
+    runAuthoringAI.mockImplementation(async (args: any) => { seen = args.prompt; return ok; });
+    await generateSingleTemplate('prompt', 'goal', [{ name: 'doc.md', text }], [], [], BRAND, CTX);
+    return seen;
+  };
+
+  it('marks an excerpt in the prompt instead of cutting silently', async () => {
+    const seen = await promptFor('x'.repeat(50_000));
+    expect(seen).toContain('Excerpt');
+    expect(seen).toContain('50,000 characters');
+  });
+
+  it('leaves a document that fits completely unmarked', async () => {
+    const seen = await promptFor('all of it');
+    expect(seen).toContain('all of it');
+    expect(seen).not.toContain('Excerpt');
   });
 });

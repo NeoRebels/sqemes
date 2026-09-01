@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useWorkspace, useUI } from '../store';
-import { authoringModelId } from '../lib/authoringAI';
+import { authoringModelId, hasAuthoringAlternatives } from '../lib/authoringAI';
 import { analyzeWebsite } from '../lib/wizardGeneration';
 import { TONE_LABELS } from '../lib/compileBrandVoice';
 import type { ToneLevel, BrandProfile } from '../types';
@@ -78,7 +78,7 @@ export function BrandProfileForm({
     } catch (err: any) {
       // SQEM-203 — this belongs at the field, not in a toast 1200px away in the opposite corner
       // that disappears after a few seconds. It stays until the input changes.
-      setWebsiteError(describeAIError(err, 'Could not read that website. Fill the form in manually.'));
+      setWebsiteError(describeAIError(err, 'Could not read that website. Fill the form in manually.', { alternativesAvailable: hasAuthoringAlternatives(workspace) }));
     } finally {
       setAnalyzing(false);
     }

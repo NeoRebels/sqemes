@@ -17,6 +17,7 @@ import { TagPicker } from '../components/TagPicker';
 import { UploadFileModal } from '../components/UploadFileModal';
 import { BrandVoiceForm } from '../components/BrandVoiceForm';
 import { TemplateAccessControl, seedFromWorkspaceDefault, accessToValue, accessValueToAccess, unrepresentableRoleGrants, type TemplateAccessValue } from '../components/TemplateAccessControl';
+import { accessAppliesTo, isMultiSeat } from '../lib/templateAccessScope';
 import PersonCard from '../components/ui/PersonCard';
 import { fetchTemplateAccess, setTemplateAccess } from '../lib/api/templateAccess';
 import { fetchGroups } from '../lib/api/groups';
@@ -731,7 +732,12 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                 matches the creator by id, and NULL matches nobody, so "Only me" would hide it from
                 everyone including whoever picked it. Templates created over MCP before SQEM-240
                 carry this; 47 of 82 on production did. */}
-            {!isLibrary && canEdit && !IS_SELF_HOSTED && (
+            {/* SQEM-314 — and on Solo it is not shown at all: one seat, nobody to grant to, so the
+                question does not arise. ⛔ `accessAppliesTo` keeps it visible when the template
+                already carries rules — a workspace downgraded from Team keeps its restricted
+                templates, and hiding the control would leave the owner locked out of his own
+                template with nothing on screen explaining it. */}
+            {!isLibrary && canEdit && !IS_SELF_HOSTED && accessAppliesTo(workspace, access.mode !== 'everyone' || legacyRoles.length > 0) && (
               <TemplateAccessControl
                 value={access}
                 onChange={v => { setAccess(v); setIsDirty(true); }}
@@ -747,6 +753,9 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                    absence. Editors get the reason instead. */
                 onCreateGroup={currentUser?.role === 'admin' ? () => navigate('/settings', { state: { initialTab: 'team' } }) : undefined}
                 allowPrivate
+                /* SQEM-314 — offer "Restrict access" on a multi-seat plan even while nobody else has
+                   joined yet; that absence is a matter of time, not a reason to withhold it. */
+                multiSeat={isMultiSeat(workspace)}
                 legacyRoles={legacyRoles}
                 privateDisabledReason={
                   id && !formData.createdBy
