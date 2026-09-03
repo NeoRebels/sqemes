@@ -55,3 +55,16 @@ describe('can — settings:general', () => {
   it('allows editor', () => expect(can(editor, ws, 'settings:general')).toBe(true));
   it('denies member', () => expect(can(member, ws, 'settings:general')).toBe(false));
 });
+
+// SQEM-328 — the pair that has to stay apart. `api-keys:own` is "my own connection", which everyone
+// needs to use MCP at all; `api-keys:manage` is the workspace's AI provider keys, which cost money
+// on every call. They shared a settings tab, which is how one gate came to hide both.
+describe('can — api-keys:own', () => {
+  it('allows admin',  () => expect(can(admin,  ws, 'api-keys:own')).toBe(true));
+  it('allows editor', () => expect(can(editor, ws, 'api-keys:own')).toBe(true));
+  it('allows member', () => expect(can(member, ws, 'api-keys:own')).toBe(true));
+  it('is not the same gate as api-keys:manage for a member', () => {
+    expect(can(member, ws, 'api-keys:own')).toBe(true);
+    expect(can(member, ws, 'api-keys:manage')).toBe(false);
+  });
+});

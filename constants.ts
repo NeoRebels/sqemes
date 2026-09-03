@@ -28,9 +28,16 @@ export const PLAN_AI_CREDITS: Record<PlanTier, number> = {
 //
 // The confusion is measured, not hypothetical: a customer had **assistant and skill the wrong way
 // round** after using the product.
+// ⚠️ SQEM-324 — **"persona" was taken out of the assistant's description, and that is not a style
+// edit.** Both this text and MCP_SYSTEM_PROMPT below described an assistant as "a persona"; Personas
+// then became a first-class object that is something else — an orchestrator that routes to several
+// templates. One word for two things is the exact confusion the comment above records as measured
+// (a customer had assistant and skill the wrong way round). The MCP prompt matters most: the same
+// server now advertises `[persona]` entries, so a model would have read a contradiction about its
+// own tools. If the owner would rather rename the new object instead, this is the line to revert.
 export const KIND_HELP: Record<'prompt' | 'assistant' | 'skill', string> = {
   prompt: 'A task you reuse and fill in each time. Example: \u201cCold Outreach Email\u201d \u2014 you supply the customer and the product.',
-  assistant: 'A persona to work with, with its own instructions and context files. Example: \u201cEditor-in-Chief\u201d \u2014 sharpens clarity, flow and structure.',
+  assistant: 'A standing role to work with, with its own instructions and context files. Example: \u201cEditor-in-Chief\u201d \u2014 sharpens clarity, flow and structure.',
   skill: 'A piece of your company\u2019s knowledge that AI applies whenever it fits \u2014 no filling in. Example: \u201cAIDA Copywriting Framework\u201d, or your brand voice.',
 };
 
@@ -93,7 +100,7 @@ Whenever you use a template, say which one.
 
 Templates come in three kinds and are used differently:
 - A prompt is a task with {{variables}}. Fill them from the request; ask only for what you genuinely cannot infer.
-- An assistant is a persona with a system instruction and context files. Adopt it for the rest of the task.
+- An assistant is a standing role with a system instruction and context files. Adopt it for the rest of the task.
 - A skill is a reusable block of company knowledge. Apply it in addition to whatever else you are doing.
 
 Do not paste a template's contents into your reply unless you are asked for it. Use it, then answer.

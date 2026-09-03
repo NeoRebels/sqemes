@@ -204,6 +204,66 @@ function toSlug(title: string): string {
     .replace(/^_+|_+$/g, '');
 }
 
+// SQEM-324 — a persona, rendered.
+//
+// ⛔ **Both MCP surfaces call this one function**, and that is the point rather than tidiness: a
+// persona reachable as a prompt (the human picks it) and as a tool (the model loads it mid-chat)
+// must be the *same* persona. Two renderers would drift, and the drift would be invisible — the
+// same class of failure `can_access_template` / `mcp_accessible_template_ids` carries a warning
+// about three files away.
+//
+// ⚠️ `routes` arrives ALREADY FILTERED to what this caller may open. Routes they cannot reach are
+// omitted, never listed as unavailable: a model that sees a route it cannot fetch does not skip it,
+// it invents the contents. Saying less is the safe direction here; saying "restricted" is not.
+function composePersona(
+  persona: { title: string; description: string; content: string },
+  routes: { name: string; title: string; kind: string; condition: string; description: string }[],
+): string {
+  const lines: string[] = [];
+  lines.push('---');
+  lines.push(`persona: ${persona.title}`);
+  if (persona.description) lines.push(`description: ${persona.description}`);
+  lines.push('---');
+  lines.push('');
+  if (persona.content.trim()) {
+    lines.push(persona.content.trim());
+    lines.push('');
+  }
+
+  if (routes.length) {
+    lines.push('## Routes — load one only when its condition applies');
+    lines.push('');
+    lines.push('| When | Load |');
+    lines.push('|---|---|');
+    for (const r of routes) {
+      // The condition is prose for the model to judge; the right-hand side is the exact call to
+      // make. Naming the tool beats naming the template: the model needs the verb, not a noun it
+      // then has to guess a call for.
+      // ⛔ **An empty condition falls back to the template's own description, not to a stub.**
+      // SQEM-324 shipped with `the task matches "<title>"` here, which is a sentence that carries no
+      // information the title did not already carry — it made the empty case useless and pushed the
+      // author into writing a condition for every route, most of which would have restated the
+      // description anyway.
+      //
+      // ⚠️ The fallback resolves **at render time**, so it is always the current description. A
+      // condition copied into the column at attach time would have gone stale the moment somebody
+      // improved the template's description — and nothing would have said so.
+      const when = (r.condition || r.description || `the task matches "${r.title}"`).replace(/\|/g, '\\|');
+      lines.push(`| ${when} | \`get_template(name: "${r.name}")\` — ${r.kind} “${r.title}” |`);
+    }
+    lines.push('');
+    lines.push('**Load nothing until a condition applies, and load only the one that does.** Loading');
+    lines.push('every route defeats the purpose of this document: it exists so the knowledge arrives');
+    lines.push('when it is needed rather than all at once. If nothing fits, ask instead of guessing.');
+  } else {
+    // A persona whose routes are all invisible to this caller. It still has a role and rules, and
+    // those are worth having — but it must not imply that anything is loadable.
+    lines.push('_This persona currently has no routes available to you._');
+  }
+
+  return lines.join('\n');
+}
+
 async function hashKey(key: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -496,6 +556,90 @@ Deno.serve(async (req) => {
     canAccessTemplate = (templateId: string) => !restricted.has(templateId);
   }
 
+  // SQEM-324 — the same question for personas, answered the same way and for the same reasons.
+  // An API-key connection has no user, so it sees only personas with no access rules at all.
+  let canAccessPersona: (personaId: string) => boolean;
+
+  if (mcpUserId) {
+    const { data: pAccRows } = await adminClient.rpc('mcp_accessible_persona_ids', {
+      p_workspace_id: workspaceId, p_user_id: mcpUserId,
+    });
+    const accessiblePersonas = new Set(((pAccRows as { id: string }[] | null) || []).map(r => r.id));
+    canAccessPersona = (personaId: string) => accessiblePersonas.has(personaId);
+  } else {
+    const { data: pRuleRows } = await adminClient
+      .from('persona_access')
+      .select('persona_id')
+      .eq('workspace_id', workspaceId);
+    const restrictedPersonas = new Set(((pRuleRows as { persona_id: string }[] | null) || []).map(r => r.persona_id));
+    canAccessPersona = (personaId: string) => !restrictedPersonas.has(personaId);
+  }
+
+  // SQEM-326 — how many routes a persona has, and how many of them THIS caller can open.
+  //
+  // ⚠️ Batched on purpose. The first cut asked per persona, which is one query per row in
+  // `list_personas` and `prompts/list` — a workspace with twenty personas paid twenty round trips
+  // to render a menu.
+  const routeVisibility = async (personaIds: string[]) => {
+    const out = new Map<string, { total: number; visible: number }>();
+    for (const pid of personaIds) out.set(pid, { total: 0, visible: 0 });
+    if (personaIds.length === 0) return out;
+
+    const { data: rows } = await adminClient
+      .from('persona_templates')
+      .select('persona_id, template_id')
+      .in('persona_id', personaIds);
+
+    for (const r of ((rows as { persona_id: string; template_id: string }[] | null) || [])) {
+      const entry = out.get(r.persona_id);
+      if (!entry) continue;
+      entry.total += 1;
+      if (canAccessTemplate(r.template_id)) entry.visible += 1;
+    }
+    return out;
+  };
+
+  /**
+   * SQEM-326 — a persona this caller should not be offered at all.
+   *
+   * ⛔ **Only when it HAS routes and none of them survive the filter.** A persona with no routes at
+   * all is a role description, which is a legitimate thing to hand somebody — its author knows it is
+   * empty. A persona whose seven routes all belong to templates this caller cannot open is
+   * different: it advertises a capability it cannot deliver, and the model would work from a role
+   * description while believing it has knowledge behind it.
+   *
+   * Hiding beats listing-with-a-note, for the same reason unreachable routes are omitted rather than
+   * marked: a model told "this exists but you may not have it" reaches for it anyway.
+   */
+  const hiddenFromCaller = (v: { total: number; visible: number } | undefined) =>
+    !!v && v.total > 0 && v.visible === 0;
+
+  // SQEM-324 — load a persona with its routes, filtered to what THIS caller may open.
+  //
+  // ⚠️ The route filter is `canAccessTemplate`, never the persona's own access. A persona shared
+  // with everyone may attach a template restricted to its author; the colleague gets the persona
+  // without that route, and the template stays shut. Filtering on the persona instead would hand
+  // out its author's reach along with it — a permission grant by attachment.
+  const loadPersona = async (persona: { id: string; title: string; description: string; content: string }) => {
+    const { data: routeRows } = await adminClient
+      .from('persona_templates')
+      .select('template_id, condition, sort_order, prompts(title, kind, description)')
+      .eq('persona_id', persona.id)
+      .order('sort_order');
+
+    const routes = ((routeRows as any[] | null) || [])
+      .filter(r => r.prompts && canAccessTemplate(r.template_id))
+      .map(r => ({
+        name:        toSlug(r.prompts.title),
+        title:       r.prompts.title,
+        kind:        r.prompts.kind,
+        condition:   r.condition || '',
+        description: r.prompts.description || '',
+      }));
+
+    return { text: composePersona(persona, routes), routeCount: routes.length };
+  };
+
   // SQEM-291 — the same question for context files, and it is not answered by the line above.
   //
   // `resolveContextFiles` is safe already: it only ever runs for a template the caller reached, so
@@ -555,7 +699,16 @@ Deno.serve(async (req) => {
         "whether a matching template already exists. If one does, load it with get_template " +
         "and follow it. If nothing matches, proceed normally.\n\n" +
         "Templates encode the user's preferred structure and wording, so reusing one is " +
-        "usually better than improvising.",
+        "usually better than improvising.\n\n" +
+        // SQEM-324 — without this paragraph the persona tools exist and are never called.
+        // A tool is only reachable if the model knows the WORDS that should reach for it,
+        // which is why the user's own phrasing is quoted here rather than paraphrased.
+        "This workspace may also define PERSONAS: working roles that bundle several " +
+        "templates behind conditions saying which to load when. When the user names one " +
+        "— 'use/load/call the X persona from Sqemes' — call get_persona. When a task " +
+        "clearly belongs to a role rather than a single template, call list_personas " +
+        "first. Adopt the persona, then load a route only once its condition applies: " +
+        "loading every route at once is exactly what a persona exists to avoid.",
       // SQEM-089 — brand the connector. `icons` (MCP SEP-973) is additive metadata a
       // client MAY render in its connector list; PNG over HTTPS is the safest, most
       // widely-supported form, served credential-free from our own domain. `sizes` is
@@ -599,6 +752,35 @@ Deno.serve(async (req) => {
         arguments: buildArguments(t.variables || []),
       }));
 
+    // SQEM-324 — personas ride the same rail, because this is the rail a *person* picks from. The
+    // tools below let the model load one mid-conversation; this is what puts "Sales" in the client's
+    // picker before a word is typed. Same object, two ways in, one renderer.
+    const { data: personaRows } = await adminClient
+      .from('personas')
+      .select('id, title, description')
+      .eq('workspace_id', workspaceId)
+      .order('title');
+
+    // ⚠️ Slug collisions are possible — a template and a persona may share a title. `prompts/get`
+    // resolves templates first, so an unqualified duplicate would make the persona unreachable
+    // while still listing it. Suffixing only the loser keeps every ordinary name clean.
+    const takenNames = new Set(prompts.map(p => p.name));
+    const visiblePersonas = ((personaRows as any[] | null) || []).filter(p => canAccessPersona(p.id));
+    const personaRoutes = await routeVisibility(visiblePersonas.map(p => p.id));
+    for (const persona of visiblePersonas) {
+      // SQEM-326 — every route belongs to a template this caller cannot open: offering the entry
+      // would advertise knowledge that cannot arrive.
+      if (hiddenFromCaller(personaRoutes.get(persona.id))) continue;
+      const base = toSlug(persona.title);
+      const name = takenNames.has(base) ? `${base}_persona` : base;
+      takenNames.add(name);
+      prompts.push({
+        name,
+        description: `[persona] ${persona.description || persona.title}`,
+        arguments: [],
+      });
+    }
+
     return rpcResult(id, { prompts });
   }
 
@@ -617,6 +799,31 @@ Deno.serve(async (req) => {
       .or('published.eq.true,kind.eq.skill'); // SQEM-110/210 — vestigial guard, see above
 
     const template = (templates || []).find((t: any) => toSlug(t.title) === name);
+
+    // SQEM-324 — not a template? It may be a persona. Templates resolve first, which is what the
+    // `_persona` suffix in prompts/list exists to work around; both spellings are accepted here so
+    // a client that cached either name keeps working.
+    if (!template || !canAccessTemplate(template.id)) {
+      const bare = name.endsWith('_persona') ? name.slice(0, -'_persona'.length) : name;
+      const { data: personaRows } = await adminClient
+        .from('personas')
+        .select('id, title, description, content')
+        .eq('workspace_id', workspaceId);
+      const persona = ((personaRows as any[] | null) || [])
+        .find(p => toSlug(p.title) === bare || toSlug(p.title) === name);
+
+      const personaVisible = persona
+        ? !hiddenFromCaller((await routeVisibility([persona.id])).get(persona.id))
+        : false;
+      if (persona && canAccessPersona(persona.id) && personaVisible) {
+        const { text } = await loadPersona(persona);
+        return rpcResult(id, {
+          description: `[persona] ${persona.description || persona.title}`,
+          messages: [{ role: 'user', content: { type: 'text', text } }],
+        });
+      }
+    }
+
     if (!template || !canAccessTemplate(template.id)) return rpcError(id, -32602, `Prompt not found: ${name}`); // SQEM-142
 
     const resolvedInputs: Record<string, string> = {};
@@ -749,6 +956,22 @@ Deno.serve(async (req) => {
             },
           },
           required: ['query'],
+        },
+      },
+      {
+        name: 'list_personas',
+        description: 'List the workspace\'s personas. A PERSONA is a working role — a general instruction plus conditions saying which template to load when. Use it when the user names a persona ("use the Sales persona from Sqemes", "load persona X"), or when a task clearly belongs to a role the workspace has defined. Returns id, name, description and how many routes each one currently offers you.\n\nA persona is not a template and cannot be fetched with get_template; call get_persona.',
+        inputSchema: { type: 'object', properties: {} },
+      },
+      {
+        name: 'get_persona',
+        description: 'Load a persona by name or id and adopt it for the rest of the task. Returns markdown: the role and its rules, plus a table of ROUTES — each a condition and the exact get_template call to make when that condition applies.\n\n⚠️ Load a route only when its condition actually applies, and only that one. The routes are deliberately NOT included up front: the persona is small, the templates behind it are not, and fetching them all defeats the purpose.\n\nRoutes you cannot access are already omitted — what you receive is what you may load. If the persona lists no routes, work from the role description and say so if asked for more.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id:   { type: 'string', description: 'UUID of the persona (from list_personas)' },
+            name: { type: 'string', description: 'Slug name of the persona (from list_personas)' },
+          },
         },
       },
       {
@@ -912,6 +1135,61 @@ Deno.serve(async (req) => {
     const requiredCap = TOOL_CAPABILITY[toolName];
     if (requiredCap && !scopes.includes(requiredCap)) {
       return rpcError(id, -32002, `Insufficient scope: '${toolName}' requires the '${requiredCap}' permission, which this connection is not granted.`);
+    }
+
+    // SQEM-324 — the tool half of personas. The prompt half (prompts/list) is what a person picks
+    // from a client menu; this is what answers "use the Sales persona from Sqemes" typed as a
+    // sentence, which is how it is actually used in Claude Code.
+    if (toolName === 'list_personas') {
+      const { data: personaRows } = await adminClient
+        .from('personas')
+        .select('id, title, description')
+        .eq('workspace_id', workspaceId)
+        .order('title');
+
+      const visible = ((personaRows as any[] | null) || []).filter(p => canAccessPersona(p.id));
+
+      // The route count is AFTER the template filter, so it reports what this caller would actually
+      // get — not what the author sees. A "7 routes" that turns into 4 on load is worse than no
+      // number. SQEM-326 — one batched lookup rather than a query per persona.
+      const counts = await routeVisibility(visible.map(p => p.id));
+      const result = visible
+        .filter(p => !hiddenFromCaller(counts.get(p.id)))
+        .map(persona => ({
+          id: persona.id,
+          name: toSlug(persona.title),
+          title: persona.title,
+          description: persona.description || '',
+          routeCount: counts.get(persona.id)?.visible ?? 0,
+        }));
+
+      return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
+    }
+
+    if (toolName === 'get_persona') {
+      const personaId   = args.id;
+      const personaName = args.name;
+      if (!personaId && !personaName) return rpcError(id, -32602, 'Provide either id or name');
+
+      const { data: personaRows } = await adminClient
+        .from('personas')
+        .select('id, title, description, content')
+        .eq('workspace_id', workspaceId);
+
+      const persona = personaId
+        ? ((personaRows as any[] | null) || []).find(p => p.id === personaId)
+        : ((personaRows as any[] | null) || []).find(p => toSlug(p.title) === personaName);
+
+      if (!persona || !canAccessPersona(persona.id)) return rpcError(id, -32602, 'Persona not found');
+      // SQEM-326 — same rule as the listing: a persona whose every route is out of reach is not
+      // offered. Answering "not found" rather than explaining is deliberate — the alternative tells
+      // a model that something exists which it may not have, and it reaches for it anyway.
+      if (hiddenFromCaller((await routeVisibility([persona.id])).get(persona.id))) {
+        return rpcError(id, -32602, 'Persona not found');
+      }
+
+      const { text } = await loadPersona(persona);
+      return rpcResult(id, { content: [{ type: 'text', text }] });
     }
 
     if (toolName === 'list_templates') {

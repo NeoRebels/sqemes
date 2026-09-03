@@ -6,6 +6,7 @@ export type Action =
   | 'library:copy'
   | 'team:manage'
   | 'api-keys:manage'
+  | 'api-keys:own'
   | 'plans:manage'
   | 'settings:general';
 
@@ -27,6 +28,12 @@ export function can(user: User, workspace: Workspace, action: Action): boolean {
       return user.role === 'admin';
     case 'api-keys:manage':
       return user.role !== 'member';
+    // SQEM-328 — "my own connection" is a different question from "the workspace's provider keys",
+    // and they only looked like one because they share a settings tab. Everyone may hold a key
+    // bound to themselves; only non-members may touch the AI provider keys above, and only an admin
+    // may mint a workspace-wide key (enforced in the page and in RLS, not here).
+    case 'api-keys:own':
+      return true;
     case 'plans:manage':
       return user.role === 'admin';
     case 'settings:general':

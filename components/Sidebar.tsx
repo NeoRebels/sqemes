@@ -21,6 +21,7 @@ import {
   Moon,
   BookOpen,
   Loader2,
+  Users,
 } from 'lucide-react';
 import { useUI, useWorkspace } from '../store';
 import PersonCard from './ui/PersonCard';
@@ -156,6 +157,9 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
   const navLinks: { to: string; icon: any; label: string; beta?: boolean; arrow?: boolean }[] = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/templates", icon: FileText, label: "Templates" },
+    // SQEM-324 — directly under Templates, because a persona is made of them; anywhere else in
+    // this list and the relationship has to be explained instead of seen.
+    { to: "/personas", icon: Users, label: "Personas" },
     { to: "/library", icon: Store, label: "Marketplace" },
     { to: "/files", icon: Paperclip, label: "Files" },
     { to: "/chat", icon: MessageSquare, label: "Chat", arrow: true },

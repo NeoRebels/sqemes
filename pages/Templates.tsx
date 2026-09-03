@@ -10,8 +10,8 @@ import { importSkillBundle } from '../lib/skillBundleIo';
 import { publishToMarketplace, submitToMarketplaceViaProxy, fetchCanPublish } from '../lib/api/library';
 import { TEMPLATE_CATEGORIES, KIND_HELP } from '../constants';
 import type JSZip from 'jszip';
-import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Search, Plus, Play, Edit, Trash2, Copy, Star, Bot, PenTool, Wand2, Sparkles, Loader2, Store, Lock, Upload, Package, FolderDown } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router';
+import { Search, Plus, Edit, Trash2, Copy, Star, Bot, PenTool, Wand2, Sparkles, Loader2, Store, Lock, Upload, Package, FolderDown } from 'lucide-react';
 import Card from '../components/ui/Card';
 import TemplateCard from '../components/ui/TemplateCard';
 import Modal from '../components/ui/Modal';
@@ -58,7 +58,6 @@ const PromptCard = memo(function PromptCard({
   onDuplicate,
   onExportSkill,
   onDeleteRequest,
-  onRun,
   onSetTag,
   onPublish,
   showPublish,
@@ -73,7 +72,6 @@ const PromptCard = memo(function PromptCard({
   onDuplicate: (prompt: Prompt) => void;
   onExportSkill: (prompt: Prompt) => void;
   onDeleteRequest: (id: string) => void;
-  onRun: (prompt: Prompt) => void;
   onSetTag: (prompt: Prompt, tag: string | null) => void;
   onPublish: (prompt: Prompt) => void;
   showPublish: boolean;
@@ -108,14 +106,6 @@ const PromptCard = memo(function PromptCard({
     badges={(
       <>
         <KindBadge kind={prompt.kind} />
-        {restricted && (
-          <span
-            className="text-2xs font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded-lg uppercase tracking-wider flex items-center gap-1"
-            title="Restricted — not visible to everyone in this workspace"
-          >
-            <Lock className="w-3 h-3" /> Restricted
-          </span>
-        )}
         {/* SQEM-210 — no "Draft" badge: the draft axis is gone from workspace templates, and
             `published` is now always true for them. What it used to signal is the "Restricted"
             badge above, which reads the access rules that actually govern visibility. */}
@@ -175,14 +165,24 @@ const PromptCard = memo(function PromptCard({
         </button>
       </>
     )}
-    footerRight={(
-      <button
-        onClick={e => { e.preventDefault(); onRun(prompt); }}
-        className="flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white text-xs font-bold rounded-lg hover:bg-brand-700 transition-all shadow-sm"
+    /* SQEM-330 — "Use in Chat" is gone and the Restricted badge takes the slot, matching the
+       persona cards.
+
+       ⛔ The button was the loudest element on every card — solid brand fill, in a footer of quiet
+       icon actions — for a path that already exists twice: the card links to the template, and Chat
+       has its own picker with search, kind tabs and favourites. It bought one click and spent the
+       card's only strong accent on it.
+
+       ⚠️ Nothing is lost: `/chat` still accepts `launchTemplateId` in its route state, so any deep
+       link into a template continues to work. Only this entry point is removed. */
+    footerRight={restricted ? (
+      <span
+        className="text-2xs font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0"
+        title="Restricted — not visible to everyone in this workspace"
       >
-        <Play className="w-3 h-3" /> Use in Chat
-      </button>
-    )}
+        <Lock className="w-3 h-3" /> Restricted
+      </span>
+    ) : undefined}
   />
   );
 });
@@ -192,7 +192,6 @@ const Templates = () => {
   const { workspaceFiles, addWorkspaceFile } = useData();
   const { currentUser, workspace } = useWorkspace();
   const { showToast, isLoading } = useUI();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const selectedKind = (searchParams.get('kind') ?? 'all') as 'all' | PromptKind;
@@ -343,10 +342,6 @@ const Templates = () => {
     showToast(prompt.isFavorite ? "Removed from favorites" : "Added to favorites", "success");
   }, [storeFavorite, showToast]);
 
-  const handleRun = useCallback((prompt: Prompt) => {
-    navigate('/chat', { state: { launchTemplateId: prompt.id } });
-  }, [navigate]);
-
   const handleSetTag = useCallback((prompt: Prompt, tag: string | null) => {
     updatePrompt({ ...prompt, tag });
   }, [updatePrompt]);
@@ -456,9 +451,15 @@ const Templates = () => {
     if (!importBundleData || !workspace?.id) return;
     setImporting(true);
     try {
-      const { templates, files } = await importBundle(importBundleData.zip, importBundleData.manifest, workspace.id, currentUser.id);
+      const { templates, personas, files } = await importBundle(importBundleData.zip, importBundleData.manifest, workspace.id, currentUser.id);
       files.forEach(addWorkspaceFile); // prompts arrive via the store's realtime subscription
-      showToast(`Imported ${templates} template${templates === 1 ? '' : 's'}`, 'success');
+      // SQEM-330 — personas only appear in the count when the bundle carried any, so an ordinary
+      // template import reads exactly as it did before.
+      showToast(
+        `Imported ${templates} template${templates === 1 ? '' : 's'}` +
+        (personas ? ` and ${personas} persona${personas === 1 ? '' : 's'}` : ''),
+        'success',
+      );
       setImportBundleData(null);
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Import failed', 'error');
@@ -608,7 +609,6 @@ const Templates = () => {
               onDuplicate={handleDuplicate}
               onExportSkill={handleExportSkill}
               onDeleteRequest={handleDeleteRequest}
-              onRun={handleRun}
               onSetTag={handleSetTag}
               onPublish={openPublish}
               showPublish={true}
@@ -704,7 +704,7 @@ const Templates = () => {
       {/* Import preview (SQEM-161) — transparency before applying a third-party bundle */}
       <Modal open={!!importBundleData} onClose={() => !importing && setImportBundleData(null)} size="sm" className="p-6">
         {importBundleData && (() => {
-          const { templates, files } = importBundleData.manifest;
+          const { templates, files, personas } = importBundleData.manifest;
           const totalBytes = (files || []).reduce((s, f) => s + (f.sizeBytes || 0), 0);
           const mb = (totalBytes / (1024 * 1024));
           return (
@@ -720,6 +720,15 @@ const Templates = () => {
               <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 p-4 mb-4 text-sm">
                 <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Templates</span><span className="font-bold text-slate-800 dark:text-slate-100">{(templates || []).length}</span></div>
                 <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Context files</span><span className="font-bold text-slate-800 dark:text-slate-100">{(files || []).length}{totalBytes ? ` · ${mb < 0.1 ? '<0.1' : mb.toFixed(1)} MB` : ''}</span></div>
+                {/* ⛔ SQEM-330 — this row was missing, and its absence was the bug. `importBundle`
+                    has created personas since SQEM-330 and the success toast counts them, but this
+                    dialog — whose entire job is "review what lands before continuing" — listed only
+                    templates and files. A preview that omits part of what it is about to create is
+                    worse than no preview: it was *read* as complete. Shown only when the bundle
+                    carries any, so an ordinary template import looks exactly as it did. */}
+                {(personas || []).length > 0 && (
+                  <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Personas</span><span className="font-bold text-slate-800 dark:text-slate-100">{(personas || []).length}</span></div>
+                )}
               </div>
               {(templates || []).length > 0 && (
                 <ul className="mb-5 max-h-32 overflow-y-auto text-sm text-slate-700 dark:text-slate-200 space-y-1">
@@ -731,7 +740,7 @@ const Templates = () => {
               )}
               <div className="flex gap-2">
                 <button onClick={() => setImportBundleData(null)} disabled={importing} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50">Cancel</button>
-                <button onClick={confirmImport} disabled={importing || !((templates || []).length)} className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                <button onClick={confirmImport} disabled={importing || !((templates || []).length || (personas || []).length)} className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                   {importing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importing…</> : 'Import'}
                 </button>
               </div>

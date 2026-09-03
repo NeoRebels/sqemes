@@ -136,6 +136,46 @@ export interface Prompt {
   brandConfig?: AssistantBrandConfig;
 }
 
+/**
+ * SQEM-324 — one route of a persona: a template, and the condition under which a client should load
+ * it.
+ *
+ * ⚠️ `condition` is prose written for a model to judge ("the user wants an offer laid out"), not a
+ * rule we evaluate. Nothing in this codebase branches on it, and nothing should: the moment we
+ * execute the routing ourselves, a persona stops being a document and becomes a multi-step prompt
+ * chain — a shape this product removed on purpose and does not reintroduce.
+ */
+export interface PersonaRoute {
+  templateId: string;
+  /** Denormalised for rendering — the archive card and the editor both want it without a join. */
+  templateTitle?: string;
+  templateKind?: PromptKind;
+  condition: string;
+  /** Ascending. The order the routes appear in the composed orchestrator. */
+  sortOrder: number;
+}
+
+export interface Persona {
+  id: string;
+  workspaceId: string;
+  title: string;
+  description: string;
+  /**
+   * The orchestrator PROSE only — role, working style, rules. **Never the routing table**: that
+   * lives in `routes`, so deleting a template cannot leave a route pointing at nothing. What MCP
+   * serves is composed from both at read time.
+   */
+  content: string;
+  tags: string[];
+  routes: PersonaRoute[];
+  /** SQEM-265 — set when the wizard generated it. NULL is "not known to be generated". */
+  aiGeneratedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  usageCount: number;
+}
+
 export interface WorkspaceFile {
   id: string;
   workspaceId: string;

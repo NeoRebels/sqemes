@@ -8,8 +8,9 @@ import { fetchPromptDetail } from '../lib/api/prompts';
 import { fetchLibraryTemplateDetail } from '../lib/api/library';
 import { AVAILABLE_MODELS, TEMPLATE_CATEGORIES, KIND_HELP } from '../constants';
 import { runAuthoringAI, authoringModelId } from '../lib/authoringAI';
-import { Save, Plus, Trash2, Settings, Edit, ChevronDown, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Bot, Wand2, FlaskConical, UserRound } from 'lucide-react';
+import { Save, Plus, Trash2, Settings, Edit, ChevronDown, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Bot, Wand2, FlaskConical, UserRound, Users } from 'lucide-react';
 import Modal from '../components/ui/Modal';
+import ConfirmModal from '../components/ui/ConfirmModal';
 import Button from '../components/ui/Button';
 import FieldTooltip from '../components/FieldTooltip';
 import { ContextFilePicker } from '../components/ContextFilePicker';
@@ -78,6 +79,8 @@ const TemplateEditor = () => {
   const [isDirty, setIsDirty] = useState(false);
   const [showDiscardModal, setShowDiscardModal] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  // SQEM-329 — was a native window.confirm(); see components/ui/ConfirmModal for why it is gone.
+  const [confirmBrandSwitch, setConfirmBrandSwitch] = useState(false);
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const [mobileTab, setMobileTab] = useState<'editor' | 'settings' | 'test'>('editor');
 
@@ -613,10 +616,13 @@ Output only the refined prompt text, with no surrounding explanation or commenta
               />
             </div>
 
-            {/* About */}
+            {/* SQEM-330 — "Description", not "About". The column is `description`, the persona editor
+                says Description, and the marketplace card shows it under that name. Three words for
+                one field is the pattern SQEM-287 measured on the provider keys, where the same
+                thing was called three different things in three screens. */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">About</label>
+                <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Description</label>
                 {canEdit && (
                   <button
                     type="button"
@@ -763,6 +769,30 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                     : undefined
                 }
               />
+            )}
+
+            {/* SQEM-323 — what the Cloud control would have said, in one line, for self-host.
+                The block above is `!IS_SELF_HOSTED`, so until now this spot was simply **empty** —
+                and an empty spot states nothing: somebody editing a template on a self-hosted
+                instance had no way to learn who can open it. The answer is always "everyone in the
+                workspace", precisely because the control that writes `template_access` rows is the
+                one being hidden.
+
+                ⚠️ A line, not a card. This is an editor sidebar next to the Save button; a gradient
+                upsell box here would sell at the moment somebody is trying to work. The Cloud offer
+                belongs in Settings (see the CTA there) — this only has to be true. */}
+            {!isLibrary && canEdit && IS_SELF_HOSTED && (
+              <div>
+                <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Access</label>
+                <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/40 px-3 py-2.5">
+                  <Users className="w-4 h-4 shrink-0 mt-0.5 text-slate-400" />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <span className="font-semibold text-slate-600 dark:text-slate-300">Everyone in this workspace</span>{' '}
+                    can see and use this template. Restricting one to people or groups is available on{' '}
+                    <a href="https://sqemes.com" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">Sqemes Cloud</a>.
+                  </p>
+                </div>
+              </div>
             )}
 
             {/* Context Files — workspace templates only */}
@@ -921,9 +951,7 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                       <button
                         type="button"
                         onClick={() => {
-                          if (window.confirm('Switch back to Brand Voice Builder? The form will re-populate from your saved configuration.')) {
-                            setBrandVoiceMode('structured');
-                          }
+                          setConfirmBrandSwitch(true);
                         }}
                         className="text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 transition-colors"
                       >
@@ -937,7 +965,7 @@ Output only the refined prompt text, with no surrounding explanation or commenta
                   <textarea
                     value={formData.systemInstruction || ''}
                     onChange={e => { setFormData(prev => ({ ...prev, systemInstruction: e.target.value })); setIsDirty(true); }}
-                    placeholder="Define the persona, behaviour, and any extra context/knowledge for this assistant..."
+                    placeholder="Define the role, behaviour, and any extra context/knowledge for this assistant..."
                     readOnly={!canEdit}
                     className="w-full p-3 text-sm font-mono text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl resize-none outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all leading-relaxed placeholder-slate-300 dark:placeholder-slate-600 h-64"
                   />
@@ -1055,6 +1083,21 @@ Output only the refined prompt text, with no surrounding explanation or commenta
           <Button variant="danger" onClick={() => navigate(listPath)} className="flex-1 py-2.5 text-xs shadow-lg hover:shadow-red-200">Discard</Button>
         </div>
       </Modal>
+
+      {/* SQEM-329 — the brand-voice switch. Not destructive in the "gone forever" sense, so the
+          action is `primary`: it re-populates the form from the saved configuration, and anything
+          typed only into the raw field since is what is actually at stake. The sentence says so. */}
+      <ConfirmModal
+        open={confirmBrandSwitch}
+        title="Switch back to Brand Voice Builder?"
+        confirmLabel="Switch back"
+        cancelLabel="Stay in advanced"
+        variant="primary"
+        onConfirm={() => { setBrandVoiceMode('structured'); setConfirmBrandSwitch(false); }}
+        onClose={() => setConfirmBrandSwitch(false)}
+      >
+        <p>The form re-populates from your saved configuration. Edits made only in the raw instruction since then are not carried back.</p>
+      </ConfirmModal>
 
       {/* Delete Confirmation Modal */}
       <Modal open={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} size="sm" className="p-6">

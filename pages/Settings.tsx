@@ -64,6 +64,7 @@ import {
   Download,
   SlidersHorizontal,
   Sparkles,
+  ArrowUpRight,
 } from 'lucide-react';
 
 type TabId = 'general' | 'brand' | 'team' | 'plans' | 'api' | 'connectors' | 'profile';
@@ -460,8 +461,13 @@ const Settings = () => {
   const visibleTabs = tabs.filter(tab => {
     if (IS_SELF_HOSTED && tab.id === 'plans') return false; // SQEM-119 — no billing on self-host
     if (IS_SELF_HOSTED && tab.id === 'brand') return false;  // SQEM-170 — Brand is Cloud-only
-    // Members (no settings:general) still get their Profile + Connectors (they may add personal ones).
-    if (!can(currentUser, workspace, 'settings:general')) return tab.id === 'profile' || tab.id === 'connectors';
+    // Members (no settings:general) still get their Profile + Connectors (they may add personal ones)
+    // and, since SQEM-328, **API & MCP** — the only place to obtain the key their own MCP client
+    // needs. ⚠️ The tab is not the permission: the provider-keys card inside it stays behind
+    // `api-keys:manage`, so what a member reaches is their own connection and nothing else.
+    if (!can(currentUser, workspace, 'settings:general')) {
+      return tab.id === 'profile' || tab.id === 'connectors' || tab.id === 'api';
+    }
     if (!can(currentUser, workspace, 'plans:manage')) return tab.id !== 'plans';
     return true;
   });
@@ -947,15 +953,72 @@ const Settings = () => {
                   grant template access and appears nowhere else in the product. Whoever creates one
                   is thinking about a template, so it belongs beside the setting that makes it useful.
 
-                  ⛔ **Its own condition, deliberately outside the `!IS_SELF_HOSTED` block above.**
-                  Access groups are not Cloud-only — the migration ships with the bundle and the
-                  policies apply there identically. Folding this into that block would take group
-                  management away from every self-hosted instance, and it would look perfectly
-                  correct on Cloud while doing it.
+                  ⛔ **Cloud-only since SQEM-323, and the comment that stood here argued the exact
+                  opposite.** It read: *"Its own condition, deliberately outside the `!IS_SELF_HOSTED`
+                  block. Access groups are not Cloud-only — the migration ships with the bundle and
+                  the policies apply there identically."* Both of those sentences are true and the
+                  conclusion did not follow from them. **A group has exactly one consumer** —
+                  `TemplateAccessControl` — and that control is `!IS_SELF_HOSTED` in the block above
+                  *and* in `pages/TemplateEditor.tsx`. With no way to attach a group to a template,
+                  a self-hoster was maintaining objects that could never grant anything.
+
+                  ⚠️ That is worse than a missing feature: it is a feature that pretends to work.
+                  **The tables and policies still ship** — schema parity across Cloud and self-host is
+                  worth more than two unused tables, and rows an instance already created are left
+                  untouched rather than dropped: they have no consumer, so nothing is gained by a
+                  migration that cannot be undone.
 
                   No `mt-*` here: this tab spaces its cards with `space-y-6`, unlike the Team tab. */}
-              {can(currentUser, workspace, 'team:manage') && (
+              {!IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
                 <AccessGroupsCard workspaceId={workspace.id} members={workspace.members} />
+              )}
+
+              {/* SQEM-323 — the self-host counterpart of both blocks above, and deliberately **one**
+                  card for them. The default and the groups are two controls in the code and a single
+                  idea to a reader — *who may use a template* — so two CTAs would nag where one
+                  informs.
+
+                  The shape is copied from the Apps CTA in `ConnectorsCard` (SQEM-155) on purpose:
+                  two upsells that look different read as two features.
+
+                  ⚠️ Gated on `team:manage`, not shown to everyone. A member cannot change template
+                  access on Cloud either, so advertising it to them would be an offer they could not
+                  act on. And the first line states what *does* apply here — an upsell that only
+                  says what is missing leaves the actual rule unsaid. */}
+              {IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
+                <Card className="p-6 md:p-8">
+                  <div className="mb-6">
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <Lock className="w-5 h-5 text-brand-500" />
+                      Template Access
+                    </h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                      Every template in this workspace is available to all of its members.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-brand-100 dark:border-brand-900/40 bg-gradient-to-br from-brand-50 to-white dark:from-brand-900/20 dark:to-slate-800/50 p-6 text-center">
+                    <div className="flex items-center justify-center gap-1.5 mb-4">
+                      {[Users, Lock, User].map((Icon, i) => (
+                        <div key={i} className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-sm">
+                          <Icon className="w-5 h-5 text-brand-500" />
+                        </div>
+                      ))}
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Access control and groups</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 max-w-md mx-auto">
+                      Decide per template who may see and use it: everyone, only you, or named people
+                      and groups that keep following your team as it changes. Available on Sqemes Cloud.
+                    </p>
+                    <a
+                      href="https://sqemes.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none"
+                    >
+                      Explore Sqemes Cloud <ArrowUpRight className="w-4 h-4" />
+                    </a>
+                  </div>
+                </Card>
               )}
 
               {/* SQEM-170 — Content Governance is a Cloud-only feature */}
@@ -1429,8 +1492,15 @@ const Settings = () => {
           )}
 
           {/* --- Integrations Tab --- */}
-          {activeTab === 'api' && can(currentUser, workspace, 'api-keys:manage') && (
+          {activeTab === 'api' && can(currentUser, workspace, 'api-keys:own') && (
             <div className="space-y-6 animate-fade-in">
+              {/* ⛔ SQEM-328 — AI provider keys stay closed to members, and the difference from the
+                  cards below is not a matter of degree. A provider key is a workspace-wide
+                  credential that costs money on every call and serves everybody; a public API key
+                  is one person's own connection. They shared this tab by accident of layout, which
+                  is exactly why the whole tab was closed to members until now — the coarse gate was
+                  hiding a fine distinction rather than making one. */}
+              {can(currentUser, workspace, 'api-keys:manage') && (
               <Card className="p-6 md:p-8">
                 <div className="flex items-center justify-between mb-6">
                   <div>
@@ -1548,6 +1618,7 @@ const Settings = () => {
                   })}
                 </div>
               </Card>
+              )}
 
               {/* Public API Keys */}
               <Card className="p-6 md:p-8">

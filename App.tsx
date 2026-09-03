@@ -12,6 +12,8 @@ import { IS_SELF_HOSTED } from './lib/env';
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const Templates = React.lazy(() => import('./pages/Templates'));
 const TemplateEditor = React.lazy(() => import('./pages/TemplateEditor'));
+const Personas = React.lazy(() => import('./pages/Personas'));           // SQEM-324
+const PersonaEditor = React.lazy(() => import('./pages/PersonaEditor')); // SQEM-324
 const PromptRunnerRedirect = () => {
   const { id } = useParams<{ id: string }>();
   const nav = useNavigate();
@@ -225,6 +227,10 @@ const AppRoutes = () => {
             visibly — the template opened, just in the wrong place. If you are writing a link
             to a template, you almost certainly want `/edit`. */}
         <Route path="/prompts/:id" element={<PromptRunnerRedirect />} />
+        {/* SQEM-324 — the persona editor is full-screen like the template editor: same job,
+            same amount of screen it wants. */}
+        <Route path="/personas/new" element={<PersonaEditor />} />
+        <Route path="/personas/:id/edit" element={<PersonaEditor />} />
         <Route path="/library/new" element={<TemplateEditor />} />
         <Route path="/library/:id/edit" element={<TemplateEditor />} />
         <Route path="/library/:id" element={<MarketplaceTemplate />} />
@@ -232,6 +238,7 @@ const AppRoutes = () => {
         {/* Dashboard Layout Routes */}
         <Route path="/" element={<LayoutPage><Dashboard /></LayoutPage>} />
         <Route path="/templates" element={<LayoutPage><Templates /></LayoutPage>} />
+        <Route path="/personas" element={<LayoutPage><Personas /></LayoutPage>} />
         <Route path="/prompts" element={<Navigate to="/templates" replace />} />
         <Route path="/assistants" element={<Navigate to="/templates?kind=assistant" replace />} />
         <Route path="/files" element={<LayoutPage><Files /></LayoutPage>} />

@@ -14,6 +14,7 @@ export default function TemplateCard({
   title,
   titleHref,
   description,
+  extra,
   footerLeft,
   footerRight,
 }: {
@@ -29,6 +30,15 @@ export default function TemplateCard({
   /** When set, the title links here with the shared hover treatment. */
   titleHref?: string;
   description?: string;
+  /**
+   * SQEM-330 — content between the description and the footer.
+   *
+   * Added for the persona cards, whose route chips answer *what does this do* and therefore belong
+   * with the description rather than among the badges (which sit above the title and read as
+   * classification) or in the footer (which is the action row). Optional, so every existing card is
+   * byte-identical without it.
+   */
+  extra?: React.ReactNode;
   /** Left side of the footer — secondary icon actions or stat chips. */
   footerLeft?: React.ReactNode;
   /** Right side of the footer — the primary action button. */
@@ -61,6 +71,9 @@ export default function TemplateCard({
         {description !== undefined && (
           <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-4 leading-relaxed">{description}</p>
         )}
+
+        {/* Above the stretched title link, so anything interactive in here still receives clicks. */}
+        {extra && <div className="relative z-10">{extra}</div>}
       </div>
 
       {(footerLeft || footerRight) && (

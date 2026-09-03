@@ -42,12 +42,41 @@ export type BundleTemplate = {
 // confirmed on 2026-08-31: **no bundle has ever been downloaded**, so there is no file in the world
 // carrying a populated `skills` to be compatible with. Keeping a reader for a shape that was never
 // shipped is ceremony. That premise expires — see the note in `templateBundle.ts`.
+/**
+ * SQEM-330 — a persona in a bundle, with its routes pointing at `BundleTemplate.ref`.
+ *
+ * ⛔ **A persona cannot travel alone.** It is a set of references to templates; exported without
+ * them it is a role description whose every route leads nowhere, and importing it would produce
+ * exactly that. So exporting a persona pulls its attached templates (and their context files) into
+ * the same bundle, and the routes address them by bundle ref rather than by database id.
+ *
+ * ⚠️ **Access rules are NOT carried.** `persona_access` names people and groups of *this* workspace;
+ * those ids mean nothing in another one. An imported persona starts under the destination
+ * workspace's own default, which is the only answer that is not quietly wrong.
+ */
+export type BundlePersonaRoute = { templateRef: string; condition: string };
+export type BundlePersona = {
+  ref: string;
+  title: string;
+  description: string;
+  content: string;
+  tags: string[];
+  routes: BundlePersonaRoute[];
+};
+
 export type BundleManifest = {
   schema: string;
   exportedAt?: string;
   generator?: string;
   templates: BundleTemplate[];
   files: BundleFile[];
+  /**
+   * ⚠️ **Optional, and deliberately not a schema bump.** A bundle written before SQEM-330 has no
+   * `personas` key and stays valid — the reader simply finds nothing. Bumping `BUNDLE_SCHEMA` would
+   * have announced an incompatibility that does not exist, and forced a version check into every
+   * reader for a field they can ignore. Additive beats versioned when it is genuinely additive.
+   */
+  personas?: BundlePersona[];
 };
 
 export const sanitizeName = (name: string) => name.replace(/[^\w.-]+/g, '_').slice(0, 80) || 'file';

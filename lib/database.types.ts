@@ -524,6 +524,106 @@ export type Database = {
       // SQEM-292 — access groups. Hand-written rather than regenerated: the generator needs a live
       // database, and leaving them out is how `legal_acceptances` ended up with five permanent tsc
       // errors nobody could act on.
+      // SQEM-324 — Personas. `content` holds the orchestrator PROSE; the routes live in
+      // persona_templates, so a deleted template cannot leave a dangling route in the text.
+      personas: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          title: string;
+          description: string;
+          content: string;
+          tags: string[];
+          created_by: string | null;
+          ai_generated_at: string | null;
+          usage_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          title: string;
+          description?: string;
+          content?: string;
+          tags?: string[];
+          created_by?: string | null;
+          ai_generated_at?: string | null;
+          usage_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          title?: string;
+          description?: string;
+          content?: string;
+          tags?: string[];
+          created_by?: string | null;
+          ai_generated_at?: string | null;
+          usage_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      persona_templates: {
+        Row: {
+          persona_id: string;
+          template_id: string;
+          condition: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          persona_id: string;
+          template_id: string;
+          condition?: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          persona_id?: string;
+          template_id?: string;
+          condition?: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      // SQEM-324 — ships with the schema, written from SQEM-326 onwards. No `role` column:
+      // nothing has written a role principal since SQEM-211.
+      persona_access: {
+        Row: {
+          id: string;
+          persona_id: string;
+          workspace_id: string;
+          user_id: string | null;
+          group_id: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          persona_id: string;
+          workspace_id: string;
+          user_id?: string | null;
+          group_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          persona_id?: string;
+          workspace_id?: string;
+          user_id?: string | null;
+          group_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       workspace_groups: {
         Row: {
           id: string;

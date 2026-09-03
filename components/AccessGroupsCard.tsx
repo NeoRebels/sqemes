@@ -14,6 +14,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Pencil, Check, X, Loader2 } from 'lucide-react';
 import Card from './ui/Card';
+import ConfirmModal from './ui/ConfirmModal';
 import Button from './ui/Button';
 import { Input } from './ui/Input';
 import Checkbox from './ui/Checkbox';
@@ -34,6 +35,8 @@ export default function AccessGroupsCard({
   const [editing, setEditing] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  // SQEM-329 — the group awaiting confirmation, with the count that makes the sentence true.
+  const [pendingDelete, setPendingDelete] = useState<{ group: WorkspaceGroup; used: number } | null>(null);
 
   const load = async () => {
     try {
@@ -63,21 +66,27 @@ export default function AccessGroupsCard({
     }
   };
 
-  const handleDelete = async (g: WorkspaceGroup) => {
-    // ⚠️ Deleting a group revokes access everywhere it was used, in one step. `template_access` is
-    // ON DELETE CASCADE, so a template restricted only to this group falls back to its creator alone
-    // — and nothing at the template says why. Counting first turns "delete Marketing" into the
-    // sentence that actually describes the act.
+  // ⚠️ Deleting a group revokes access everywhere it was used, in one step. `template_access` is
+  // ON DELETE CASCADE, so a template restricted only to this group falls back to its creator alone
+  // — and nothing at the template says why. Counting first turns "delete Marketing" into the
+  // sentence that actually describes the act.
+  //
+  // SQEM-329 — the count is fetched BEFORE the dialog opens, which is why asking and deleting are
+  // two functions now. The old `window.confirm` could await first and block second; a modal cannot.
+  const askDelete = async (g: WorkspaceGroup) => {
     let used = 0;
     try { used = await countTemplatesUsingGroup(g.id); } catch { /* fall through to the plainer warning */ }
-    const warning = used > 0
-      ? `Delete “${g.name}”? ${used} template${used === 1 ? '' : 's'} currently grant access through this group — they will lose it.`
-      : `Delete “${g.name}”? It is not used by any template.`;
-    if (!window.confirm(warning)) return;
+    setPendingDelete({ group: g, used });
+  };
+
+  const handleDelete = async () => {
+    const g = pendingDelete?.group;
+    if (!g) return;
     setBusy(true);
     try {
       await deleteGroup(g.id);
       await load();
+      setPendingDelete(null);
       showToast(`Deleted “${g.name}”`, 'success');
     } catch (err: any) {
       showToast(err.message || 'Could not delete the group', 'error');
@@ -178,7 +187,7 @@ export default function AccessGroupsCard({
                       </span>
                     </button>
                     <button type="button" onClick={() => setRenaming({ id: g.id, name: g.name })} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg"><Pencil className="w-3.5 h-3.5" /></button>
-                    <button type="button" onClick={() => void handleDelete(g)} disabled={busy} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
+                    <button type="button" onClick={() => void askDelete(g)} disabled={busy} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
                   </>
                 )}
               </div>
@@ -199,6 +208,31 @@ export default function AccessGroupsCard({
           ))}
         </div>
       )}
+
+      {/* SQEM-329 — the sentence has to name the consequence, and the consequence depends on a
+          number we had to fetch first. That is why the count is carried in state rather than
+          computed while rendering: a dialog that says "0 templates" for a second and then corrects
+          itself is worse than one that opens a moment later. */}
+      <ConfirmModal
+        open={!!pendingDelete}
+        title={`Delete “${pendingDelete?.group.name ?? ''}”?`}
+        confirmLabel="Delete group"
+        busy={busy}
+        onConfirm={() => void handleDelete()}
+        onClose={() => setPendingDelete(null)}
+      >
+        {pendingDelete && pendingDelete.used > 0 ? (
+          <p>
+            <span className="font-semibold text-slate-600 dark:text-slate-300">
+              {pendingDelete.used} template{pendingDelete.used === 1 ? '' : 's'}
+            </span>{' '}
+            currently grant access through this group — they will lose it, and nothing at the
+            template will say why.
+          </p>
+        ) : (
+          <p>It is not used by any template.</p>
+        )}
+      </ConfirmModal>
     </Card>
   );
 }
