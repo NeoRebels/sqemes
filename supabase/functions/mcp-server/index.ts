@@ -67,7 +67,19 @@ const TOOL_CAPABILITY: Record<string, Capability> = {
   update_template:   'update',
   delete_template:   'delete',
   delete_file:       'delete',
+  // SQEM-332 — these two were missing, and the omission failed in **both** directions at once:
+  // `tools/list` filters on `scopes.includes(TOOL_CAPABILITY[name])`, so an unmapped tool is never
+  // advertised, while `tools/call` guarded with `if (requiredCap && …)`, so an unmapped tool skipped
+  // the check entirely. Invisible and ungated from one missing line.
+  list_personas:     'read',
+  get_persona:       'read',
 };
+
+// ⚠️ SQEM-332 — a third list naming the tools was tried here and removed again: it would have been
+// one more place to keep in step, which is the disease rather than the cure. The two halves that
+// must agree are this map and the array inside `tools/list`, and
+// `tests/unit/mcpToolCapability.test.ts` reads **this file** to compare them — no import, because
+// the module calls `Deno.serve` at load and cannot be pulled into a test.
 const READ_METHODS = new Set(['prompts/list', 'prompts/get', 'resources/list', 'resources/read']);
 
 // ---- Text file MIME types allowed for upload_file ----
@@ -1132,8 +1144,19 @@ Deno.serve(async (req) => {
     if (!toolName) return rpcError(id, -32602, 'Missing tool name');
 
     // Capability gate (SQEM-064): reject tools the connection isn't scoped for.
+    //
+    // ⛔ **SQEM-332 — an unmapped tool is now REFUSED, not waved through.** The old guard read
+    // `if (requiredCap && …)`, so a tool missing from `TOOL_CAPABILITY` had `undefined` here, the
+    // condition was falsy, and the call proceeded **with no scope check at all**. That is the
+    // dangerous half of the same omission that made the persona tools invisible in `tools/list`:
+    // one direction hides a tool, the other unguards it, and only the first is noticeable.
+    //
+    // Failing closed costs nothing — a tool the map does not know is a tool nobody meant to expose.
     const requiredCap = TOOL_CAPABILITY[toolName];
-    if (requiredCap && !scopes.includes(requiredCap)) {
+    if (!requiredCap) {
+      return rpcError(id, -32601, `Unknown tool: '${toolName}'.`);
+    }
+    if (!scopes.includes(requiredCap)) {
       return rpcError(id, -32002, `Insufficient scope: '${toolName}' requires the '${requiredCap}' permission, which this connection is not granted.`);
     }
 

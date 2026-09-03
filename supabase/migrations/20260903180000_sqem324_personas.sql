@@ -2,6 +2,14 @@
 -- SQEM-324 — Personas: an orchestrator over existing templates
 -- ============================================================
 --
+-- ⚠️ **This file was edited AFTER it had run on production (2026-09-03, SQEM-331), with the
+-- owner's explicit approval — which the repository conventions require before an already-applied
+-- migration may be touched at all.** Two of its comments pointed at an internal document that the
+-- public export prunes, so a self-hoster read a pointer to a file their checkout never had.
+-- Nothing executable changed: one SQL comment, and one `comment on table` string whose new text is
+-- re-issued by `20260903230000_sqem331_persona_comment.sql`, because editing this file does not
+-- make it run again.
+--
 -- A persona is a role description plus CONDITIONS — when to load which template. The routing is
 -- performed by the MCP client, lazily: the orchestrator costs a few hundred tokens and a template is
 -- fetched only once its condition fires. That is the whole economic argument for the feature.
@@ -13,7 +21,9 @@
 -- no context files, and no content that is ever sent as a prompt on its own — it is a COMPOSITION of
 -- templates. As a fourth kind it would land in the template list, and every filter, importer,
 -- exporter and marketplace path would have to learn to skip it. The cost of this decision is stated
--- rather than hidden: `pm/VISION.md` says "three kinds" in several places and has to change with it.
+-- rather than hidden: the product vision document names exactly three template kinds in several
+-- places and has to change along with this table. (That document is internal to the source
+-- repository; the decision itself is stated here so this file explains itself.)
 --
 -- ⛔ WHY THE CONDITIONS LIVE IN A COLUMN AND NOT IN THE MARKDOWN. The obvious design writes the
 -- routing table into the orchestrator text, which reads well and is wrong: the attachment would then
@@ -238,7 +248,7 @@ create policy "persona_access_delete" on public.persona_access
   using (public.get_user_role(workspace_id) in ('admin', 'editor'));
 
 comment on table public.personas is
-  'SQEM-324 — an orchestrator over templates: prose in `content`, routes in `persona_templates`. MCP-only; there is no Chat launch path, and that gap is argued in pm/VISION.md rather than left to look accidental.';
+  'SQEM-324 — an orchestrator over templates: prose in `content`, routes in `persona_templates`. MCP-only; there is no Chat launch path, and that gap is a deliberate decision rather than an oversight.';
 comment on table public.persona_templates is
   'SQEM-324 — one route: template + the condition under which a client should load it. `condition` is prose for the model, never parsed here — parsing it would turn a document into the prompt chain the guardrails removed.';
 comment on table public.persona_access is
