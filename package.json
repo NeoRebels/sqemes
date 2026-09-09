@@ -1,7 +1,7 @@
 {
   "name": "sqemes",
   "private": true,
-  "version": "1.11.7",
+  "version": "1.11.8",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
@@ -63,7 +63,7 @@
     "vitest": "^4.1.10"
   },
   "overrides": {
-    "js-yaml": "^4.3.1",
+    "js-yaml": "^4.3.2",
     "brace-expansion": "^5.0.9",
     "minimatch": "^10.0.3",
     "undici": "^7.29.0",

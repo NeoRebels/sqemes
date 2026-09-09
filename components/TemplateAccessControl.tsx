@@ -9,8 +9,9 @@
 // SQEM-292 — **admins and editors no longer come along.** "Restrict access" used to mean "these
 // people, and also everyone who runs the workspace", which is not what it said. Both states are now
 // promises: "Only me" to one person, "Restrict access" to a named set. Emergency access is
-// `reassign_orphaned_templates()` — it hands a departing member's templates to the longest-standing
-// admin, which is an event rather than a standing permission.
+// `reassign_orphaned_content()` (SQEM-344; was `reassign_orphaned_templates`) — it hands a departing
+// member's templates, personas and files to the longest-standing admin, which is an event rather than
+// a standing permission.
 //
 // SQEM-211 — **per template, access is granted to people, not to roles.** The role checkbox is gone.
 //

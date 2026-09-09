@@ -73,6 +73,18 @@ const TOOL_CAPABILITY: Record<string, Capability> = {
   // the check entirely. Invisible and ungated from one missing line.
   list_personas:     'read',
   get_persona:       'read',
+  // SQEM-337 — the write half personas never had. They are MCP-only
+  // (`pm/VISION.md` in the source repository), so read-only tooling left the one object that exists
+  // nowhere else as the only one you could not edit where it lives. ⚠️ Adding a tool means adding it HERE and to the `tools/list` array — that pairing is
+  // what SQEM-332 cost, and `tests/unit/mcpToolCapability.test.ts` now fails if one half is missed.
+  create_persona:    'create',
+  update_persona:    'update',
+  delete_persona:    'delete',
+  // SQEM-338 — the routes. Both are `update` on the PERSONA, not `create`/`delete` of their own:
+  // a route has no life outside the role it belongs to, and treating an attach as a creation would
+  // let a `create`-only connection reshape a persona it may not otherwise touch.
+  attach_template:   'update',
+  detach_template:   'update',
 };
 
 // ⚠️ SQEM-332 — a third list naming the tools was tried here and removed again: it would have been
@@ -587,6 +599,70 @@ Deno.serve(async (req) => {
     canAccessPersona = (personaId: string) => !restrictedPersonas.has(personaId);
   }
 
+  // SQEM-336 — what role does this connection's user hold in the workspace?
+  //
+  // Resolved once per connection rather than per call: the role cannot change mid-request, and a
+  // lookup inside each write handler would run for an answer that never differs. SQEM-336 was the
+  // first time `mcp-server` read `workspace_members` at all.
+  //
+  // ⚠️ A connection WITHOUT a user gets no role — and needs none. See `mayWrite`.
+  let mcpUserRole: string | null = null;
+  if (mcpUserId) {
+    const { data: memberRow } = await adminClient
+      .from('workspace_members')
+      .select('role')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', mcpUserId)
+      .maybeSingle();
+    mcpUserRole = (memberRow as { role?: string } | null)?.role ?? null;
+  }
+
+  /**
+   * SQEM-339 — may this user manage content that is not their own?
+   *
+   * **Admin and editor, not admin alone.** SQEM-336 started with admin, and SQEM-339 corrected it:
+   * an Editor exists precisely to work on the workspace's shared templates, so a rule that let them
+   * see a shared template and not maintain it would have broken the role's whole purpose. A Member
+   * is the case the gate is actually for — they use the library, they do not curate it.
+   */
+  const mcpUserManagesContent = mcpUserRole === 'admin' || mcpUserRole === 'editor';
+
+  /**
+   * SQEM-336 → 341 — may this connection write at all?
+   *
+   *   user-bound connection    editor or admin
+   *   connection with no user  yes, bounded by its narrow sight (SQEM-210)
+   *
+   * **A member reads. That is the whole role.** Decided by the product owner on 2026-09-09, and it
+   * is not a new rule — it is the one RLS has enforced since the beginning (`prompts_insert`,
+   * `prompts_update` and `prompts_delete` all test `get_user_role(...) in ('admin','editor')`).
+   * MCP simply never asked, because it runs as service role and RLS never sees it. The two channels
+   * disagreeing was invisible until the permission matrix put them side by side (SQEM-341).
+   *
+   * ⛔ **Ownership used to be a third disjunct and was removed, which is the subtle half.** Once a
+   * member cannot create, they can only *become* an owner one way: by having been an editor or
+   * admin earlier. `createdBy === mcpUserId` therefore stopped being an "own work" clause and
+   * became purely a **grandfathering clause for the demoted** — invisible and uncountable, since
+   * nothing lists how many templates a downgraded colleague may still change. RLS never granted
+   * that, so keeping it here would have meant the two channels still disagreed, just in a smaller
+   * place.
+   *
+   * ⚠️ **`created_by` keeps both jobs it ever had** — it decides who *sees* a row (the creator
+   * branch in `can_access_*`, the mechanism behind "Only me") and who *inherits* it when somebody
+   * leaves (`reassign_orphaned_content()`, SQEM-344). It only loses the third job, which SQEM-339
+   * gave it for one day. Custody is an **event**; authority is a standing property of the role.
+   * Mixing them was the mistake.
+   *
+   * ⚠️ **The predicate is deliberately connection-scoped rather than row-scoped**, so there is no
+   * per-row decision left to get wrong — and `create`, which has no row, can use the same one.
+   */
+  const mayWrite: boolean = !mcpUserId || mcpUserManagesContent;
+
+  /** The same refusal everywhere, so a member never has to guess which tool is the fussy one. */
+  const refuseWrite = (id: unknown, what: string) =>
+    rpcError(id as never, -32602,
+      `Not allowed: ${what}. Creating, changing and deleting are for editors and admins; a member's connection is read-only. This matches the web app, where the same actions are closed to members.`);
+
   // SQEM-326 — how many routes a persona has, and how many of them THIS caller can open.
   //
   // ⚠️ Batched on purpose. The first cut asked per persona, which is one query per row in
@@ -987,6 +1063,72 @@ Deno.serve(async (req) => {
         },
       },
       {
+        name: 'create_persona',
+        description: 'Create a persona — a standing working role the workspace can adopt: who this role is, how it works, what it refuses.\n\nWRITE THE ROLE, NOT THE ROUTING. A persona holds prose only; which template applies when lives in its routes, attached separately. Do not list templates in the content — a routing table written into the prose goes stale the moment a template is renamed, and nothing corrects it.\n\nA persona is not a template: it has no {{variables}}, no context files, and its text is never sent to a model as a task. Use create_template for those.\n\nNew personas are visible to the whole workspace. That is deliberate and not a gap: a caller only ever receives the routes they already have access to, so an open persona grants nothing.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            title:       { type: 'string', description: 'Name of the role, e.g. "Sales Engineer"' },
+            description: { type: 'string', description: 'One line on when to reach for this persona — this is what list_personas shows' },
+            content:     { type: 'string', description: 'The role itself: instructions, working style, rules. Markdown. No routing table.' },
+            tags:        { type: 'array', items: { type: 'string' }, description: 'Optional tags' },
+          },
+          required: ['title'],
+        },
+      },
+      {
+        name: 'update_persona',
+        description: 'Change a persona\'s title, description, content or tags. Only the fields you pass are touched; the rest stay as they are, and its routes are never affected.\n\nCall get_persona first if you are editing text you did not just write — this overwrites, it does not merge.\n\nRequires that you created the persona, or that you are an editor or admin: a persona is a shared role, so rewriting it changes it for everyone who uses it.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id:          { type: 'string', description: 'UUID of the persona (from list_personas)' },
+            title:       { type: 'string' },
+            description: { type: 'string' },
+            content:     { type: 'string', description: 'Replaces the role text entirely. No routing table.' },
+            tags:        { type: 'array', items: { type: 'string' } },
+          },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'delete_persona',
+        description: 'Delete a persona and its routes. The templates it pointed at are NOT deleted — only the role and its routing.\n\nRequires that you created the persona, or that you are an editor or admin of the workspace.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'UUID of the persona (from list_personas)' },
+          },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'attach_template',
+        description: 'Add a route to a persona: which template to load, and the condition that says when.\n\nTHE CONDITION IS THE POINT, which is why it is required. It answers what this template means IN THIS persona — the same template plays different parts in different roles, and its own description cannot say that. Write the situation ("the customer asks for a written quote"), not a restatement of the title.\n\nAttaching grants nobody any access. A colleague only ever receives routes they could already open, so attaching a restricted template gives a persona that is quietly smaller for them. The reply tells you when that is the case — pass it on.\n\nRe-attaching a template already on the persona updates its condition rather than failing.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            persona_id:  { type: 'string', description: 'UUID of the persona (from list_personas)' },
+            template_id: { type: 'string', description: 'UUID of the template (from list_templates or search_templates)' },
+            condition:   { type: 'string', description: 'When this route applies, in the persona\'s own terms. Required.' },
+            sort_order:  { type: 'number', description: 'Optional position; appended to the end when omitted' },
+          },
+          required: ['persona_id', 'template_id', 'condition'],
+        },
+      },
+      {
+        name: 'detach_template',
+        description: 'Remove a route from a persona. The template itself is untouched — only the route disappears.\n\nRequires that you created the persona, or that you are an editor or admin of the workspace.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            persona_id:  { type: 'string', description: 'UUID of the persona (from list_personas)' },
+            template_id: { type: 'string', description: 'UUID of the template whose route should be removed' },
+          },
+          required: ['persona_id', 'template_id'],
+        },
+      },
+      {
         name: 'get_template',
         description: 'Load a template\'s full content, variables, and metadata so you can actually use it — e.g. a template found via search_templates or list_templates — by id or name slug. Works for any kind (prompt, assistant, or skill). Binary files (PDF, images) are always listed in "contextFiles" with a resource "uri" — fetch their bytes with resources/read. Text context files are inlined by default, or listed the same way if you pass include_files: "list". Use this to inspect a template before updating it, or to consume a skill\'s full knowledge.',
         inputSchema: {
@@ -1160,6 +1302,25 @@ Deno.serve(async (req) => {
       return rpcError(id, -32002, `Insufficient scope: '${toolName}' requires the '${requiredCap}' permission, which this connection is not granted.`);
     }
 
+    // SQEM-341 — a member may read the library, not change it. Enforced HERE rather than in each
+    // handler, deliberately.
+    //
+    // ⛔ Six handlers create things and every one of them would have needed the same three lines.
+    // That shape is exactly how SQEM-336 happened: `update_template` and `delete_template` were the
+    // two nobody remembered. A rule that must be repeated per tool is a rule that will be missed by
+    // the next tool — and the missing one is silent, because a skipped check looks like success.
+    //
+    // The capability table already says which tools write. Reusing it means a new tool is covered by
+    // being *declared*, not by someone remembering to guard it.
+    //
+    // ⚠️ **The scope check above is not a substitute.** Scopes say what the connection was issued
+    // for; this says what the person behind it may do. A member picks their own scopes when they
+    // mint a key (SQEM-328, default `{read,create,update,delete}`), so the scope is theirs to grant
+    // themselves — the role is not.
+    if (requiredCap !== 'read' && !mayWrite) {
+      return refuseWrite(id, `'${toolName}' (${requiredCap})`);
+    }
+
     // SQEM-324 — the tool half of personas. The prompt half (prompts/list) is what a person picks
     // from a client menu; this is what answers "use the Sales persona from Sqemes" typed as a
     // sentence, which is how it is actually used in Claude Code.
@@ -1213,6 +1374,250 @@ Deno.serve(async (req) => {
 
       const { text } = await loadPersona(persona);
       return rpcResult(id, { content: [{ type: 'text', text }] });
+    }
+
+    // ---- SQEM-337 — the write half of personas -------------------------------------------------
+
+    type PersonaWriteTarget =
+      | { ok: true;  row: { id: string; title: string; created_by: string | null } }
+      | { ok: false; message: string };
+
+    /**
+     * Resolve a persona for a WRITE, applying both SQEM-336 gates in the order that ticket fixed.
+     *
+     * ⛔ Deliberately does NOT apply `hiddenFromCaller`, which `get_persona` does. That filter hides
+     * a persona whose every route is out of the caller's reach, because a role a model cannot
+     * actually perform is worse than no role at all. It is a **usefulness** rule, not an access
+     * rule — and borrowing it here would make a persona uneditable by its own author the moment
+     * somebody restricted the templates behind it. The author is precisely the person who then
+     * needs to fix it.
+     */
+    const findPersonaForWrite = async (personaId: string): Promise<PersonaWriteTarget> => {
+      const { data: row } = await adminClient
+        .from('personas')
+        .select('id, title, created_by')
+        .eq('workspace_id', workspaceId)
+        .eq('id', personaId)
+        .single();
+
+      // Gate 1 — visibility. Same wording for absent and invisible, or the tool becomes a way to
+      // probe which ids exist (SQEM-291, applied to templates in SQEM-336).
+      if (!row || !canAccessPersona(personaId))
+        return { ok: false, message: `Persona not found: ${personaId}` };
+
+      // Gate 2 — authority, and its message says so plainly: gate 1 is already passed, so the
+      // caller knows the persona exists. Hiding behind "not found" here would explain nothing.
+      //
+      // ⚠️ No authority check here any more (SQEM-341). It lives once, at the capability dispatch,
+      // so a member never reaches this function at all. Repeating it would be a check that cannot
+      // fire — and a check that cannot fire is indistinguishable from one that does not work.
+      return { ok: true, row: row as { id: string; title: string; created_by: string | null } };
+    };
+
+    if (toolName === 'create_persona') {
+      const { title, description, content, tags } = args;
+      if (!title?.trim()) return rpcError(id, -32602, 'title is required');
+
+      const { data: inserted, error: insertErr } = await adminClient
+        .from('personas')
+        .insert({
+          workspace_id: workspaceId,
+          title:        title.trim(),
+          description:  description?.trim() || '',
+          content:      content || '',
+          tags:         Array.isArray(tags) ? tags : [],
+          // SQEM-240's rule, applied to personas verbatim: a workspace-wide key has no "me", so the
+          // row simply gets no owner. ⚠️ Never seed a restriction on top of that — a principal-less
+          // access row over a `created_by = NULL` object is invisible to EVERYONE, its author
+          // included, and is recoverable only by SQL. That is what made 47 of 82 templates
+          // unreachable before SQEM-240.
+          created_by:   mcpUserId,
+        })
+        .select('id, title')
+        .single();
+
+      if (insertErr || !inserted)
+        return rpcError(id, -32603, `Failed to create persona: ${insertErr?.message ?? 'unknown error'}`);
+
+      // ⛔ No `persona_access` row is written, and that is a decision (owner, 2026-09-08), not an
+      // omission: a persona starts open. Templates seed `workspaces.default_template_access` at
+      // this point; personas have no equivalent and are not getting one, because a persona hands
+      // out no access of its own — SQEM-326 filters every route against the CALLER, and hides a
+      // persona whose routes are all out of reach. An open persona over restricted templates is
+      // therefore not a leak; for anyone who may not use it, it is simply not there.
+      //
+      // ⛔ No `ai_generated_at` either. Our Article 50 classification puts MCP under *"neither — the
+      // client labels"*: the generating model runs in the client, under the client's name, so we are
+      // not the provider of that generation. The rule itself is the sentence above, so nothing is
+      // missing without the source; written out in
+      // `pm/DOCUMENTATION.md` in the source repository.
+      // `create_template` has never stamped it here, for the same reason.
+      return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
+        id:    inserted.id,
+        title: inserted.title,
+        note:  'Created, and visible to the whole workspace. It has no routes yet — attach templates to it in the app.',
+      }, null, 2) }] });
+    }
+
+    if (toolName === 'update_persona') {
+      const { id: personaId, title, description, content, tags } = args;
+      if (!personaId) return rpcError(id, -32602, 'id is required');
+
+      const target = await findPersonaForWrite(personaId);
+      if (!target.ok) return rpcError(id, -32602, target.message);
+
+      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (title       !== undefined) updates.title       = String(title).trim();
+      if (description !== undefined) updates.description = String(description).trim();
+      if (content     !== undefined) updates.content     = content;
+      if (Array.isArray(tags))       updates.tags        = tags;
+
+      const { error: updateErr } = await adminClient
+        .from('personas')
+        .update(updates)
+        .eq('workspace_id', workspaceId)
+        .eq('id', personaId);
+
+      if (updateErr) return rpcError(id, -32603, `Failed to update persona: ${updateErr.message}`);
+
+      // Naming the fields back is not decoration: this tool overwrites rather than merges, and a
+      // model that passed `content` by mistake should be able to see that it did.
+      return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
+        updated: true,
+        id:      target.row.id,
+        fields:  Object.keys(updates).filter(k => k !== 'updated_at'),
+      }, null, 2) }] });
+    }
+
+    if (toolName === 'delete_persona') {
+      const personaId = args.id;
+      if (!personaId) return rpcError(id, -32602, 'id is required');
+
+      const target = await findPersonaForWrite(personaId);
+      if (!target.ok) return rpcError(id, -32602, target.message);
+
+      const { error: deleteErr } = await adminClient
+        .from('personas')
+        .delete()
+        .eq('workspace_id', workspaceId)
+        .eq('id', personaId);
+
+      if (deleteErr) return rpcError(id, -32603, `Failed to delete persona: ${deleteErr.message}`);
+
+      // `persona_templates` and `persona_access` go with it by cascade. ⚠️ The TEMPLATES do not —
+      // that cascade sits on the join table, so deleting a role never destroys the work it pointed
+      // at. Said out loud in the reply because a model that just deleted something should be able
+      // to tell the user exactly how far the deletion reached, without guessing.
+      return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
+        deleted: true,
+        id:      target.row.id,
+        title:   target.row.title,
+        note:    'The persona and its routes are gone. The templates it pointed at are untouched.',
+      }, null, 2) }] });
+    }
+
+    if (toolName === 'attach_template') {
+      const { persona_id, template_id, condition, sort_order } = args;
+      if (!persona_id)  return rpcError(id, -32602, 'persona_id is required');
+      if (!template_id) return rpcError(id, -32602, 'template_id is required');
+      // ⛔ Required, not defaulted. `persona_templates.condition` has `default ''` and an empty one
+      // renders as the template's own description (SQEM-324) — technically valid, and exactly the
+      // route that says nothing about what this template means *in this persona*. A tool that
+      // accepts the empty case invites it; the schema and this check both refuse.
+      if (!condition?.trim())
+        return rpcError(id, -32602, 'condition is required — say when this route applies, in the persona\'s own terms. It is what a route is for.');
+
+      const target = await findPersonaForWrite(persona_id);
+      if (!target.ok) return rpcError(id, -32602, target.message);
+
+      // The template must be visible too: attaching means naming it, and you cannot name what you
+      // are not allowed to see. Same wording as an absent row, for the SQEM-291 reason.
+      const { data: tpl } = await adminClient
+        .from('prompts')
+        .select('id, title')
+        .eq('workspace_id', workspaceId)
+        .eq('id', template_id)
+        .single();
+      if (!tpl || !canAccessTemplate(template_id))
+        return rpcError(id, -32602, `Template not found: ${template_id}`);
+
+      let order = typeof sort_order === 'number' ? sort_order : null;
+      if (order === null) {
+        const { data: last } = await adminClient
+          .from('persona_templates')
+          .select('sort_order')
+          .eq('persona_id', persona_id)
+          .order('sort_order', { ascending: false })
+          .limit(1);
+        order = (((last as { sort_order: number }[] | null) || [])[0]?.sort_order ?? -1) + 1;
+      }
+
+      const { error: attachErr } = await adminClient
+        .from('persona_templates')
+        .upsert(
+          { persona_id, template_id, condition: condition.trim(), sort_order: order },
+          { onConflict: 'persona_id,template_id' },
+        );
+      if (attachErr) return rpcError(id, -32603, `Failed to attach template: ${attachErr.message}`);
+
+      // ⛔ SQEM-338's acceptance condition, not a nicety.
+      //
+      // SQEM-326 decided that attaching must NOT widen access — routes are filtered against the
+      // CALLER, never the author. Correct, and it has a consequence: attaching a restricted
+      // template produces a persona that is quietly smaller for everyone else, their routes simply
+      // absent. For humans that ticket solved it by naming the restricted attachments to the author
+      // in the editor. ⚠️ Over MCP there is no editor to warn in — so the warning has to travel in
+      // the reply, or the invisibility SQEM-326 spent its effort on returns through a new door.
+      const { data: rules } = await adminClient
+        .from('template_access')
+        .select('template_id')
+        .eq('workspace_id', workspaceId)
+        .eq('template_id', template_id);
+      const restricted = (((rules as unknown[] | null) || []).length) > 0;
+
+      return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
+        attached:    true,
+        persona:     target.row.title,
+        template:    (tpl as { title: string }).title,
+        condition:   condition.trim(),
+        sort_order:  order,
+        reach: restricted
+          ? 'RESTRICTED — this template has access rules. Colleagues those rules exclude receive the persona WITHOUT this route, and nothing tells them why. Attaching granted nobody access. Say this to whoever asked for the attachment.'
+          : 'Open to the whole workspace — everyone who uses this persona gets this route.',
+      }, null, 2) }] });
+    }
+
+    if (toolName === 'detach_template') {
+      const { persona_id, template_id } = args;
+      if (!persona_id)  return rpcError(id, -32602, 'persona_id is required');
+      if (!template_id) return rpcError(id, -32602, 'template_id is required');
+
+      const target = await findPersonaForWrite(persona_id);
+      if (!target.ok) return rpcError(id, -32602, target.message);
+
+      // ⚠️ Deliberately NO visibility check on the template here, unlike attach.
+      //
+      // Attaching means naming a template, so you must be allowed to see it. Detaching removes
+      // something from a persona that is already yours to change — and requiring template
+      // visibility would strand its owner with a route they cannot remove the moment somebody
+      // restricts the template behind it. Same trap as reusing `hiddenFromCaller` for writes: the
+      // person who has to clean it up is the one the rule would lock out.
+      const { data: removed, error: detachErr } = await adminClient
+        .from('persona_templates')
+        .delete()
+        .eq('persona_id', persona_id)
+        .eq('template_id', template_id)
+        .select('template_id');
+
+      if (detachErr) return rpcError(id, -32603, `Failed to detach template: ${detachErr.message}`);
+      if (!removed || (removed as unknown[]).length === 0)
+        return rpcError(id, -32602, `That template is not attached to this persona: ${template_id}`);
+
+      return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
+        detached: true,
+        persona:  target.row.title,
+        note:     'The route is gone. The template itself is untouched and still available on its own.',
+      }, null, 2) }] });
     }
 
     if (toolName === 'list_templates') {
@@ -1461,11 +1866,16 @@ Deno.serve(async (req) => {
 
       const { data: existing } = await adminClient
         .from('prompts')
-        .select('id, kind, content')
+        .select('id, kind, content, created_by')
         .eq('workspace_id', workspaceId)
         .eq('id', templateId)
         .single();
-      if (!existing) return rpcError(id, -32602, `Template not found: ${templateId}`);
+      // SQEM-336, gate 1 — visibility. Until that ticket the write path scoped to the workspace and
+      // nothing else, so a connection could overwrite a template it was not allowed to read. Same
+      // wording whether the row is absent or merely invisible: two different answers turn the tool
+      // into a way to test which ids exist. `delete_file` has said so since SQEM-291.
+      if (!existing || !canAccessTemplate(templateId))
+        return rpcError(id, -32602, `Template not found: ${templateId}`);
 
       const updates: Record<string, any> = { updated_at: new Date().toISOString() };
       if (title              !== undefined) updates.title              = title.trim();
@@ -1519,11 +1929,15 @@ Deno.serve(async (req) => {
 
       const { data: existing } = await adminClient
         .from('prompts')
-        .select('id, title, kind')
+        .select('id, title, kind, created_by')
         .eq('workspace_id', workspaceId)
         .eq('id', templateId)
         .single();
-      if (!existing) return rpcError(id, -32602, `Template not found: ${templateId}`);
+      // SQEM-336, gate 1 of 2 — visibility. Same wording for absent and invisible, so this cannot be
+      // used to probe for ids (SQEM-291). Destroying something you were never allowed to see is the
+      // worse half of the leak that note describes: with files you could only ask, here you can act.
+      if (!existing || !canAccessTemplate(templateId))
+        return rpcError(id, -32602, `Template not found: ${templateId}`);
 
       const { error: deleteErr } = await adminClient
         .from('prompts')
@@ -1873,7 +2287,7 @@ Deno.serve(async (req) => {
 
       const { data: file } = await adminClient
         .from('workspace_files')
-        .select('id, name, storage_path')
+        .select('id, name, storage_path, created_by')
         .eq('workspace_id', workspaceId)
         .eq('id', fileId)
         .maybeSingle();
@@ -1901,17 +2315,18 @@ Deno.serve(async (req) => {
         .contains('context_file_ids', [fileId]);
       const referencedBy = refs || [];
 
+      // SQEM-234 — the count is deliberately complete, the names are not. `referencedBy` comes from
+      // the service role and therefore includes templates this caller has no access to; returning
+      // their titles turned "try to delete a file" into a way to read the name of someone else's
+      // private template. Same trade as the Files page, from the other side: the number is what
+      // makes the file protectable, the title is what leaks.
+      const nameable = referencedBy.filter((t: any) => canAccessTemplate(t.id));
+      const restricted = referencedBy.length - nameable.length;
+
       // 4. Blocked: still attached elsewhere and no explicit force/replaceWith.
       //    Return the referencing templates so the assistant can confirm with the
       //    user before touching them (a tool can't prompt the user itself).
       if (referencedBy.length > 0 && !force && !replaceWith) {
-        // SQEM-234 — the count is deliberately complete, the names are not. `referencedBy` comes
-        // from the service role and therefore includes templates this caller has no access to;
-        // returning their titles turned "try to delete a file" into a way to read the name of
-        // someone else's private template. Same trade as the Files page, from the other side: the
-        // number is what makes the file protectable, the title is what leaks.
-        const nameable = referencedBy.filter((t: any) => canAccessTemplate(t.id));
-        const restricted = referencedBy.length - nameable.length;
         return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
           deleted: false,
           blocked: true,
@@ -1920,6 +2335,28 @@ Deno.serve(async (req) => {
           ...(restricted > 0 ? { restrictedCount: restricted } : {}),
           howToProceed: 'Call delete_file again with force:true to detach the file from these templates and delete it, or replaceWith:<fileId> to swap in a replacement file for each of them first.',
         }, null, 2) }] });
+      }
+
+      // 4b. SQEM-340 — proceeding would change templates this caller cannot see.
+      //
+      // ⛔ A different question from "may you write at all", and it needs a different predicate.
+      // The central gate asks whether this *connection* may write; here the objects being changed
+      // are not the file but every template the detach or swap touches.
+      //
+      // The blocked response above already admits the reach ("3 of which you cannot see") and then
+      // let the caller proceed anyway. That is informed consent to a number whose contents are
+      // unknown: you learn THAT three colleagues' templates are affected, never which or how badly.
+      // Not a basis for an irreversible change to someone else's work.
+      //
+      // ⚠️ **Since SQEM-341 this constrains exactly one caller: the workspace-wide key.** Anyone
+      // user-bound who reached this line is already an editor or admin, so `mcpUserManagesContent`
+      // holds for them. A key with no user passes the central gate on `!mcpUserId` — bounded by its
+      // narrow sight (SQEM-336, decision 3) — and this is precisely the action that would reach
+      // past that sight. The check therefore looks redundant and is not: it is the one place where
+      // "bounded by what it can see" has to be enforced rather than assumed.
+      if (restricted > 0 && !mcpUserManagesContent) {
+        return rpcError(id, -32602,
+          `This file is attached to ${restricted} template(s) you cannot see. Detaching or replacing it there would change work you have no access to, so it needs an editor or admin. Ask one, or remove the file only from the templates you can see (update_template with file_ids).`);
       }
 
       // 5. Detach (or swap for the replacement) on every referencing template.

@@ -55,8 +55,8 @@ jobs:
           # Narrow beats loosening the org default for five repos to let one bot write one file.
           #
           # ⚠️ Fine-grained tokens EXPIRE. When it does, signing breaks — and it breaks quietly, in
-          # the one mechanism whose failure nobody notices. The expiry date belongs in
-          # pm/PRODUCTION_PROMOTION.md, not in someone's memory.
+          # the one mechanism whose failure nobody notices. Record the expiry date in the
+          # maintainers' release runbook, not in someone's memory.
           GITHUB_TOKEN: ${{ secrets.CLA_SIGNATURE_TOKEN }}
         with:
           path-to-signatures: signatures/version1/cla.json
