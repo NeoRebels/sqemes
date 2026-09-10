@@ -95,7 +95,16 @@ export interface AuthoringAIParams {
   modelId: string | null;
   systemInstruction: string;
   prompt: string;
-  temperature?: number;
+  /**
+   * ⛔ SQEM-367 — there is deliberately no `temperature` here any more, and this note is the
+   * reason it should not come back. Fifteen call sites each hard-coded one (0.2 … 1), the app
+   * has never had a control that sets it, and the numbers were picked by whoever wrote the
+   * line rather than measured. `execute-step` now sends none, exactly as `chat-message` has
+   * since SQEM-125 — where the reason is written down: GPT-5 and the o-series **reject** a
+   * non-default value.
+   *
+   * Removing the field is the point: while it existed, the next caller set it.
+   */
   /**
    * SQEM-316 — documents to send alongside the prompt: PDFs and images, base64, no `data:` prefix.
    *
@@ -123,7 +132,6 @@ export async function runAuthoringAI({
   modelId,
   systemInstruction,
   prompt,
-  temperature = 1,
   attachments = [],
 }: AuthoringAIParams): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession();
@@ -148,7 +156,6 @@ export async function runAuthoringAI({
       promptContent: attachments.length
         ? [{ text: prompt }, ...attachments.map(a => ({ inlineData: { mimeType: a.mimeType, data: a.data } }))]
         : prompt,
-      temperature,
       jobId,
       funded,
     }),

@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { workspaceId, modelId, systemInstruction, messages, temperature = 1, jobId, funded, connectorIds } = await req.json();
+    const { workspaceId, modelId, systemInstruction, messages, jobId, funded, connectorIds } = await req.json();
 
     // Funded (Sqemes-credit) calls don't carry a modelId — they use FUNDED_MODEL.
     if (!workspaceId || (!funded && !modelId) || !messages || !Array.isArray(messages) || messages.length === 0) {
@@ -211,7 +211,7 @@ Deno.serve(async (req) => {
     }
 
     if (isGeminiImageModel) {
-      const result = await callGemini(apiKey, effectiveModelId, systemInstruction, messages, temperature, true);
+      const result = await callGemini(apiKey, effectiveModelId, systemInstruction, messages, true);
       return new Response(JSON.stringify({ result }), {
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -229,7 +229,7 @@ Deno.serve(async (req) => {
     const connectors = ((provider === 'claude' || provider === 'openai') && Array.isArray(connectorIds) && connectorIds.length > 0)
       ? await resolveConnectors(adminClient, workspaceId, user.id, connectorIds)
       : null;
-    EdgeRuntime.waitUntil(runAndBroadcast(jobId, provider, apiKey, effectiveModelId, systemInstruction, sanitizedMessages, temperature, !!funded, workspaceId, fundedCreditLimit, connectors));
+    EdgeRuntime.waitUntil(runAndBroadcast(jobId, provider, apiKey, effectiveModelId, systemInstruction, sanitizedMessages, !!funded, workspaceId, fundedCreditLimit, connectors));
     return new Response(JSON.stringify({ jobId }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
@@ -291,7 +291,6 @@ async function runAndBroadcast(
   modelId: string,
   systemInstruction: string | undefined,
   messages: ChatMessage[],
-  temperature: number,
   funded = false,
   workspaceId?: string,
   creditLimit = 0,
@@ -301,21 +300,21 @@ async function runAndBroadcast(
     let result: string;
     let totalTokens = 0;
     if (provider === 'gemini') {
-      result = await callGemini(apiKey, modelId, systemInstruction, messages, temperature, false);
+      result = await callGemini(apiKey, modelId, systemInstruction, messages, false);
     } else if (provider === 'openai') {
       result = connectors?.length
         ? await callOpenAIResponses(apiKey, modelId, systemInstruction, messages, connectors)
-        : await callOpenAI(apiKey, modelId, systemInstruction, messages, temperature);
+        : await callOpenAI(apiKey, modelId, systemInstruction, messages);
     } else if (provider === 'claude') {
-      result = await callClaude(apiKey, modelId, systemInstruction, messages, temperature, connectors);
+      result = await callClaude(apiKey, modelId, systemInstruction, messages, connectors);
     } else if (provider === 'deepseek') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.deepseek.com/v1/chat/completions', systemInstruction, messages, temperature, 'deepseek'));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.deepseek.com/v1/chat/completions', systemInstruction, messages, 'deepseek'));
     } else if (provider === 'mistral') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.mistral.ai/v1/chat/completions', systemInstruction, messages, temperature, 'mistral'));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.mistral.ai/v1/chat/completions', systemInstruction, messages, 'mistral'));
     } else if (provider === 'grok') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.x.ai/v1/chat/completions', systemInstruction, messages, temperature, 'grok'));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.x.ai/v1/chat/completions', systemInstruction, messages, 'grok'));
     } else if (provider === 'openrouter') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://openrouter.ai/api/v1/chat/completions', systemInstruction, messages, temperature, 'openrouter'));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://openrouter.ai/api/v1/chat/completions', systemInstruction, messages, 'openrouter'));
     } else {
       result = `[${provider}] Model ${modelId} is not yet supported.`;
     }
@@ -394,7 +393,6 @@ async function callGemini(
   modelId: string,
   systemInstruction: string | undefined,
   messages: ChatMessage[],
-  temperature: number,
   isImageModel: boolean
 ): Promise<string> {
   // SQEM-111 — modelId is interpolated into the request path; allow only id-shaped values.
@@ -463,7 +461,6 @@ async function callOpenAI(
   modelId: string,
   systemInstruction: string | undefined,
   messages: ChatMessage[],
-  temperature: number
 ): Promise<string> {
   const apiMessages: any[] = [];
 
@@ -563,7 +560,6 @@ async function callClaude(
   modelId: string,
   systemInstruction: string | undefined,
   messages: ChatMessage[],
-  temperature: number,
   connectors: ResolvedConnector[] | null = null,
 ): Promise<string> {
   const apiMessages = messages.map(msg => {
@@ -639,7 +635,6 @@ async function callOpenAICompatible(
   endpoint: string,
   systemInstruction: string | undefined,
   messages: ChatMessage[],
-  temperature: number,
   provider?: string,
 ): Promise<{ content: string; totalTokens: number }> {
   const apiMessages: any[] = [];

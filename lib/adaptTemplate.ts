@@ -49,7 +49,6 @@ Rules:
     modelId: ctx.modelId,
     systemInstruction,
     prompt: `<template>\n${body}\n</template>`,
-    temperature: 0.7,
   });
   return adapted?.trim() || body;
 }

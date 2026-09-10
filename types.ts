@@ -104,7 +104,10 @@ export interface Step {
   model: string;
   assistantId?: string;
   includePreviousResult?: boolean;
-  temperature?: number;
+  // ⛔ SQEM-367 — `temperature` was here and is gone. `steps` is legacy-read-only (multi-step
+  // chains went in SQEM-040), nothing read the field, and the migration of 2026-09-10 removed it
+  // from every stored row in `prompts` and `library_templates`. A type that still declared it
+  // would describe something no row carries any more.
 }
 
 export interface Prompt {

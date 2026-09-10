@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     }
 
     // 2. Parse request body
-    const { workspaceId, modelId, systemInstruction, promptContent, temperature = 1, jobId, promptId, funded } = await req.json();
+    const { workspaceId, modelId, systemInstruction, promptContent, jobId, promptId, funded } = await req.json();
 
     // Funded (Sqemes-credit) calls don't carry a modelId — they use FUNDED_MODEL.
     if (!workspaceId || !promptContent || (!funded && !modelId)) {
@@ -192,7 +192,7 @@ Deno.serve(async (req) => {
     }
 
     if (isGeminiImageModel) {
-      const result = await callGemini(apiKey, effectiveModelId, systemInstruction, promptContent, temperature);
+      const result = await callGemini(apiKey, effectiveModelId, systemInstruction, promptContent);
       return new Response(JSON.stringify({ result }), {
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
     }
-    EdgeRuntime.waitUntil(runAndBroadcast(jobId, provider, apiKey, effectiveModelId, systemInstruction, promptContent, temperature, promptId, !!funded, workspaceId, fundedCreditLimit));
+    EdgeRuntime.waitUntil(runAndBroadcast(jobId, provider, apiKey, effectiveModelId, systemInstruction, promptContent, promptId, !!funded, workspaceId, fundedCreditLimit));
     return new Response(JSON.stringify({ jobId }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
@@ -234,7 +234,6 @@ async function runAndBroadcast(
   modelId: string,
   systemInstruction: string | undefined,
   promptContent: string | any[],
-  temperature: number,
   promptId?: string,
   funded = false,
   workspaceId?: string,
@@ -244,19 +243,19 @@ async function runAndBroadcast(
     let result: string;
     let totalTokens = 0;
     if (provider === 'gemini') {
-      result = await callGemini(apiKey, modelId, systemInstruction, promptContent, temperature);
+      result = await callGemini(apiKey, modelId, systemInstruction, promptContent);
     } else if (provider === 'openai') {
-      result = await callOpenAI(apiKey, modelId, systemInstruction, promptContent, temperature);
+      result = await callOpenAI(apiKey, modelId, systemInstruction, promptContent);
     } else if (provider === 'claude') {
-      result = await callClaude(apiKey, modelId, systemInstruction, promptContent, temperature);
+      result = await callClaude(apiKey, modelId, systemInstruction, promptContent);
     } else if (provider === 'deepseek') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.deepseek.com/v1/chat/completions', systemInstruction, promptContent, temperature, 'deepseek'));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.deepseek.com/v1/chat/completions', systemInstruction, promptContent, 'deepseek'));
     } else if (provider === 'mistral') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.mistral.ai/v1/chat/completions', systemInstruction, promptContent, temperature, 'mistral'));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.mistral.ai/v1/chat/completions', systemInstruction, promptContent, 'mistral'));
     } else if (provider === 'grok') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.x.ai/v1/chat/completions', systemInstruction, promptContent, temperature, 'grok'));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.x.ai/v1/chat/completions', systemInstruction, promptContent, 'grok'));
     } else if (provider === 'openrouter') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://openrouter.ai/api/v1/chat/completions', systemInstruction, promptContent, temperature, 'openrouter'));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://openrouter.ai/api/v1/chat/completions', systemInstruction, promptContent, 'openrouter'));
     } else {
       result = `[${provider}] Model ${modelId} is not yet supported.`;
     }
@@ -288,7 +287,6 @@ async function callGemini(
   modelId: string,
   systemInstruction: string | undefined,
   promptContent: string | any[],
-  temperature: number
 ): Promise<string> {
   // SQEM-111 — modelId is interpolated into the request path; allow only id-shaped values.
   if (!/^[A-Za-z0-9._-]+$/.test(modelId)) throw new Error('Invalid model id');
@@ -307,7 +305,9 @@ async function callGemini(
     contents.push({ role: 'user', parts });
   }
 
-  const generationConfig: any = { temperature };
+  // SQEM-367 — authoring sends no temperature; let each model use its own default. Same change
+  // SQEM-125 made to `chat-message`, a month late for this half of the product.
+  const generationConfig: any = {};
 
   // Enable image output for image-capable Gemini models
   const isImageModel = modelId.includes('image');
@@ -356,7 +356,6 @@ async function callOpenAI(
   modelId: string,
   systemInstruction: string | undefined,
   promptContent: string | any[],
-  temperature: number
 ): Promise<string> {
   const messages: any[] = [];
 
@@ -380,12 +379,11 @@ async function callOpenAI(
     messages.push({ role: 'user', content: promptContent });
   }
 
-  // GPT-5 and o-series (o1/o3/o4…) models reject a non-default temperature — only send it
-  // for models that accept it (gpt-4o, gpt-4, …).
-  const mLower = modelId.toLowerCase();
-  const supportsTemperature = !(mLower.startsWith('gpt-5') || /^o\d/.test(mLower));
+  // SQEM-367 — no temperature. ⛔ This used to carry a `supportsTemperature` exception, because
+  // GPT-5 and the o-series reject a non-default value: an exception protecting a knob **nobody could
+  // turn**, since the app has never had a temperature control anywhere. The exception went with the
+  // field it was protecting.
   const openaiBody: Record<string, unknown> = { model: modelId, messages };
-  if (supportsTemperature) openaiBody.temperature = temperature;
 
   const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -410,7 +408,6 @@ async function callClaude(
   modelId: string,
   systemInstruction: string | undefined,
   promptContent: string | any[],
-  temperature: number
 ): Promise<string> {
   let userContent: string | any[];
   if (Array.isArray(promptContent)) {
@@ -428,10 +425,9 @@ async function callClaude(
     userContent = promptContent;
   }
 
-  const body: any = {
+  const body: any = {  // SQEM-367 — no temperature
     model: modelId,
     max_tokens: 8192,
-    temperature,
     messages: [{ role: 'user', content: userContent }],
   };
 
@@ -488,7 +484,6 @@ async function callOpenAICompatible(
   endpoint: string,
   systemInstruction: string | undefined,
   promptContent: string | any[],
-  temperature: number,
   provider?: string,
 ): Promise<{ content: string; totalTokens: number }> {
   const messages: any[] = [];
@@ -527,11 +522,9 @@ async function callOpenAICompatible(
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      model: modelId,
-      messages,
-      temperature,
-    }),
+    // SQEM-367 — no temperature. ⚠️ Matters most here: a self-hoster points this branch at any
+    // OpenAI-compatible endpoint, and some of them reject the field outright.
+    body: JSON.stringify({ model: modelId, messages }),
   });
 
   if (!response.ok) {

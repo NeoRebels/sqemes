@@ -163,7 +163,7 @@ export default function EditorTestPanel({ template, resetKey, onReset }: Props) 
     const systemInstruction = template.kind === 'assistant' ? (template.systemInstruction || undefined) : undefined;
     // Funded (keyless) → send `funded` and omit modelId; the server picks the funded model.
     const funded = isFundedModel(selectedModel);
-    const payloadBase = { workspaceId: workspace.id, modelId: funded ? undefined : selectedModel, funded, systemInstruction, temperature: 0.7 };
+    const payloadBase = { workspaceId: workspace.id, modelId: funded ? undefined : selectedModel, funded, systemInstruction };
 
     // Build messages for API — images go as inlineData in the last user message
     const apiMessages = withUser.map((m, i) => {

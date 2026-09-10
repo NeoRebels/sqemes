@@ -107,7 +107,7 @@ export async function analyzeWebsite(url: string, ctx: GenContext): Promise<Part
 
   const systemInstruction =
     'Extract brand details from the website text below. Return ONLY a JSON object — no prose, no code fences — with keys "brandName" (string), "whatItDoes" (one sentence), "audience" (string), and "tone" (integer 1-5, where 1 = very formal and 5 = very casual). If a field is unknown, use an empty string (or 3 for tone).';
-  const raw = await runAuthoringAI({ ...ctx, systemInstruction, prompt: String(data.text ?? ''), temperature: 0.3 });
+  const raw = await runAuthoringAI({ ...ctx, systemInstruction, prompt: String(data.text ?? '') });
   const obj = parseJsonObject(raw);
   return {
     brandName: String(obj.brandName ?? '').slice(0, 120),
@@ -124,8 +124,8 @@ export async function generateBrandAssistant(b: BrandInput, ctx: GenContext): Pr
     'Write 2 short examples that demonstrate this brand\'s voice at the given tone. Return ONLY a JSON array — no prose, no code fences — of objects with keys "input" (a realistic user request) and "output" (how the brand would respond, in voice).';
 
   const [brandContext, examplesRaw] = await Promise.all([
-    runAuthoringAI({ ...ctx, systemInstruction: roleSys, prompt: brandSummary(b), temperature: 0.5 }).then(t => t.trim()),
-    runAuthoringAI({ ...ctx, systemInstruction: exampleSys, prompt: brandSummary(b), temperature: 0.6 }).catch(() => ''),
+    runAuthoringAI({ ...ctx, systemInstruction: roleSys, prompt: brandSummary(b) }).then(t => t.trim()),
+    runAuthoringAI({ ...ctx, systemInstruction: exampleSys, prompt: brandSummary(b) }).catch(() => ''),
   ]);
 
   const examples: BrandVoiceExample[] = parseJsonArray(examplesRaw)
@@ -148,7 +148,7 @@ export async function generateBrandAssistant(b: BrandInput, ctx: GenContext): Pr
 export async function generateStarterAssistants(b: BrandInput, ctx: GenContext, count = 2): Promise<TemplateDraft[]> {
   const systemInstruction =
     `You build a starter set of AI assistants (personas) for a brand's team. An assistant is a reusable persona: a system instruction that sets its role, expertise, and behaviour for this brand. Generate exactly ${count} distinct, useful assistants (e.g. a customer-support agent, a content writer, a research analyst — tailored to this brand). Return ONLY a JSON array — no prose, no code fences — of objects with keys "title" (short), "description" (one sentence on what it's for), and "instruction" (the full system instruction / persona, addressing the assistant in the second person, 3–6 sentences).`;
-  const raw = await runAuthoringAI({ ...ctx, systemInstruction, prompt: brandSummary(b), temperature: 0.7 });
+  const raw = await runAuthoringAI({ ...ctx, systemInstruction, prompt: brandSummary(b) });
   return parseJsonArray(raw)
     .filter(x => x?.title && x?.instruction)
     .slice(0, count)
@@ -165,7 +165,7 @@ export async function generateStarterAssistants(b: BrandInput, ctx: GenContext, 
 export async function generateStarterPrompts(b: BrandInput, ctx: GenContext, count = 5): Promise<TemplateDraft[]> {
   const systemInstruction =
     `You build a starter prompt library for a brand's team. Generate exactly ${count} reusable, practical prompt templates tailored to this brand's work. If a "Primary AI use case" is given, prioritise prompts that serve it. Each prompt MUST use {{variable_name}} placeholders for the user's inputs (snake_case names). Return ONLY a JSON array — no prose, no code fences — of objects with keys "title" (short), "description" (one sentence on when to use it), and "content" (the prompt body with {{placeholders}}).`;
-  const raw = await runAuthoringAI({ ...ctx, systemInstruction, prompt: brandSummary(b), temperature: 0.7 });
+  const raw = await runAuthoringAI({ ...ctx, systemInstruction, prompt: brandSummary(b) });
   return parseJsonArray(raw)
     .filter(x => x?.title && x?.content)
     .slice(0, count)
@@ -181,7 +181,7 @@ export async function generateStarterPrompts(b: BrandInput, ctx: GenContext, cou
 export async function generateStarterSkills(b: BrandInput, ctx: GenContext, count = 1): Promise<TemplateDraft[]> {
   const systemInstruction =
     `You build reusable AI "skills" for a brand. A skill is durable knowledge/instructions an AI agent applies when relevant — not a fill-in template. If a "Primary AI use case" is given, make the skill serve it. Generate exactly ${count}. Return ONLY a JSON array — no prose, no code fences — of objects with keys "title", "description" (one sentence describing WHEN to use the skill; agents use this to discover it), and "content" (the skill's instructions/knowledge).`;
-  const raw = await runAuthoringAI({ ...ctx, systemInstruction, prompt: brandSummary(b), temperature: 0.7 });
+  const raw = await runAuthoringAI({ ...ctx, systemInstruction, prompt: brandSummary(b) });
   return parseJsonArray(raw)
     .filter(x => x?.title && x?.content)
     .slice(0, count)
@@ -367,7 +367,6 @@ export async function generateSingleTemplate(
 
 What they want to achieve with this template:
 ${goal}${filesBlock}`,
-    temperature: 0.7,
   });
 
   // Reuses the parser the starter generators already use — it was there, and writing a second one
@@ -419,7 +418,6 @@ export async function pickHelpfulFiles(
       'You decide which documents a template should carry as context. Return ONLY a JSON object with one key "keep": an array of the exact filenames that genuinely help with the stated task. Be strict — a document that is merely on a related subject does not belong. An empty array is the right answer more often than not.',
     prompt: `The task:
 ${goal}\n\nCandidate documents:\n\n${candidates.map(f => `--- ${f.name} ---\n${f.text.slice(0, 40_000)}`).join('\n\n')}`,
-    temperature: 0.2,
   });
   const x = parseJsonObject(raw);
   return Array.isArray(x?.keep) ? (x.keep as unknown[]).map(String) : [];

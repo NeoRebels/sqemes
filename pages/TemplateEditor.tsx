@@ -450,7 +450,6 @@ Output only the refined prompt text, with no surrounding explanation or commenta
         modelId,
         systemInstruction,
         prompt: `<prompt_template>\n${textContent}\n</prompt_template>`,
-        temperature: 1,
       });
       if (enhanced) {
         setFormData(prev => ({ ...prev, content: enhanced }));
@@ -480,7 +479,6 @@ Output only the refined prompt text, with no surrounding explanation or commenta
         modelId,
         systemInstruction,
         prompt: textContent,
-        temperature: 0.3,
       });
       if (generated) {
         setFormData(prev => ({ ...prev, description: generated.trim() }));

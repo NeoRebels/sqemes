@@ -108,7 +108,6 @@ Rules for "routes":
         modelId: authoringModelId(workspace),
         systemInstruction,
         prompt: `What this persona should be:\n${goal.trim()}\n\nTemplates it may route to:\n${catalogue}`,
-        temperature: 0.7,
       });
 
       const parsed = parseJsonObject(raw);

@@ -231,7 +231,6 @@ ${routeSummary}`;
         modelId: authoringModelId(workspace),
         systemInstruction,
         prompt: `<persona_role>\n${content.trim()}\n</persona_role>`,
-        temperature: 1,
       });
       if (enhanced) {
         setContent(enhanced);
@@ -281,7 +280,6 @@ Write 1-2 sentences that answer: **for which kind of task should someone pick th
         modelId: authoringModelId(workspace),
         systemInstruction,
         prompt: `Persona name: ${title || '(unnamed)'}\n\nRole description:\n${content.trim() || '(empty)'}\n\nAttached templates:\n${routeSummary || '(none)'}`,
-        temperature: 0.3,
       });
       if (generated) {
         setDescription(generated.trim());
@@ -321,7 +319,6 @@ Rules:
         modelId: authoringModelId(workspace),
         systemInstruction,
         prompt: `Persona: ${title || '(unnamed)'}\nRole:\n${content.trim() || '(empty)'}\n\nTemplate: ${tpl?.title || route.templateTitle}\nIts description: ${tpl?.description || '(none)'}`,
-        temperature: 0.4,
       });
       if (generated) setCondition(route.templateId, generated.trim().replace(/^["']|["']$/g, ''));
     } catch (err: any) {
