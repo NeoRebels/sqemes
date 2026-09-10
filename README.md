@@ -9,7 +9,7 @@ work, through three channels:
 - 💬 **Sqemes chat** — run them against your own model keys (bring-your-own-key)
 - 🔌 **MCP** — expose them to Claude Desktop, Cursor, or any MCP client
 
-Self-hostable and open-source — own your data. Under the hood everything is one `Template` model
+Self-hostable and fair-code — own your data. Under the hood everything is one `Template` model
 distinguished by `kind` (prompt / assistant / skill), so what you author once works across all three
 channels.
 
