@@ -5,6 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>sqemes</title>
     <link rel="icon" type="image/png" href="/logo-favicon-V2.png" />
+
+    <!--
+      SQEM-361 — installable from the home screen, deliberately WITHOUT a service worker.
+
+      ⛔ Chrome's install prompt still wants a service worker with a fetch handler, and we are not
+      adding one: SQEM-301 exists because a replaced lazy chunk after a deploy produced "Something
+      went wrong", and a caching worker makes exactly that class worse and far harder to diagnose.
+      There is also no offline story to tell — the app is a thin client over Supabase and the AI
+      providers. iOS "Add to Home Screen" needs no worker, and iOS is where the browser chrome costs
+      the most.
+
+      ⚠️ Named `manifest.json`, not `.webmanifest`: self-host serves the bundle from
+      `nginx:1.27-alpine`, whose `mime.types` has no mapping for `.webmanifest` — it would go out as
+      `application/octet-stream`. `.json` is mapped everywhere, and the failure would otherwise
+      appear ONLY on self-host, where we would not see it.
+
+      ⚠️ No CSP change is needed or wanted: `vercel.json` sets `default-src 'self'` and no
+      `manifest-src`, so the fallback applies and a same-origin manifest loads. Do not add
+      `manifest-src` "to be safe" — it would only widen the policy.
+    -->
+    <link rel="manifest" href="/manifest.json" />
+    <!-- ⚠️ Its own file: iOS composites a transparent home-screen icon onto BLACK, and the favicon
+         has an alpha channel. This one is flattened onto white. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Sqemes" />
+    <!-- Follows the theme the same way the app does; a single manifest `theme_color` cannot. -->
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111827" media="(prefers-color-scheme: dark)" />
+
     <link rel="stylesheet" href="/index.css">
     <!-- SQEM-126: runtime instance config (self-host rewrites /config.js at container start; empty placeholder on Cloud). Must load before the app module. -->
     <script src="/config.js"></script>

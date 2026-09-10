@@ -624,6 +624,34 @@ export type Database = {
         };
         Relationships: [];
       };
+      // SQEM-264 → 358 — one row per user per document version accepted. It has existed since
+      // August; `LegalGate.tsx` has queried it ever since, and every one of those calls was an
+      // unchecked `never`. Five of the ten errors that SQEM-358 had to clear came from this omission
+      // alone.
+      legal_acceptances: {
+        Row: {
+          id: string;
+          user_id: string;
+          document: 'terms' | 'privacy';
+          version: string;
+          accepted_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          document: 'terms' | 'privacy';
+          version: string;
+          accepted_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          document?: 'terms' | 'privacy';
+          version?: string;
+          accepted_at?: string;
+        };
+        Relationships: [];
+      };
       workspace_groups: {
         Row: {
           id: string;
@@ -684,6 +712,27 @@ export type Database = {
       workspace_file_usage: {
         Args: { p_workspace_id: string };
         Returns: { file_id: string; total_templates: number }[];
+      };
+      // SQEM-343 — the demotion flow. Admin-gated inside; see the migration for why the handover
+      // wrapper exists separately from `reassign_orphaned_content` (the triggers call that one with
+      // no `auth.uid()`, so the permission check cannot live in it).
+      count_restricted_content_for_member: {
+        Args: { p_workspace_id: string; p_user_id: string };
+        Returns: { templates: number; personas: number }[];
+      };
+      handover_content_from_member: {
+        Args: { p_workspace_id: string; p_user_id: string };
+        Returns: undefined;
+      };
+      release_restricted_content: {
+        Args: { p_workspace_id: string; p_user_id: string };
+        Returns: { templates: number; personas: number }[];
+      };
+      // SQEM-357 — an admin withdraws a shared chat. ⛔ Takes no target visibility: withdrawing is a
+      // reduction, sharing is a disclosure, and the missing parameter is what keeps them apart.
+      unshare_chat_session: {
+        Args: { p_session_id: string };
+        Returns: undefined;
       };
       increment_credits: {
         Args: { ws_id: string; amount: number };

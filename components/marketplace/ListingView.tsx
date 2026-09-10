@@ -53,8 +53,10 @@ export default function ListingView({
   return (
     // Owns its scroll (SQEM-191): this route renders outside Layout, and index.css sets
     // `overflow: hidden` on html/body — min-h-screen would grow past the viewport and be
-    // clipped, not scrolled. h-screen (not 100vh) keeps the staging-banner override working.
-    <div className="h-screen overflow-y-auto bg-slate-50 dark:bg-slate-900">
+    // clipped, not scrolled. A Tailwind height class (not a raw `100vh`) keeps the staging-banner
+    // override working — `index.css` overrides `.h-screen` *and* `.h-dvh`, and SQEM-360 moved this
+    // to `h-dvh` so the bottom no longer sits behind iOS Safari's toolbar.
+    <div className="h-dvh overflow-y-auto bg-slate-50 dark:bg-slate-900">
       <div className="max-w-3xl mx-auto px-6 pt-6 flex items-center justify-between">
         {onExit
           ? <FullScreenExit label="Back to Marketplace" onExit={onExit} escapeEnabled />

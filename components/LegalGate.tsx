@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { IS_SELF_HOSTED } from '../lib/env';
 import Button from './ui/Button';
 import Checkbox from './ui/Checkbox';
+import ScrollScreen from './ScrollScreen';
 import {
   LEGAL_DOCUMENTS,
   publishedDocuments,
@@ -95,8 +96,14 @@ const LegalGateActive = ({
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
-      <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-sm p-8">
+    /* SQEM-360 — was a bare `min-h-screen` under `html, body { overflow: hidden }`, i.e. clipped
+       with no scroll. It fits a phone held upright; it does not fit in landscape, at browser zoom,
+       or with large system text — and this screen stands in front of the entire app, so content
+       that cannot be reached is a button that cannot be pressed and an account that cannot be
+       used. `ScrollScreen` (SQEM-099) was written for exactly this and names "the gate" in its own
+       comment; it had been applied to two of the four pages listed there. */
+    <ScrollScreen className="bg-slate-50 dark:bg-slate-900">
+      <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-sm p-6 sm:p-8">
         <div className="flex items-center gap-3 mb-4">
           <FileText className="w-5 h-5 text-brand-600" aria-hidden="true" />
           <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">
@@ -145,7 +152,7 @@ const LegalGateActive = ({
           We record which version you agreed to and when.
         </p>
       </div>
-    </div>
+    </ScrollScreen>
   );
 };
 

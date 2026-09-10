@@ -126,7 +126,9 @@ export function BrandVoiceForm({ config, onChange, onSwitchToAdvanced, disabled,
         <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">
           Tone — <span className="font-normal text-slate-400">{TONE_LABELS[config.tone]}</span>
         </label>
-        <div className="grid grid-cols-5 gap-1 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
+        {/* SQEM-360 — five cells at ~50px on a 320px screen broke "Very Formal"/"Very Casual"
+            apart mid-word. Three across below `sm:`, the intended row from there on. */}
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-1 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
           {TONE_OPTIONS.map(opt => (
             <button
               key={opt.value}

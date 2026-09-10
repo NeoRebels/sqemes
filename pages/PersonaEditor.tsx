@@ -395,14 +395,14 @@ Rules:
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen text-slate-400 gap-2">
+      <div className="flex items-center justify-center h-dvh text-slate-400 gap-2">
         <Loader2 className="w-5 h-5 animate-spin" /> Loading persona…
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen bg-white dark:bg-slate-900 overflow-hidden">
+    <div className="flex flex-col h-dvh bg-white dark:bg-slate-900 overflow-hidden">
       <header className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 h-16 px-4 md:px-6 flex items-center justify-between shrink-0 z-10">
         <div className="flex items-center gap-2">
           <img src="/logo-favicon-V2.png" alt="sqemes" className="w-8 h-8 rounded-lg shrink-0" />

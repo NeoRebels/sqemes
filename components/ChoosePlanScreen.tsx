@@ -113,7 +113,7 @@ const ChoosePlanScreen = () => {
   };
 
   return (
-    <div className="h-screen overflow-y-auto bg-slate-50 dark:bg-slate-900 flex flex-col items-center px-4 pt-10 pb-32">
+    <div className="h-dvh overflow-y-auto bg-slate-50 dark:bg-slate-900 flex flex-col items-center px-4 pt-10 pb-32">
       <div className="w-full max-w-6xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-10">

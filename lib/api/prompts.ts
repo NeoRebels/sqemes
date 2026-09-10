@@ -20,6 +20,10 @@ export type PromptRow = {
   usage_count: number;
   is_favorite?: boolean;
   source_template_id?: string | null;
+  // SQEM-265 → 358 — the column has existed since August; this hand-maintained shape never gained it,
+  // and `rowToPrompt` read it anyway. Nothing failed at runtime (the value is there), but nothing
+  // type-checked it either, because `tsc` was not part of CI.
+  ai_generated_at?: string | null;
   published?: boolean;
   brand_config?: unknown;
   created_at: string;

@@ -182,3 +182,26 @@ export async function deleteChatMessages(ids: string[]): Promise<void> {
   if (error) throw error;
 }
 
+
+/**
+ * SQEM-357 — a workspace admin withdraws a shared chat.
+ *
+ * ⛔ **Through an RPC, not an update.** `chat_sessions_update` was opened to members in the
+ * collaborative-chat migration but carries no `WITH CHECK`, so Postgres applies its `USING` clause to
+ * the new row too — a member may change a shared session while it *stays* shared, and fails the
+ * moment `visibility` flips. The policy therefore blocks exactly this operation, as a side effect of
+ * an extension that wanted something else. Widening it would let an admin write every column;
+ * a named call does one thing.
+ *
+ * ⛔ **One direction only, enforced in the function.** Withdrawing is a reduction; sharing is a
+ * disclosure, and an admin who could publish a colleague's private chat would hold a completely
+ * different power. There is deliberately no target-visibility parameter.
+ *
+ * ⚠️ The author keeps the chat: `chat_sessions_select` still matches on `user_id = auth.uid()`. And
+ * the existing expiry trigger starts a 30-day countdown on withdrawal, so the artefact cleans itself
+ * up — a shared session never expires, which is what made these permanent in the first place.
+ */
+export async function unshareChatSession(sessionId: string): Promise<void> {
+  const { error } = await supabase.rpc('unshare_chat_session', { p_session_id: sessionId });
+  if (error) throw error;
+}

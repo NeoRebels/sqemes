@@ -103,7 +103,7 @@ const Auth = ({ inviteEmail, initialMode }: { inviteEmail?: string; initialMode?
   };
 
   return (
-    <div className="h-screen overflow-hidden flex">
+    <div className="h-dvh overflow-hidden flex">
       {/* Right — Image panel (hidden on mobile) */}
       <div className="hidden md:flex flex-1 relative overflow-hidden bg-auth-highlight">
         <img

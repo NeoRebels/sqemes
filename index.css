@@ -60,12 +60,39 @@ body {
   padding-top: var(--staging-banner-height);
 }
 
-.staging-environment-shell .h-screen {
+.staging-environment-shell .h-screen,
+.staging-environment-shell .h-dvh {
   height: calc(100vh - var(--staging-banner-height));
 }
 
 .staging-environment-shell .min-h-screen {
   min-height: calc(100vh - var(--staging-banner-height));
+}
+
+/*
+ * SQEM-360 — iOS Safari zooms the whole page whenever a focused form control renders below 16px,
+ * and it does NOT zoom back out. Every field in the app was 14px (`text-sm`, from the `Input`
+ * primitive and from ~40 hand-rolled ones), so a single tap on the chat composer left the layout
+ * wider than the screen until the user pinched it back by hand.
+ *
+ * ⛔ Deliberately a stylesheet rule and not 40 edits to `text-base sm:text-sm`. Editing the call
+ * sites would be a *rule* — "remember the 16px minimum" — and the next hand-rolled field would
+ * reintroduce the bug, exactly the failure shape SQEM-358 was about. This is a *mechanism*: no
+ * field below 640px can be under 16px, whatever class it carries.
+ *
+ * ⚠️ `!important` is required, not sloppiness: it overrides a utility class (`.text-sm`, 0-1-0)
+ * from an element selector (0-0-1), so source order cannot win. It is scoped to phone widths and
+ * to text-entry controls only.
+ *
+ * ⚠️ Fields therefore render one step larger on phones than in the design. That is the intended
+ * trade and it reads better; heights grow slightly because they come from padding.
+ */
+@media (max-width: 639.98px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }
 
 body {

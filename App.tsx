@@ -100,7 +100,7 @@ const Layout = ({ children }: React.PropsWithChildren<{}>) => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   return (
-    <div className="flex h-screen w-full bg-slate-50 dark:bg-slate-900 overflow-hidden">
+    <div className="flex h-dvh w-full bg-slate-50 dark:bg-slate-900 overflow-hidden">
       <Sidebar mobileOpen={mobileMenuOpen} setMobileOpen={setMobileMenuOpen} />
 
       <div className="flex-1 flex flex-col h-full relative overflow-hidden">

@@ -1,7 +1,7 @@
 {
   "name": "sqemes",
   "private": true,
-  "version": "1.11.9",
+  "version": "1.11.10",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
@@ -17,6 +17,7 @@
     "local:destroy": "bash scripts/local-stack.sh destroy",
     "local:logs": "bash scripts/local-stack.sh logs",
     "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,css}\"",
     "test": "vitest run",

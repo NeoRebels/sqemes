@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { useUI, useWorkspace, useData, useChatSessions } from '../store';
+import { can } from '../lib/permissions';
 import { checkContentViolation } from '../lib/contentGuard';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { supabase } from '../lib/supabase';
@@ -16,11 +17,13 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { markdownUrlTransform } from '../lib/markdownUrlTransform';
+import { shouldSendOnEnter, hasCoarsePointer } from '../lib/chatKeys';
 import { useLocation, useNavigate, useParams, Link } from 'react-router';
 import { SUPPORTED_MIME_TYPES, ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, isImageType, fileTypeLabel } from '../lib/uploadTypes';
 import {
   createChatSession, addChatMessage, fetchChatMessages, deleteChatMessages,
   fetchSharedChatSessions,
+  unshareChatSession,
 } from '../lib/api/chatSessions';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -315,6 +318,17 @@ const Chat = () => {
 
   // ── Mobile tab ───────────────────────────────────────────────────────────
   const [mobileTab, setMobileTab] = useState<'sessions' | 'chat'>('chat');
+
+  // SQEM-360 — decides whether `Enter` sends or breaks the line (see `lib/chatKeys.ts`). Watched
+  // rather than read once, because a tablet gains and loses its keyboard while the tab stays open.
+  const [coarsePointer, setCoarsePointer] = useState(hasCoarsePointer);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(pointer: coarse)');
+    const onChange = () => setCoarsePointer(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   // ── Chat search (SQEM-103) ───────────────────────────────────────────────
   const [searchOpen, setSearchOpen] = useState(false);
@@ -846,7 +860,9 @@ Output only the refined prompt text, with no surrounding explanation or commenta
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    // SQEM-360 — `Enter` sends only where `Shift+Enter` exists to make a line break. On a touch
+    // keyboard it does not, so Return stays Return and the send button beside the field sends.
+    if (shouldSendOnEnter(e, coarsePointer)) { e.preventDefault(); handleSend(); }
     if (e.key === '/' && !input.trim()) {
       e.preventDefault();
       setTemplateModalInitId(null);
@@ -878,6 +894,26 @@ Output only the refined prompt text, with no surrounding explanation or commenta
     await storeUpdateSession(session.id, { visibility: next });
     setOpenMenuId(null);
     showToast(next === 'workspace' ? 'Chat shared with workspace' : 'Chat set to private', 'success');
+  };
+
+  /**
+   * SQEM-357 — a workspace admin withdraws somebody else's shared chat.
+   *
+   * ⛔ Deliberately NOT part of the owner context menu. That menu offers rename, share and delete —
+   * every one of which would be wrong for a person who does not own the conversation. An admin gets
+   * exactly one action, and it is the only one that is anybody else's business.
+   *
+   * ⚠️ The chat is not lost: the author still sees it, and the existing expiry trigger gives it 30
+   * days before it goes. Withdrawing sharing is reversible by its owner for a month.
+   */
+  const handleWithdrawSharing = async (session: ChatSession) => {
+    try {
+      await unshareChatSession(session.id);
+      setSharedSessions(prev => prev.filter(s => s.id !== session.id));
+      showToast('Sharing withdrawn — the chat stays with its author', 'success');
+    } catch (err: any) {
+      showToast(err?.message || 'Could not withdraw sharing', 'error');
+    }
   };
 
   const handleDeleteConfirm = async (id: string) => {
@@ -947,6 +983,19 @@ Output only the refined prompt text, with no surrounding explanation or commenta
           <Globe className="w-3 h-3 text-brand-400 shrink-0 mt-1" />
         )}
 
+        {/* SQEM-357 — the one action an admin has on somebody else's shared chat. A dead artefact
+            otherwise: its author has left the workspace, only they could withdraw it, and a shared
+            session never expires. */}
+        {!isOwner && session.visibility === 'workspace' && can(currentUser, workspace, 'team:manage') && (
+          <button
+            onClick={e => { e.stopPropagation(); handleWithdrawSharing(session); }}
+            title="Withdraw sharing — the chat stays with its author"
+            className="p-1 shrink-0 text-slate-300 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 rounded-md transition-all opacity-0 group-hover:opacity-100"
+          >
+            <Lock className="w-3.5 h-3.5" />
+          </button>
+        )}
+
         {/* Context menu (owner only) */}
         {isOwner && (
           <div className="relative shrink-0" ref={openMenuId === session.id ? menuRef : null}>
@@ -984,7 +1033,7 @@ Output only the refined prompt text, with no surrounding explanation or commenta
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
+    <div className="flex flex-col h-dvh bg-slate-50 dark:bg-slate-900 overflow-hidden">
 
       {/* ── Mobile tab switcher ── */}
       <div className="md:hidden flex border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 z-20 shrink-0">

@@ -22,5 +22,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      # SQEM-358/362 — `tsc` is the only one of these four that catches a forgotten import.
+      # Measured in the source repository, not assumed: with `can(...)` used and never imported,
+      # `npm run build` exited 0 and `npm run lint` reported 0 errors. Vite transpiles without
+      # type-checking, and ESLint without type-aware rules does not report undefined identifiers.
+      # Both correct on their own; the gap is that nothing ran the check that would find it.
+      #
+      # ⛔ It was added to the private CI on 2026-09-10 and this file was overlooked for a day —
+      # the same shape as the bug itself. A contributor's PR could pass every check here and still
+      # carry a runtime ReferenceError.
+      - run: npm run typecheck
       - run: npm test
       - run: npm run build

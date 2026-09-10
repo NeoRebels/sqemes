@@ -42,6 +42,11 @@ export const PROVIDERS: Record<string, ProviderCfg> = {
     tokenUrl: 'https://oauth2.googleapis.com/token',
     clientIdEnv: 'GOOGLE_OAUTH_CLIENT_ID',
     clientSecretEnv: 'GOOGLE_OAUTH_CLIENT_SECRET',
+    // SQEM-359 — `prompt: 'consent'` stays HERE and must not be "harmonised" with Microsoft below.
+    // Google returns the `refresh_token` **only on the first consent**; on every later authorization
+    // the response carries an access token and no refresh token, so the connector would work for an
+    // hour and then die with nothing in the logs saying why. Forcing the dialog is the documented way
+    // to get one every time. `access_type: 'offline'` is required for the same reason.
     authExtra: { access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true' },
     scopeFilter: (s) => s.includes('googleapis.com/auth/'),
     scopeShort: (s) => s.split('/auth/')[1] ?? s,
@@ -52,7 +57,25 @@ export const PROVIDERS: Record<string, ProviderCfg> = {
     tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
     clientIdEnv: 'MICROSOFT_OAUTH_CLIENT_ID',
     clientSecretEnv: 'MICROSOFT_OAUTH_CLIENT_SECRET',
-    authExtra: { prompt: 'consent', response_mode: 'query' },
+    // SQEM-359 — ⛔ this said `prompt: 'consent'` until 2026-09-10, and it was never a decision: both
+    // provider blocks were written in the same commit (SQEM-154) and Microsoft inherited Google's
+    // value. **Google's reason does not transfer.** Microsoft returns a refresh token on every code
+    // exchange that asked for `offline_access` — which all three Microsoft apps do — so nothing here
+    // depends on forcing the dialog.
+    //
+    // What it cost: `prompt=consent` shows the consent dialog *every* time, ignoring consent that is
+    // already granted. In a tenant where an admin consented org-wide it re-asks each user; in a
+    // tenant that disables user consent (a common hardening) the user is shown a dialog they are not
+    // allowed to accept and the connect **fails**. Reported by a customer.
+    //
+    // ⚠️ Not simply dropped. With no `prompt` Microsoft signs in "the sole current user" silently —
+    // and `connector-oauth-callback` stores no account identity, so a connector bound to the wrong
+    // (often personal) mailbox looks exactly like a correct one. `select_account` always shows the
+    // picker and forces no consent: one click, and nobody connects the wrong mailbox unknowingly.
+    //
+    // ⛔ `prompt=none` is not an option here: it errors with `interaction_required` whenever the
+    // request cannot complete silently, which on a first connect is always.
+    authExtra: { prompt: 'select_account', response_mode: 'query' },
     scopeFilter: (s) => /mail\.|calendars\.|files\.|contacts\./i.test(s),
     scopeShort: (s) => s.replace(/^https?:\/\/[^/]+\//, ''),
     hasRead: (parts) => parts.some((p) => /read/i.test(p)),
