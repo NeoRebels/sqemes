@@ -31,7 +31,7 @@ async function getKey(): Promise<CryptoKey> {
   const keyBytes = hexToBytes(raw);
   return crypto.subtle.importKey(
     'raw',
-    keyBytes,
+    keyBytes as BufferSource,
     { name: 'AES-GCM' },
     false,
     ['encrypt', 'decrypt']

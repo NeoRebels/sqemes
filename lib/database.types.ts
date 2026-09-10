@@ -403,6 +403,7 @@ export type Database = {
           title: string;
           model: string;
           assistant_id: string | null;
+          applied_skill_ids: string[];
           visibility: 'private' | 'workspace';
           is_generating: boolean;
           pinned: boolean;
@@ -416,6 +417,7 @@ export type Database = {
           title?: string;
           model?: string;
           assistant_id?: string | null;
+          applied_skill_ids?: string[];
           visibility?: 'private' | 'workspace';
           is_generating?: boolean;
           pinned?: boolean;
@@ -429,6 +431,7 @@ export type Database = {
           title?: string;
           model?: string;
           assistant_id?: string | null;
+          applied_skill_ids?: string[];
           visibility?: 'private' | 'workspace';
           is_generating?: boolean;
           pinned?: boolean;

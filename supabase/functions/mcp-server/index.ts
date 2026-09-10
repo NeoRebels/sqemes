@@ -1,5 +1,10 @@
 import JSZip from 'npm:jszip@3.10.1';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
+import {
+  createLibraryReader, hiddenFromCaller, toSlug, renderContextBlocks,
+  LibraryNotFound, LibraryBadRequest,
+} from '../_shared/libraryQueries.ts';
+import { LIBRARY_SYSTEM_PROMPT } from '../_shared/libraryPrompt.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
 import { safeStorageFileName } from '../_shared/storageKey.ts';
 import { readSkillMd, toSlug as skillSlug, withoutOwnFrontmatter } from '../_shared/skillMd.ts';
@@ -36,6 +41,35 @@ function rpcError(id: unknown, code: number, message: string) {
 
 // 401 with the OAuth resource-metadata challenge. Returned for missing, malformed,
 // invalid, or expired credentials so spec-compliant MCP clients (re)authorize.
+/**
+ * SQEM-373 — the JSON-RPC envelope around a shared library read.
+ *
+ * ⭐ This is the whole seam. `_shared/libraryQueries.ts` returns plain data and knows nothing about
+ * JSON-RPC; Chat wraps the same data as a tool result. Putting either envelope in the query module
+ * would have forced the other surface to unwrap it again.
+ */
+async function libraryResult(id: unknown, run: () => Promise<unknown>): Promise<Response> {
+  try {
+    const result = await run();
+    return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
+  } catch (err) {
+    return libraryError(id, err);
+  }
+}
+
+/**
+ * ⚠️ Both library errors map to -32602 (invalid params), which is what these handlers returned
+ * before the move. Anything else is a real fault and is re-thrown to the outer handler rather than
+ * flattened into "not found" — a database outage that reads as a missing template is the kind of
+ * error somebody spends an afternoon on.
+ */
+function libraryError(id: unknown, err: unknown): Response {
+  if (err instanceof LibraryNotFound || err instanceof LibraryBadRequest) {
+    return rpcError(id, -32602, err.message);
+  }
+  throw err;
+}
+
 function authChallenge(): Response {
   // SQEM-088 — advertise the custom domain (PUBLIC_API_URL) when set, so the resource
   // metadata pointer matches the domain the client connected to; else the project URL.
@@ -230,72 +264,7 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 
 // ---- Helpers ----
 
-function toSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-}
 
-// SQEM-324 — a persona, rendered.
-//
-// ⛔ **Both MCP surfaces call this one function**, and that is the point rather than tidiness: a
-// persona reachable as a prompt (the human picks it) and as a tool (the model loads it mid-chat)
-// must be the *same* persona. Two renderers would drift, and the drift would be invisible — the
-// same class of failure `can_access_template` / `mcp_accessible_template_ids` carries a warning
-// about three files away.
-//
-// ⚠️ `routes` arrives ALREADY FILTERED to what this caller may open. Routes they cannot reach are
-// omitted, never listed as unavailable: a model that sees a route it cannot fetch does not skip it,
-// it invents the contents. Saying less is the safe direction here; saying "restricted" is not.
-function composePersona(
-  persona: { title: string; description: string; content: string },
-  routes: { name: string; title: string; kind: string; condition: string; description: string }[],
-): string {
-  const lines: string[] = [];
-  lines.push('---');
-  lines.push(`persona: ${persona.title}`);
-  if (persona.description) lines.push(`description: ${persona.description}`);
-  lines.push('---');
-  lines.push('');
-  if (persona.content.trim()) {
-    lines.push(persona.content.trim());
-    lines.push('');
-  }
-
-  if (routes.length) {
-    lines.push('## Routes — load one only when its condition applies');
-    lines.push('');
-    lines.push('| When | Load |');
-    lines.push('|---|---|');
-    for (const r of routes) {
-      // The condition is prose for the model to judge; the right-hand side is the exact call to
-      // make. Naming the tool beats naming the template: the model needs the verb, not a noun it
-      // then has to guess a call for.
-      // ⛔ **An empty condition falls back to the template's own description, not to a stub.**
-      // SQEM-324 shipped with `the task matches "<title>"` here, which is a sentence that carries no
-      // information the title did not already carry — it made the empty case useless and pushed the
-      // author into writing a condition for every route, most of which would have restated the
-      // description anyway.
-      //
-      // ⚠️ The fallback resolves **at render time**, so it is always the current description. A
-      // condition copied into the column at attach time would have gone stale the moment somebody
-      // improved the template's description — and nothing would have said so.
-      const when = (r.condition || r.description || `the task matches "${r.title}"`).replace(/\|/g, '\\|');
-      lines.push(`| ${when} | \`get_template(name: "${r.name}")\` — ${r.kind} “${r.title}” |`);
-    }
-    lines.push('');
-    lines.push('**Load nothing until a condition applies, and load only the one that does.** Loading');
-    lines.push('every route defeats the purpose of this document: it exists so the knowledge arrives');
-    lines.push('when it is needed rather than all at once. If nothing fits, ask instead of guessing.');
-  } else {
-    // A persona whose routes are all invisible to this caller. It still has a role and rules, and
-    // those are worth having — but it must not imply that anything is loadable.
-    lines.push('_This persona currently has no routes available to you._');
-  }
-
-  return lines.join('\n');
-}
 
 async function hashKey(key: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
@@ -306,151 +275,12 @@ function substituteVariables(content: string, inputs: Record<string, string>): s
   return content.replace(/\{\{(\w+)\}\}/g, (_, name) => inputs[name] ?? '');
 }
 
-// Mimes whose stored bytes are textual content (inlined directly). Everything else
-// (PDF, images) is binary — referenced by resource URI for the client to fetch.
-function isTextContentMime(mime: string): boolean {
-  return mime.startsWith('text/')
-    || mime === 'application/json'
-    || mime === 'application/toml'
-    || mime === 'application/sql';
-}
 
-// Chunk-safe base64 — spreading a large Uint8Array into String.fromCharCode overflows the stack.
-function toBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  const CHUNK = 0x8000;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(binary);
-}
 
-// Resolves context files from storage (source of truth — no longer extracted_text).
-// Text files carry their content; binaries carry only a resource URI to fetch.
-async function resolveContextFiles(
-  client: any,
-  workspaceId: string,
-  fileIds: string[] | null | undefined,
-): Promise<Array<{ id: string; name: string; mimeType: string; uri: string; byteSize: number; text: string | null }>> {
-  if (!fileIds?.length) return [];
-  const { data: files } = await client
-    .from('workspace_files')
-    .select('id, name, mime_type, size_bytes, storage_path')
-    .eq('workspace_id', workspaceId)
-    .in('id', fileIds);
 
-  const resolved = [];
-  for (const f of (files || [])) {
-    let text: string | null = null;
-    if (isTextContentMime(f.mime_type)) {
-      const { data: blob } = await client.storage.from('workspace-files').download(f.storage_path);
-      if (blob) text = await blob.text();
-    }
-    resolved.push({
-      id: f.id,
-      name: f.name,
-      mimeType: f.mime_type,
-      uri: `sqemes://files/${f.id}`,
-      byteSize: f.size_bytes ?? 0,
-      text,
-    });
-  }
-  return resolved;
-}
 
-// ---- SQEM-232 — context-file stats for list_templates / search_templates ----
 
-// SQEM-230 gave get_template an `include_files: "list"` mode, but a caller had no way to know it was
-// worth using: neither list_templates nor search_templates said anything about attached files. The
-// decision had to be made before the information existed. These two numbers close that gap.
-//
-// Measured on production 2026-08-16 before choosing the query shape: 44 files in the workspace, 42 of
-// them referenced by some template, 78 templates of which 18 carry files. Fetching every file's
-// id+size for the workspace is therefore ~44 rows (~2 KB) and simpler than assembling an id union
-// that would select almost the same rows anyway. **If a workspace ever holds thousands of files with
-// only a handful attached, switch to `.in()` over the union of context_file_ids** — the tradeoff
-// flips there, and this comment is the reason it was not written that way from the start.
-async function contextFileStats(
-  client: any,
-  workspaceId: string,
-  templates: Array<{ id: string; context_file_ids: string[] | null }>,
-): Promise<Map<string, { count: number; bytes: number }>> {
-  const stats = new Map<string, { count: number; bytes: number }>();
-  if (!templates.some(t => t.context_file_ids?.length)) return stats;
 
-  const { data: files } = await client
-    .from('workspace_files')
-    .select('id, size_bytes')
-    .eq('workspace_id', workspaceId);
-
-  const sizeById = new Map<string, number>(
-    ((files || []) as Array<{ id: string; size_bytes: number | null }>).map(f => [f.id, f.size_bytes ?? 0]),
-  );
-
-  for (const t of templates) {
-    const ids = t.context_file_ids ?? [];
-    if (!ids.length) continue;
-    // Count only ids that actually resolve, so count and bytes describe the same set. A dangling id
-    // (file deleted, reference left behind) would otherwise inflate the count while contributing
-    // nothing to the size, and the caller would size its decision on a file that cannot be read.
-    let count = 0, bytes = 0;
-    for (const fid of ids) {
-      const size = sizeById.get(fid);
-      if (size === undefined) continue;
-      count += 1;
-      bytes += size;
-    }
-    if (count > 0) stats.set(t.id, { count, bytes });
-  }
-  return stats;
-}
-
-// ---- SQEM-230 — previews for include_files: "list" ----
-
-const PREVIEW_HEADING_LIMIT = 40;
-const PREVIEW_CHAR_LIMIT    = 500;
-
-// Builds the preview that decides whether a caller bothers to fetch a file at all.
-//
-// A bare filename is not enough: the caller cannot tell whether the fetch is worth it, so it fetches
-// everything — which costs what inlining costs, plus round-trips. The preview has to carry enough
-// shape to answer "is what I need in here?".
-//
-// Markdown gets its heading outline, because that IS the table of contents of a knowledge file.
-// Everything else falls back to the opening characters. Markdown is detected by mime alone, which is
-// safe here: BOTH upload paths normalise the extension to a mime before the row is written —
-// `lib/api/files.ts` via `inferTextMime()`, and `upload_file` via the `TEXT_MIME` map. A `.md` is
-// always stored as `text/markdown`, never as `application/octet-stream`.
-function buildPreview(text: string, mimeType: string): { preview: string; truncated: boolean } {
-  if (mimeType === 'text/markdown') {
-    const headings = text.split('\n').filter(l => /^#{1,2}\s+\S/.test(l)).map(l => l.trim());
-    if (headings.length > 0) {
-      const kept = headings.slice(0, PREVIEW_HEADING_LIMIT);
-      return { preview: kept.join('\n'), truncated: headings.length > kept.length };
-    }
-    // A markdown file with no h1/h2 — an unstructured note. The outline would be empty and
-    // therefore useless, so fall through to the character preview rather than return nothing.
-  }
-  const slice = text.slice(0, PREVIEW_CHAR_LIMIT);
-  return { preview: slice, truncated: text.length > slice.length };
-}
-
-// Renders resolved context files as prompt text: text inline, binaries as a URI reference.
-//
-// SQEM-230 — `mode: 'list'` renders text files the same way binaries have always been rendered, by
-// reference. The body then names what context exists without carrying it, which is the whole point:
-// the caller decides per file whether to spend the tokens.
-function renderContextBlocks(
-  resolved: Array<{ name: string; mimeType: string; uri: string; text: string | null }>,
-  mode: 'inline' | 'list' = 'inline',
-): string[] {
-  return resolved.map(f =>
-    f.text != null && mode === 'inline'
-      ? `[Context: ${f.name}]\n${f.text}`
-      : `[Context file: ${f.name} (${f.mimeType}) — read via ${f.uri}]`,
-  );
-}
 
 // Extracts {{placeholder}} names from content and builds a variables array.
 // Only used for kind=prompt — skills and assistants do not support variables.
@@ -694,20 +524,21 @@ Deno.serve(async (req) => {
    * this path. The deleted branch was over-restrictive on purpose ("restricting too much is the
    * recoverable direction"), and anything replacing it needs that property, not just a set of ids.
    */
-  const { data: accRows } = await adminClient.rpc('mcp_accessible_template_ids', {
-    p_workspace_id: workspaceId, p_user_id: mcpUserId,
-  });
-  const accessibleTemplates = new Set(((accRows as { id: string }[] | null) || []).map(r => r.id));
-  const canAccessTemplate = (templateId: string): boolean => accessibleTemplates.has(templateId);
 
-  // SQEM-324 — the same question for personas, answered the same way and for the same reasons.
-  // Its no-user branch fell with the template one in SQEM-346; see the note above for why a future
-  // service identity must not simply reinstate either.
-  const { data: pAccRows } = await adminClient.rpc('mcp_accessible_persona_ids', {
-    p_workspace_id: workspaceId, p_user_id: mcpUserId,
-  });
-  const accessiblePersonas = new Set(((pAccRows as { id: string }[] | null) || []).map(r => r.id));
-  const canAccessPersona = (personaId: string): boolean => accessiblePersonas.has(personaId);
+  /**
+   * ⭐ **SQEM-373 — the access sets and the read handlers now live in `_shared/libraryQueries.ts`.**
+   *
+   * They were moved, not copied. Chat gained native tool calling over the same library, and a second
+   * implementation of "which templates may this person see" would have been the fourth twin in this
+   * repo — an access rule fixed on one surface and left standing on the other is a security bug that
+   * reads like a feature gap.
+   *
+   * Nothing about the behaviour here changed: the reader runs the same two RPCs with the same
+   * `mcpUserId`, and every handler below still answers exactly what it answered before.
+   */
+  const lib = await createLibraryReader({ client: adminClient, workspaceId, userId: mcpUserId });
+  const canAccessTemplate = lib.canAccessTemplate;
+  const canAccessPersona  = lib.canAccessPersona;
 
   // SQEM-336 — what role does this connection's user hold in the workspace?
   //
@@ -778,104 +609,10 @@ Deno.serve(async (req) => {
     rpcError(id as never, -32602,
       `Not allowed: ${what}. Creating, changing and deleting are for editors and admins; a member's connection is read-only. This matches the web app, where the same actions are closed to members.`);
 
-  // SQEM-326 — how many routes a persona has, and how many of them THIS caller can open.
-  //
-  // ⚠️ Batched on purpose. The first cut asked per persona, which is one query per row in
-  // `list_personas` and `prompts/list` — a workspace with twenty personas paid twenty round trips
-  // to render a menu.
-  const routeVisibility = async (personaIds: string[]) => {
-    const out = new Map<string, { total: number; visible: number }>();
-    for (const pid of personaIds) out.set(pid, { total: 0, visible: 0 });
-    if (personaIds.length === 0) return out;
-
-    const { data: rows } = await adminClient
-      .from('persona_templates')
-      .select('persona_id, template_id')
-      .in('persona_id', personaIds);
-
-    for (const r of ((rows as { persona_id: string; template_id: string }[] | null) || [])) {
-      const entry = out.get(r.persona_id);
-      if (!entry) continue;
-      entry.total += 1;
-      if (canAccessTemplate(r.template_id)) entry.visible += 1;
-    }
-    return out;
-  };
-
-  /**
-   * SQEM-326 — a persona this caller should not be offered at all.
-   *
-   * ⛔ **Only when it HAS routes and none of them survive the filter.** A persona with no routes at
-   * all is a role description, which is a legitimate thing to hand somebody — its author knows it is
-   * empty. A persona whose seven routes all belong to templates this caller cannot open is
-   * different: it advertises a capability it cannot deliver, and the model would work from a role
-   * description while believing it has knowledge behind it.
-   *
-   * Hiding beats listing-with-a-note, for the same reason unreachable routes are omitted rather than
-   * marked: a model told "this exists but you may not have it" reaches for it anyway.
-   */
-  const hiddenFromCaller = (v: { total: number; visible: number } | undefined) =>
-    !!v && v.total > 0 && v.visible === 0;
-
-  // SQEM-324 — load a persona with its routes, filtered to what THIS caller may open.
-  //
-  // ⚠️ The route filter is `canAccessTemplate`, never the persona's own access. A persona shared
-  // with everyone may attach a template restricted to its author; the colleague gets the persona
-  // without that route, and the template stays shut. Filtering on the persona instead would hand
-  // out its author's reach along with it — a permission grant by attachment.
-  const loadPersona = async (persona: { id: string; title: string; description: string; content: string }) => {
-    const { data: routeRows } = await adminClient
-      .from('persona_templates')
-      .select('template_id, condition, sort_order, prompts(title, kind, description)')
-      .eq('persona_id', persona.id)
-      .order('sort_order');
-
-    const routes = ((routeRows as any[] | null) || [])
-      .filter(r => r.prompts && canAccessTemplate(r.template_id))
-      .map(r => ({
-        name:        toSlug(r.prompts.title),
-        title:       r.prompts.title,
-        kind:        r.prompts.kind,
-        condition:   r.condition || '',
-        description: r.prompts.description || '',
-      }));
-
-    return { text: composePersona(persona, routes), routeCount: routes.length };
-  };
-
-  // SQEM-291 — the same question for context files, and it is not answered by the line above.
-  //
-  // `resolveContextFiles` is safe already: it only ever runs for a template the caller reached, so
-  // the file rides along with something they may see. **`resources/list` and `resources/read` are
-  // not** — they addressed the whole workspace by id, so a model could enumerate the names of every
-  // file in it and read any of them, including those attached to templates the caller cannot open.
-  //
-  // Enumeration is the sharper half: nobody asked for that list, and a file name alone can be the
-  // disclosure ("Q3-layoffs.xlsx").
-  //
-  // Built as a set once, not a check per file: `resources/list` would otherwise make one round trip
-  // per row. The uploader clause mirrors `can_access_file()` — and since SQEM-346 it always applies,
-  // because there is always an uploader to compare against.
-  const accessibleFileIds: Set<string> = await (async () => {
-    const { data: rows } = await adminClient
-      .from('prompts')
-      .select('id, context_file_ids')
-      .eq('workspace_id', workspaceId);
-    type Row = { id: string; context_file_ids: string[] | null };
-    const all = (rows as Row[] | null) || [];
-    const ids = new Set<string>();
-    for (const r of all) {
-      if (!canAccessTemplate(r.id)) continue;
-      for (const fid of r.context_file_ids || []) ids.add(fid);
-    }
-    const { data: own } = await adminClient
-      .from('workspace_files')
-      .select('id')
-      .eq('workspace_id', workspaceId)
-      .eq('created_by', mcpUserId);
-    for (const f of (own as { id: string }[] | null) || []) ids.add(f.id);
-    return ids;
-  })();
+  // SQEM-373 — all four moved into the reader with their comments intact; see
+  // `_shared/libraryQueries.ts`. `hiddenFromCaller` is a pure function and is imported directly.
+  const routeVisibility = lib.routeVisibility;
+  const loadPersona = lib.renderPersona;
 
   // 3. Route methods
 
@@ -891,25 +628,11 @@ Deno.serve(async (req) => {
       // in the system context at session start, before any per-request tool matching. This
       // is the strongest lever for getting a connected client to proactively consider the
       // user's templates on relevant requests, instead of only when they name Sqemes.
-      instructions:
-        "Sqemes is this workspace's template library — reusable prompts, assistants, and " +
-        "skills the user has curated for their recurring tasks.\n\n" +
-        "Before writing, drafting, generating, reviewing, or rewriting any substantial " +
-        "content from scratch — an email, a spec, a plan, a code review, a message, a " +
-        "prompt — first call search_templates with a keyword from the request to check " +
-        "whether a matching template already exists. If one does, load it with get_template " +
-        "and follow it. If nothing matches, proceed normally.\n\n" +
-        "Templates encode the user's preferred structure and wording, so reusing one is " +
-        "usually better than improvising.\n\n" +
-        // SQEM-324 — without this paragraph the persona tools exist and are never called.
-        // A tool is only reachable if the model knows the WORDS that should reach for it,
-        // which is why the user's own phrasing is quoted here rather than paraphrased.
-        "This workspace may also define PERSONAS: working roles that bundle several " +
-        "templates behind conditions saying which to load when. When the user names one " +
-        "— 'use/load/call the X persona from Sqemes' — call get_persona. When a task " +
-        "clearly belongs to a role rather than a single template, call list_personas " +
-        "first. Adopt the persona, then load a route only once its condition applies: " +
-        "loading every route at once is exactly what a persona exists to avoid.",
+      //
+      // ⛔ SQEM-378 — this used to be a hand-written text right here, a second wording of the block
+      // Settings shows people to paste into their own client. Two texts, one job, neither aware of
+      // the other — and only this one had learned about personas (SQEM-324). One source now.
+      instructions: LIBRARY_SYSTEM_PROMPT,
       // SQEM-089 — brand the connector. `icons` (MCP SEP-973) is additive metadata a
       // client MAY render in its connector list; PNG over HTTPS is the safest, most
       // widely-supported form, served credential-free from our own domain. `sizes` is
@@ -1033,7 +756,7 @@ Deno.serve(async (req) => {
       resolvedInputs[v.name] = args[v.name] ?? v.defaultValue ?? '';
     }
 
-    const resolvedContext = await resolveContextFiles(adminClient, workspaceId, template.context_file_ids);
+    const resolvedContext = await lib.resolveContextFiles(template.context_file_ids);
     const contextParts: string[] = renderContextBlocks(resolvedContext);
 
     const renderedContent = substituteVariables(template.content || '', resolvedInputs);
@@ -1073,7 +796,7 @@ Deno.serve(async (req) => {
       .order('name');
 
     // SQEM-291 — filtered, not just fetched. Listing a name is a disclosure of its own.
-    const resources = (files || []).filter((f: any) => accessibleFileIds.has(f.id)).map((f: any) => ({
+    const resources = (files || []).filter((f: any) => lib.canAccessFile(f.id)).map((f: any) => ({
       uri: `sqemes://files/${f.id}`,
       name: f.name,
       mimeType: f.mime_type,
@@ -1088,41 +811,17 @@ Deno.serve(async (req) => {
     const uri: string = params?.uri;
     if (!uri) return rpcError(id, -32602, 'Missing URI');
 
-    const fileId = uri.replace(/^sqemes:\/\/files\//, '');
-
-    // SQEM-291 — checked before the row is fetched, and answered with "not found" rather than
-    // "forbidden". A distinct denial would confirm that the id exists, which is the thing the caller
-    // is not entitled to know here.
-    if (!accessibleFileIds.has(fileId)) return rpcError(id, -32602, `Resource not found: ${uri}`);
-
-    const { data: file } = await adminClient
-      .from('workspace_files')
-      .select('id, name, mime_type, storage_path')
-      .eq('workspace_id', workspaceId)
-      .eq('id', fileId)
-      .single();
-
-    if (!file) return rpcError(id, -32602, `Resource not found: ${uri}`);
-
-    const { data: blob, error: storageErr } = await adminClient.storage
-      .from('workspace-files')
-      .download(file.storage_path);
-
-    if (storageErr || !blob) {
-      return rpcError(id, -32603, 'File content not available');
-    }
-
-    // Text content is returned inline; binaries (PDF/images) as base64.
-    if (isTextContentMime(file.mime_type)) {
+    try {
+      const file = await lib.readContextFile(uri);
+      // Text content is returned inline; binaries (PDF/images) as base64.
       return rpcResult(id, {
-        contents: [{ uri, mimeType: file.mime_type, text: await blob.text() }],
+        contents: [file.text != null
+          ? { uri: file.uri, mimeType: file.mimeType, text: file.text }
+          : { uri: file.uri, mimeType: file.mimeType, blob: file.base64 }],
       });
+    } catch (err) {
+      return libraryError(id, err);
     }
-
-    const base64 = toBase64(await blob.arrayBuffer());
-    return rpcResult(id, {
-      contents: [{ uri, mimeType: file.mime_type, blob: base64 }],
-    });
   }
 
   // ---- tools/list ----
@@ -1461,55 +1160,17 @@ Deno.serve(async (req) => {
     // from a client menu; this is what answers "use the Sales persona from Sqemes" typed as a
     // sentence, which is how it is actually used in Claude Code.
     if (toolName === 'list_personas') {
-      const { data: personaRows } = await adminClient
-        .from('personas')
-        .select('id, title, description')
-        .eq('workspace_id', workspaceId)
-        .order('title');
-
-      const visible = ((personaRows as any[] | null) || []).filter(p => canAccessPersona(p.id));
-
-      // The route count is AFTER the template filter, so it reports what this caller would actually
-      // get — not what the author sees. A "7 routes" that turns into 4 on load is worse than no
-      // number. SQEM-326 — one batched lookup rather than a query per persona.
-      const counts = await routeVisibility(visible.map(p => p.id));
-      const result = visible
-        .filter(p => !hiddenFromCaller(counts.get(p.id)))
-        .map(persona => ({
-          id: persona.id,
-          name: toSlug(persona.title),
-          title: persona.title,
-          description: persona.description || '',
-          routeCount: counts.get(persona.id)?.visible ?? 0,
-        }));
-
-      return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
+      return libraryResult(id, () => lib.listPersonas());
     }
 
     if (toolName === 'get_persona') {
-      const personaId   = args.id;
-      const personaName = args.name;
-      if (!personaId && !personaName) return rpcError(id, -32602, 'Provide either id or name');
-
-      const { data: personaRows } = await adminClient
-        .from('personas')
-        .select('id, title, description, content')
-        .eq('workspace_id', workspaceId);
-
-      const persona = personaId
-        ? ((personaRows as any[] | null) || []).find(p => p.id === personaId)
-        : ((personaRows as any[] | null) || []).find(p => toSlug(p.title) === personaName);
-
-      if (!persona || !canAccessPersona(persona.id)) return rpcError(id, -32602, 'Persona not found');
-      // SQEM-326 — same rule as the listing: a persona whose every route is out of reach is not
-      // offered. Answering "not found" rather than explaining is deliberate — the alternative tells
-      // a model that something exists which it may not have, and it reaches for it anyway.
-      if (hiddenFromCaller((await routeVisibility([persona.id])).get(persona.id))) {
-        return rpcError(id, -32602, 'Persona not found');
+      try {
+        const { text } = await lib.getPersona({ id: args.id, name: args.name });
+        // ⚠️ Markdown, not JSON — unlike every other tool here. A persona is written to be read.
+        return rpcResult(id, { content: [{ type: 'text', text }] });
+      } catch (err) {
+        return libraryError(id, err);
       }
-
-      const { text } = await loadPersona(persona);
-      return rpcResult(id, { content: [{ type: 'text', text }] });
     }
 
     // ---- SQEM-337 — the write half of personas -------------------------------------------------
@@ -1759,148 +1420,20 @@ Deno.serve(async (req) => {
     }
 
     if (toolName === 'list_templates') {
-      const kind = args.kind && args.kind !== 'all' ? args.kind : null;
-      let query = adminClient
-        .from('prompts')
-        .select('id, title, description, kind, variables, context_file_ids')
-        .eq('workspace_id', workspaceId)
-        .or('published.eq.true,kind.eq.skill') // SQEM-110/210 — vestigial guard, see above
-        .order('title');
-      if (kind) query = query.eq('kind', kind);
-      const { data: templates } = await query;
-
-      const visible = (templates || [])
-        .filter((t: any) => canAccessTemplate(t.id)); // SQEM-142/210 — access-filtered (per user on OAuth, open-only on API keys)
-      // SQEM-232 — stats computed AFTER the access filter, so a template the caller may not see
-      // contributes nothing, not even its file count.
-      const stats = await contextFileStats(adminClient, workspaceId, visible);
-
-      const result = visible
-        .map((t: any) => {
-          const s = stats.get(t.id);
-          return {
-            id:            t.id,
-            name:          toSlug(t.title),
-            title:         t.title,
-            kind:          t.kind,
-            description:   t.description || '',
-            argumentCount: (t.variables || []).filter((v: any) => v.type !== 'file').length,
-            // Omitted entirely when there are no files — a list of zeroes is noise the model has to
-            // read past on every entry, and most templates carry nothing.
-            ...(s ? { contextFileCount: s.count, contextBytes: s.bytes } : {}),
-          };
-        });
-
-      return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
+      return libraryResult(id, () => lib.listTemplates({ kind: args.kind && args.kind !== 'all' ? args.kind : null }));
     }
 
     if (toolName === 'search_templates') {
-      const query = (args.query || '').toLowerCase();
-      if (!query) return rpcError(id, -32602, 'Missing search query');
-
-      let dbQuery = adminClient
-        .from('prompts')
-        .select('id, title, description, kind, context_file_ids')
-        .eq('workspace_id', workspaceId)
-        .or('published.eq.true,kind.eq.skill'); // SQEM-110/210 — vestigial guard, see above
-      if (args.kind) dbQuery = dbQuery.eq('kind', args.kind);
-      const { data: templates } = await dbQuery;
-
-      const matched = (templates || [])
-        .filter((t: any) =>
-          canAccessTemplate(t.id) && ( // SQEM-142/210 — access-filtered (per user on OAuth, open-only on API keys)
-            t.title.toLowerCase().includes(query) ||
-            (t.description || '').toLowerCase().includes(query)
-          )
-        );
-      // SQEM-232 — only for the matches, so a search that hits nothing costs no extra query.
-      const stats = await contextFileStats(adminClient, workspaceId, matched);
-
-      const results = matched
-        .map((t: any) => {
-          const s = stats.get(t.id);
-          return {
-            id:          t.id,
-            name:        toSlug(t.title),
-            title:       t.title,
-            kind:        t.kind,
-            description: t.description || '',
-            ...(s ? { contextFileCount: s.count, contextBytes: s.bytes } : {}),
-          };
-        });
-
-      return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify(results, null, 2) }] });
+      return libraryResult(id, () => lib.searchTemplates({ query: args.query || '', kind: args.kind ?? null }));
     }
 
     if (toolName === 'get_template') {
-      const templateId   = args.id;
-      const templateName = args.name;
-      if (!templateId && !templateName) return rpcError(id, -32602, 'Provide either id or name');
-
-      const { data: templates } = await adminClient
-        .from('prompts')
-        .select('id, title, description, kind, content, system_instruction, variables, context_file_ids')
-        .eq('workspace_id', workspaceId)
-        .or('published.eq.true,kind.eq.skill'); // SQEM-110/210 — vestigial guard, see above
-
-      const tpl = templateId
-        ? (templates || []).find((t: any) => t.id === templateId)
-        : (templates || []).find((t: any) => toSlug(t.title) === templateName);
-
-      if (!tpl || !canAccessTemplate(tpl.id)) return rpcError(id, -32602, 'Template not found'); // SQEM-142
-
-      // SQEM-230 — how context files come back. Default stays `inline` so every existing caller
-      // gets byte-identical output; an unknown value is rejected rather than silently treated as
-      // the default, because a typo'd mode would look like it worked while doing the opposite.
-      const includeFiles: string = args.include_files ?? 'inline';
-      if (includeFiles !== 'inline' && includeFiles !== 'list') {
-        return rpcError(id, -32602, `include_files must be "inline" or "list" (got "${includeFiles}")`);
-      }
-
-      // Text context files are inlined; binaries (PDF/images) are referenced by resource URI.
-      let content = tpl.content || '';
-      const resolved = await resolveContextFiles(adminClient, workspaceId, tpl.context_file_ids);
-      for (const block of renderContextBlocks(resolved, includeFiles)) {
-        content += `\n\n${block}`;
-      }
-
-      // In `inline` mode the shape is untouched — adding fields here would change every existing
-      // caller's payload, which is exactly what the default is meant to prevent.
-      //
-      // Access note (SQEM-230, decided 2026-08-16): the uris below are read back through
-      // `resources/read`, which authorises on `workspace_id` — NOT on template access. That is
-      // deliberate and matches the product: `workspace_files` is a workspace-wide library
-      // (SQEM-039, `workspace_files_select` grants every member every file), and one file may be
-      // attached to several templates, so "which template decides?" has no answer. Do not "fix"
-      // this into template-derived access without also filtering `resources/list` — otherwise a
-      // caller could list a file it may not read.
-      const contextFiles = resolved.map(f => {
-        const base = { name: f.name, uri: f.uri, mimeType: f.mimeType };
-        if (includeFiles === 'inline') return base;
-        const listed: any = { ...base, byteSize: f.byteSize };
-        if (f.text != null) {
-          const { preview, truncated } = buildPreview(f.text, f.mimeType);
-          listed.preview = preview;
-          listed.previewTruncated = truncated;
-        }
-        return listed;
-      });
-
-      const vars = (tpl.variables || []).filter((v: any) => v.type !== 'file');
-      const result: any = {
-        id:            tpl.id,
-        name:          toSlug(tpl.title),
-        title:         tpl.title,
-        kind:          tpl.kind,
-        description:   tpl.description || '',
-        content,
-        argumentCount: vars.length,
-        variables:     vars.map((v: any) => ({ name: v.name, label: v.label, type: v.type })),
-        contextFiles,
-      };
-      if (tpl.system_instruction) result.system_instruction = tpl.system_instruction;
-
-      return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
+      // ⚠️ `include_files` defaults to `inline` HERE and to `list` in Chat. The default belongs to
+      // the surface, not to the query: every MCP client written against SQEM-230 expects inline, and
+      // changing that would alter the payload of callers that never asked for anything.
+      return libraryResult(id, () => lib.getTemplate({
+        id: args.id, name: args.name, includeFiles: args.include_files ?? 'inline',
+      }));
     }
 
     if (toolName === 'list_files') {
@@ -1914,7 +1447,7 @@ Deno.serve(async (req) => {
       // `resources/read` are the MCP resource surface, but `list_files` is a *tool* and reaches the
       // same rows by a different route. Closing two of three leaves the door open while the diff
       // looks complete.
-      const result = (files || []).filter((f: any) => accessibleFileIds.has(f.id)).map((f: any) => ({
+      const result = (files || []).filter((f: any) => lib.canAccessFile(f.id)).map((f: any) => ({
         id:       f.id,
         name:     f.name,
         mimeType: f.mime_type,
@@ -2357,7 +1890,7 @@ Deno.serve(async (req) => {
       // SQEM-291 — the `fileId` comes from the caller, so a foreign one can be passed here. Without
       // the visibility check this branch answers with a name and a MIME type for a file the caller
       // cannot otherwise see: an idempotency shortcut that doubles as a lookup.
-      if (existing && !accessibleFileIds.has(fileId)) {
+      if (existing && !lib.canAccessFile(fileId)) {
         return rpcError(id, -32602, `File not found: ${fileId}`);
       }
       if (existing) {
@@ -2421,7 +1954,7 @@ Deno.serve(async (req) => {
       // found" and "deleted" differ, so without this check the tool doubles as a way to test whether
       // a given id exists in the workspace. Same wording either way, so an invisible file is
       // indistinguishable from an absent one.
-      if (!accessibleFileIds.has(fileId)) return rpcError(id, -32602, `File not found: ${fileId}`);
+      if (!lib.canAccessFile(fileId)) return rpcError(id, -32602, `File not found: ${fileId}`);
 
       const { data: file } = await adminClient
         .from('workspace_files')
@@ -2440,7 +1973,7 @@ Deno.serve(async (req) => {
           .eq('workspace_id', workspaceId)
           .eq('id', replaceWith)
           .maybeSingle();
-        if (!rep || !accessibleFileIds.has(replaceWith))
+        if (!rep || !lib.canAccessFile(replaceWith))
           return rpcError(id, -32602, `replaceWith file not found: ${replaceWith}`);
         replacement = rep;
       }

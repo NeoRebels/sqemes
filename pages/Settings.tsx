@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useUI, useWorkspace } from '../store';
 import { can } from '../lib/permissions';
 import { useLocation, useNavigate } from 'react-router';
-import { PLANS, TRIAL_DAYS, VAT_NOTE, MCP_SYSTEM_PROMPT } from '../constants';
+import { PLANS, TRIAL_DAYS, VAT_NOTE, LIBRARY_SYSTEM_PROMPT } from '../constants';
 import { hasActiveSubscription, isTrialing } from '../lib/subscription';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { fetchCanPublish, setPublisherToken } from '../lib/api/library';
@@ -175,16 +175,20 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
               would be a text people copy and then wonder why nothing changed. */}
           <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">System prompt (optional)</p>
+            {/* SQEM-378 — the same text the MCP server hands out and the same one the Sqemes chat
+                works under. Saying so matters: it is the difference between "a snippet we offer" and
+                "the rule this product already follows", and the second is what makes someone paste
+                it. One source, so this claim cannot quietly stop being true. */}
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-              The server already asks connected clients to check your library first. Add this where your
-              AI tool keeps its standing instructions and it also applies in clients that ignore that,
-              and to everyone at once.
+              This is the same instruction the Sqemes chat already works under, and the one the server
+              hands to connected clients. Add it where your AI tool keeps its standing instructions and
+              it applies in clients that ignore the server&rsquo;s own — and to everyone at once.
             </p>
             <div className="relative bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl p-4">
-              <pre className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap max-h-44 overflow-y-auto pr-8">{MCP_SYSTEM_PROMPT}</pre>
+              <pre className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap max-h-44 overflow-y-auto pr-8">{LIBRARY_SYSTEM_PROMPT}</pre>
               <button
                 type="button"
-                onClick={async () => { await copyToClipboard(MCP_SYSTEM_PROMPT); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 2000); }}
+                onClick={async () => { await copyToClipboard(LIBRARY_SYSTEM_PROMPT); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 2000); }}
                 className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-brand-500 transition-colors"
                 title="Copy system prompt"
               >

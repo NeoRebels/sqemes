@@ -240,6 +240,8 @@ export interface ChatSession {
   title: string;
   model: string;
   assistantId?: string;
+  /** SQEM-371 — skills applied to this session, in application order. Assistants stay in `assistantId`. */
+  appliedSkillIds: string[];
   visibility: 'private' | 'workspace';
   createdAt: string;
   lastActiveAt: string;

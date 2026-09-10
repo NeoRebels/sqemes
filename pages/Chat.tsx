@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
-import { useUI, useWorkspace, useData, useChatSessions } from '../store';
+import { useUI, useWorkspace, useData, useChatSessions, usePrompts } from '../store';
 import { can } from '../lib/permissions';
 import { checkContentViolation } from '../lib/contentGuard';
 import { IS_SELF_HOSTED } from '../lib/env';
@@ -8,15 +8,11 @@ import { waitForJobResult } from '../lib/realtimeJob';
 import { AVAILABLE_MODELS } from '../constants';
 import { buildEnabledModels, isFundedModel } from '../lib/enabledModels';
 import { edgeError } from '../lib/edgeError';
-import {
-  Send, Bot, User, Sparkles, AlertTriangle, Loader2,
-  Copy, Check, Pencil, Paperclip, Plug, X, FileText, MessageSquarePlus, Search,
-  MoreHorizontal, Globe, Lock, Trash2, MessageSquare, Wand2, PenTool,
-  Key, Upload, Files,
-} from 'lucide-react';
+import { Send, Bot, User, Sparkles, AlertTriangle, Loader2, Copy, Check, Pencil, Paperclip, Plug, X, FileText, MessageSquarePlus, Search, MoreHorizontal, Globe, Lock, Trash2, MessageSquare, Wand2, Key, Upload, Files } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { markdownUrlTransform } from '../lib/markdownUrlTransform';
+import { composeSystemInstruction, resolveAppliedContext } from '../lib/templateContext';
 import { shouldSendOnEnter, hasCoarsePointer } from '../lib/chatKeys';
 import { useLocation, useNavigate, useParams, Link } from 'react-router';
 import { SUPPORTED_MIME_TYPES, ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, isImageType, fileTypeLabel } from '../lib/uploadTypes';
@@ -24,6 +20,8 @@ import {
   createChatSession, addChatMessage, fetchChatMessages, deleteChatMessages,
   fetchSharedChatSessions,
   unshareChatSession,
+  fetchAppliedContext,
+  updateAppliedContext,
 } from '../lib/api/chatSessions';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -270,6 +268,8 @@ const searchShortcutHint =
 const Chat = () => {
   const { workspace, currentUser } = useWorkspace();
   const { workspaceFiles, addWorkspaceFile } = useData();
+  // SQEM-371 — needed to turn the ids stored on a session back into templates on load.
+  const { prompts } = usePrompts();
   const { chatSessions, addChatSession, updateChatSession: storeUpdateSession,
     deleteChatSession: storeDeleteSession } = useChatSessions();
   const { showToast } = useUI();
@@ -283,8 +283,14 @@ const Chat = () => {
   const [selectedModel, setSelectedModel]     = useState('');
   const [selectedAssistantId, setSelectedAssistantId] = useState<string | null>(null);
   const [activeAssistantTemplate, setActiveAssistantTemplate] = useState<Prompt | null>(null);
-  const [activeInsertedTemplate, setActiveInsertedTemplate]   = useState<Prompt | null>(null);
   const [activeSystemInstruction, setActiveSystemInstruction] = useState<string>('');
+  /**
+   * SQEM-371 — skills applied to this session, in application order, with the context each
+   * contributes. Kept apart from the assistant because they are different things: one assistant
+   * REPLACES the role, skills STACK on top of it. Flattening both into one string would lose the
+   * order that `composeSystemInstruction` depends on.
+   */
+  const [activeSkills, setActiveSkills] = useState<{ template: Prompt; context: string }[]>([]);
   const [isLoading, setIsLoading]             = useState(false);
   const [error, setError]                     = useState<string | null>(null);
   const [errorCode, setErrorCode]             = useState<string | null>(null);
@@ -408,6 +414,45 @@ const Chat = () => {
         })));
         setSessionId(routeSessionId);
         setMobileTab('chat');
+
+        // SQEM-371 — restore what is applied to THIS session, and clear what belonged to the last.
+        //
+        // ⛔ Both halves are new and both were real defects. `assistant_id` was written on create
+        // and never read, so a reload silently dropped the assistant. And nothing cleared the state
+        // on a switch, so an assistant applied in session A kept governing session B — with the
+        // header confirming it as if intended.
+        //
+        // ⚠️ Set unconditionally, including to empty. An early return on "nothing applied" would
+        // leave the previous session's context in place, which is exactly the leak.
+        try {
+          const applied = await fetchAppliedContext(routeSessionId);
+          const assistant = applied.assistantId
+            ? prompts.find(p => p.id === applied.assistantId && p.kind === 'assistant') ?? null
+            : null;
+          // ⚠️ Ids that no longer resolve are dropped rather than reported: a template can vanish
+          // by deletion OR by access control, and from here the two are indistinguishable. The
+          // session keeps working with what is left.
+          const skills = applied.appliedSkillIds
+            .map(id => prompts.find(p => p.id === id && p.kind === 'skill'))
+            .filter((p): p is Prompt => !!p);
+
+          const [assistantCtx, skillCtxs] = await Promise.all([
+            assistant ? resolveAppliedContext(assistant, workspaceFiles) : Promise.resolve(null),
+            Promise.all(skills.map(sk => resolveAppliedContext(sk, workspaceFiles))),
+          ]);
+
+          setActiveAssistantTemplate(assistant);
+          setSelectedAssistantId(assistant?.id ?? null);
+          setActiveSystemInstruction(assistantCtx?.text ?? '');
+          setActiveSkills(skills.map((template, i) => ({ template, context: skillCtxs[i].text })));
+        } catch {
+          // A failed restore must not cost the conversation. Clear rather than keep the previous
+          // session's context — wrong context is worse than none, and this is the leak's direction.
+          setActiveAssistantTemplate(null);
+          setSelectedAssistantId(null);
+          setActiveSystemInstruction('');
+          setActiveSkills([]);
+        }
       } catch {
         // SQEM-287 — a dead end otherwise: the conversation list is right there, and starting a
         // new chat loses nothing, but neither is obvious while staring at a failure.
@@ -507,6 +552,7 @@ const Chat = () => {
     setAttachments([]);
     setActiveAssistantTemplate(null);
     setActiveSystemInstruction('');
+    setActiveSkills([]);
     setSelectedAssistantId(null);
     setSessionId(null);
     sessionLoadedRef.current = null;
@@ -755,7 +801,14 @@ Output only the refined prompt text, with no surrounding explanation or commenta
     try {
       if (!activeSessionId) {
         const title = trimmed.slice(0, 60).trim() + (trimmed.length > 60 ? '…' : '');
-        const newSession = await createChatSession(workspace.id, currentUser.id, title, selectedModel, selectedAssistantId || undefined);
+        const newSession = await createChatSession(
+          workspace.id, currentUser.id, title, selectedModel,
+          selectedAssistantId || undefined,
+          // SQEM-371 — a skill applied BEFORE the first message has no session to be written
+          // to yet; it rides along here. Without this it would survive until the first reload
+          // and then quietly disappear — the exact failure this ticket exists to remove.
+          activeSkills.map(sk => sk.template.id),
+        );
         activeSessionId = newSession.id;
         sessionLoadedRef.current = activeSessionId; // prevent fetch from overwriting optimistic messages
         setSessionId(activeSessionId);
@@ -799,14 +852,29 @@ Output only the refined prompt text, with no surrounding explanation or commenta
       const jobId = crypto.randomUUID();
       // Funded (keyless) → send `funded` and omit modelId; the server picks the funded model.
       const funded = isFundedModel(selectedModel);
-      const chatPayloadBase = { workspaceId: workspace.id, modelId: funded ? undefined : selectedModel, funded, systemInstruction: activeSystemInstruction || undefined };
+      // SQEM-370 — the zone is the only part of the time context the client knows; the server
+      // formats the moment in it, per request. Read at send time, not at session start: someone who
+      // travels, or whose machine changes zone, should not keep the old one for the session's life.
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const chatPayloadBase = { workspaceId: workspace.id, modelId: funded ? undefined : selectedModel, funded, systemInstruction: composeSystemInstruction(activeSystemInstruction || null, activeSkills.map(s => s.context)), timeZone };
       const messagesToSend = truncateMessagesToPayloadLimit(allMessages, chatPayloadBase);
 
       // Show thinking bubble immediately — before the fetch even completes
       setMessages(prev => [...prev, { id: assistantMsgId, role: 'assistant', content: '', pending: true, model: modelInfo?.name || selectedModel }]);
 
       // Subscribe to Realtime before sending the request
-      const resultPromise = waitForJobResult(jobId, controller.signal);
+      //
+      // SQEM-372 — the third argument paints the answer as it is written. ⚠️ Each delta carries the
+      // WHOLE text so far, so this REPLACES the content instead of appending: a dropped broadcast
+      // then repairs itself on the next one rather than leaving a hole.
+      //
+      // `pending` is cleared on the first delta — the thinking bubble has done its job the moment
+      // there is text to show, and leaving it would render a spinner above the reply it announced.
+      const resultPromise = waitForJobResult(jobId, controller.signal, (textSoFar) => {
+        setMessages(prev => prev.map(m => (
+          m.id === assistantMsgId ? { ...m, content: textSoFar, pending: false } : m
+        )));
+      });
 
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-message`, {
         method: 'POST',
@@ -1173,46 +1241,69 @@ Output only the refined prompt text, with no surrounding explanation or commenta
               onEmptyAction={() => navigate('/settings', { state: { initialTab: 'api' } })}
             />
 
-            {/* Active context strip — assistant (persistent) or inserted skill (clears on send); prompts need no pill */}
-            {(activeAssistantTemplate || (activeInsertedTemplate && activeInsertedTemplate.kind !== 'prompt')) && (() => {
-              const isAssistant = !!activeAssistantTemplate;
-              const template = activeAssistantTemplate ?? activeInsertedTemplate!;
-              const fileCount = template.contextFileIds?.length ?? 0;
-              const pillColors = isAssistant
-                ? 'text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-700'
-                : template.kind === 'skill'
-                  ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700'
-                  : 'text-brand-700 dark:text-brand-300 bg-brand-50 dark:bg-brand-900/20 border-brand-200 dark:border-brand-700';
-              const dismissColors = isAssistant
-                ? 'text-violet-400 hover:text-violet-700 dark:hover:text-violet-200'
-                : template.kind === 'skill'
-                  ? 'text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-200'
-                  : 'text-brand-400 hover:text-brand-700 dark:hover:text-brand-200';
-              const kindLabel = isAssistant ? 'Assistant' : template.kind === 'skill' ? 'Skill' : 'Prompt';
-              const KindIcon = isAssistant ? Bot : template.kind === 'skill' ? Wand2 : PenTool;
+            {/*
+              SQEM-371 — the applied-context strip. It shows a SET now, because more than one thing
+              can be applied: at most one assistant (it replaces the role) plus any number of skills
+              (they stack on it). The container was already built for a row — `overflow-x-auto` was
+              there while only ever one pill was rendered.
+            */}
+            {(() => {
+              const applied: { template: Prompt; isAssistant: boolean }[] = [
+                ...(activeAssistantTemplate ? [{ template: activeAssistantTemplate, isAssistant: true }] : []),
+                ...activeSkills.map(sk => ({ template: sk.template, isAssistant: false })),
+              ];
+              if (!applied.length) return null;
+
+              const fileCount = applied.reduce((n, a) => n + (a.template.contextFileIds?.length ?? 0), 0);
+
+              const removeApplied = (template: Prompt, isAssistant: boolean) => {
+                if (isAssistant) {
+                  setActiveAssistantTemplate(null);
+                  setActiveSystemInstruction('');
+                  setSelectedAssistantId(null);
+                  if (sessionId) void updateAppliedContext(sessionId, { assistantId: null }).catch(() => {});
+                  return;
+                }
+                setActiveSkills(prev => {
+                  const next = prev.filter(sk => sk.template.id !== template.id);
+                  // ⚠️ Removing has to reach the session too. Clearing only the client state would
+                  // put the skill back on the next reload — the same write-only hole this ticket fixes.
+                  if (sessionId) void updateAppliedContext(sessionId, { appliedSkillIds: next.map(sk => sk.template.id) }).catch(() => {});
+                  return next;
+                });
+              };
+
               return (
                 <>
                   <div className="w-px h-5 bg-slate-200 dark:bg-slate-600 shrink-0" />
                   <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 font-medium">Using:</span>
                   <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0 flex-1">
-                    <div className={`shrink-0 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${pillColors}`}>
-                      <KindIcon className="w-3.5 h-3.5" />
-                      <span className="opacity-60 font-medium">{kindLabel}</span>
-                      <span className="opacity-30">·</span>
-                      <span className="font-semibold">{template.title}</span>
-                      <button
-                        onClick={() => {
-                          if (isAssistant) { setActiveAssistantTemplate(null); setActiveSystemInstruction(''); setSelectedAssistantId(null); }
-                          else { setActiveInsertedTemplate(null); setInput(''); }
-                        }}
-                        className={`ml-0.5 transition-colors ${dismissColors}`}
-                        title="Remove"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
+                    {applied.map(({ template, isAssistant }) => {
+                      const pillColors = isAssistant
+                        ? 'text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-700'
+                        : 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700';
+                      const dismissColors = isAssistant
+                        ? 'text-violet-400 hover:text-violet-700 dark:hover:text-violet-200'
+                        : 'text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-200';
+                      const KindIcon = isAssistant ? Bot : Wand2;
+                      return (
+                        <div key={template.id} className={`shrink-0 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${pillColors}`}>
+                          <KindIcon className="w-3.5 h-3.5" />
+                          <span className="opacity-60 font-medium">{isAssistant ? 'Assistant' : 'Skill'}</span>
+                          <span className="opacity-30">·</span>
+                          <span className="font-semibold">{template.title}</span>
+                          <button
+                            onClick={() => removeApplied(template, isAssistant)}
+                            className={`ml-0.5 transition-colors ${dismissColors}`}
+                            title="Remove"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      );
+                    })}
                     {fileCount > 0 && (
-                      <div className="shrink-0 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-full">
+                      <div className="shrink-0 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-full">
                         <FileText className="w-3 h-3" />
                         <span className="font-medium">{fileCount} file{fileCount !== 1 ? 's' : ''}</span>
                       </div>
@@ -1468,7 +1559,6 @@ Output only the refined prompt text, with no surrounding explanation or commenta
         initialTemplateId={templateModalInitId}
         onInsert={(text, template, images) => {
           setInput(text);
-          setActiveInsertedTemplate(template);
           if (images.length) addContextImages(images);
           textareaRef.current?.focus();
         }}
@@ -1477,7 +1567,22 @@ Output only the refined prompt text, with no surrounding explanation or commenta
           setActiveSystemInstruction(systemInstruction);
           setSelectedAssistantId(template.id);
           if (images.length) addContextImages(images);
+          // SQEM-371 — persist so a reload keeps it. Only when a session exists: a chat that has
+          // not been created yet carries its assistant through `createChatSession`.
+          if (sessionId) void updateAppliedContext(sessionId, { assistantId: template.id }).catch(() => {});
           showToast('Assistant applied to this chat', 'success');
+        }}
+        onSkillSelect={(template, context, images) => {
+          // ⛔ Applied, not inserted. A skill is a knowledge block, not a task — pasting it into
+          // the composer made the header's "Using:" chip a claim the mechanism did not honour.
+          setActiveSkills(prev => {
+            if (prev.some(s => s.template.id === template.id)) return prev; // applying twice is a no-op
+            const next = [...prev, { template, context }];
+            if (sessionId) void updateAppliedContext(sessionId, { appliedSkillIds: next.map(s => s.template.id) }).catch(() => {});
+            return next;
+          });
+          if (images.length) addContextImages(images);
+          showToast('Skill applied to this chat', 'success');
         }}
       />
 

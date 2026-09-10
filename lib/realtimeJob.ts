@@ -9,7 +9,19 @@ import { supabase } from './supabase';
 
 const JOB_TIMEOUT_MS = 180_000; // 180 s — well above the 150 s edge function limit
 
-export function waitForJobResult(jobId: string, signal?: AbortSignal): Promise<string> {
+/**
+ * SQEM-372 — `onDelta` receives the answer as it is written.
+ *
+ * ⚠️ **Each delta carries the WHOLE text so far, not an increment.** Realtime broadcast is
+ * best-effort; with increments one dropped message would leave a permanent hole in the middle of a
+ * reply. So the caller REPLACES what it is showing rather than appending — and any message that
+ * arrives repairs every drop before it.
+ */
+export function waitForJobResult(
+  jobId: string,
+  signal?: AbortSignal,
+  onDelta?: (textSoFar: string) => void,
+): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const channel = supabase.channel(`job:${jobId}`);
 
@@ -19,6 +31,12 @@ export function waitForJobResult(jobId: string, signal?: AbortSignal): Promise<s
     }, JOB_TIMEOUT_MS);
 
     channel
+      .on('broadcast', { event: 'delta' }, ({ payload }: { payload: { delta?: string } }) => {
+        // ⚠️ Deliberately does NOT touch the timeout. A stream that starts and then stalls must
+        // still time out — refreshing on every delta would let a wedged provider hold the UI open
+        // indefinitely, which is worse than an honest timeout because nothing ever reports it.
+        if (typeof payload.delta === 'string') onDelta?.(payload.delta);
+      })
       .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string } }) => {
         clearTimeout(timeout);
         supabase.removeChannel(channel);

@@ -23,6 +23,7 @@ function rowToChatSession(row: ChatSessionRow, currentUserId: string): ChatSessi
     title: row.title,
     model: row.model,
     assistantId: row.assistant_id || undefined,
+    appliedSkillIds: row.applied_skill_ids ?? [],
     visibility: row.visibility,
     createdAt: row.created_at,
     lastActiveAt: row.last_active_at,
@@ -53,7 +54,8 @@ export async function createChatSession(
   currentUserId: string,
   title: string,
   model: string,
-  assistantId?: string
+  assistantId?: string,
+  appliedSkillIds?: string[],
 ): Promise<ChatSession> {
   const { data, error } = await supabase
     .from('chat_sessions')
@@ -63,6 +65,7 @@ export async function createChatSession(
       title,
       model,
       assistant_id: assistantId || null,
+      applied_skill_ids: appliedSkillIds ?? [],
     })
     .select()
     .single();
@@ -77,7 +80,7 @@ export async function fetchChatSessions(
 ): Promise<ChatSession[]> {
   const { data, error } = await supabase
     .from('chat_sessions')
-    .select('id, title, user_id, created_at, last_active_at, visibility, model, assistant_id, is_generating, workspace_id, pinned')
+    .select('id, title, user_id, created_at, last_active_at, visibility, model, assistant_id, applied_skill_ids, is_generating, workspace_id, pinned')
     .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
     .order('last_active_at', { ascending: false });
@@ -203,5 +206,43 @@ export async function deleteChatMessages(ids: string[]): Promise<void> {
  */
 export async function unshareChatSession(sessionId: string): Promise<void> {
   const { error } = await supabase.rpc('unshare_chat_session', { p_session_id: sessionId });
+  if (error) throw error;
+}
+
+
+/**
+ * SQEM-371 — reads back the context applied to one session.
+ *
+ * ⛔ It had to be written, because nothing read `assistant_id`: it was set on create and never
+ * fetched again, so a reload silently dropped the assistant. That is the half of this ticket that
+ * looked like it already worked.
+ */
+export async function fetchAppliedContext(
+  sessionId: string,
+): Promise<{ assistantId: string | null; appliedSkillIds: string[] }> {
+  const { data, error } = await supabase
+    .from('chat_sessions')
+    .select('assistant_id, applied_skill_ids')
+    .eq('id', sessionId)
+    .single();
+
+  if (error) throw error;
+  return {
+    assistantId: (data as { assistant_id: string | null }).assistant_id ?? null,
+    appliedSkillIds: (data as { applied_skill_ids: string[] | null }).applied_skill_ids ?? [],
+  };
+}
+
+/** Persists a change to what is applied. Called on apply and on remove, never on send. */
+export async function updateAppliedContext(
+  sessionId: string,
+  applied: { assistantId?: string | null; appliedSkillIds?: string[] },
+): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  if ('assistantId' in applied) patch.assistant_id = applied.assistantId ?? null;
+  if (applied.appliedSkillIds) patch.applied_skill_ids = applied.appliedSkillIds;
+  if (!Object.keys(patch).length) return;
+
+  const { error } = await supabase.from('chat_sessions').update(patch).eq('id', sessionId);
   if (error) throw error;
 }

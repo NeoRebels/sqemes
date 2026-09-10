@@ -170,8 +170,21 @@ Deno.serve(async (req) => {
     const modelLower = effectiveModelId.toLowerCase();
 
     // 7. Call LLM provider
-    // Image generation models return a single response — keep them non-streaming.
-    // All text models use SSE streaming to avoid the Supabase gateway idle timeout.
+    // Image generation models return a single response and take the branch below.
+    //
+    // ⛔ SQEM-372 — a second line here used to claim "All text models use SSE streaming to avoid the
+    // Supabase gateway idle timeout." **Nothing streams.** No request sets `stream: true`, nothing
+    // parses SSE, and the model's answer is assembled in full and broadcast in one piece.
+    //
+    // ⚠️ The line arrived in SQEM-017 — the commit that *introduced* the background-job design and
+    // thereby made it false. Before that, the function held the HTTP connection open and needed SSE
+    // to survive the gateway's idle timeout; moving the work into `EdgeRuntime.waitUntil()` after
+    // the response removed the timeout and the streaming with it. The comment described the
+    // mechanism it was replacing, inside the change that replaced it, and outlived it by months.
+    //
+    // It is corrected rather than deleted because it cost real time: streaming was scoped on the
+    // assumption that "the provider side already streams and only the client delta is missing".
+    // It does not. Building it means `stream: true` plus SSE parsing in four provider shapes.
     const imageGenModels: Record<string, string> = {
       'gpt-image-1': 'https://api.openai.com/v1/images/generations',
       'gpt-image-1-mini': 'https://api.openai.com/v1/images/generations',

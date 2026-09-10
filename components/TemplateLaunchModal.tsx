@@ -5,23 +5,33 @@ import Modal from './ui/Modal';
 import SegmentedTabs from './ui/SegmentedTabs';
 import KindBadge from './ui/KindBadge';
 import { Prompt, PromptKind } from '../types';
-import { SUPPORTED_MIME_TYPES, ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, isImageType } from '../lib/uploadTypes';
-import { getWorkspaceFileSignedUrl } from '../lib/api/files';
+import { SUPPORTED_MIME_TYPES, ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES } from '../lib/uploadTypes';
+import {
+  resolveAttachmentFiles as resolveAttachments,
+  resolveFileBlocks as resolveBlocks,
+  resolveAppliedContext,
+  type ContextImage,
+} from '../lib/templateContext';
 
-export interface ContextImage { mimeType: string; dataUrl: string; name: string; }
+// SQEM-371 — the type moved to `lib/templateContext` with the resolution itself; re-exported here
+// because Chat has always imported it from this module.
+export type { ContextImage };
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onInsert: (text: string, template: Prompt, images: ContextImage[]) => void;
   onAssistantSelect: (template: Prompt, systemInstruction: string, images: ContextImage[]) => void;
+  /** SQEM-371 — a skill is APPLIED like an assistant, not pasted into the composer. */
+  onSkillSelect: (template: Prompt, context: string, images: ContextImage[]) => void;
   initialTemplateId?: string | null;
 }
 
 type Step = 'pick' | 'variables';
 type KindFilter = 'all' | PromptKind;
 
-export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssistantSelect, initialTemplateId }: Props) {
+export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssistantSelect,
+  onSkillSelect, initialTemplateId }: Props) {
   const { prompts, toggleFavorite } = usePrompts();
   const { workspaceFiles } = useData();
 
@@ -82,53 +92,22 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssis
     setStep('variables');
   };
 
-  const isAttachmentType = (mimeType: string) => isImageType(mimeType) || mimeType === 'application/pdf';
-
-  // Images + PDFs → base64 data-URL attachments (delivered to the model as inlineData).
-  const resolveAttachmentFiles = async (fileIds: string[]): Promise<ContextImage[]> => {
-    const attachFiles = workspaceFiles.filter(f => fileIds.includes(f.id) && isAttachmentType(f.mimeType));
-    const results: ContextImage[] = [];
-    await Promise.all(attachFiles.map(async f => {
-      try {
-        const url = await getWorkspaceFileSignedUrl(f.storagePath);
-        const res = await fetch(url);
-        const blob = await res.blob();
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        results.push({ mimeType: f.mimeType, dataUrl, name: f.name });
-      } catch { /* skip files that fail to load */ }
-    }));
-    return results;
-  };
-
-  // Text/code files → raw text blocks (fetched at use time; no extraction pipeline).
-  const resolveFileBlocks = async (fileIds: string[]): Promise<string[]> => {
-    const textFiles = workspaceFiles.filter(f => fileIds.includes(f.id) && !isAttachmentType(f.mimeType));
-    const blocks: string[] = [];
-    await Promise.all(textFiles.map(async f => {
-      try {
-        const url = await getWorkspaceFileSignedUrl(f.storagePath);
-        const res = await fetch(url);
-        const text = await res.text();
-        if (text.trim()) blocks.push(`[Context: ${f.name}]\n${text.trim()}`);
-      } catch { /* skip */ }
-    }));
-    return blocks;
-  };
+  // SQEM-371 — the resolution lives in `lib/templateContext` now: applied context has to be
+  // rebuilt when a SESSION LOADS as well, so it needed a second caller and therefore one home.
+  const resolveAttachmentFiles = (fileIds: string[]) => resolveAttachments(workspaceFiles, fileIds);
+  const resolveFileBlocks = (fileIds: string[]) => resolveBlocks(workspaceFiles, fileIds);
 
   const resolveAndLaunch = async (template: Prompt, variableInputs: Record<string, string>) => {
     setIsResolving(true);
     try {
-      if (template.kind === 'assistant') {
-        const allFileIds = template.contextFileIds ?? [];
-        const fileBlocks = await resolveFileBlocks(allFileIds);
-        const images = await resolveAttachmentFiles(allFileIds);
-        const enrichedParts = [template.systemInstruction, ...fileBlocks].filter(Boolean);
-        onAssistantSelect(template, enrichedParts.join('\n\n'), images);
+      // SQEM-371 — assistant and skill both become system context; only a prompt goes to the
+      // composer. ⛔ Until now there was one branch here and a skill fell through to the prompt
+      // path — while the header chip already announced it as applied. The header was right and the
+      // mechanism was wrong.
+      if (template.kind === 'assistant' || template.kind === 'skill') {
+        const { text, images } = await resolveAppliedContext(template, workspaceFiles);
+        if (template.kind === 'assistant') onAssistantSelect(template, text, images);
+        else onSkillSelect(template, text, images);
         handleClose();
         return;
       }
@@ -385,7 +364,8 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssis
             >
               {isResolving
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing…</>
-                : selected?.kind === 'assistant' ? 'Apply assistant' : 'Insert into chat'
+                : selected?.kind === 'assistant' ? 'Apply assistant'
+                  : selected?.kind === 'skill' ? 'Apply skill' : 'Insert into chat'
               }
             </button>
           </div>

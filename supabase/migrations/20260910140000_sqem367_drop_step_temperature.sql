@@ -1,9 +1,9 @@
 -- SQEM-367 — remove `temperature` from every legacy `steps` entry, in both tables that hold them.
 --
 -- ⛔ Written as an ADDITIVE migration instead of editing `20260313000003_seed_library_templates.sql`,
--- which is where ~90 of these values were written. That file has been on production since March;
--- `AGENTS.md` allows editing a migration only when it has NOT reached production, and editing it
--- would in any case have fixed nothing that is already in a database — it would only have changed
+-- which is where ~90 of these values were written. That file has been on production since March, and
+-- `AGENTS.md` in the source repository allows editing a migration only once it has NOT reached
+-- production. Editing it would in any case have fixed nothing already in a database — only changed
 -- what a fresh install seeds, while leaving every existing row untouched and the history describing
 -- something that never ran.
 --
