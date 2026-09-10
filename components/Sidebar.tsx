@@ -154,12 +154,22 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
   };
 
 
-  const navLinks: { to: string; icon: any; label: string; beta?: boolean; arrow?: boolean }[] = [
+  /**
+   * SQEM-350 — `badge?: string` replaces a `beta?: boolean` that no entry ever set.
+   *
+   * The boolean shipped with a finished badge and no user, so adding a second mechanism beside it
+   * would have left two ways to label a nav item — and two ways drift apart the moment somebody
+   * extends the wrong one.
+   */
+  const navLinks: { to: string; icon: any; label: string; badge?: string; arrow?: boolean }[] = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/templates", icon: FileText, label: "Templates" },
     // SQEM-324 — directly under Templates, because a persona is made of them; anywhere else in
     // this list and the relationship has to be explained instead of seen.
-    { to: "/personas", icon: Users, label: "Personas" },
+    // SQEM-350 — a persona is the one object that only ever acts through MCP: it is maintained here
+    // and invoked nowhere else in the app. Sitting between Templates and Chat, nothing says so, and
+    // the next move is to go looking for it in Chat. The label answers that before it is asked.
+    { to: "/personas", icon: Users, label: "Personas", badge: "MCP only" },
     { to: "/library", icon: Store, label: "Marketplace" },
     { to: "/files", icon: Paperclip, label: "Files" },
     { to: "/chat", icon: MessageSquare, label: "Chat", arrow: true },
@@ -174,7 +184,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
     return true;
   });
 
-  const renderNavItem = (to: string, Icon: any, label: string, beta?: boolean, arrow?: boolean) => {
+  const renderNavItem = (to: string, Icon: any, label: string, badge?: string, arrow?: boolean) => {
     const active = isActive(to);
     return (
       <Link
@@ -198,9 +208,11 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
         {!isCollapsed && (
           <>
             <span className="truncate">{label}</span>
-            {beta && (
-              <span className="ml-auto text-3xs font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">
-                Beta
+            {badge && (
+              // ⚠️ Neutral, not amber. This states where something works, it does not warn — and the
+              // amber the old Beta badge used is the colour this app reserves for caution.
+              <span className="ml-auto text-3xs font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 shrink-0 whitespace-nowrap">
+                {badge}
               </span>
             )}
             {arrow && (
@@ -320,7 +332,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
 
         <div className="flex-1 overflow-y-auto py-2 px-4 space-y-1 overflow-x-hidden scrollbar-thin">
           <div className="mb-6 space-y-1">
-            {visibleNavLinks.map(link => renderNavItem(link.to, link.icon, link.label, link.beta, link.arrow))}
+            {visibleNavLinks.map(link => renderNavItem(link.to, link.icon, link.label, link.badge, link.arrow))}
           </div>
         </div>
 

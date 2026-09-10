@@ -191,17 +191,146 @@ describe('MCP write authorisation (SQEM-336)', () => {
     expect(SRC).toMatch(/if \(requiredCap !== 'read' && !mayWrite\) \{/);
   });
 
-  it('derives the write right from the role, not from the row', () => {
-    // ⛔ No `createdBy` parameter any more. Once a member cannot create, ownership could only ever
+  it('derives the write right from the role, and from nothing else', () => {
+    // ⛔ No `createdBy` parameter (SQEM-341). Once a member cannot create, ownership could only ever
     // be inherited from an earlier role — a grandfathering clause for the demoted, invisible and
     // uncountable. RLS never granted it; this is MCP catching up, not a new rule.
-    expect(SRC).toMatch(/const mayWrite: boolean = !mcpUserId \|\| mcpUserManagesContent;/);
+    //
+    // ⛔ And no `!mcpUserId` disjunct (SQEM-346). That was the workspace-wide key: the last place
+    // where authority hung on a SECRET rather than on a PERSON — and it was reachable by accident,
+    // because `user_id` carried `on delete set null`, so deleting a profile promoted that person's
+    // read-only member key into it.
+    expect(SRC).toMatch(/const mayWrite: boolean = mcpUserManagesContent;/);
     expect(SRC, 'the row-scoped predicate should be gone').not.toMatch(/hasWriteAuthority/);
+    expect(SRC, 'no path may grant write without a role').not.toMatch(/!mcpUserId \|\|/);
   });
 
   it('derives that authority from the role, not from the scope alone', () => {
     expect(SRC).toMatch(/from\('workspace_members'\)[\s\S]{0,200}?\.eq\('user_id', mcpUserId\)/);
-    expect(SRC).toContain("mcpUserRole = (memberRow as { role?: string } | null)?.role ?? null");
+    expect(SRC).toContain("const mcpUserRole: string | null = (memberRow as { role?: string } | null)?.role ?? null");
+  });
+
+  it('does not advertise a write tool to a connection that may not write (SQEM-349)', () => {
+    /**
+     * ⛔ Reported from production: a member ticked *Create* on their own key, `create_template`
+     * showed up in their client, they used it, and `tools/call` refused them. The refusal was
+     * right — advertising the tool was not. A model cannot tell "you may not" from "this is
+     * broken", and neither can the person watching it.
+     *
+     * ⚠️ SQEM-332 was the same disagreement pointing the other way: not offered, not guarded.
+     * Whichever way it points, the advertisement is the silent half.
+     */
+    const src = code(SRC);
+    const filter = src.match(/const visibleTools = tools\.filter\(([\s\S]*?)\n\s*\}\);/);
+    expect(filter, 'the tools/list filter was not found — did it get rewritten?').toBeTruthy();
+    // Scope alone is not enough: the role has to appear in the same predicate.
+    expect(filter![1]).toContain('scopes.includes');
+    expect(filter![1], 'tools/list must consult the role, not only the scope').toContain('mayWrite');
+    // And `read` must survive it — a member whose tools all vanished would be worse than the bug.
+    expect(filter![1], "read must not be gated behind mayWrite").toMatch(/cap === 'read' \|\| mayWrite/);
+  });
+
+  it('refuses a key that belongs to nobody (SQEM-346)', () => {
+    // `user_id` is NOT NULL in the database, so this guard cannot fire. It is pinned precisely
+    // BECAUSE it cannot: a null slipping through would not throw, it would silently restore the
+    // workspace-wide key. A guard whose absence fails open has to be held in place by a test.
+    expect(code(SRC)).toMatch(/const keyUserId: string \| null =[\s\S]{0,120}?if \(!keyUserId\) \{[\s\S]{0,60}?authChallenge\(\)/);
+  });
+
+  it('counts calls without refusing any (SQEM-351)', () => {
+    const src = code(SRC);
+    expect(src, 'calls are not being recorded at all').toContain("rpc('record_mcp_call'");
+
+    // ⛔ **Recording itself must refuse nothing**, and the order matters more than it looks now that
+    // SQEM-352's budget sits right after it: a call the budget turns away is still DEMAND, and it has
+    // to be counted before it is refused. Counting only what got through would measure the limit
+    // instead of the need — and the next calibration would then justify itself with its own effect.
+    //
+    // ⚠️ Bounded to the counting block itself. A looser window reaches into the routing that follows,
+    // where refusals are normal and expected — and a test that fails on correct code next door gets
+    // relaxed rather than read.
+    const block = src.match(/if \(counted\) \{[\s\S]*?\[mcp-metrics\]/);
+    expect(block, 'the counting block was not found — was it restructured?').toBeTruthy();
+    expect(block![0], 'recording must not refuse or short-circuit').not.toMatch(/\breturn\b|rpcError/);
+  });
+
+  it('checks a per-key budget, read and write kept apart (SQEM-352)', () => {
+    const src = code(SRC);
+    expect(src).toContain("rpc('check_mcp_rate_limit'");
+    // ⭐ Per KEY, not per workspace. A workspace-wide limit lets one runaway client throttle the
+    // whole team — the attacker then causes exactly the damage the limit exists to prevent, to the
+    // wrong people.
+    expect(src).toMatch(/check_mcp_rate_limit'[\s\S]{0,160}?p_key_id: keyId/);
+    // Two budgets, because an agent reads constantly and writes rarely; one shared number has to be
+    // set for the loud case and is then useless for the expensive one.
+    expect(src).toMatch(/MCP_READ_RPM/);
+    expect(src).toMatch(/MCP_WRITE_RPM/);
+    expect(src).toMatch(/kind === 'read' \? MCP_READ_RPM : MCP_WRITE_RPM/);
+  });
+
+  it('fails open when the budget check itself is broken (SQEM-352)', () => {
+    // ⛔ A limiter that locks people out when IT is unhealthy is worse than what it protects against.
+    // This is the same decision as the older helper — and the same trap: SQEM-335 failed open for
+    // seven months without anyone noticing. Visibility is handled by the migration's self-test, not
+    // by making this fail closed.
+    const src = code(SRC);
+    const block = src.match(/check_mcp_rate_limit'[\s\S]*?\[mcp-rate\] check threw/);
+    expect(block, 'the budget block was not found — was it restructured?').toBeTruthy();
+    expect(block![0], 'a broken budget check must not refuse the caller').toMatch(/budgetErr[\s\S]{0,200}?console\.error/);
+    // The refusal must be reachable only on an explicit `false`, never on an error or on undefined.
+    expect(block![0]).toMatch(/withinBudget === false/);
+  });
+
+  it('tells the client what ran out and when it returns (SQEM-352)', () => {
+    // A refusal a model cannot act on leaves it two options: give up, or hammer. Hammering is the
+    // behaviour the limit exists to stop, so a bare error would make the limit self-defeating.
+    const src = code(SRC);
+    expect(src).toMatch(/Rate limit reached[\s\S]{0,200}?resets within 60 seconds/);
+    expect(src, 'the message should say the limit is per connection').toMatch(/per connection/);
+  });
+
+  it('does not count the handshake, and takes the capability from the map (SQEM-351)', () => {
+    const src = code(SRC);
+    // `initialize`/`ping` are emitted on the client's own schedule and would swamp the signal.
+    //
+    // ⛔ Anchored to the counting guard itself, immediately followed by `const counted`. The first
+    // version of this test matched loosely and passed while the guard was weakened — because the
+    // PAYWALL gate a few lines above tests the same two methods, and the loose match found that one
+    // instead. Caught by mutation, not by reading. **A test that can match the wrong occurrence of a
+    // condition is not testing the condition.**
+    expect(src, 'the counting guard must skip the handshake').toMatch(
+      /if \(method !== 'initialize' && method !== 'ping'\) \{\s*const counted/,
+    );
+    // ⚠️ The capability is read from TOOL_CAPABILITY, never re-derived — a second copy of that
+    // mapping is what SQEM-332 and SQEM-349 each cost.
+    expect(src).toMatch(/TOOL_CAPABILITY\[[\s\S]{0,80}?\][\s\S]{0,200}?record_mcp_call/);
+  });
+
+  it('stops answering after 90 days of silence (SQEM-348)', () => {
+    const src = code(SRC);
+    expect(src).toMatch(/IDLE_LIMIT_MS = 90 \* 24 \* 60 \* 60 \* 1000/);
+    // ⚠️ The fallback matters as much as the limit: a key issued and never used has a null
+    // `last_used_at`, and reading that as "unknown, let it through" would exempt exactly the
+    // connections nobody is watching.
+    expect(src).toMatch(/last_used_at[\s\S]{0,160}?\?\?[\s\S]{0,80}?created_at/);
+    expect(src).toMatch(/Date\.now\(\) - new Date\(lastSeen\)\.getTime\(\) > IDLE_LIMIT_MS/);
+  });
+
+  it('reads freshness BEFORE stamping it', () => {
+    // The handler updates `last_used_at` on every call. If the idle check ran after that write,
+    // every key would look used a millisecond ago and the limit above would never bite.
+    const src = code(SRC);
+    expect(src.indexOf('IDLE_LIMIT_MS')).toBeGreaterThan(-1);
+    expect(src.indexOf('IDLE_LIMIT_MS')).toBeLessThan(src.indexOf("update({ last_used_at:"));
+  });
+
+  it('has no visibility branch for a connection without a user (SQEM-346)', () => {
+    // Both `else` branches (SQEM-210 templates, SQEM-324 personas) served the workspace-wide key.
+    // With that key gone the question has one answer, and a surviving branch would be a second,
+    // laxer definition of "what may this connection see".
+    const src = code(SRC);
+    expect(src).not.toMatch(/canAccessTemplate = \(templateId: string\) => !restricted\.has/);
+    expect(src).not.toMatch(/canAccessPersona = \(personaId: string\) => !restrictedPersonas\.has/);
   });
 
   it('counts editors, not admins alone', () => {

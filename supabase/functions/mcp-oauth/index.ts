@@ -111,6 +111,29 @@ Deno.serve(async (req) => {
     let body: any = {};
     try { body = await req.json(); } catch { /* body is optional */ }
     const clientId = randomHex(16);
+
+    /**
+     * SQEM-348 — **keep the registration.**
+     *
+     * Until now this endpoint minted an id and forgot everything, which made the response formally
+     * correct and practically worthless: `client_name`, the one thing a client tells us about
+     * itself, was discarded in the same breath. The consequence was visible in the Integrations
+     * list — every connection called "Claude Desktop", because that string was the hardcoded
+     * default on the consent screen and nobody retypes it.
+     *
+     * ⚠️ Best-effort by design: a failed write must not fail the registration. The id we return
+     * still works for the whole OAuth flow — the only thing lost is a nicer name in a list, and
+     * refusing to register somebody over that would be the wrong trade.
+     */
+    const clientName = typeof body.client_name === 'string' ? body.client_name.trim().slice(0, 80) : null;
+    try {
+      await createAdminClient().from('mcp_oauth_clients').insert({
+        client_id:     clientId,
+        client_name:   clientName || null,
+        redirect_uris: Array.isArray(body.redirect_uris) ? body.redirect_uris : null,
+      });
+    } catch { /* see above — the flow does not depend on this row */ }
+
     return json({
       client_id: clientId,
       client_id_issued_at: Math.floor(Date.now() / 1000),
@@ -128,6 +151,29 @@ Deno.serve(async (req) => {
   if (req.method === 'GET' && path === '/authorize') {
     const dest = new URL(`${APP_URL}/oauth/authorize`);
     url.searchParams.forEach((v, k) => dest.searchParams.set(k, v));
+
+    /**
+     * SQEM-348 — hand the registered client name to the consent screen, so its name field can be
+     * prefilled with what the client calls itself instead of "Claude Desktop" for everybody.
+     *
+     * ⛔ Resolved HERE and not on the page: the page runs in the browser with the publishable key,
+     * and `mcp_oauth_clients` is closed to it (RLS on, no policies). Exposing the table to make the
+     * lookup client-side would turn a display convenience into a readable list of every
+     * registration.
+     */
+    const cid = url.searchParams.get('client_id');
+    if (cid) {
+      try {
+        const { data: reg } = await createAdminClient()
+          .from('mcp_oauth_clients')
+          .select('client_name')
+          .eq('client_id', cid)
+          .maybeSingle();
+        const registered = (reg as { client_name?: string | null } | null)?.client_name;
+        if (registered) dest.searchParams.set('client_name', registered);
+      } catch { /* a missing name costs a nicer default, nothing more */ }
+    }
+
     return new Response(null, {
       status: 302,
       headers: { ...CORS, Location: dest.toString() },
@@ -245,12 +291,34 @@ Deno.serve(async (req) => {
       // Integrations tab via the admin/editor RLS policy — SQEM-068).
       const { data: connKey } = await admin
         .from('sqemes_api_keys')
-        .select('connection_expires_at')
+        .select('connection_expires_at, last_used_at, created_at')
         .eq('id', rt.key_id)
         .single();
       const connectionLifetime: string | null = connKey?.connection_expires_at ?? null;
       if (connectionLifetime && new Date(connectionLifetime) < new Date()) {
         return json({ error: 'invalid_grant', error_description: 'Connection expired; re-authorize' }, 400);
+      }
+
+      /**
+       * SQEM-348 — **90 days without a single call and the connection stops refreshing.**
+       *
+       * ⛔ This has to live here as well as in `mcp-server`, and the reason is the whole point of the
+       * ticket. `mcp-server` refuses the *access* token; without this, the client would simply mint a
+       * fresh one and carry on. A connection that has not been used in three months would renew
+       * itself indefinitely — which is exactly the state a user creates by disconnecting the server
+       * in their client, an act that tells us nothing.
+       *
+       * ⚠️ `last_used_at` is stamped by `mcp-server`, not here. Refreshing is therefore NOT "use":
+       * a client that only ever renews its token never resets the clock, which is the behaviour we
+       * want and is easy to break by adding a convenience write.
+       */
+      const IDLE_LIMIT_MS = 90 * 24 * 60 * 60 * 1000;
+      const lastSeen: string | null = connKey?.last_used_at ?? connKey?.created_at ?? null;
+      if (lastSeen && Date.now() - new Date(lastSeen).getTime() > IDLE_LIMIT_MS) {
+        return json({
+          error: 'invalid_grant',
+          error_description: 'Connection unused for 90 days; re-authorize',
+        }, 400);
       }
 
       // Rotate: invalidate the presented token.
@@ -368,6 +436,9 @@ Deno.serve(async (req) => {
       connection_expires_at: connectionExpiresAt,  // displayed connection lifetime (Integrations tab)
       is_oauth:              true,                 // distinguishes OAuth connections in the UI
       user_id:               authCode.user_id,     // SQEM-142 — enables per-user template access filtering
+      // SQEM-348 — which registration this connection came from. `mcp_auth_codes` has carried
+      // `client_id` through the flow since SQEM-064; it simply never arrived on the target row.
+      client_id:             authCode.client_id ?? null,
     }).select('id').single();
 
     if (keyErr || !keyRow) {

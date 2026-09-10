@@ -450,8 +450,37 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.11.8        # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.11.9        # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
+
+### ⛔ 3a. Before v1.11.9: count your workspace-wide MCP keys
+
+**v1.11.9 makes every MCP key belong to exactly one person, and its migration deletes the ones that
+belong to nobody.** Those keys are gone permanently, and anything running on one stops working the
+moment you update — with no error you would see coming, because the automation simply starts getting
+refused.
+
+Run this **before** you update:
+
+```sql
+select id, name, key_prefix, last_used_at
+from public.sqemes_api_keys
+where user_id is null;
+```
+
+Nothing returned: update normally. Anything returned: create a replacement key **bound to a person**
+(Settings → MCP), put it into whatever uses the old one, and only then update.
+
+⚠️ **The replacement sees more than the old key did.** A workspace-wide key could only reach objects
+with no access rules at all; a key bound to somebody reaches everything that person reaches. If that
+is wider than you want, bind it to an account with narrower access rather than to an admin.
+
+⚠️ **Two other changes in v1.11.9 you will notice.** A **member** can no longer create, update or
+delete over MCP — that is the rule row-level security has always enforced in the web app, and MCP
+simply never asked. And **`RATE_LIMIT_RPM` starts working**: it did nothing at all between February
+and September 2026 (a function parameter shadowed a column, so the check threw on every call and was
+skipped). If you set that value low back when you believed it applied, you are about to get the
+effect you originally asked for.
 
 ### 3. Check for new env vars
 
@@ -461,6 +490,12 @@ own `.env` **before** rebuilding:
 ```bash
 git diff <old-tag> <new-tag> -- selfhost/.env.example
 ```
+
+**New in v1.11.9:** `MCP_READ_RPM` (default 600) and `MCP_WRITE_RPM` (default 120) — per-connection
+MCP budgets, per minute, read and write kept apart. ⚠️ They are **ceilings against a runaway client,
+not tuned budgets**: ten calls a second sustained across a minute is a loop, not somebody working,
+and that is all they are set to catch. Lower them if you know your own traffic; there is no reason to
+raise them.
 
 ### 4. Apply the update
 

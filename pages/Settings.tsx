@@ -11,6 +11,11 @@ import { BrandProfileForm, brandFormFromProfile, type BrandFormValue } from '../
 import { TemplateAccessControl, workspaceDefaultToValue, valueToWorkspaceDefault } from '../components/TemplateAccessControl';
 import { supabase } from '../lib/supabase';
 import { saveApiKey, deleteApiKey, getApiKeyStatus } from '../lib/api/apiKeys';
+import {
+  countRestrictedContentForMember,
+  handoverContentFromMember,
+  releaseRestrictedContent,
+} from '../lib/api/members';
 import { mcpKeyExpiry, isMcpKeyExpired } from '../lib/mcpKeys';
 import { ProviderIcon } from '../components/ProviderIcon';
 import McpIcon from '../components/McpIcon';
@@ -27,7 +32,8 @@ import { buildAccountExport, accountExportFilename } from '../lib/accountExport'
 import { downloadBlob } from '../lib/templateBundle';
 import {
   ApiKeyScopeFields,
-  DEFAULT_KEY_SCOPE,
+  defaultScopeFor,
+  clampScopeToAuthority,
   scopeArrayFromValue,
   expiresAtFromValue,
   valueFromKey,
@@ -234,11 +240,23 @@ const Settings = () => {
   const [sqemesApiKeysLoaded, setSqemesApiKeysLoaded] = useState(false);
   const [showGenerateKeyModal, setShowGenerateKeyModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
-  const [newKeyScope, setNewKeyScope] = useState<KeyScopeValue>(DEFAULT_KEY_SCOPE);
+  /**
+   * SQEM-349 — may this person grant write scopes on a connection at all?
+   *
+   * ⛔ Deliberately `prompts:edit` and not a new action. It already means "may change content" and is
+   * exactly `admin || editor` — the same predicate `mcp-server` derives its `mayWrite` from. A second,
+   * nearly-identical action is how two definitions of one rule start drifting apart.
+   *
+   * ⚠️ Declared ABOVE the scope state on purpose (SQEM-353). The initial value of that state used to
+   * be the unclamped default, which was harmless only because the one button that opens the dialog
+   * happens to reset it first. That is a property of a call site, not of the code — and a second
+   * entry point would silently bring the ticked-but-unusable boxes back.
+   */
+  const canWriteContent = can(currentUser, workspace, 'prompts:edit');
+
+  const [newKeyScope, setNewKeyScope] = useState<KeyScopeValue>(defaultScopeFor(canWriteContent));
   // SQEM-143 — new keys are bound to their creator by default (the key only exposes templates
   // the creator may access). Admins can opt into a workspace-wide key (all templates).
-  const [newKeyBindToMe, setNewKeyBindToMe] = useState(true);
-  const isWorkspaceAdmin = currentUser.role === 'admin';
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
   const [generatedKeyValue, setGeneratedKeyValue] = useState<string | null>(null);
   const [deletingKeyId, setDeletingKeyId] = useState<string | null>(null);
@@ -267,7 +285,7 @@ const Settings = () => {
   // Editing scope/expiry of an existing connection (no re-issue).
   const [editingKey, setEditingKey] = useState<SqemesApiKey | null>(null);
   const [editKeyName, setEditKeyName] = useState('');
-  const [editKeyScope, setEditKeyScope] = useState<KeyScopeValue>(DEFAULT_KEY_SCOPE);
+  const [editKeyScope, setEditKeyScope] = useState<KeyScopeValue>(defaultScopeFor(canWriteContent));
   const [isSavingScope, setIsSavingScope] = useState(false);
 
   const loadSqemesApiKeys = async () => {
@@ -291,17 +309,24 @@ const Settings = () => {
       const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
       const keyHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-      // SQEM-143 — bind the key to its creator (default) so mcp-server filters templates to
-      // that user's access; admins may leave it workspace-wide (user_id null). Non-admins are
-      // always bound to themselves (a workspace-wide key would bypass template access control).
+      // SQEM-143 → 346 — the key is bound to its creator, always. `mcp-server` filters templates to
+      // that person's access, and since SQEM-346 there is no other kind: `user_id` is NOT NULL and
+      // the workspace-wide option is gone. It was the last place where authority hung on a secret
+      // instead of a person, and `on delete set null` meant a member's read-only key could fall into
+      // it by having its profile deleted.
       const { error } = await supabase.from('sqemes_api_keys').insert({
         workspace_id: workspace.id,
         name: newKeyName.trim(),
         key_hash: keyHash,
         key_prefix: keyPrefix,
-        scopes: scopeArrayFromValue(newKeyScope),
+        // SQEM-353 — clamped, not trusted. The checkboxes are disabled for a member, but a disabled
+        // checkbox prevents the click and not the value: the default carried create+update, so a
+        // member's key was written with scopes they can never use. ⚠️ Kept here as well as in the
+        // form's starting value, because the UI is never the boundary — the same reason SQEM-349's
+        // real fix sat in the server rather than in this dialog.
+        scopes: scopeArrayFromValue(clampScopeToAuthority(newKeyScope, canWriteContent)),
         expires_at: expiresAtFromValue(newKeyScope),
-        user_id: newKeyBindToMe || !isWorkspaceAdmin ? currentUser.id : null,
+        user_id: currentUser.id,
       });
 
       if (error) throw error;
@@ -309,7 +334,7 @@ const Settings = () => {
       setGeneratedKeyValue(key);
       setShowGenerateKeyModal(false);
       setNewKeyName('');
-      setNewKeyScope(DEFAULT_KEY_SCOPE);
+      setNewKeyScope(defaultScopeFor(canWriteContent));
       await loadSqemesApiKeys();
     } catch (err: any) {
       // SQEM-293 — a denied insert surfaces as "new row violates row-level security policy for table
@@ -361,7 +386,12 @@ const Settings = () => {
     // (managed by the OAuth flow), not editable here — only name + scopes update in place.
     const updates: Record<string, unknown> = {
       name: trimmedName,
-      scopes: scopeArrayFromValue(editKeyScope),
+      // SQEM-353 — clamped on save as well. ⚠️ An existing key that carries write scopes from a time
+      // when its owner was an editor keeps SHOWING them (the row really does hold them), but they
+      // fall away the next time a member saves it. That is the honest direction: a scope beyond the
+      // role is inert, and letting it quietly persist is how it becomes live again on a promotion
+      // without anyone ever having chosen it.
+      scopes: scopeArrayFromValue(clampScopeToAuthority(editKeyScope, canWriteContent)),
     };
     if (editingKey.is_oauth) {
       // OAuth: the lifetime is connection_expires_at (the refresh grant reads it); expires_at
@@ -443,6 +473,83 @@ const Settings = () => {
   const currentPlan = PLANS[workspace.plan];
   const hasActiveSub = hasActiveSubscription(workspace);
   const memberLimit = currentPlan.users;
+  /**
+   * SQEM-343 — a demotion to `member` is not a one-click change any more.
+   *
+   * ⛔ Since SQEM-341 the write policies require visibility, and two individually sensible rules then
+   * combine into a dead object: the demoted creator still SEES their restricted template (the creator
+   * branch) but may no longer write; editors and admins may write but do not see it (SQEM-292). Nobody
+   * can edit it.
+   *
+   * So the admin is asked, with the number in front of them, and picks one of three named ways. ⚠️
+   * "Leave as is" is a legitimate outcome — the person is still here and can ask — but it must be
+   * chosen, not defaulted into. On DEPARTURE the same situation fires a trigger with no question,
+   * because there is nobody left to ask.
+   */
+  type DemoteChoice = 'handover' | 'release' | 'leave';
+  const [demoteTarget, setDemoteTarget] = useState<
+    { id: string; name: string; templates: number; personas: number } | null
+  >(null);
+  const [demoteChoice, setDemoteChoice] = useState<DemoteChoice | null>(null);
+  const [isDemoting, setIsDemoting] = useState(false);
+
+  const handleRoleChange = async (member: { id: string; name: string; role: UserRole }, next: UserRole) => {
+    // Only a step DOWN to member can strand anything. admin → editor changes nothing: both still write.
+    if (next !== 'member' || member.role === 'member') {
+      updateMemberRole(member.id, next);
+      return;
+    }
+    try {
+      const counts = await countRestrictedContentForMember(workspace.id, member.id);
+      if (counts.templates === 0 && counts.personas === 0) {
+        updateMemberRole(member.id, next);
+        return;
+      }
+      setDemoteChoice(null);
+      setDemoteTarget({ id: member.id, name: member.name, ...counts });
+    } catch (err: any) {
+      // ⚠️ Demote anyway rather than blocking on a failed count: a role change the admin asked for is
+      // not something to refuse because a follow-up question could not be prepared. Say so, though.
+      showToast(err?.message || 'Could not check this member\'s restricted content — demoting anyway', 'error');
+      updateMemberRole(member.id, next);
+    }
+  };
+
+  const confirmDemotion = async () => {
+    if (!demoteTarget || !demoteChoice) return;
+    setIsDemoting(true);
+    try {
+      // ⛔ The custody move runs FIRST, while the person is still an editor. Reversed, there is a
+      // window in which they are a member and the objects are already unreachable for everyone.
+      if (demoteChoice === 'handover') await handoverContentFromMember(workspace.id, demoteTarget.id);
+      if (demoteChoice === 'release')  await releaseRestrictedContent(workspace.id, demoteTarget.id);
+      updateMemberRole(demoteTarget.id, 'member');
+      setDemoteTarget(null);
+    } catch (err: any) {
+      showToast(err?.message || 'Could not apply that choice — the role is unchanged', 'error');
+    } finally {
+      setIsDemoting(false);
+    }
+  };
+
+  /**
+   * SQEM-348 — how close a connection is to the 90-day idle cut-off (SQEM-346).
+   *
+   * ⛔ The rule already ships and refuses silently: `mcp-server` stops answering and the refresh
+   * grant stops renewing. Nothing tells the owner beforehand, so a connection someone still needs
+   * dies on a Tuesday for no visible reason. This is the warning that makes the rule fair.
+   *
+   * ⚠️ Counts from `last_used_at`, falling back to `created_at` — exactly what the server does. A
+   * different clock here would be worse than no badge: it would say "fine" about a key already
+   * being refused.
+   */
+  const IDLE_LIMIT_DAYS = 90;
+  const idleDays = (k: SqemesApiKey): number => {
+    const since = k.last_used_at ?? k.created_at;
+    if (!since) return 0;
+    return Math.floor((Date.now() - new Date(since).getTime()) / 86_400_000);
+  };
+
   const memberCount = workspace.members.length;
   // SQEM-119 — self-host has no subscription model: unlimited seats + all features (like managed).
   const isLimitReached = !workspace.isManaged && !IS_SELF_HOSTED && memberCount >= memberLimit;
@@ -1186,7 +1293,7 @@ const Settings = () => {
                             <select
                               className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold uppercase tracking-wider rounded-lg py-1.5 px-3 outline-none focus:border-brand-500 cursor-pointer hover:border-slate-300 dark:hover:border-slate-500 transition-colors"
                               value={member.role}
-                              onChange={(e) => updateMemberRole(member.id, e.target.value as UserRole)}
+                              onChange={(e) => handleRoleChange(member, e.target.value as UserRole)}
                               disabled={member.id === currentUser.id}
                             >
                               <option value="admin">Admin</option>
@@ -1633,7 +1740,7 @@ const Settings = () => {
                     </p>
                   </div>
                   <button
-                    onClick={() => { setNewKeyName(''); setNewKeyScope(DEFAULT_KEY_SCOPE); setNewKeyBindToMe(true); setShowGenerateKeyModal(true); }}
+                    onClick={() => { setNewKeyName(''); setNewKeyScope(defaultScopeFor(canWriteContent)); setShowGenerateKeyModal(true); }}
                     disabled={!hasMcpAccess}
                     title={!hasMcpAccess ? 'Upgrade to Team or Business to generate MCP keys' : undefined}
                     className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
@@ -1693,6 +1800,13 @@ const Settings = () => {
                           <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                             {k.last_used_at ? `Last used ${new Date(k.last_used_at).toLocaleDateString()}` : 'Never used'}
                           </p>
+                          {idleDays(k) >= 60 && (
+                            <p className={`text-2xs font-bold mt-0.5 ${idleDays(k) >= IDLE_LIMIT_DAYS ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                              {idleDays(k) >= IDLE_LIMIT_DAYS
+                                ? 'Idle — stopped working'
+                                : `Idle ${idleDays(k)} days — stops at ${IDLE_LIMIT_DAYS}`}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           <button
@@ -1905,6 +2019,73 @@ const Settings = () => {
       </div>
 
       {/* Invite Modal */}
+      {/* SQEM-343 — demoting to member, when it would strand something. */}
+      <Modal open={!!demoteTarget} onClose={() => !isDemoting && setDemoteTarget(null)} size="md" className="p-6">
+        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
+          Make {demoteTarget?.name} a member?
+        </h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
+          Members can use the library but not change it. {demoteTarget?.name} has{' '}
+          <span className="font-semibold text-slate-700 dark:text-slate-200">
+            {demoteTarget?.templates ?? 0} restricted template{(demoteTarget?.templates ?? 0) === 1 ? '' : 's'}
+            {(demoteTarget?.personas ?? 0) > 0
+              ? ` and ${demoteTarget?.personas} restricted persona${demoteTarget?.personas === 1 ? '' : 's'}`
+              : ''}
+          </span>
+          . After the change nobody will be able to edit {(demoteTarget?.templates ?? 0) + (demoteTarget?.personas ?? 0) === 1 ? 'it' : 'them'} —
+          they can see {(demoteTarget?.templates ?? 0) + (demoteTarget?.personas ?? 0) === 1 ? 'it' : 'them'} but not write, and editors can write but not see.
+        </p>
+
+        <div className="space-y-2 mb-5">
+          {([
+            {
+              key: 'handover' as const,
+              title: 'Hand over custody',
+              body: `Gives them to the longest-standing admin, the same way as when someone leaves. ${demoteTarget?.name} loses sight of their own work — and their uploaded files change custody too, though everyone can already see those.`,
+            },
+            {
+              key: 'release' as const,
+              title: 'Release them',
+              body: 'Drops the "only me" marker, so the workspace can see and edit them. This breaks a promise to someone who is still here.',
+            },
+            {
+              key: 'leave' as const,
+              title: 'Leave as is',
+              body: `${demoteTarget?.name} keeps seeing them and nobody can edit them, including ${demoteTarget?.name}. Fine for now — you can hand them over later.`,
+            },
+          ]).map(opt => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => setDemoteChoice(opt.key)}
+              className={`w-full px-3 py-2.5 rounded-xl border text-sm text-left transition-all ${demoteChoice === opt.key ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-slate-900 dark:text-slate-100' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+            >
+              <span className="font-semibold block">{opt.title}</span>
+              <span className="block text-xs text-slate-400 dark:text-slate-500 mt-0.5">{opt.body}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => setDemoteTarget(null)}
+            disabled={isDemoting}
+            className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          {/* ⛔ Disabled until a choice is made. No preselection: "leave as is" is the cheapest to
+              click and the one that quietly builds the dead end, so it must be picked deliberately. */}
+          <button
+            onClick={confirmDemotion}
+            disabled={!demoteChoice || isDemoting}
+            className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDemoting ? 'Applying...' : 'Make member'}
+          </button>
+        </div>
+      </Modal>
+
       <Modal open={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} size="md" className="p-6 md:p-8">
         <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6">Invite Team Member</h3>
         <form onSubmit={handleInvite} className="space-y-5">
@@ -1955,39 +2136,15 @@ const Settings = () => {
           autoFocus
         />
         <div className="mb-5">
-          <ApiKeyScopeFields value={newKeyScope} onChange={setNewKeyScope} />
+          <ApiKeyScopeFields value={newKeyScope} onChange={setNewKeyScope} canWrite={canWriteContent} />
         </div>
-        {/* SQEM-143 — template access this key exposes over MCP. */}
+        {/* SQEM-143 → 346 — a key carries its creator's access, and there is no other option.
+            The two-way picker that stood here offered admins "Whole workspace"; that key is gone.
+            ⚠️ Its own label was already wrong — it promised "every template, ignoring per-template
+            restrictions", which stopped being true with SQEM-210 three months before it was removed. */}
         <div className="mb-5">
           <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Template access</label>
-          {isWorkspaceAdmin ? (
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => setNewKeyBindToMe(true)}
-                className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl border text-sm text-left transition-all ${newKeyBindToMe ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-slate-900 dark:text-slate-100' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
-              >
-                <User className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
-                  <span className="font-semibold">My access</span>
-                  <span className="block text-xs text-slate-400">Only templates you can access</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setNewKeyBindToMe(false)}
-                className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl border text-sm text-left transition-all ${!newKeyBindToMe ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-slate-900 dark:text-slate-100' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
-              >
-                <Users className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
-                  <span className="font-semibold">Whole workspace</span>
-                  <span className="block text-xs text-slate-400">Every template, ignoring per-template restrictions</span>
-                </span>
-              </button>
-            </div>
-          ) : (
-            <p className="text-xs text-slate-400 dark:text-slate-500">This key inherits your template access — it can only reach templates you can access.</p>
-          )}
+          <p className="text-xs text-slate-400 dark:text-slate-500">This key inherits your template access — it can only reach templates you can access, and it is removed if you leave the workspace.</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowGenerateKeyModal(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
@@ -2013,7 +2170,7 @@ const Settings = () => {
           placeholder="e.g. Production, Zapier, n8n"
           className="w-full p-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all mb-5 placeholder:text-slate-400 dark:placeholder:text-slate-500"
         />
-        <ApiKeyScopeFields value={editKeyScope} onChange={setEditKeyScope} />
+        <ApiKeyScopeFields value={editKeyScope} onChange={setEditKeyScope} canWrite={canWriteContent} />
         <div className="flex gap-2 mt-6">
           <button onClick={() => setEditingKey(null)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
           <button

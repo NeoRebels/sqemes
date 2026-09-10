@@ -7,6 +7,7 @@
 // voterKey must be 64-hex, per-voterKey + per-IP rate limit. Toggle handled server-side (re-casting the
 // same value clears the vote), mirroring the Cloud voteListing behaviour.
 import { createAdminClient } from '../_shared/supabase-admin.ts';
+import { checkRateLimit } from '../_shared/rateLimit.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -44,13 +45,27 @@ Deno.serve(async (req) => {
     if (value !== 1 && value !== -1) return json({ error: 'value must be 1 or -1' }, 400);
     if (!listingId || typeof listingId !== 'string') return json({ error: 'listingId required' }, 400);
 
-    // Rate limit per voter_key and per IP (uses the shared rate_limit_counters via a namespaced UUID).
+    /**
+     * Rate limit per voter_key and per IP, through the shared `rate_limit_counters` via a namespaced
+     * UUID.
+     *
+     * ⛔ **This used to call the RPC directly, and it was broken from February to September 2026**
+     * for the same reason as every other caller (SQEM-335: a parameter named like a column made the
+     * function throw on every call). Worse than elsewhere: it destructured only `{ data: ok }`, so
+     * the error was discarded, `ok` was `undefined`, `ok === false` was false — and the request went
+     * through **without even a log line**. On a public endpoint, which is the one place a limit is
+     * aimed at strangers rather than at colleagues.
+     *
+     * ⚠️ It goes through `checkRateLimit` now. Not tidiness: a second copy of the RPC's argument
+     * names is a second thing to get wrong, and it is exactly what kept this call site out of view
+     * when the shared helper was being looked at.
+     */
     const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown';
-    const windowKey = Math.floor(Date.now() / 60000);
     for (const seed of [`vote:${voterKey}`, `voteip:${ip}`]) {
       const nsId = await uuidFromSeed(seed);
-      const { data: ok } = await admin.rpc('check_and_increment_rate_limit', { ws_id: nsId, window_key: windowKey, rate_limit: RATE_PER_MIN });
-      if (ok === false) return json({ error: 'Rate limit reached — try again shortly' }, 429);
+      if (!(await checkRateLimit(nsId, RATE_PER_MIN))) {
+        return json({ error: 'Rate limit reached — try again shortly' }, 429);
+      }
     }
 
     // Only published listings are votable.

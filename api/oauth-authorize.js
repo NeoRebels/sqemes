@@ -143,6 +143,32 @@ h1{font-family:'DM Sans',sans-serif;font-weight:700;font-size:22px;line-height:2
 var SUPA='${supabaseUrl}',KEY='${anonKey}',BASE='${oauthBase}';
 var sp=new URLSearchParams(location.search);
 var RU=sp.get('redirect_uri')||'',CC=sp.get('code_challenge')||'',CCM=sp.get('code_challenge_method')||'S256',ST=sp.get('state')||'',CID=sp.get('client_id')||'';
+// SQEM-348 — prefill with the name the client registered for itself. The old hardcoded default was
+// the actual reason every connection in the Integrations list read "Claude Desktop": nobody retypes
+// a field that already looks filled in.
+// ⛔ Assigned through .value, never into the markup. client_name is self-asserted at registration and
+// therefore attacker-controlled — the same rule as the workspace name above (SQEM-019).
+var CN=(sp.get('client_name')||'').trim();
+
+// SQEM-348 — the default connection name is "<person> – <client>".
+//
+// Two separate corrections, and both were the same mistake in different places: the field was
+// prefilled with a constant, so it read the same for every client AND for every person. The client
+// half comes from the RFC 7591 registration (client_name); the person half is added here because an
+// Integrations list is read by admins looking for WHOSE connection something is.
+//
+// ⛔ Set through .value, never into the markup. Both halves are attacker-influenced — client_name is
+// self-asserted at registration, the profile name is user-editable — so the same rule applies as to
+// the workspace name below (SQEM-019).
+function setDefaultConnName(person){
+  var el=document.getElementById('sc-name');
+  if(!el)return;
+  var client=CN||'Claude Desktop';
+  // ⚠️ maxlength is 60. Trim the PERSON, never the client: a truncated client name reads like a
+  // different product, a truncated first name still identifies the right human.
+  var name=person?(person.slice(0,28)+' – '+client):client;
+  el.value=name.slice(0,60);
+}
 var tok=null,wsId=null;
 
 function show(id){['s-loading','s-approve','s-signin'].forEach(function(s){document.getElementById(s).classList.toggle('hidden',s!==id)});}
@@ -188,6 +214,19 @@ async function init(){
   var email=(s.user&&s.user.email)||(payload&&payload.email)||'';
   if(email){document.getElementById('user-email').textContent=email;document.getElementById('user-row').classList.remove('hidden');}
   var uid=(s.user&&s.user.id)||(payload&&payload.sub)||'';
+
+  // The profile name is what the app shows everywhere else, so it is what belongs here. ⚠️ Never
+  // block on it: a failed lookup costs a nicer default and nothing else, and the local part of the
+  // email still identifies the person well enough to be useful.
+  var person='';
+  try{
+    var pr=await fetch(SUPA+'/rest/v1/profiles?select=name&id=eq.'+uid,{headers:{'Authorization':'Bearer '+tok,'apikey':KEY}});
+    var pj=await pr.json();
+    if(Array.isArray(pj)&&pj[0]&&pj[0].name)person=String(pj[0].name).trim();
+  }catch(e){}
+  if(!person&&email)person=email.split('@')[0];
+  setDefaultConnName(person);
+
   try{
     var mr=await fetch(SUPA+'/rest/v1/workspace_members?select=workspace_id&user_id=eq.'+uid,{headers:{'Authorization':'Bearer '+tok,'apikey':KEY}});
     var ms=await mr.json();

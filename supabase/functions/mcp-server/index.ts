@@ -54,6 +54,16 @@ function authChallenge(): Response {
 // Each tool/read-method requires a capability; a connection grants a subset.
 type Capability = 'read' | 'create' | 'update' | 'delete';
 const FULL_SCOPES: Capability[] = ['read', 'create', 'update', 'delete'];
+/**
+ * SQEM-352 — per-connection ceilings, one-minute windows.
+ *
+ * ⛔ **Not calibrated.** See the note at the check itself: these guard against a runaway loop, not
+ * against a heavy user, and they are meant to be tightened once SQEM-351 has measured what a real
+ * working minute looks like. Env-configurable so that tightening needs no migration.
+ */
+const MCP_READ_RPM  = parseInt(Deno.env.get('MCP_READ_RPM')  || '600', 10);
+const MCP_WRITE_RPM = parseInt(Deno.env.get('MCP_WRITE_RPM') || '120', 10);
+
 const TOOL_CAPABILITY: Record<string, Capability> = {
   list_templates:    'read',
   search_templates:  'read',
@@ -183,10 +193,10 @@ const SKILL_UPLOAD_CONCURRENCY = 8;
  * invisible to EVERYONE including its owner, recoverable only by SQL. Measured on production
  * 2026-08-17: 47 of 82 templates had no owner, 24 of 29 skills.
  *
- * Without an authorizing user we set neither. Decided with the product owner (2026-08-17): **a
- * workspace API key creates "everyone" templates only, and reads only "everyone".** It cannot express
- * "only me" because there is no "me" — and seeding a restriction here would manufacture exactly the
- * unreachable row described above. The tool descriptions say so.
+ * ⛔ **The "without an authorizing user" case is gone (SQEM-346).** It used to matter a great deal:
+ * a workspace API key had no "me", so it created "everyone" templates only — seeding a restriction
+ * for a caller with no identity would have manufactured exactly the unreachable row described above.
+ * Every key is a person's now, so there is always an owner to write and always a "me" to restrict to.
  *
  * SQEM-248 — shared by `create_template` and `import_skill_from_url` rather than copied. A second
  * copy of this rule is how the first one came to be missing.
@@ -194,9 +204,8 @@ const SKILL_UPLOAD_CONCURRENCY = 8;
 async function workspaceRestrictsNewTemplates(
   adminClient: ReturnType<typeof createAdminClient>,
   workspaceId: string,
-  mcpUserId: string | null,
+  mcpUserId: string,
 ): Promise<boolean> {
-  if (!mcpUserId) return false;
   const { data: ws } = await adminClient
     .from('workspaces')
     .select('default_template_access')
@@ -505,7 +514,7 @@ Deno.serve(async (req) => {
 
   const { data: keyRow, error: keyErr } = await adminClient
     .from('sqemes_api_keys')
-    .select('id, workspace_id, name, scopes, expires_at, is_oauth, user_id')
+    .select('id, workspace_id, name, scopes, expires_at, is_oauth, user_id, created_at, last_used_at')
     .eq('key_hash', keyHash)
     .single();
 
@@ -515,6 +524,44 @@ Deno.serve(async (req) => {
 
   // Expired connection — challenge so OAuth clients re-authorize (SQEM-064).
   if (keyRow.expires_at && new Date(keyRow.expires_at).getTime() <= Date.now()) {
+    return authChallenge();
+  }
+
+  /**
+   * SQEM-346 — **every key belongs to exactly one person.**
+   *
+   * `user_id` is `NOT NULL` since the SQEM-346 migration, so this cannot fire. It stays because
+   * everything below reads `mcpUserId` as *a person*: a null slipping past here would not throw, it
+   * would silently restore the workspace-wide key — a connection that wrote without any role being
+   * checked. A guard whose absence fails **open** is worth one line even when the database already
+   * makes it impossible.
+   */
+  const keyUserId: string | null = (keyRow as { user_id?: string | null }).user_id ?? null;
+  if (!keyUserId) {
+    return authChallenge();
+  }
+
+  /**
+   * SQEM-348 — **"never expires" means never, while it is being used.**
+   *
+   * Owner decision 2026-09-09: the lifetime stays selectable as "never", but 90 days without a single
+   * call and the connection stops answering. That closes the case the user cannot see — somebody
+   * disconnects the server in their client, which tells us nothing, and the refresh token lives on.
+   *
+   * ⚠️ Read BEFORE the `last_used_at` write below, or every key looks fresh forever.
+   * ⚠️ `last_used_at` is null on a key that was issued and never used; `created_at` is then the
+   * honest starting point, not "unknown, let it through".
+   *
+   * Refusing rather than deleting is deliberate: a refused key can be re-authorised in seconds, a
+   * deleted row cannot be brought back. Pruning rows is a separate decision with a separate blast
+   * radius, and it is NOT taken here.
+   */
+  const IDLE_LIMIT_MS = 90 * 24 * 60 * 60 * 1000;
+  const lastSeen: string | null =
+    (keyRow as { last_used_at?: string | null }).last_used_at
+    ?? (keyRow as { created_at?: string | null }).created_at
+    ?? null;
+  if (lastSeen && Date.now() - new Date(lastSeen).getTime() > IDLE_LIMIT_MS) {
     return authChallenge();
   }
 
@@ -544,60 +591,123 @@ Deno.serve(async (req) => {
     return rpcError(id, -32003, 'This Sqemes workspace has no active subscription. Resubscribe at app.sqemes.com to use MCP.');
   }
 
-  // Read-capability gate for the MCP read primitives (SQEM-064).
-  if (READ_METHODS.has(method) && !scopes.includes('read')) {
-    return rpcError(id, -32002, `Insufficient scope: '${method}' requires the 'read' permission.`);
+  /**
+   * SQEM-351 — count the call. **Only count it.** Nothing here refuses anything.
+   *
+   * ⛔ It exists so SQEM-352 can pick a limit from a measurement instead of a guess. `last_used_at`
+   * says *that* a key was used, never *how often*, and a limit chosen without that number either
+   * catches nobody or lands in the middle of a real session — where it reads as a broken product
+   * rather than a rule.
+   *
+   * ⚠️ **After the paywall gate, not before.** A lapsed workspace's refused calls are not the usage
+   * we are trying to size a budget against; counting them would inflate exactly the number the next
+   * ticket depends on.
+   *
+   * ⚠️ **`initialize` and `ping` are skipped on purpose.** They are protocol overhead a client emits
+   * on its own schedule, and they would swamp the signal we actually want.
+   *
+   * The capability comes from `TOOL_CAPABILITY`, never re-derived — re-deriving that mapping in a
+   * second place is what SQEM-332 and SQEM-349 each cost.
+   */
+  if (method !== 'initialize' && method !== 'ping') {
+    const counted = method === 'tools/call'
+      ? TOOL_CAPABILITY[(params as { name?: string } | undefined)?.name ?? '']
+      : 'read';
+
+    if (counted) {
+      /**
+       * SQEM-351 — count the call. **Counting refuses nothing.**
+       *
+       * ⛔ **Recorded BEFORE the budget check, and that order is the point.** A call the budget turns
+       * away is still demand — arguably the most interesting kind, because it is exactly what a
+       * limit would have to accommodate. Counting only what got through would measure the limit
+       * instead of the need, and then SQEM-352's calibration would justify itself with its own
+       * effect.
+       *
+       * ⚠️ `initialize` and `ping` are skipped: protocol overhead on the client's own schedule, which
+       * would swamp the signal. Best-effort — a failed count must never cost the caller their answer.
+       * Awaited rather than fired-and-forgotten, because an un-awaited promise can be torn down with
+       * the response. The capability comes from `TOOL_CAPABILITY`, never re-derived.
+       */
+      try {
+        await adminClient.rpc('record_mcp_call', { p_key_id: keyId, p_capability: counted });
+      } catch (e) {
+        console.error('[mcp-metrics] failed to record call:', (e as Error).message);
+      }
+
+      /**
+       * SQEM-352 — the budget, checked after the call is counted and before the work is done.
+       *
+       * ⛔ **These numbers are a ceiling against the absurd, NOT a calibrated budget**, and the
+       * difference is the whole reason they can ship today. A calibrated budget needs the
+       * measurements from SQEM-351, which do not exist yet — that ticket shipped the same day. A
+       * ceiling needs only to know what cannot be legitimate: ten calls a second sustained across a
+       * minute is not an agent working, it is a loop.
+       *
+       * ⚠️ **Tighten them once `mcp_call_peaks` holds real data.** They are env-configurable so that
+       * needs no migration. Until then they are deliberately far too generous — MCP has no ceiling at
+       * all today, and a very high one costs nobody who is working anything.
+       *
+       * ⭐ **Read and write are separate budgets.** An agent lists templates constantly; that is
+       * normal, not abuse. It creates one rarely. A shared limit has to be set for the loud case and
+       * is then useless for the expensive one — and writing is the half you do not get back.
+       *
+       * ⚠️ Fail-open, like everywhere: a limiter that locks people out when *it* is unhealthy is
+       * worse than what it protects against. The SQEM-335 lesson is not the direction of that failure
+       * but its visibility — answered by the self-test in this migration, which refuses to apply if
+       * the function counts without limiting.
+       */
+      const kind  = counted === 'read' ? 'read' : 'write';
+      const limit = kind === 'read' ? MCP_READ_RPM : MCP_WRITE_RPM;
+      try {
+        const { data: withinBudget, error: budgetErr } = await adminClient.rpc('check_mcp_rate_limit', {
+          p_key_id: keyId, p_kind: kind, p_limit: limit,
+        });
+        if (budgetErr) {
+          console.error('[mcp-rate] check failed, allowing request:', budgetErr.message);
+        } else if (withinBudget === false) {
+          // ⛔ A refusal is only useful if the client can act on it: the exhausted budget by name and
+          // when it returns. A model can wait for that; on a generic error it can only give up or
+          // hammer — and hammering is the behaviour the limit exists to stop.
+          return rpcError(id, -32005,
+            `Rate limit reached: more than ${limit} ${kind} calls in one minute on this connection. It resets within 60 seconds — retry then. The limit is per connection, so nobody else on the workspace is affected.`);
+        }
+      } catch (e) {
+        console.error('[mcp-rate] check threw, allowing request:', (e as Error).message);
+      }
+    }
   }
 
   // SQEM-142 — per-user template access. OAuth connections carry the authorizing user; restrict
   // templates to what that user may access.
-  const mcpUserId: string | null = (keyRow as { user_id?: string | null }).user_id ?? null;
-  let canAccessTemplate: (templateId: string) => boolean;
+  const mcpUserId: string = keyUserId;
 
-  if (mcpUserId) {
-    const { data: accRows } = await adminClient.rpc('mcp_accessible_template_ids', {
-      p_workspace_id: workspaceId, p_user_id: mcpUserId,
-    });
-    const accessible = new Set(((accRows as { id: string }[] | null) || []).map(r => r.id));
-    canAccessTemplate = (templateId: string) => accessible.has(templateId);
-  } else {
-    // SQEM-210 — an API-key connection has no user, so no access rule can be evaluated *for*
-    // anyone. It therefore gets only what is open to everyone: templates with no access rules.
-    //
-    // This closes a real hole rather than a theoretical one. Until now these connections skipped
-    // access filtering entirely and saw every template in the workspace; the only thing holding
-    // restricted ones back was `published = false`, which SQEM-210 retires. Without this, "Only me"
-    // would have become "anyone holding the workspace API key".
-    //
-    // Deliberately over-restrictive: a template restricted *to the key's owner* is invisible here
-    // too, because there is no owner to compare against. Bind the key to a user (OAuth) to get the
-    // per-user set. Restricting too much is the recoverable direction; leaking is not.
-    const { data: ruleRows } = await adminClient
-      .from('template_access')
-      .select('template_id')
-      .eq('workspace_id', workspaceId);
-    const restricted = new Set(((ruleRows as { template_id: string }[] | null) || []).map(r => r.template_id));
-    canAccessTemplate = (templateId: string) => !restricted.has(templateId);
-  }
+  /**
+   * ⛔ **The `else` branch that used to stand here is gone (SQEM-346).**
+   *
+   * It handled the connection with no user: SQEM-210 gave it only templates carrying no access rules
+   * at all, because with nobody to evaluate a rule *for*, "restricted" could not be answered. That
+   * branch was correct for as long as such a connection could exist. It no longer can — every key is
+   * a person's — so the question has one answer instead of two.
+   *
+   * ⚠️ Worth keeping in mind if a service identity is ever introduced: it does **not** get to reuse
+   * this path. The deleted branch was over-restrictive on purpose ("restricting too much is the
+   * recoverable direction"), and anything replacing it needs that property, not just a set of ids.
+   */
+  const { data: accRows } = await adminClient.rpc('mcp_accessible_template_ids', {
+    p_workspace_id: workspaceId, p_user_id: mcpUserId,
+  });
+  const accessibleTemplates = new Set(((accRows as { id: string }[] | null) || []).map(r => r.id));
+  const canAccessTemplate = (templateId: string): boolean => accessibleTemplates.has(templateId);
 
   // SQEM-324 — the same question for personas, answered the same way and for the same reasons.
-  // An API-key connection has no user, so it sees only personas with no access rules at all.
-  let canAccessPersona: (personaId: string) => boolean;
-
-  if (mcpUserId) {
-    const { data: pAccRows } = await adminClient.rpc('mcp_accessible_persona_ids', {
-      p_workspace_id: workspaceId, p_user_id: mcpUserId,
-    });
-    const accessiblePersonas = new Set(((pAccRows as { id: string }[] | null) || []).map(r => r.id));
-    canAccessPersona = (personaId: string) => accessiblePersonas.has(personaId);
-  } else {
-    const { data: pRuleRows } = await adminClient
-      .from('persona_access')
-      .select('persona_id')
-      .eq('workspace_id', workspaceId);
-    const restrictedPersonas = new Set(((pRuleRows as { persona_id: string }[] | null) || []).map(r => r.persona_id));
-    canAccessPersona = (personaId: string) => !restrictedPersonas.has(personaId);
-  }
+  // Its no-user branch fell with the template one in SQEM-346; see the note above for why a future
+  // service identity must not simply reinstate either.
+  const { data: pAccRows } = await adminClient.rpc('mcp_accessible_persona_ids', {
+    p_workspace_id: workspaceId, p_user_id: mcpUserId,
+  });
+  const accessiblePersonas = new Set(((pAccRows as { id: string }[] | null) || []).map(r => r.id));
+  const canAccessPersona = (personaId: string): boolean => accessiblePersonas.has(personaId);
 
   // SQEM-336 — what role does this connection's user hold in the workspace?
   //
@@ -605,17 +715,17 @@ Deno.serve(async (req) => {
   // lookup inside each write handler would run for an answer that never differs. SQEM-336 was the
   // first time `mcp-server` read `workspace_members` at all.
   //
-  // ⚠️ A connection WITHOUT a user gets no role — and needs none. See `mayWrite`.
-  let mcpUserRole: string | null = null;
-  if (mcpUserId) {
-    const { data: memberRow } = await adminClient
-      .from('workspace_members')
-      .select('role')
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', mcpUserId)
-      .maybeSingle();
-    mcpUserRole = (memberRow as { role?: string } | null)?.role ?? null;
-  }
+  // ⚠️ **A null role is a real state and it means "no longer a member".** Since SQEM-346 a key is
+  // deleted when its owner leaves, so this should not occur — but a role read that returns nothing
+  // must fail closed regardless, because the alternative is that leaving the workspace silently
+  // upgrades somebody.
+  const { data: memberRow } = await adminClient
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', mcpUserId)
+    .maybeSingle();
+  const mcpUserRole: string | null = (memberRow as { role?: string } | null)?.role ?? null;
 
   /**
    * SQEM-339 — may this user manage content that is not their own?
@@ -628,10 +738,15 @@ Deno.serve(async (req) => {
   const mcpUserManagesContent = mcpUserRole === 'admin' || mcpUserRole === 'editor';
 
   /**
-   * SQEM-336 → 341 — may this connection write at all?
+   * SQEM-336 → 341 → 346 — may this connection write at all?
    *
-   *   user-bound connection    editor or admin
-   *   connection with no user  yes, bounded by its narrow sight (SQEM-210)
+   * **Editor or admin. That is the whole rule now.**
+   *
+   * ⛔ The second line that stood here — *"connection with no user: yes, bounded by its narrow
+   * sight"* — is gone with the workspace-wide key (SQEM-346, owner decision). It was the last place
+   * where authority hung on a **secret** instead of on a **person**, and it was reachable by
+   * accident: `user_id` carried `on delete set null`, so deleting a profile promoted that person's
+   * read-only member key into this branch. Authority now hangs on a person without exception.
    *
    * **A member reads. That is the whole role.** Decided by the product owner on 2026-09-09, and it
    * is not a new rule — it is the one RLS has enforced since the beginning (`prompts_insert`,
@@ -656,7 +771,7 @@ Deno.serve(async (req) => {
    * ⚠️ **The predicate is deliberately connection-scoped rather than row-scoped**, so there is no
    * per-row decision left to get wrong — and `create`, which has no row, can use the same one.
    */
-  const mayWrite: boolean = !mcpUserId || mcpUserManagesContent;
+  const mayWrite: boolean = mcpUserManagesContent;
 
   /** The same refusal everywhere, so a member never has to guess which tool is the fussy one. */
   const refuseWrite = (id: unknown, what: string) =>
@@ -739,8 +854,8 @@ Deno.serve(async (req) => {
   // disclosure ("Q3-layoffs.xlsx").
   //
   // Built as a set once, not a check per file: `resources/list` would otherwise make one round trip
-  // per row. The uploader clause mirrors `can_access_file()` — an API-key connection has no user, so
-  // `mcpUserId` is null and nothing is claimed as uploaded by anybody.
+  // per row. The uploader clause mirrors `can_access_file()` — and since SQEM-346 it always applies,
+  // because there is always an uploader to compare against.
   const accessibleFileIds: Set<string> = await (async () => {
     const { data: rows } = await adminClient
       .from('prompts')
@@ -753,14 +868,12 @@ Deno.serve(async (req) => {
       if (!canAccessTemplate(r.id)) continue;
       for (const fid of r.context_file_ids || []) ids.add(fid);
     }
-    if (mcpUserId) {
-      const { data: own } = await adminClient
-        .from('workspace_files')
-        .select('id')
-        .eq('workspace_id', workspaceId)
-        .eq('created_by', mcpUserId);
-      for (const f of (own as { id: string }[] | null) || []) ids.add(f.id);
-    }
+    const { data: own } = await adminClient
+      .from('workspace_files')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('created_by', mcpUserId);
+    for (const f of (own as { id: string }[] | null) || []) ids.add(f.id);
     return ids;
   })();
 
@@ -1151,7 +1264,7 @@ Deno.serve(async (req) => {
       },
       {
         name: 'create_template',
-        description: 'Create a new template (prompt, assistant, or skill) in the workspace.\n\nVariables (kind=prompt only): pass a "variables" array of {name, label?, type?} objects. Alternatively, write {{variable_name}} placeholders in content and they are auto-extracted. "type" can be "text" (default) or "textarea" for longer inputs.\nExample: [{"name":"draft","label":"Email Draft","type":"textarea"},{"name":"tone","type":"text"}]\n\nContext files: pass "file_ids" (array of UUIDs from list_files) to attach workspace files as context.\n\nAgent Skills (kind=skill): a skill is a FOLDER, and Sqemes holds it whole. Put the SKILL.md body in "content", its frontmatter title/description in "title"/"description", and upload EVERY other file in the folder via upload_file under its relative path (references/…, scripts/…, assets/…), then attach them all through file_ids. Uploading only the SKILL.md leaves a skill that describes files nobody has.\n\nWho can see it: the new template follows the workspace default — open to everyone, or restricted to you if the workspace starts new templates restricted. Change it per template in the Sqemes app.\nOn a workspace API key (no authorizing user) the template is ALWAYS created open to everyone and has no owner, because there is no "you" to restrict it to. Connect over OAuth if new templates must start restricted.',
+        description: 'Create a new template (prompt, assistant, or skill) in the workspace.\n\nVariables (kind=prompt only): pass a "variables" array of {name, label?, type?} objects. Alternatively, write {{variable_name}} placeholders in content and they are auto-extracted. "type" can be "text" (default) or "textarea" for longer inputs.\nExample: [{"name":"draft","label":"Email Draft","type":"textarea"},{"name":"tone","type":"text"}]\n\nContext files: pass "file_ids" (array of UUIDs from list_files) to attach workspace files as context.\n\nAgent Skills (kind=skill): a skill is a FOLDER, and Sqemes holds it whole. Put the SKILL.md body in "content", its frontmatter title/description in "title"/"description", and upload EVERY other file in the folder via upload_file under its relative path (references/…, scripts/…, assets/…), then attach them all through file_ids. Uploading only the SKILL.md leaves a skill that describes files nobody has.\n\nWho can see it: the new template follows the workspace default — open to everyone, or restricted to you if the workspace starts new templates restricted. Change it per template in the Sqemes app.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1272,8 +1385,31 @@ Deno.serve(async (req) => {
       },
     ];
 
-    // Only advertise tools the connection is scoped for (SQEM-064).
-    const visibleTools = tools.filter((t) => scopes.includes(TOOL_CAPABILITY[t.name]));
+    /**
+     * Only advertise tools this connection can actually use — **scope AND role** (SQEM-064 → 349).
+     *
+     * ⛔ The role half was missing, and the symptom was reported from production: a member ticked
+     * *Create* on their own key (SQEM-328 lets them mint one), `create_template` appeared in their
+     * client, they used it, and `tools/call` refused them. **The refusal is correct; advertising it
+     * was not.** A model cannot tell "you may not" from "this is broken", and neither can the person
+     * watching it.
+     *
+     * ⚠️ **This is SQEM-332 turned around.** There a tool was neither offered nor guarded; here it is
+     * offered *and* guarded. Both times the advertisement and the gate disagreed — and both times the
+     * advertisement was the silent half.
+     *
+     * ⛔ **Fixed here rather than only in the settings dialog, because the dialog is not the
+     * boundary.** Three cases a disabled checkbox never reaches: keys minted before the rule existed,
+     * an editor's fully-scoped key that outlives their demotion, and a member updating their own key
+     * row through PostgREST — which RLS permits, since the row is theirs.
+     *
+     * The scope still narrows and the role still grants (SQEM-341); a scope beyond the role is not
+     * corrupt data, it is simply inert. This makes the tool list say so.
+     */
+    const visibleTools = tools.filter((t) => {
+      const cap = TOOL_CAPABILITY[t.name];
+      return scopes.includes(cap) && (cap === 'read' || mayWrite);
+    });
     return rpcResult(id, { tools: visibleTools });
   }
 
@@ -1426,11 +1562,13 @@ Deno.serve(async (req) => {
           description:  description?.trim() || '',
           content:      content || '',
           tags:         Array.isArray(tags) ? tags : [],
-          // SQEM-240's rule, applied to personas verbatim: a workspace-wide key has no "me", so the
-          // row simply gets no owner. ⚠️ Never seed a restriction on top of that — a principal-less
-          // access row over a `created_by = NULL` object is invisible to EVERYONE, its author
-          // included, and is recoverable only by SQL. That is what made 47 of 82 templates
-          // unreachable before SQEM-240.
+          // SQEM-240's rule, applied to personas verbatim. Since SQEM-346 there is always an owner
+          // to write here — the ownerless case the rule was built for cannot arise from MCP any more.
+          // ⚠️ It still matters, because `created_by` remains nullable in the table and a row CAN
+          // lose its owner elsewhere: a principal-less access row over a `created_by = NULL` object
+          // is invisible to EVERYONE, its author included, and recoverable only by SQL. That is what
+          // made 47 of 82 templates unreachable before SQEM-240. Never seed a restriction without an
+          // owner.
           created_by:   mcpUserId,
         })
         .select('id, title')
@@ -2348,12 +2486,20 @@ Deno.serve(async (req) => {
       // unknown: you learn THAT three colleagues' templates are affected, never which or how badly.
       // Not a basis for an irreversible change to someone else's work.
       //
-      // ⚠️ **Since SQEM-341 this constrains exactly one caller: the workspace-wide key.** Anyone
-      // user-bound who reached this line is already an editor or admin, so `mcpUserManagesContent`
-      // holds for them. A key with no user passes the central gate on `!mcpUserId` — bounded by its
-      // narrow sight (SQEM-336, decision 3) — and this is precisely the action that would reach
-      // past that sight. The check therefore looks redundant and is not: it is the one place where
-      // "bounded by what it can see" has to be enforced rather than assumed.
+      // ⛔ **Since SQEM-346 this check can no longer fire, and it stays anyway. Read why before
+      // deleting it.**
+      //
+      // It used to constrain exactly one caller — the workspace-wide key, which passed the central
+      // gate on `!mcpUserId` and was bounded only by its narrow sight. That caller no longer exists,
+      // and everyone who now reaches this line is already an editor or admin, so the condition is
+      // provably false.
+      //
+      // ⚠️ It is kept because it is the **only** place in this file where "reach may not exceed
+      // sight" is enforced rather than inherited. Today that property follows from `mayWrite`; the
+      // moment anything widens `mayWrite` — a service identity, an automation role, a scope that
+      // grants rather than narrows — this line is what still holds, and whoever makes that change is
+      // unlikely to rediscover the rule from scratch. Three lines of dead code against one silent
+      // reintroduction of the hole SQEM-340 closed.
       if (restricted > 0 && !mcpUserManagesContent) {
         return rpcError(id, -32602,
           `This file is attached to ${restricted} template(s) you cannot see. Detaching or replacing it there would change work you have no access to, so it needs an editor or admin. Ask one, or remove the file only from the templates you can see (update_template with file_ids).`);
