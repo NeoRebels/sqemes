@@ -59,7 +59,7 @@ docker compose logs -f app functions
 | `db`, `auth`, `rest`, `storage`, `realtime`, `kong`, `meta`, `imgproxy`, `supavisor`, `studio` | Vendored upstream Supabase stack |
 | `init` | One-shot: applies the repo's `supabase/migrations` + creates the private `workspace-files` bucket |
 | `app` | The Sqemes SPA (built from source, served by nginx) |
-| `api-sidecar` | Serves the repo's `/api` handlers (extension-config, MCP OAuth) — the Cloud Vercel functions |
+| `api-sidecar` | Serves the repo's `/api` handlers (extension-config, MCP OAuth, marketplace proxy) — the Cloud Vercel functions. TypeScript handlers are bundled to plain `.js` in the image's build stage (SQEM-399); the runtime stage is Node plus files, no npm dependency |
 | `functions` | Edge runtime serving the repo's `supabase/functions` |
 | `caddy` *(TLS mode only)* | Reverse proxy + automatic HTTPS for a real domain |
 
@@ -113,7 +113,7 @@ selfhost/
   Dockerfile.app              # production build of the SPA → nginx
   nginx.conf                  # SPA static serving
   init/apply.sh               # migration runner + bucket creation
-  api-sidecar/                # Node server + Dockerfile serving the repo's /api handlers
+  api-sidecar/                # Node server + two-stage Dockerfile (bundle api/*.ts, then plain Node) serving the repo's /api handlers
   edge-main/index.ts          # edge-runtime dispatch router (--main-service target)
   volumes/proxy/caddy/Caddyfile  # Caddy routing (app / api-sidecar / kong)
   volumes/                    # vendored upstream config (kong, db init, pooler, …)
