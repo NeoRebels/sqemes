@@ -105,17 +105,17 @@ export function valueFromKey(scopes: string[] | null, expiresAt: string | null):
 const CAPS: { key: 'create' | 'update' | 'delete'; label: string; hint: string }[] = [
   {
     key: 'create',
-    label: 'Create templates & personas, upload files',
+    label: 'Create playbooks & personas, upload files',
     hint: 'create_template, create_persona, import_skill_from_url, upload_file, create_upload_url, finalize_upload',
   },
   {
     key: 'update',
-    label: 'Update templates & personas, change persona routes',
+    label: 'Update playbooks & personas, change persona routes',
     hint: 'update_template, update_persona, attach_template, detach_template',
   },
   {
     key: 'delete',
-    label: 'Delete templates, personas & files',
+    label: 'Delete playbooks, personas & files',
     hint: 'delete_template, delete_persona, delete_file',
   },
 ];
@@ -148,7 +148,7 @@ export function ApiKeyScopeFields({
         <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Permissions</p>
         <div className="flex items-center gap-2 text-sm text-slate-400 dark:text-slate-500 mb-2">
           <Check className="w-4 h-4 text-emerald-500" />
-          Read templates, files &amp; personas — always included
+          Read playbooks, files &amp; personas — always included
         </div>
         {!canWrite && (
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">

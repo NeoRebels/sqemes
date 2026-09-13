@@ -44,7 +44,7 @@ export default function AuthoringModelCard({
       </h2>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
         Used when Sqemes writes for you — enhancing a prompt, generating a description, the setup and
-        template wizards, and adapting a template to your brand. It does not affect Chat, where you pick
+        playbook wizards, and adapting a playbook to your brand. It does not affect Chat, where you pick
         the model each time.
       </p>
 

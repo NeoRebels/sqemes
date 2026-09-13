@@ -2,25 +2,25 @@ import { useState } from 'react';
 import { useWorkspace, useUI } from '../store';
 import { authoringModelId, hasAuthoringAlternatives } from '../lib/authoringAI';
 import { analyzeWebsite } from '../lib/wizardGeneration';
-import { TONE_LABELS } from '../lib/compileBrandVoice';
-import type { ToneLevel, BrandProfile } from '../types';
+import type { BrandProfile } from '../types';
 import { Loader2, Globe, AlertCircle } from 'lucide-react';
 import { describeAIError } from '../lib/aiErrors';
 
 // SQEM-106 — shared brand form used by both onboarding (WizardCreateStep) and
 // Settings → Brand. Owns the "Analyze your website" prefill + the brand fields.
 // Controlled via `value`/`onChange`; analyze reads the workspace AI config itself.
+// SQEM-395 — three fields and the website. "Tone of your playbooks" (a 1–5 select nobody chose
+// consciously — the website analysis guessed it, the default was 3) and "What do you want to use AI
+// for?" (which the Playbook Wizard asks per playbook anyway) are gone, here and in Settings → Brand.
 export interface BrandFormValue {
   brandName: string;
   whatItDoes: string;
   audience: string;
-  useCase: string;
-  tone: ToneLevel;
   website: string;
 }
 
 export const EMPTY_BRAND_FORM: BrandFormValue = {
-  brandName: '', whatItDoes: '', audience: '', useCase: '', tone: 3, website: '',
+  brandName: '', whatItDoes: '', audience: '', website: '',
 };
 
 export function brandFormFromProfile(p?: BrandProfile): BrandFormValue {
@@ -28,8 +28,6 @@ export function brandFormFromProfile(p?: BrandProfile): BrandFormValue {
     brandName: p?.brandName ?? '',
     whatItDoes: p?.whatItDoes ?? '',
     audience: p?.audience ?? '',
-    useCase: p?.useCase ?? '',
-    tone: p?.tone ?? 3,
     website: p?.website ?? '',
   };
 }
@@ -42,10 +40,19 @@ export function BrandProfileForm({
   value,
   onChange,
   disabled = false,
+  collapsible = false,
 }: {
   value: BrandFormValue;
   onChange: (patch: Partial<BrandFormValue>) => void;
   disabled?: boolean;
+  /**
+   * SQEM-386 (rounds 2–3) — in the setup wizard the form is ONE view at a time: the website field
+   * (with Analyze) OR the three manual fields, with a link each way. A successful analysis switches to
+   * the fields so what was filled in is visible. Round 2 had the fields fold out UNDER the website
+   * field; the owner wanted the two to replace each other, with a way back. Settings → Brand keeps
+   * the full form: there the person came to edit exactly those fields.
+   */
+  collapsible?: boolean;
 }) {
   const { workspace } = useWorkspace();
   const { showToast } = useUI();
@@ -53,6 +60,7 @@ export function BrandProfileForm({
   const canUseAI = !!modelId || !!workspace.fundedAvailable;
   const [analyzing, setAnalyzing] = useState(false);
   const [websiteError, setWebsiteError] = useState<string | null>(null);
+  const [view, setView] = useState<'website' | 'manual'>('website');
 
   const handleAnalyze = async () => {
     if (!canUseAI || !value.website.trim()) return;
@@ -72,8 +80,8 @@ export function BrandProfileForm({
       if (fields.brandName) patch.brandName = fields.brandName;
       if (fields.whatItDoes) patch.whatItDoes = fields.whatItDoes;
       if (fields.audience) patch.audience = fields.audience;
-      if (fields.tone) patch.tone = fields.tone;
       onChange(patch);
+      setView('manual');
       showToast('Filled in from your site — review and edit below.', 'success');
     } catch (err: any) {
       // SQEM-203 — this belongs at the field, not in a toast 1200px away in the opposite corner
@@ -87,6 +95,7 @@ export function BrandProfileForm({
   return (
     <div>
       {/* Website URL — analyzes the homepage and fills the form */}
+      {(!collapsible || view === 'website') && (
       <div className="mb-4">
         <label className={labelCls}>
           Analyze your website <span className="normal-case font-normal text-slate-400">(optional — fills the form)</span>
@@ -124,13 +133,35 @@ export function BrandProfileForm({
           <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">Add a provider key or enable Sqemes AI to analyze a website.</p>
         )}
       </div>
+      )}
 
-      <div className="flex items-center gap-3 mb-4">
-        <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
-        <span className="text-2xs font-semibold text-slate-400 uppercase tracking-wider">or fill in manually</span>
-        <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
-      </div>
+      {collapsible ? (
+        view === 'website' ? (
+          <button
+            type="button"
+            onClick={() => setView('manual')}
+            className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline mb-4"
+          >
+            Or fill in the details yourself
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setView('website')}
+            className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline mb-4"
+          >
+            ← Analyze a website instead
+          </button>
+        )
+      ) : (
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+          <span className="text-2xs font-semibold text-slate-400 uppercase tracking-wider">or fill in manually</span>
+          <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+        </div>
+      )}
 
+      {(!collapsible || view === 'manual') && (
       <div className="space-y-3">
         <div>
           <label className={labelCls}>Brand name</label>
@@ -144,20 +175,8 @@ export function BrandProfileForm({
           <label className={labelCls}>Who is your audience?</label>
           <input value={value.audience} onChange={e => onChange({ audience: e.target.value })} placeholder="e.g. HR leaders at mid-size companies" disabled={disabled} className={inputCls} />
         </div>
-        <div>
-          <label className={labelCls}>
-            What do you want to use AI for? <span className="normal-case font-normal text-slate-400">(optional)</span>
-          </label>
-          <input value={value.useCase} onChange={e => onChange({ useCase: e.target.value })} placeholder="e.g. drafting client emails, workshop materials, social posts" disabled={disabled} className={inputCls} />
-          <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">Helps tailor generated templates to your work.</p>
-        </div>
-        <div>
-          <label className={labelCls}>Tone</label>
-          <select value={value.tone} onChange={e => onChange({ tone: Number(e.target.value) as ToneLevel })} disabled={disabled} className={`${inputCls} appearance-none`}>
-            {([1, 2, 3, 4, 5] as ToneLevel[]).map(t => <option key={t} value={t}>{TONE_LABELS[t]}</option>)}
-          </select>
-        </div>
       </div>
+      )}
     </div>
   );
 }

@@ -283,7 +283,7 @@ function substituteVariables(content: string, inputs: Record<string, string>): s
 
 
 // Extracts {{placeholder}} names from content and builds a variables array.
-// Only used for kind=prompt — skills and assistants do not support variables.
+// Only used for kind=prompt — skills do not support variables.
 function extractVariables(content: string): any[] {
   const seen = new Set<string>();
   const regex = /\{\{(\w+)\}\}/g;
@@ -718,7 +718,7 @@ Deno.serve(async (req) => {
 
     const { data: templates } = await adminClient
       .from('prompts')
-      .select('id, title, description, content, system_instruction, variables, context_file_ids, kind')
+      .select('id, title, description, content, variables, context_file_ids, kind')
       .eq('workspace_id', workspaceId)
       .or('published.eq.true,kind.eq.skill'); // SQEM-110/210 — vestigial guard, see above
 
@@ -766,19 +766,10 @@ Deno.serve(async (req) => {
     if (renderedContent) parts.push(renderedContent);
 
     const text = parts.join('\n\n');
-    const messages: any[] = [];
-
-    if (template.kind === 'assistant' && template.system_instruction) {
-      messages.push({
-        role: 'user',
-        content: { type: 'text', text: substituteVariables(template.system_instruction, resolvedInputs) },
-      });
-    } else {
-      messages.push({
-        role: 'user',
-        content: { type: 'text', text: text },
-      });
-    }
+    // SQEM-390 — one shape for both kinds. An assistant used to be served from `system_instruction`
+    // here; that column is unread since the kind went, and the migration moved its text into
+    // `content`, so a former assistant renders exactly as it did.
+    const messages: any[] = [{ role: 'user', content: { type: 'text', text } }];
 
     return rpcResult(id, {
       description: template.description || template.title,
@@ -830,13 +821,13 @@ Deno.serve(async (req) => {
     const tools = [
       {
         name: 'list_templates',
-        description: 'Browse every published template in the workspace (prompts, assistants, skills) with id, name, kind and description. Use this to see what reusable templates exist before composing something from scratch, or to find a template\'s id/name to pass to get_template. For a targeted lookup by keyword use search_templates instead. Optionally filter by kind.\n\nTemplates with attached context files also report "contextFileCount" and "contextBytes" (absent when there are none). Use them to decide HOW to load the template: when a template has several files or a large total, call get_template with include_files: "list" — you then get each file\'s name, size and a preview instead of its full text, and read only the ones you need via resources/read. For one small file, the default is fine.',
+        description: 'Browse every published template in the workspace (prompts and skills) with id, name, kind and description. Use this to see what reusable templates exist before composing something from scratch, or to find a template\'s id/name to pass to get_template. For a targeted lookup by keyword use search_templates instead. Optionally filter by kind.\n\nTemplates with attached context files also report "contextFileCount" and "contextBytes" (absent when there are none). Use them to decide HOW to load the template: when a template has several files or a large total, call get_template with include_files: "list" — you then get each file\'s name, size and a preview instead of its full text, and read only the ones you need via resources/read. For one small file, the default is fine.',
         inputSchema: {
           type: 'object',
           properties: {
             kind: {
               type: 'string',
-              enum: ['prompt', 'skill', 'assistant', 'all'],
+              enum: ['prompt', 'skill', 'all'],
               description: 'Filter by template kind. Defaults to all.',
             },
           },
@@ -844,14 +835,14 @@ Deno.serve(async (req) => {
       },
       {
         name: 'search_templates',
-        description: 'Find a workspace template by keyword (matches title and description). Call this first whenever the user asks you to write, draft, generate, review, or rewrite something, to check for a matching prompt, assistant, or skill before composing from scratch. Returns matching templates with their id and name — pass one to get_template to load its full content. Optionally filter by kind.\n\nMatches with attached context files also report "contextFileCount" and "contextBytes" (absent when there are none). Use them to decide HOW to load the template: when a template has several files or a large total, call get_template with include_files: "list" — you then get each file\'s name, size and a preview instead of its full text, and read only the ones you need via resources/read. For one small file, the default is fine.',
+        description: 'Find a workspace template by keyword (matches title and description). Call this first whenever the user asks you to write, draft, generate, review, or rewrite something, to check for a matching prompt or skill before composing from scratch. Returns matching templates with their id and name — pass one to get_template to load its full content. Optionally filter by kind.\n\nMatches with attached context files also report "contextFileCount" and "contextBytes" (absent when there are none). Use them to decide HOW to load the template: when a template has several files or a large total, call get_template with include_files: "list" — you then get each file\'s name, size and a preview instead of its full text, and read only the ones you need via resources/read. For one small file, the default is fine.',
         inputSchema: {
           type: 'object',
           properties: {
             query: { type: 'string', description: 'Keyword to search for' },
             kind: {
               type: 'string',
-              enum: ['prompt', 'skill', 'assistant'],
+              enum: ['prompt', 'skill'],
               description: 'Optional kind filter',
             },
           },
@@ -942,7 +933,7 @@ Deno.serve(async (req) => {
       },
       {
         name: 'get_template',
-        description: 'Load a template\'s full content, variables, and metadata so you can actually use it — e.g. a template found via search_templates or list_templates — by id or name slug. Works for any kind (prompt, assistant, or skill). Binary files (PDF, images) are always listed in "contextFiles" with a resource "uri" — fetch their bytes with resources/read. Text context files are inlined by default, or listed the same way if you pass include_files: "list". Use this to inspect a template before updating it, or to consume a skill\'s full knowledge.',
+        description: 'Load a template\'s full content, variables, and metadata so you can actually use it — e.g. a template found via search_templates or list_templates — by id or name slug. Works for both kinds (prompt or skill). Binary files (PDF, images) are always listed in "contextFiles" with a resource "uri" — fetch their bytes with resources/read. Text context files are inlined by default, or listed the same way if you pass include_files: "list". Use this to inspect a template before updating it, or to consume a skill\'s full knowledge.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -963,15 +954,14 @@ Deno.serve(async (req) => {
       },
       {
         name: 'create_template',
-        description: 'Create a new template (prompt, assistant, or skill) in the workspace.\n\nVariables (kind=prompt only): pass a "variables" array of {name, label?, type?} objects. Alternatively, write {{variable_name}} placeholders in content and they are auto-extracted. "type" can be "text" (default) or "textarea" for longer inputs.\nExample: [{"name":"draft","label":"Email Draft","type":"textarea"},{"name":"tone","type":"text"}]\n\nContext files: pass "file_ids" (array of UUIDs from list_files) to attach workspace files as context.\n\nAgent Skills (kind=skill): a skill is a FOLDER, and Sqemes holds it whole. Put the SKILL.md body in "content", its frontmatter title/description in "title"/"description", and upload EVERY other file in the folder via upload_file under its relative path (references/…, scripts/…, assets/…), then attach them all through file_ids. Uploading only the SKILL.md leaves a skill that describes files nobody has.\n\nWho can see it: the new template follows the workspace default — open to everyone, or restricted to you if the workspace starts new templates restricted. Change it per template in the Sqemes app.',
+        description: 'Create a new template (prompt or skill) in the workspace. A prompt is a task with {{variables}}; a skill is a block of knowledge applied when it fits. For a ROLE — who to be, and which template to load when — create a persona instead (create_persona).\n\nVariables (kind=prompt only): pass a "variables" array of {name, label?, type?} objects. Alternatively, write {{variable_name}} placeholders in content and they are auto-extracted. "type" can be "text" (default) or "textarea" for longer inputs.\nExample: [{"name":"draft","label":"Email Draft","type":"textarea"},{"name":"tone","type":"text"}]\n\nContext files: pass "file_ids" (array of UUIDs from list_files) to attach workspace files as context.\n\nAgent Skills (kind=skill): a skill is a FOLDER, and Sqemes holds it whole. Put the SKILL.md body in "content", its frontmatter title/description in "title"/"description", and upload EVERY other file in the folder via upload_file under its relative path (references/…, scripts/…, assets/…), then attach them all through file_ids. Uploading only the SKILL.md leaves a skill that describes files nobody has.\n\nWho can see it: the new template follows the workspace default — open to everyone, or restricted to you if the workspace starts new templates restricted. Change it per template in the Sqemes app.',
         inputSchema: {
           type: 'object',
           properties: {
-            kind:               { type: 'string', enum: ['prompt', 'assistant', 'skill'], description: 'Template kind' },
+            kind:               { type: 'string', enum: ['prompt', 'skill'], description: 'Template kind' },
             title:              { type: 'string', description: 'Human-readable display name' },
             content:            { type: 'string', description: 'Template body. For kind=prompt, write {{variable_name}} placeholders for user inputs.' },
             description:        { type: 'string', description: 'Short description. Required for kind=skill — AI agents use this for discovery.' },
-            system_instruction: { type: 'string', description: 'System instruction (kind=assistant only).' },
             variables: {
               type: 'array',
               description: 'Explicit variable definitions (kind=prompt only). Each item: {name: string, label?: string, type?: "text"|"textarea"}. If omitted, variables are auto-extracted from {{placeholders}} in content.',
@@ -996,7 +986,6 @@ Deno.serve(async (req) => {
             title:              { type: 'string', description: 'New title' },
             content:            { type: 'string', description: 'New content' },
             description:        { type: 'string', description: 'New description' },
-            system_instruction: { type: 'string', description: 'New system instruction' },
             variables: {
               type: 'array',
               description: 'Replace all variables (kind=prompt only). Each item: {name: string, label?: string, type?: "text"|"textarea"}.',
@@ -1457,10 +1446,14 @@ Deno.serve(async (req) => {
     }
 
     if (toolName === 'create_template') {
-      const { kind, title, content, description, system_instruction, variables, file_ids } = args;
+      const { kind, title, content, description, variables, file_ids } = args;
 
-      if (!kind || !['prompt', 'assistant', 'skill'].includes(kind))
-        return rpcError(id, -32602, 'kind must be one of: prompt, assistant, skill');
+      // SQEM-390 — `assistant` is refused with a pointer, not silently mapped: a client that still
+      // asks for one is running on an old idea of the product, and the honest answer names the new one.
+      if (kind === 'assistant')
+        return rpcError(id, -32602, 'kind "assistant" no longer exists: create a skill for knowledge, or a persona (create_persona) for a role');
+      if (!kind || !['prompt', 'skill'].includes(kind))
+        return rpcError(id, -32602, 'kind must be one of: prompt, skill');
       if (!title?.trim())   return rpcError(id, -32602, 'title is required');
       if (content == null)  return rpcError(id, -32602, 'content is required');
       if (kind === 'skill' && !description?.trim())
@@ -1495,7 +1488,6 @@ Deno.serve(async (req) => {
           title:              title.trim(),
           content:            storedContent,
           description:        description?.trim() || '',
-          system_instruction: system_instruction || null,
           variables:          resolvedVars,
           context_file_ids:   Array.isArray(file_ids) ? file_ids : [],
           created_by:         mcpUserId,
@@ -1532,7 +1524,7 @@ Deno.serve(async (req) => {
     }
 
     if (toolName === 'update_template') {
-      const { id: templateId, title, content, description, system_instruction, variables, file_ids } = args;
+      const { id: templateId, title, content, description, variables, file_ids } = args;
       if (!templateId) return rpcError(id, -32602, 'id is required');
 
       const { data: existing } = await adminClient
@@ -1554,7 +1546,6 @@ Deno.serve(async (req) => {
       // the header that the create just removed.
       if (content            !== undefined) updates.content            = existing.kind === 'skill' ? withoutOwnFrontmatter(content) : content;
       if (description        !== undefined) updates.description        = description.trim();
-      if (system_instruction !== undefined) updates.system_instruction = system_instruction;
       if (Array.isArray(file_ids))          updates.context_file_ids   = file_ids;
 
       // Variables: only for kind=prompt
@@ -1567,7 +1558,7 @@ Deno.serve(async (req) => {
       }
 
       if (Object.keys(updates).length === 1)
-        return rpcError(id, -32602, 'No fields to update — provide at least one of: title, content, description, system_instruction, variables, file_ids');
+        return rpcError(id, -32602, 'No fields to update — provide at least one of: title, content, description, variables, file_ids');
 
       const { data: updated, error: updateErr } = await adminClient
         .from('prompts')

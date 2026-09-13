@@ -6,8 +6,7 @@
  * This client helper subscribes before the fetch and resolves when the broadcast arrives.
  */
 import { supabase } from './supabase';
-
-const JOB_TIMEOUT_MS = 180_000; // 180 s — well above the 150 s edge function limit
+import { CLIENT_JOB_TIMEOUT_MS } from '../supabase/functions/_shared/chatTimeouts.ts';
 
 /**
  * SQEM-372 — `onDelta` receives the answer as it is written.
@@ -21,6 +20,14 @@ export function waitForJobResult(
   jobId: string,
   signal?: AbortSignal,
   onDelta?: (textSoFar: string) => void,
+  /**
+   * SQEM-381 — how long to wait for the terminal broadcast. ⛔ Must exceed the server's provider
+   * timeout for the same turn, or the honest 504 arrives at nobody; `_shared/chatTimeouts.ts` holds
+   * both numbers and the test that keeps them ordered. Chat passes the connector-aware value; every
+   * other caller keeps the default. (The old comment here cited a "150 s edge function limit" — the
+   * free-plan number; production is paid, 400 s.)
+   */
+  timeoutMs: number = CLIENT_JOB_TIMEOUT_MS.default,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const channel = supabase.channel(`job:${jobId}`);
@@ -28,7 +35,7 @@ export function waitForJobResult(
     const timeout = setTimeout(() => {
       supabase.removeChannel(channel);
       reject(new Error('The model took too long to respond. Try a shorter prompt.'));
-    }, JOB_TIMEOUT_MS);
+    }, timeoutMs);
 
     channel
       .on('broadcast', { event: 'delta' }, ({ payload }: { payload: { delta?: string } }) => {

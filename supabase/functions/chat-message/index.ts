@@ -7,6 +7,7 @@ import { fetchWithTimeout } from '../_shared/fetchWithTimeout.ts';
 import { broadcastJobResult } from '../_shared/broadcast.ts';
 import { withTimeContext } from '../_shared/timeContext.ts';
 import { withLibraryPrompt } from '../_shared/libraryPrompt.ts';
+import { providerTimeoutMs } from '../_shared/chatTimeouts.ts';
 import { readSSE, geminiDelta, openAiDelta, claudeDelta } from '../_shared/sseStream.ts';
 import { createDeltaBroadcaster } from '../_shared/deltaBroadcast.ts';
 import { createLibraryReader } from '../_shared/libraryQueries.ts';
@@ -34,6 +35,11 @@ import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
 // Cloud-only: absent `MISTRAL_API_KEY` (self-host) → BYOK is the only path.
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
+
+// SQEM-381 — the same flag `subscription.ts` reads. On a self-hosted instance the connector timeouts
+// stay at the defaults, because the operator's Supabase may be free-tier (150 s wall clock) and a
+// 300 s provider call would outlive the worker — silence instead of an honest 504.
+const SELF_HOSTED = Deno.env.get('SELF_HOSTED') === 'true';
 
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -367,11 +373,15 @@ const TOOL_ROUNDS_FUNDED = 2;
 /**
  * ⛔ **The deadline, and why it exists next to the round cap rather than instead of it.**
  *
- * A Supabase edge function gets ~150 s of wall clock for the whole invocation — `waitUntil` included
- * — and one provider call may take 120 s (`fetchWithTimeout`). Six rounds of a slow model would be
- * killed by the runtime, and a killed function broadcasts nothing: the client then sits on its own
- * 180 s timeout with a spinner. **That is a worse failure than any answer**, so no new tool round is
- * started past this point. 90 s leaves room for the round in flight plus the final answer.
+ * One provider call may take 120 s (`fetchWithTimeout`), and the CLIENT gives up at 180 s
+ * (`CLIENT_JOB_TIMEOUT_MS.default`) — for a turn without connectors that is the binding limit, not
+ * the platform's wall clock (400 s on a paid plan, 150 s free; see `_shared/chatTimeouts.ts`). Six
+ * rounds of a slow model would run past the client, which then shows a timeout while the worker is
+ * still busy. So no new tool round is started past this point. 90 s leaves room for the round in
+ * flight plus the final answer, inside the client's 180 s.
+ *
+ * ⚠️ SQEM-381 corrected this comment: it used to reason from the free-plan wall clock (150 s) as if it were ours, which is
+ * the free-plan number. The 90 s figure survives because the client's 180 s binds first anyway.
  *
  * The round cap stays because the two catch different things: this catches slow, that catches a
  * model looping on cheap lookups.
@@ -446,6 +456,11 @@ async function runAndBroadcast({
    */
   const instruction = tools ? withLibraryPrompt(systemInstruction) : systemInstruction;
 
+  // SQEM-381 — measured, so the next timeout decision rests on a distribution rather than on the
+  // observation "the more connectors, the more often it times out". Logged below only for connector
+  // turns; the plain path has never been the problem.
+  const startedAt = Date.now();
+
   try {
     let result: string;
     let totalTokens = 0;
@@ -476,6 +491,12 @@ async function runAndBroadcast({
      */
     // ⚠️ `toolsRefused` matters HERE too: a refusal means zero calls, so a `calls > 0` condition
     // alone would make the one case worth knowing about the one case that logs nothing.
+    if (connectors?.length) {
+      console.log('[chat-connectors]', JSON.stringify({
+        jobId, provider, connectors: connectors.length, durationMs: Date.now() - startedAt,
+        timeoutMs: providerTimeoutMs({ connectors: true, selfHosted: SELF_HOSTED }),
+      }));
+    }
     if (tools && (tools.stats.calls > 0 || tools.stats.toolsRefused)) {
       console.log('[chat-tools]', JSON.stringify({
         jobId, provider, funded, ...tools.stats, maxRounds: tools.maxRounds,
@@ -722,7 +743,7 @@ async function callOpenAIResponses(
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify(body),
-    });
+    }, providerTimeoutMs({ connectors: !!connectors?.length, selfHosted: SELF_HOSTED })); // SQEM-381
 
     if (!response.ok) {
       const errText = await response.text();
@@ -813,9 +834,10 @@ async function readOpenAiRound(
  */
 function advanceToolRound(tools: ToolRuntime): ToolRuntime | null {
   tools.stats.rounds += 1;
-  // ⛔ Time first, because it is the constraint that actually bites: the runtime kills the whole
-  // invocation at ~150 s and a killed function broadcasts NOTHING — the user watches a spinner until
-  // the client gives up. The round cap only guards a model that loops on cheap calls.
+  // ⛔ Time first, because it is the constraint that actually bites: the client gives up at 180 s
+  // and shows a timeout while the worker is still working — and on a free-tier self-host the worker
+  // itself is killed at 150 s, broadcasting NOTHING. The round cap only guards a model that loops on
+  // cheap calls.
   if (Date.now() >= tools.deadline) {
     tools.stats.cappedAt = tools.stats.rounds;
     tools.stats.cappedBy = 'time';
@@ -890,7 +912,7 @@ async function callClaude(
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-    });
+    }, providerTimeoutMs({ connectors: !!connectors?.length, selfHosted: SELF_HOSTED })); // SQEM-381
 
     if (!response.ok) {
       const errText = await response.text();

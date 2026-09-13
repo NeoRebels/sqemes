@@ -64,18 +64,54 @@ function routeRowsToRoutes(rows: RouteRow[] | null | undefined): PersonaRoute[] 
     .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-/** Every persona in the workspace the caller may see, with its routes. */
-export async function fetchPersonas(workspaceId: string): Promise<Persona[]> {
-  const { data, error } = await supabase
-    .from('personas')
-    .select('*, persona_templates(template_id, condition, sort_order, prompts!inner(title, kind))')
-    .eq('workspace_id', workspaceId)
-    .order('updated_at', { ascending: false });
+/**
+ * Every persona in the workspace the caller may see, with its routes.
+ *
+ * SQEM-393 — with `userId`, each persona also carries `isFavorite` for that person. Optional so the
+ * Chat picker, which has no use for stars, keeps its one query.
+ */
+export async function fetchPersonas(workspaceId: string, userId?: string): Promise<Persona[]> {
+  const [{ data, error }, favoriteIds] = await Promise.all([
+    supabase
+      .from('personas')
+      .select('*, persona_templates(template_id, condition, sort_order, prompts!inner(title, kind))')
+      .eq('workspace_id', workspaceId)
+      .order('updated_at', { ascending: false }),
+    userId ? fetchPersonaFavoriteIds(userId) : Promise.resolve(null),
+  ]);
   if (error) throw error;
 
-  return (data || []).map((row: any) =>
-    rowToPersona(row as PersonaRow, routeRowsToRoutes(row.persona_templates)),
-  );
+  return (data || []).map((row: any) => {
+    const persona = rowToPersona(row as PersonaRow, routeRowsToRoutes(row.persona_templates));
+    return favoriteIds ? { ...persona, isFavorite: favoriteIds.has(persona.id) } : persona;
+  });
+}
+
+// SQEM-393 — favourites, the `setFavorite`/`fetchFavoriteIds` pair of `prompts.ts` for personas.
+// Own rows only (RLS); a duplicate insert is the same as "already a favourite", not an error.
+export async function fetchPersonaFavoriteIds(userId: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('user_persona_favorites')
+    .select('persona_id')
+    .eq('user_id', userId);
+  if (error) throw error;
+  return new Set((data || []).map(f => f.persona_id));
+}
+
+export async function setPersonaFavorite(personaId: string, userId: string, isFavorite: boolean): Promise<void> {
+  if (isFavorite) {
+    const { error } = await supabase
+      .from('user_persona_favorites')
+      .insert({ user_id: userId, persona_id: personaId });
+    if (error && error.code !== '23505') throw error;
+  } else {
+    const { error } = await supabase
+      .from('user_persona_favorites')
+      .delete()
+      .eq('user_id', userId)
+      .eq('persona_id', personaId);
+    if (error) throw error;
+  }
 }
 
 export async function fetchPersona(id: string): Promise<Persona | null> {

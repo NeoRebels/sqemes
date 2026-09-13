@@ -7,6 +7,8 @@ export type SegmentedTab<T extends string> = {
   value: T;
   label: string;
   icon?: React.ReactNode;
+  /** SQEM-384 — native hover text; the kind tabs use it to say what a Prompt/Assistant/Skill is. */
+  title?: string;
 };
 
 export default function SegmentedTabs<T extends string>({
@@ -27,6 +29,7 @@ export default function SegmentedTabs<T extends string>({
       {tabs.map((tab) => (
         <button
           key={tab.value}
+          title={tab.title}
           onClick={() => onChange(tab.value)}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
             value === tab.value

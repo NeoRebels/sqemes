@@ -28,7 +28,7 @@ const code = (src: string) => src
   .replace(/\/\*[\s\S]*?\*\//g, '');
 
 describe('composeSystemInstruction', () => {
-  it('puts the assistant first and the skills after', () => {
+  it('puts the role first and the skills after', () => {
     // ⭐ Order is load-bearing, not cosmetic: a skill refines a role. Leading with a knowledge block
     // lets it argue with the persona that is supposed to own the conversation.
     const out = composeSystemInstruction('ROLE', ['SKILL_A', 'SKILL_B'])!;
@@ -41,7 +41,7 @@ describe('composeSystemInstruction', () => {
     expect(composeSystemInstruction(null, ['1', '2', '3'])).toBe('1\n\n2\n\n3');
   });
 
-  it('works with skills and no assistant', () => {
+  it('works with skills and no role', () => {
     expect(composeSystemInstruction(null, ['SKILL'])).toBe('SKILL');
   });
 
@@ -74,14 +74,14 @@ describe('SQEM-371 — the session is the owner of applied context', () => {
     const failedRestore = catchBlock.slice(0, catchBlock.indexOf('}\n      } catch'));
     expect(failedRestore).toMatch(/setActiveSkills\(\[\]\)/);
     expect(failedRestore).toMatch(/setActiveSystemInstruction\(''\)/);
-    expect(failedRestore).toMatch(/setActiveAssistantTemplate\(null\)/);
+    expect(failedRestore).toMatch(/setActivePersona\(null\)/); // SQEM-390 — the role is the persona now
   });
 
   it('applying and removing both reach the session, not just the client', () => {
     // Clearing only client state would put a removed skill back on the next reload — the same
     // write-only hole, re-created in the opposite direction.
     const writes = [...CHAT.matchAll(/updateAppliedContext\(/g)];
-    expect(writes.length).toBeGreaterThanOrEqual(4); // assistant apply/remove, skill apply/remove
+    expect(writes.length).toBeGreaterThanOrEqual(4); // persona apply/remove, skill apply/remove
   });
 
   it('a skill applied before the first message survives session creation', () => {
@@ -89,7 +89,7 @@ describe('SQEM-371 — the session is the owner of applied context', () => {
     expect(CHAT).toMatch(/createChatSession\([\s\S]{0,400}activeSkills\.map/);
   });
 
-  it('the request sends the composed instruction, never the assistant alone', () => {
+  it('the request sends the composed instruction, never the role alone', () => {
     expect(CHAT).toMatch(/systemInstruction: composeSystemInstruction\(/);
   });
 });
@@ -97,8 +97,10 @@ describe('SQEM-371 — the session is the owner of applied context', () => {
 describe('SQEM-371 — a skill is applied, a prompt is inserted', () => {
   const MODAL = code(readFileSync(root('components/TemplateLaunchModal.tsx'), 'utf8'));
 
-  it('assistant and skill take the applied path', () => {
-    expect(MODAL).toMatch(/kind === 'assistant' \|\| template\.kind === 'skill'/);
+  it('a skill takes the applied path', () => {
+    // SQEM-390 — this read `kind === 'assistant' || template.kind === 'skill'` until the kind went.
+    expect(MODAL).toMatch(/template\.kind === 'skill'\) \{/);
+    expect(MODAL).not.toMatch(/'assistant'/);
   });
 
   it('a prompt still goes to the composer', () => {

@@ -219,7 +219,6 @@ export interface TemplateDetail {
   argumentCount: number;
   variables: { name: string; label: string; type: string }[];
   contextFiles: Array<Record<string, unknown>>;
-  system_instruction?: string;
 }
 
 export interface PersonaSummary {
@@ -535,7 +534,7 @@ export async function createLibraryReader(
 
       const { data: templates } = await client
         .from('prompts')
-        .select('id, title, description, kind, content, system_instruction, variables, context_file_ids')
+        .select('id, title, description, kind, content, variables, context_file_ids')
         .eq('workspace_id', workspaceId)
         .or('published.eq.true,kind.eq.skill'); // SQEM-110/210 — vestigial guard
 
@@ -594,7 +593,6 @@ export async function createLibraryReader(
         variables:     vars.map((v: any) => ({ name: v.name, label: v.label, type: v.type })),
         contextFiles,
       };
-      if (tpl.system_instruction) result.system_instruction = tpl.system_instruction;
       return result;
     },
 

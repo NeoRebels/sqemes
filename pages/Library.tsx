@@ -5,8 +5,9 @@ import { IS_SELF_HOSTED, MARKETPLACE_ENABLED } from '../lib/env';
 import { TEMPLATE_CATEGORIES, CATEGORY_COLORS } from '../constants';
 import { LibraryTemplate, TemplateCategory, PromptKind } from '../types';
 import { voteListing, fetchMyVotes } from '../lib/api/library';
-import { Edit, Trash2, EyeOff, ArrowUpRight, Flame, Snowflake, PenTool, Bot, Wand2, Layers } from 'lucide-react';
+import { Edit, Trash2, EyeOff, ArrowUpRight, Flame, Snowflake, PenTool, Wand2, Layers } from 'lucide-react';
 import Card from '../components/ui/Card';
+import PageHeader from '../components/ui/PageHeader';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import SearchInput from '../components/ui/SearchInput';
@@ -115,22 +116,20 @@ const Library = () => {
   return (
     <div className="p-4 md:p-8 pb-16 md:pb-20 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 md:mb-10 gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Marketplace</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-2">Browse and save templates to your workspace</p>
-        </div>
-        {/* SQEM-182 — Cloud-admin moderation + publishers, in a self-contained overlay (stubbed to null
-            on self-host, so no admin surface ships there). */}
-        <MarketplaceAdminEntry />
-      </div>
+      {/* SQEM-182 — Cloud-admin moderation + publishers, in a self-contained overlay (stubbed to null
+          on self-host, so no admin surface ships there). */}
+      <PageHeader
+        title="Marketplace"
+        subtitle="Browse and save playbooks to your workspace"
+        actions={<MarketplaceAdminEntry />}
+      />
 
       {/* Search + Kind filter — mirrors the Templates / Files bar */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Search templates..."
+          placeholder="Search playbooks..."
         />
         <SegmentedTabs<'all' | PromptKind>
           value={activeKind}
@@ -139,7 +138,6 @@ const Library = () => {
           tabs={[
             { value: 'all', label: 'All' },
             { value: 'prompt', label: 'Prompts', icon: <PenTool className="w-3 h-3" /> },
-            { value: 'assistant', label: 'Assistants', icon: <Bot className="w-3 h-3" /> },
             { value: 'skill', label: 'Skills', icon: <Wand2 className="w-3 h-3" /> },
           ]}
         />
@@ -172,9 +170,9 @@ const Library = () => {
           <div className="w-16 h-16 bg-slate-50 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
             <Layers className="w-8 h-8 text-slate-300 dark:text-slate-500" />
           </div>
-          <h3 className="text-slate-900 dark:text-slate-100 font-bold text-lg">No templates found</h3>
+          <h3 className="text-slate-900 dark:text-slate-100 font-bold text-lg">No playbooks found</h3>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            {search ? 'Try a different search term' : 'No templates in this category yet'}
+            {search ? 'Try a different search term' : 'No playbooks in this category yet'}
           </p>
         </div>
       ) : (
@@ -197,8 +195,8 @@ const Library = () => {
 
       {/* Delete Confirmation Modal */}
       <Modal open={!!deleteModalId} onClose={() => setDeleteModalId(null)} size="sm" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Delete Template?</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">This will permanently remove this template from the marketplace.</p>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Delete Playbook?</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">This will permanently remove this playbook from the marketplace.</p>
         <div className="flex gap-2">
           <button onClick={() => setDeleteModalId(null)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
           <Button variant="danger" onClick={() => handleDelete(deleteModalId!)} className="flex-1 py-2.5 text-xs shadow-lg hover:shadow-red-200">Yes, Delete</Button>
@@ -278,7 +276,7 @@ const MarketplaceCard = memo(function MarketplaceCard({
           to={`/library/${template.id}`}
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-brand-600 text-white text-xs font-bold rounded-lg hover:bg-brand-700 transition-all shadow-sm"
         >
-          <ArrowUpRight className="w-3.5 h-3.5" /> See template details
+          <ArrowUpRight className="w-3.5 h-3.5" /> See playbook details
         </Link>
       )}
     />

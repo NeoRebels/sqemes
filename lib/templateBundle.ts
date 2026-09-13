@@ -69,8 +69,8 @@ export async function buildBundle(
     bundleTemplates.push({
       ref: `t${bundleTemplates.length + 1}`,
       kind: t.kind, title: t.title, description: t.description, tag: t.tag ?? null,
-      variables: t.variables || [], content: t.content, systemInstruction: t.systemInstruction,
-      model: t.model, brandConfig: t.brandConfig, contextFileRefs,
+      variables: t.variables || [], content: t.content,
+      model: t.model, contextFileRefs,
     });
   }
 
@@ -105,22 +105,26 @@ export async function buildBundle(
 /** Read + validate a `.sqemes.zip` before showing the confirmation preview. */
 
 function buildPrompt(b: BundleTemplate, workspaceId: string, userId: string, contextFileIds: string[]): Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'> {
+  // SQEM-390 — a pre-2026-09-13 bundle may carry an assistant. It lands as a skill whose body is
+  // the old system instruction (the assistant's canonical text), falling back to `content` when
+  // there was none — exactly what the database migration did to the rows it found.
+  const legacyAssistant = b.kind === 'assistant';
+  const kind: PromptKind = legacyAssistant || b.kind === 'skill' ? 'skill' : 'prompt';
+  const content = legacyAssistant ? (b.systemInstruction || b.content || '') : (b.content || '');
   return {
     workspaceId,
-    kind: (b.kind || 'prompt') as PromptKind,
-    title: b.title || 'Imported template',
+    kind,
+    title: b.title || 'Imported playbook',
     description: b.description || '',
     tag: b.tag ?? null,
     variables: Array.isArray(b.variables) ? b.variables : [],
-    content: b.content || '',
-    systemInstruction: b.systemInstruction,
+    content,
     contextFileIds,
     model: b.model,
     createdBy: userId,
     usageCount: 0,
     isFavorite: false,
     published: true,
-    brandConfig: b.brandConfig,
   };
 }
 

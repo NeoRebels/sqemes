@@ -18,7 +18,6 @@ interface TemplateSnapshot {
   kind: PromptKind;
   title: string;
   content: string;
-  systemInstruction?: string;
   variables: Variable[];
   contextFileIds?: string[];
 }
@@ -160,7 +159,11 @@ export default function EditorTestPanel({ template, resetKey, onReset }: Props) 
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const systemInstruction = template.kind === 'assistant' ? (template.systemInstruction || undefined) : undefined;
+    // SQEM-390 — a skill is tested the way Chat applies it (SQEM-371): as system context, with the
+    // person typing the first message. This used to be the assistant's path; a skill's body went
+    // out as the first user message instead, which is how the extension inserts it but not how
+    // Chat or MCP use it.
+    const systemInstruction = template.kind === 'skill' ? (template.content.trim() || undefined) : undefined;
     // Funded (keyless) → send `funded` and omit modelId; the server picks the funded model.
     const funded = isFundedModel(selectedModel);
     const payloadBase = { workspaceId: workspace.id, modelId: funded ? undefined : selectedModel, funded, systemInstruction };
@@ -205,9 +208,9 @@ export default function EditorTestPanel({ template, resetKey, onReset }: Props) 
   }, [selectedModel, workspace, template]);
 
   const handleStartTest = async () => {
-    // Assistants carry their instructions (incl. content) in systemInstruction, so don't
-    // resend content as the first user message — just open the chat and send any context.
-    let content = template.kind === 'assistant' ? '' : (template.content ?? '');
+    // A skill is the system instruction (see sendMessage), so its body is not resent as the first
+    // user message — the chat opens and only the context files go out, if there are any.
+    let content = template.kind === 'skill' ? '' : (template.content ?? '');
     template.variables.forEach(v => {
       content = content.replace(new RegExp(`{{${v.name}}}`, 'g'), varInputs[v.name] ?? '');
     });
@@ -215,7 +218,7 @@ export default function EditorTestPanel({ template, resetKey, onReset }: Props) 
     const { textBlocks, images } = await resolveContextFiles();
     const parts = [...textBlocks, content.trim()].filter(Boolean);
     const firstMsg = parts.join('\n\n');
-    if (!firstMsg && !images.length && template.kind !== 'assistant') return;
+    if (!firstMsg && !images.length && template.kind !== 'skill') return;
 
     setTestStarted(true);
     if (firstMsg || images.length) sendMessage(firstMsg, [], images);

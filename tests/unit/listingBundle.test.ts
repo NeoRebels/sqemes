@@ -51,18 +51,18 @@ describe('listingToBundle', () => {
   });
 
   // The restriction this ticket removed: the old download was an Agent Skill folder and therefore
-  // skills only. All three kinds must now survive the trip.
-  it.each(['prompt', 'assistant', 'skill'] as const)('carries a %s', async kind => {
+  // skills only. Both kinds must survive the trip.
+  it.each(['prompt', 'skill'] as const)('carries a %s', async kind => {
     const m = await manifestOf(await listingToBundle(listing({ kind }), null));
     expect(m.templates[0].kind).toBe(kind);
   });
 
-  it('keeps an assistant’s system instruction and a prompt’s variables', async () => {
+  it('keeps a prompt’s variables, and writes no legacy field', async () => {
     const vars = [{ name: 'topic', label: 'Topic', type: 'text' }];
-    const m = await manifestOf(await listingToBundle(
-      listing({ kind: 'assistant', systemInstruction: 'You are terse.', variables: vars as never }), null,
-    ));
-    expect(m.templates[0].systemInstruction).toBe('You are terse.');
+    const m = await manifestOf(await listingToBundle(listing({ kind: 'prompt', variables: vars as never }), null));
     expect(m.templates[0].variables).toEqual(vars);
+    // SQEM-390 — `systemInstruction` is read-only legacy in the format; the writer never emits it.
+    expect(m.templates[0]).not.toHaveProperty('systemInstruction');
+    expect(m.templates[0]).not.toHaveProperty('brandConfig');
   });
 });

@@ -1,4 +1,6 @@
 import React from 'react';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
+import PullToRefreshIndicator from './PullToRefreshIndicator';
 
 /**
  * SQEM-099 — Scroll-safe full-screen wrapper for pages rendered outside `Layout`.
@@ -14,8 +16,13 @@ import React from 'react';
  * whole app: content it cannot scroll to is a button nobody can press. Written down because the
  * fix existed, was documented here by name, and still was not everywhere — nothing checked.
  */
-const ScrollScreen = ({ children, className = '' }: React.PropsWithChildren<{ className?: string }>) => (
-  <div className={`h-dvh overflow-y-auto ${className}`}>
+const ScrollScreen = ({ children, className = '' }: React.PropsWithChildren<{ className?: string }>) => {
+  // SQEM-385 — this is its own scroll container, so it gets its own pull-to-refresh.
+  const ref = React.useRef<HTMLDivElement>(null);
+  const pull = usePullToRefresh(ref);
+  return (
+  <div ref={ref} className={`h-dvh overflow-y-auto overscroll-y-contain ${className}`}>
+    <PullToRefreshIndicator {...pull} />
     {/* SQEM-360 — `h-dvh` tracks the viewport that is actually visible, so the bottom no longer
         sits behind iOS Safari's toolbar the way `h-screen` (= the large 100vh) did. The bottom
         padding stays: `dvh` follows the toolbar as it collapses and expands, and during that
@@ -24,6 +31,7 @@ const ScrollScreen = ({ children, className = '' }: React.PropsWithChildren<{ cl
       {children}
     </div>
   </div>
-);
+  );
+};
 
 export default ScrollScreen;

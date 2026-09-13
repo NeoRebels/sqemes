@@ -37,7 +37,7 @@ export async function buildAccountExport(
   const report = (step: string) => onProgress?.({ step });
 
   // ---- Templates -------------------------------------------------------------------------------
-  report('Collecting templates…');
+  report('Collecting playbooks…');
   // ⚠️ SQEM-267 — this used `fetchPrompts`, which filters `kind = 'prompt'`. So `templates.json`
   // contained the prompts and **silently omitted every assistant and every skill**, while the README
   // three functions below promised "every template you can see in this workspace". A data export that
@@ -125,7 +125,7 @@ export async function buildAccountExport(
       `Created ${new Date().toISOString()}`,
       '',
       'Contents',
-      '  templates.json  every template you can see in this workspace',
+      '  playbooks.json  every playbook you can see in this workspace',
       '  chats.json      your chat sessions, each with its messages',
       '  files.json      metadata for the workspace files',
       '  files/          the files themselves',

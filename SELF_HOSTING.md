@@ -33,14 +33,14 @@ only** and simply stay off when their secret is absent — nothing breaks.
 
 | ✅ Fair-code (self-host) | ☁️ Sqemes Cloud only |
 |---|---|
-| Core data model, prompt/assistant/skill management | Managed hosting & infrastructure |
+| Core data model, prompt/skill/persona management | Managed hosting & infrastructure |
 | MCP server + OAuth (Claude Desktop / claude.ai) | Billing & subscriptions (Stripe) |
 | Chrome extension | Platform "Sqemes AI" funded model |
 | Multi-user workspaces, invites, roles | Transactional email delivery (Resend) |
 | BYOK AI providers (OpenAI, Anthropic, Gemini, Mistral, …) | Error monitoring (Sentry) |
 | Workspace file library + signed-URL delivery | Priority support / SLA, Enterprise SSO, audit logs |
 | Connectors — Notion, Shopify, Outlook, MS Graph (your own OAuth apps) | Marketplace **submission review** + the super-admin review surface |
-| Marketplace **reading** — browse, vote, copy a published template | — |
+| Marketplace **reading** — browse, vote, copy a published playbook | — |
 
 Every Cloud-only feature is gated on a secret — **absent secret → feature disabled, no crash**
 (see the "Graceful degradation" table at the bottom). Set `SELF_HOSTED=true` (+ `VITE_SELF_HOSTED=true`)
@@ -250,7 +250,7 @@ npm run build        # → dist/
 
 ### 8. First run
 Sign up (creates your workspace), then **Settings → Integrations → add an AI provider key**
-(BYOK). You can now author templates, chat, and connect the MCP server / extension.
+(BYOK). You can now author playbooks, chat, and connect the MCP server / extension.
 
 ---
 
@@ -313,7 +313,7 @@ composers; deeply site-specific behaviour (and exotic editors) may vary.
 The global marketplace is **Cloud-hosted, self-host-readable**. Your instance talks to it over a
 public endpoint — there is no marketplace database of your own to run.
 
-**Browsing works out of the box.** Browse, vote, and copy a published template into your workspace;
+**Browsing works out of the box.** Browse, vote, and copy a published playbook into your workspace;
 nothing to configure. Controlled by `VITE_MARKETPLACE_API_URL` in the bundle `.env`:
 
 | Value | Effect |
@@ -322,7 +322,7 @@ nothing to configure. Controlled by `VITE_MARKETPLACE_API_URL` in the bundle `.e
 | a URL | Reads that instance's marketplace instead |
 | **empty** | **Marketplace disabled** — the nav item hides entirely |
 
-**Submitting your own templates** needs a **publisher token** (submissions are reviewed, so the
+**Submitting your own playbooks** needs a **publisher token** (submissions are reviewed, so the
 marketplace stays curated — it is invite-based today). Request one from Sqemes, then set it in the
 app under **Settings → General → Marketplace Publisher**. It is stored **encrypted in your database**
 and takes effect immediately — no restart, no rebuild. The env var `MARKETPLACE_PUBLISHER_TOKEN` in
@@ -450,7 +450,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.11.12       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.11.13       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### ⛔ 3a. Before v1.11.9: count your workspace-wide MCP keys
@@ -643,7 +643,11 @@ If you would rather it did not, block `/#/library/` at your reverse proxy — bu
 reaches the server, so the block has to happen in the browser or not at all. Removing the route in a
 fork is the reliable way.
 
-*Last updated: 2026-08-19 (SQEM-258) — one page now renders without signing in: a marketplace
+*Last updated: 2026-09-13 (SQEM-394) — templates are called **playbooks** in the app; the routes moved to
+`/playbooks` and every old link redirects. Nothing changes for an operator. Earlier the same day
+(SQEM-390) — the assistant template kind is gone: on upgrade the migration
+turns every assistant into a skill with the same text, and a role is a persona. Earlier: 2026-08-19
+(SQEM-258) — one page now renders without signing in: a marketplace
 listing. Written down because it changes what your instance answers without a session, even though
 nothing of yours is exposed by it — the data comes from the Cloud marketplace's own public endpoint,
 which your instance already reads.*

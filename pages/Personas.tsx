@@ -8,10 +8,13 @@
 // If personas ever reach the Dashboard, this is the moment to reconsider — not before.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Plus, Users, Loader2, Route as RouteIcon, Edit, Copy, FolderDown, Trash2, Sparkles, Lock, Upload } from 'lucide-react';
+import { Plus, Users, Loader2, Route as RouteIcon, Edit, Copy, FolderDown, Trash2, Sparkles, Lock, Upload, Star } from 'lucide-react';
 import { useWorkspace, useUI, usePrompts, useData } from '../store';
 import { can } from '../lib/permissions';
-import { fetchPersonas, duplicatePersona, deletePersona } from '../lib/api/personas';
+import { fetchPersonas, duplicatePersona, deletePersona, setPersonaFavorite, updatePersona } from '../lib/api/personas';
+import { collectWorkspaceTags } from '../lib/workspaceTags';
+import TagFilter from '../components/ui/TagFilter';
+import TagEditor from '../components/ui/TagEditor';
 import { fetchRestrictedPersonaIds } from '../lib/api/personaAccess';
 import { buildBundle, downloadBlob, readBundle, importBundle } from '../lib/templateBundle';
 import type { BundleManifest } from '../lib/bundleFormat';
@@ -19,6 +22,7 @@ import type { Persona } from '../types';
 import TemplateCard from '../components/ui/TemplateCard';
 import EmptyState from '../components/ui/EmptyState';
 import SearchInput from '../components/ui/SearchInput';
+import PageHeader from '../components/ui/PageHeader';
 import Checkbox from '../components/ui/Checkbox';
 import BulkActionBar from '../components/ui/BulkActionBar';
 import ConfirmModal from '../components/ui/ConfirmModal';
@@ -70,6 +74,9 @@ export default function Personas() {
   const { workspaceFiles } = useData();
   const [personas, setPersonas] = useState<Persona[] | null>(null);
   const [search, setSearch] = useState('');
+  // SQEM-393 — the two filters the Playbooks archive has had since SQEM-071/087.
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Persona[] | null>(null);
@@ -88,7 +95,7 @@ export default function Personas() {
     let cancelled = false;
     (async () => {
       try {
-        const rows = await fetchPersonas(workspace.id);
+        const rows = await fetchPersonas(workspace.id, currentUser.id); // SQEM-393 — with the stars
         if (!cancelled) setPersonas(rows);
         // SQEM-330 — for the Restricted badge. ⚠️ Failure is silent on purpose: the badge is
         // information, and a toast about a missing badge while somebody browses personas is noise
@@ -108,15 +115,50 @@ export default function Personas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspace?.id]);
 
+  // SQEM-393 — the tag vocabulary: playbooks + files + personas (see `collectWorkspaceTags`).
+  const allTags = useMemo(
+    () => collectWorkspaceTags(prompts, workspaceFiles, personas ?? []),
+    [prompts, workspaceFiles, personas],
+  );
+
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return personas ?? [];
-    return (personas ?? []).filter(p =>
-      p.title.toLowerCase().includes(q) ||
-      p.description.toLowerCase().includes(q) ||
-      p.routes.some(r => (r.templateTitle || '').toLowerCase().includes(q)),
-    );
-  }, [personas, search]);
+    return (personas ?? []).filter(p => {
+      if (showFavoritesOnly && !p.isFavorite) return false;
+      if (selectedTag && !p.tags.includes(selectedTag)) return false;
+      if (!q) return true;
+      return p.title.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q) ||
+        p.routes.some(r => (r.templateTitle || '').toLowerCase().includes(q));
+    });
+  }, [personas, search, showFavoritesOnly, selectedTag]);
+
+  // SQEM-393 — optimistic, then the row; on failure the state goes back and the toast says so.
+  // The same shape as `toggleFavorite` in `store/prompts.tsx`, kept here because personas are not
+  // in the store (see the header).
+  const toggleFavorite = async (persona: Persona) => {
+    const next = !persona.isFavorite;
+    setPersonas(prev => (prev ?? []).map(p => p.id === persona.id ? { ...p, isFavorite: next } : p));
+    try {
+      await setPersonaFavorite(persona.id, currentUser.id, next);
+      showToast(next ? 'Added to favorites' : 'Removed from favorites', 'success');
+    } catch (err: any) {
+      setPersonas(prev => (prev ?? []).map(p => p.id === persona.id ? { ...p, isFavorite: persona.isFavorite } : p));
+      showToast(err?.message || 'Failed to update favourite', 'error');
+    }
+  };
+
+  // One tag per persona in the UI; the column stays an array (SQEM-324) so nothing below changes.
+  const setTag = async (persona: Persona, tag: string | null) => {
+    const tags = tag ? [tag] : [];
+    setPersonas(prev => (prev ?? []).map(p => p.id === persona.id ? { ...p, tags } : p));
+    try {
+      await updatePersona(persona.id, { tags });
+    } catch (err: any) {
+      setPersonas(prev => (prev ?? []).map(p => p.id === persona.id ? { ...p, tags: persona.tags } : p));
+      showToast(err?.message || 'Failed to update tag', 'error');
+    }
+  };
 
   const visibleIds = visible.map(p => p.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.has(id));
@@ -165,8 +207,8 @@ export default function Personas() {
       downloadBlob(blob, name);
       showToast(
         templates.length
-          ? `Downloaded ${toExport.length} persona${toExport.length === 1 ? '' : 's'} with ${templates.length} template${templates.length === 1 ? '' : 's'}`
-          : 'Downloaded — this persona has no routes, so no templates travelled with it',
+          ? `Downloaded ${toExport.length} persona${toExport.length === 1 ? '' : 's'} with ${templates.length} playbook${templates.length === 1 ? '' : 's'}`
+          : 'Downloaded — this persona has no routes, so no playbooks travelled with it',
         'success',
       );
     } catch (err: any) {
@@ -208,9 +250,9 @@ export default function Personas() {
       // Re-read rather than patch state: the import created templates too, and the routes point at
       // ids only the server knows. Guessing them here would be a second, worse implementation of
       // what the query already answers.
-      setPersonas(await fetchPersonas(workspace.id));
+      setPersonas(await fetchPersonas(workspace.id, currentUser.id));
       showToast(
-        `Imported ${created} persona${created === 1 ? '' : 's'}` + (templates ? ` and ${templates} template${templates === 1 ? '' : 's'}` : ''),
+        `Imported ${created} persona${created === 1 ? '' : 's'}` + (templates ? ` and ${templates} playbook${templates === 1 ? '' : 's'}` : ''),
         'success',
       );
     } catch (err: any) {
@@ -237,17 +279,29 @@ export default function Personas() {
     }
   };
 
+  // SQEM-388 — one definition, two places (header and empty state), like the Templates page's
+  // `wizardButton`. No brand gate here, unlike the Template Wizard: a persona describes how a role
+  // works, not how the brand sounds (SQEM-325).
+  const wizardButton = !IS_SELF_HOSTED && canEdit ? (
+    <button
+      onClick={() => setWizardOpen(true)}
+      className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 px-5 py-2.5 rounded-xl font-medium text-sm transition-all justify-center"
+    >
+      <Sparkles className="w-4 h-4" /> Persona Wizard
+    </button>
+  ) : null;
+
   return (
     <div className="p-4 md:p-8 pb-16 md:pb-20 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 md:mb-10 gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Personas</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-2">
-            A working role that knows which of your templates to reach for, and when
-          </p>
-        </div>
-        {canEdit && (
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+      {/* SQEM-384 — two of three UX testers read "Persona" as a person on the team. The second
+          sentence answers that, and names where a persona works: Chat (since SQEM-373) and MCP.
+          ⛔ NOT the extension — it inserts templates into ChatGPT & Co. and knows nothing of
+          personas. The first cut said "the extension" here; the owner caught it on staging. */}
+      <PageHeader
+        title="Personas"
+        subtitle="A working role that knows which of your playbooks to reach for, and when — an AI role, not a team member. Works in Chat and via MCP."
+        actions={canEdit && (
+          <>
             {/* SQEM-325 — Cloud-only, like the Template Wizard. ⚠️ Not for want of model access:
                 `runAuthoringAI` works on self-host over BYOK, and the enhance buttons in the editor
                 use it there. The wizard is Cloud's guided surface, which is a product decision
@@ -257,32 +311,36 @@ export default function Personas() {
             <input ref={importInputRef} type="file" accept=".zip,.sqemes" onChange={handleImportFile} className="hidden" />
             <button
               onClick={() => importInputRef.current?.click()}
-              title="Import a .sqemes.zip bundle — personas arrive with the templates they route to"
+              title="Import a .sqemes.zip bundle — personas arrive with the playbooks they route to"
               className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 px-4 py-2.5 rounded-xl font-medium text-sm transition-all justify-center"
             >
               <Upload className="w-4 h-4" /> Import
             </button>
-            {!IS_SELF_HOSTED && (
-              <button
-                onClick={() => setWizardOpen(true)}
-                className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 px-5 py-2.5 rounded-xl font-medium text-sm transition-all justify-center"
-              >
-                <Sparkles className="w-4 h-4" /> Persona Wizard
-              </button>
-            )}
+            {wizardButton}
             <Link
               to="/personas/new"
               className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-brand-200 hover:shadow-brand-300 dark:shadow-none flex-1 sm:flex-none justify-center"
             >
               <Plus className="w-5 h-5" /> New Persona
             </Link>
-          </div>
+          </>
         )}
-      </div>
+      />
 
       {(personas?.length ?? 0) > 0 && (
         <div className="flex items-center gap-2 mb-8 flex-wrap">
           <SearchInput value={search} onChange={setSearch} placeholder="Search personas..." />
+          {/* SQEM-393 — the same toggle and the same filter as the Playbooks archive. */}
+          <button
+            onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+            className={`flex items-center gap-1.5 self-stretch px-3.5 py-2 rounded-xl text-sm font-medium border transition-all ${showFavoritesOnly ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-700 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+          >
+            <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-current' : ''}`} />
+            Favorites
+          </button>
+          {allTags.length > 0 && (
+            <TagFilter tags={allTags} value={selectedTag} onChange={setSelectedTag} />
+          )}
         </div>
       )}
 
@@ -316,33 +374,36 @@ export default function Personas() {
           icon={<Users className="w-8 h-8 text-brand-400" />}
           iconWrapClassName="bg-brand-50 dark:bg-brand-900/20"
           title="No personas yet"
-          description="A persona bundles the templates one role needs, with a condition for each."
+          description="A persona bundles the playbooks one role needs, with a condition for each."
           extra={
             <div className="max-w-md mx-auto mt-4 text-left text-sm text-slate-500 dark:text-slate-400 space-y-2">
               <p>
                 <span className="font-semibold text-slate-700 dark:text-slate-200">Example — “Sales”:</span>{' '}
-                the offer-layout skill when a quote is being written, the workshop template when a
+                the offer-layout skill when a quote is being written, the workshop playbook when a
                 workshop is offered, the use-case generator when somebody asks what AI could do for them.
               </p>
               <p>
-                Your MCP client loads the persona, then fetches a template only once its condition
-                applies — so the knowledge arrives when it is needed instead of all at once.
+                Chat or your MCP client loads the persona, then fetches a playbook only once its
+                condition applies — so the knowledge arrives when it is needed instead of all at once.
               </p>
             </div>
           }
           action={canEdit ? (
-            <Link to="/personas/new" className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all">
-              <Plus className="w-4 h-4" /> Create your first persona
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link to="/personas/new" className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all">
+                <Plus className="w-4 h-4" /> Create your first persona
+              </Link>
+              {wizardButton}
+            </div>
           ) : undefined}
         />
       )}
 
       {personas !== null && personas.length > 0 && visible.length === 0 && (
         <EmptyState
-          icon={<Users className="w-8 h-8 text-slate-400" />}
-          title="Nothing matches"
-          description="No persona matches your search."
+          icon={showFavoritesOnly ? <Star className="w-8 h-8 text-amber-300" /> : <Users className="w-8 h-8 text-slate-400" />}
+          title={showFavoritesOnly ? 'No favourite personas' : 'Nothing matches'}
+          description={showFavoritesOnly ? 'Star personas to see them here.' : 'No persona matches your search or filters.'}
         />
       )}
 
@@ -368,8 +429,29 @@ export default function Personas() {
                   />
                 </label>
               )}
+              topRight={(
+                /* SQEM-393 — the star, exactly where the playbook card has it. */
+                <button
+                  onClick={e => { e.preventDefault(); e.stopPropagation(); void toggleFavorite(persona); }}
+                  className="absolute top-1.5 right-1.5 z-20 p-3 text-slate-300 hover:text-amber-400 hover:scale-110 transition-all focus:outline-none"
+                  title={persona.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  <Star className={`w-5 h-5 ${persona.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`} />
+                </button>
+              )}
+              /* SQEM-393 — the tag above the title: chip + "+ tag" while there is none and the person may edit. */
+              badges={(
+                <TagEditor
+                  tags={persona.tags.slice(0, 1)}
+                  available={canEdit && persona.tags.length === 0 ? workspace.tags : []}
+                  canEdit={canEdit}
+                  onAdd={tag => void setTag(persona, tag)}
+                  onRemove={() => void setTag(persona, null)}
+                />
+              )}
               title={persona.title}
-              titleHref={`/personas/${persona.id}/edit`}
+              /* SQEM-389 — the title opens the persona in Chat, like a playbook card; edit is the pencil. */
+              titleHref={`/personas/${persona.id}`}
               description={persona.description}
               /* Title → description → what it routes to → what you can do with it. The chips answer
                  "what does this persona actually do", which continues the description rather than
@@ -390,7 +472,7 @@ export default function Personas() {
                   <button
                     onClick={e => { e.preventDefault(); void handleExport([persona]); }}
                     className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-                    title="Download persona with its templates (.sqemes.zip)"
+                    title="Download persona with its playbooks (.sqemes.zip)"
                   >
                     <FolderDown className="w-4 h-4" />
                   </button>
@@ -461,12 +543,12 @@ export default function Personas() {
           </span>{' '}
           and{' '}
           <span className="font-semibold text-slate-600 dark:text-slate-300">
-            {(importData?.manifest.templates || []).length} template{(importData?.manifest.templates || []).length === 1 ? '' : 's'}
+            {(importData?.manifest.templates || []).length} playbook{(importData?.manifest.templates || []).length === 1 ? '' : 's'}
           </span>
           {(importData?.manifest.files || []).length ? ` plus ${(importData?.manifest.files || []).length} context file${(importData?.manifest.files || []).length === 1 ? '' : 's'}` : ''} to {workspace?.name}.
         </p>
         <p>
-          The templates are created as copies — a persona&apos;s routes must point at something, so they
+          The playbooks are created as copies — a persona&apos;s routes must point at something, so they
           travel with it. Access rules do not: an imported persona starts under this workspace&apos;s own rule.
         </p>
       </ConfirmModal>
@@ -481,7 +563,7 @@ export default function Personas() {
       >
         <p>
           {pendingDelete && pendingDelete.length > 1 ? 'The personas and their routes are' : 'The persona and its routes are'} removed.{' '}
-          <span className="font-semibold text-slate-600 dark:text-slate-300">The templates themselves are not touched</span> — they keep working on their own.
+          <span className="font-semibold text-slate-600 dark:text-slate-300">The playbooks themselves are not touched</span> — they keep working on their own.
         </p>
       </ConfirmModal>
     </div>

@@ -6,7 +6,6 @@ import * as chatSessionsApi from '../lib/api/chatSessions';
 import * as filesApi from '../lib/api/files';
 
 export interface DataState {
-  assistants: Prompt[];
   libraryTemplates: LibraryTemplate[];
   fetchLibraryTemplates: () => void;
   addLibraryTemplate: (template: LibraryTemplate) => Promise<LibraryTemplate | undefined>;
@@ -29,7 +28,6 @@ export function useDataState(
   currentUser: User,
   showToast: (message: string, type: 'success' | 'error' | 'info') => void,
 ) {
-  const [assistants, setAssistants] = useState<Prompt[]>([]);
   const [libraryTemplates, setLibraryTemplates] = useState<LibraryTemplate[]>([]);
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
@@ -147,7 +145,6 @@ export function useDataState(
   }, [showToast]);
 
   return {
-    assistants, setAssistants,
     libraryTemplates, setLibraryTemplates,
     chatSessions, setChatSessions,
     workspaceFiles, setWorkspaceFiles,

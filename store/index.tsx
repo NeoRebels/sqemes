@@ -4,7 +4,6 @@ import { setMonitoringUser, clearMonitoringUser, logError } from '../lib/monitor
 import * as workspacesApi from '../lib/api/workspaces';
 import * as promptsApi from '../lib/api/prompts';
 import type { PromptRow } from '../lib/api/prompts';
-import * as assistantsApi from '../lib/api/assistants';
 import * as libraryApi from '../lib/api/library';
 import * as chatSessionsApi from '../lib/api/chatSessions';
 import type { ChatSessionRow } from '../lib/api/chatSessions';
@@ -190,7 +189,6 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
             localStorage.removeItem(cacheKey);
           } else {
             pr.setPrompts(cached.prompts);
-            da.setAssistants(cached.assistants);
             da.setChatSessions(cached.chatSessions ?? []);
             if (!initialDataLoaded.current) {
               initialDataLoaded.current = true;
@@ -204,9 +202,8 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
 
       ui.setIsBackgroundFetching(true);
       try {
-        const [promptsData, assistantsData, libraryData, chatSessionsData, workspaceFilesData, skillsData, favoriteIds] = await Promise.all([
+        const [promptsData, libraryData, chatSessionsData, workspaceFilesData, skillsData, favoriteIds] = await Promise.all([
           promptsApi.fetchPrompts(wsId, ws.currentUser.id),
-          assistantsApi.fetchAssistants(wsId),
           libraryApi.fetchLibraryTemplates().catch(() => []),
           chatSessionsApi.fetchChatSessions(wsId, ws.currentUser.id).catch(() => [] as Awaited<ReturnType<typeof chatSessionsApi.fetchChatSessions>>),
           filesApi.fetchWorkspaceFiles(wsId).catch(() => []),
@@ -217,12 +214,10 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
         if (wsId !== activeWsRef.current) return;
 
         // SQEM-087 — favourites are per-user across all kinds; fetchPrompts wires them for
-        // prompts, but skills/assistants come from fetchers that don't, so apply here too.
+        // prompts, but skills come from a fetcher that doesn't, so apply here too.
         const favSkills = skillsData.map(p => ({ ...p, isFavorite: favoriteIds.has(p.id) }));
-        const favAssistants = assistantsData.map(p => ({ ...p, isFavorite: favoriteIds.has(p.id) }));
 
-        pr.setPrompts([...promptsData, ...favSkills, ...favAssistants]);
-        da.setAssistants(favAssistants);
+        pr.setPrompts([...promptsData, ...favSkills]);
         da.setLibraryTemplates(libraryData);
         da.setChatSessions(chatSessionsData);
         da.setWorkspaceFiles(workspaceFilesData);
@@ -232,8 +227,7 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
           localStorage.setItem(cacheKey, JSON.stringify({
             version: CACHE_VERSION,
             cachedAt: Date.now(),
-            prompts: [...promptsData, ...skillsData, ...assistantsData],
-            assistants: assistantsData,
+            prompts: [...promptsData, ...skillsData],
             chatSessions: chatSessionsData,
           }));
         } catch { /* storage quota exceeded — ignore */ }
@@ -359,7 +353,6 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
   }), [pr.prompts, pr.addPrompt, pr.updatePrompt, pr.toggleFavorite, pr.deletePrompt, pr.deletePrompts, pr.duplicatePrompt]);
 
   const dataValue = useMemo(() => ({
-    assistants: da.assistants,
     libraryTemplates: da.libraryTemplates, fetchLibraryTemplates: da.fetchLibraryTemplates,
     addLibraryTemplate: da.addLibraryTemplate, updateLibraryTemplate: da.updateLibraryTemplate,
     deleteLibraryTemplate: da.deleteLibraryTemplate, copyTemplateToWorkspace: da.copyTemplateToWorkspace,
@@ -368,7 +361,6 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
     removeWorkspaceFiles: da.removeWorkspaceFiles,
     skills: da.skills,
   }), [
-    da.assistants,
     da.libraryTemplates, da.fetchLibraryTemplates, da.addLibraryTemplate,
     da.updateLibraryTemplate, da.deleteLibraryTemplate, da.copyTemplateToWorkspace,
     da.workspaceFiles, da.addWorkspaceFile, da.patchWorkspaceFile, da.removeWorkspaceFile,

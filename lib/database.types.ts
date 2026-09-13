@@ -404,6 +404,7 @@ export type Database = {
           model: string;
           assistant_id: string | null;
           applied_skill_ids: string[];
+          persona_id: string | null;
           visibility: 'private' | 'workspace';
           is_generating: boolean;
           pinned: boolean;
@@ -418,6 +419,7 @@ export type Database = {
           model?: string;
           assistant_id?: string | null;
           applied_skill_ids?: string[];
+          persona_id?: string | null;
           visibility?: 'private' | 'workspace';
           is_generating?: boolean;
           pinned?: boolean;
@@ -432,6 +434,7 @@ export type Database = {
           model?: string;
           assistant_id?: string | null;
           applied_skill_ids?: string[];
+          persona_id?: string | null;
           visibility?: 'private' | 'workspace';
           is_generating?: boolean;
           pinned?: boolean;
@@ -484,6 +487,25 @@ export type Database = {
         Update: {
           user_id?: string;
           prompt_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      // SQEM-393 — favourite personas, the twin of the table above (a persona is not a `prompts` row).
+      user_persona_favorites: {
+        Row: {
+          user_id: string;
+          persona_id: string;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          persona_id: string;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          persona_id?: string;
           created_at?: string;
         };
         Relationships: [];

@@ -132,12 +132,12 @@ export default function AccessGroupsCard({
        `mt-*`. Keeping the prop means the card does not have to know which kind of parent it is in. */
     <Card className={`p-6 md:p-8 animate-fade-in ${className}`}>
       {/* SQEM-300 — no icon. It was written for "Team Members" directly above, which has none; after
-          SQEM-304 the neighbour is "Template Access", which has none either. The reason held through
+          SQEM-304 the neighbour is "Playbook Access", which has none either. The reason held through
           the move, which is the useful kind of reason. */}
       <div className="mb-1">
         <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Access Groups</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Name a set of people once, then grant a template to the group instead of to each person. Adding somebody to a group gives them everything that group can reach.
+          Name a set of people once, then grant a playbook to the group instead of to each person. Adding somebody to a group gives them everything that group can reach.
         </p>
       </div>
 
@@ -211,7 +211,7 @@ export default function AccessGroupsCard({
 
       {/* SQEM-329 — the sentence has to name the consequence, and the consequence depends on a
           number we had to fetch first. That is why the count is carried in state rather than
-          computed while rendering: a dialog that says "0 templates" for a second and then corrects
+          computed while rendering: a dialog that says "0 playbooks" for a second and then corrects
           itself is worse than one that opens a moment later. */}
       <ConfirmModal
         open={!!pendingDelete}
@@ -224,13 +224,13 @@ export default function AccessGroupsCard({
         {pendingDelete && pendingDelete.used > 0 ? (
           <p>
             <span className="font-semibold text-slate-600 dark:text-slate-300">
-              {pendingDelete.used} template{pendingDelete.used === 1 ? '' : 's'}
+              {pendingDelete.used} playbook{pendingDelete.used === 1 ? '' : 's'}
             </span>{' '}
             currently grant access through this group — they will lose it, and nothing at the
-            template will say why.
+            playbook will say why.
           </p>
         ) : (
-          <p>It is not used by any template.</p>
+          <p>It is not used by any playbook.</p>
         )}
       </ConfirmModal>
     </Card>

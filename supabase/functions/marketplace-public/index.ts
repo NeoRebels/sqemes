@@ -21,7 +21,7 @@ const CORS = {
 
 // Public column allowlist — do NOT add workspace_id, created_by, bundle_path, status, scan_risk, scan_reasons.
 const LIST_COLS =
-  'id, kind, title, description, category, tags, variables, steps, system_instruction, brand_config, usage_count, created_at, updated_at, score, vote_count, preview';
+  'id, kind, title, description, category, tags, variables, steps, usage_count, created_at, updated_at, score, vote_count, preview';
 const DETAIL_COLS = `${LIST_COLS}, content`;
 
 // Strip bundle_path (leaks the workspace id) and surface only its presence as a boolean.

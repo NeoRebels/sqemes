@@ -288,7 +288,7 @@ const ChoosePlanScreen = () => {
         {isLapsed && (
         <div className="max-w-md mx-auto mt-8 text-center">
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Your templates and files are yours. You can download all of them at any time, whether or not you resubscribe.
+            Your playbooks and files are yours. You can download all of them at any time, whether or not you resubscribe.
           </p>
           <button
             onClick={handleExport}

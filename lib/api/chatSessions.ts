@@ -2,7 +2,10 @@ import { supabase } from '../supabase';
 import type { Database } from '../database.types';
 import type { ChatSession, StoredChatMessage } from '../../types';
 
-export type ChatSessionRow = Database['public']['Tables']['chat_sessions']['Row'] & {
+// SQEM-390 — `assistant_id` is optional here because the explicit column lists no longer select it;
+// the column itself stays on the table (legacy, unread) and `select('*')` still returns it.
+export type ChatSessionRow = Omit<Database['public']['Tables']['chat_sessions']['Row'], 'assistant_id'> & {
+  assistant_id?: string | null;
   profiles?: { name: string; avatar: string } | null;
 };
 
@@ -22,8 +25,8 @@ function rowToChatSession(row: ChatSessionRow, currentUserId: string): ChatSessi
     userId: row.user_id,
     title: row.title,
     model: row.model,
-    assistantId: row.assistant_id || undefined,
     appliedSkillIds: row.applied_skill_ids ?? [],
+    personaId: row.persona_id || undefined,
     visibility: row.visibility,
     createdAt: row.created_at,
     lastActiveAt: row.last_active_at,
@@ -54,9 +57,12 @@ export async function createChatSession(
   currentUserId: string,
   title: string,
   model: string,
-  assistantId?: string,
   appliedSkillIds?: string[],
+  /** SQEM-389 — a persona applied before the first message rides along here, like the skills. */
+  personaId?: string,
 ): Promise<ChatSession> {
+  // SQEM-390 — `assistant_id` is no longer written: the assistant kind is gone, a skill is one of
+  // `applied_skill_ids`, and the role is `persona_id`. The column stays on the table, unread.
   const { data, error } = await supabase
     .from('chat_sessions')
     .insert({
@@ -64,8 +70,8 @@ export async function createChatSession(
       user_id: currentUserId,
       title,
       model,
-      assistant_id: assistantId || null,
       applied_skill_ids: appliedSkillIds ?? [],
+      persona_id: personaId || null,
     })
     .select()
     .single();
@@ -80,7 +86,7 @@ export async function fetchChatSessions(
 ): Promise<ChatSession[]> {
   const { data, error } = await supabase
     .from('chat_sessions')
-    .select('id, title, user_id, created_at, last_active_at, visibility, model, assistant_id, applied_skill_ids, is_generating, workspace_id, pinned')
+    .select('id, title, user_id, created_at, last_active_at, visibility, model, applied_skill_ids, persona_id, is_generating, workspace_id, pinned')
     .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
     .order('last_active_at', { ascending: false });
@@ -214,33 +220,35 @@ export async function unshareChatSession(sessionId: string): Promise<void> {
  * SQEM-371 — reads back the context applied to one session.
  *
  * ⛔ It had to be written, because nothing read `assistant_id`: it was set on create and never
- * fetched again, so a reload silently dropped the assistant. That is the half of this ticket that
- * looked like it already worked.
+ * fetched again, so a reload silently dropped the assistant. That is the half of that ticket that
+ * looked like it already worked. (SQEM-390 retired the column from this reader with the assistant
+ * kind; the migration moved every value into `applied_skill_ids` first.)
  */
 export async function fetchAppliedContext(
   sessionId: string,
-): Promise<{ assistantId: string | null; appliedSkillIds: string[] }> {
+): Promise<{ appliedSkillIds: string[]; personaId: string | null }> {
   const { data, error } = await supabase
     .from('chat_sessions')
-    .select('assistant_id, applied_skill_ids')
+    .select('applied_skill_ids, persona_id')
     .eq('id', sessionId)
     .single();
 
   if (error) throw error;
   return {
-    assistantId: (data as { assistant_id: string | null }).assistant_id ?? null,
     appliedSkillIds: (data as { applied_skill_ids: string[] | null }).applied_skill_ids ?? [],
+    // SQEM-389 — the persona is the session's role.
+    personaId: (data as { persona_id?: string | null }).persona_id ?? null,
   };
 }
 
 /** Persists a change to what is applied. Called on apply and on remove, never on send. */
 export async function updateAppliedContext(
   sessionId: string,
-  applied: { assistantId?: string | null; appliedSkillIds?: string[] },
+  applied: { appliedSkillIds?: string[]; personaId?: string | null },
 ): Promise<void> {
   const patch: Record<string, unknown> = {};
-  if ('assistantId' in applied) patch.assistant_id = applied.assistantId ?? null;
   if (applied.appliedSkillIds) patch.applied_skill_ids = applied.appliedSkillIds;
+  if ('personaId' in applied) patch.persona_id = applied.personaId ?? null; // SQEM-389
   if (!Object.keys(patch).length) return;
 
   const { error } = await supabase.from('chat_sessions').update(patch).eq('id', sessionId);

@@ -3,9 +3,10 @@ import { Link } from 'react-router';
 import {
   Upload, Search, Image, FileText, FileSpreadsheet, File,
   Trash2, Loader2, ExternalLink, ChevronDown, ArrowUpDown, Pencil,
-  Bot, Wand2, PenTool, Lock, Link2,
+  Wand2, PenTool, Lock, Link2,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
+import PageHeader from '../components/ui/PageHeader';
 import SearchInput from '../components/ui/SearchInput';
 import SegmentedTabs, { SegmentedTab } from '../components/ui/SegmentedTabs';
 import EmptyState from '../components/ui/EmptyState';
@@ -54,7 +55,6 @@ type SortKey = 'newest' | 'name' | 'largest' | 'mostused' | 'leastused';
 type FileUsage = { id: string; title: string; kind: string };
 
 function KindIcon({ kind, className }: { kind: string; className?: string }) {
-  if (kind === 'assistant') return <Bot className={className} />;
   if (kind === 'skill') return <Wand2 className={className} />;
   return <PenTool className={className} />;
 }
@@ -263,7 +263,7 @@ const FileRow = ({
                   ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-900/40 cursor-pointer'
                   : 'bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-default'
               }`}
-              title={usageCount > 0 ? `Referenced by ${usageCount} template${usageCount === 1 ? '' : 's'} — click to see which` : 'Not used by any template'}
+              title={usageCount > 0 ? `Referenced by ${usageCount} playbook${usageCount === 1 ? '' : 's'} — click to see which` : 'Not used by any playbook'}
             >
               {usageCount > 0 ? `Used in ${usageCount}` : 'Unused'}
             </button>
@@ -271,16 +271,16 @@ const FileRow = ({
               <div className="absolute left-0 top-full mt-1 z-20 w-56 max-h-64 overflow-y-auto bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-1 animate-scale-up origin-top-left">
                 <div className="px-3 py-1.5 border-b border-slate-50 dark:border-slate-700">
                   <p className="text-2xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                    Used in {usageCount} template{usageCount === 1 ? '' : 's'}
+                    Used in {usageCount} playbook{usageCount === 1 ? '' : 's'}
                   </p>
                 </div>
                 {usedBy.map(t => (
                   <Link
                     key={t.id}
-                    // SQEM-313 — the editor, not the legacy `/prompts/:id` shim (which lands in Chat).
+                    // SQEM-313 — the editor, not the `/playbooks/:id` shim (which lands in Chat).
                     // Someone opening "used in N templates" wants to see *where* the file hangs — and
                     // that is the context-file list in the editor, the only place they can remove it.
-                    to={`/prompts/${t.id}/edit`}
+                    to={`/playbooks/${t.id}/edit`}
                     onClick={() => setShowUsage(false)}
                     className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
                   >
@@ -294,7 +294,7 @@ const FileRow = ({
                   <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-400 dark:text-slate-500">
                     <Lock className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate italic">
-                      {restrictedCount} restricted template{restrictedCount === 1 ? '' : 's'}
+                      {restrictedCount} restricted playbook{restrictedCount === 1 ? '' : 's'}
                     </span>
                   </div>
                 )}
@@ -346,7 +346,7 @@ const FileRow = ({
             <span
               title={
                 usageCount > 0
-                  ? `Cannot be deleted — this file is in use by ${usageCount} template${usageCount === 1 ? '' : 's'}`
+                  ? `Cannot be deleted — this file is in use by ${usageCount} playbook${usageCount === 1 ? '' : 's'}`
                   : 'Delete file'
               }
               className="inline-flex"
@@ -507,7 +507,7 @@ export default function Files() {
   const handleBulkDelete = async () => {
     setBulkDeleting(true);
     if (selectedDeletable.length > 0) await removeWorkspaceFiles(selectedDeletable);
-    else showToast('Nothing deleted — every selected file is still used by a template', 'info');
+    else showToast('Nothing deleted — every selected file is still used by a playbook', 'info');
     setBulkDeleting(false);
     setBulkConfirm(false);
     setSelectedIds(new Set());
@@ -580,13 +580,10 @@ export default function Files() {
       onDrop={handleDrop}
     >
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 md:mb-10 gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Files</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-2">
-            Upload files to use as context in your templates · Max {MAX_FILE_SIZE_MB} MB per file
-          </p>
-        </div>
+      <PageHeader
+        title="Files"
+        subtitle={<>Upload files to use as context in your playbooks · Max {MAX_FILE_SIZE_MB} MB per file</>}
+        actions={<>
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
@@ -605,7 +602,8 @@ export default function Files() {
           className="hidden"
           onChange={e => handleFiles(e.target.files)}
         />
-      </div>
+        </>}
+      />
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-8">
@@ -622,7 +620,7 @@ export default function Files() {
         {usageOptions.length > 1 && (
           <SelectFilter
             icon={Link2}
-            ariaLabel="Filter by the template using the file"
+            ariaLabel="Filter by the playbook using the file"
             allLabel="All files"
             options={usageOptions}
             value={usedIn}
@@ -680,7 +678,7 @@ export default function Files() {
             icon={<Upload className="w-8 h-8 text-brand-400" />}
             iconWrapClassName="bg-brand-50 dark:bg-brand-900/20"
             title="No files yet"
-            description="Upload PDFs, documents, and images to use as context in your templates."
+            description="Upload PDFs, documents, and images to use as context in your playbooks."
             action={
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -729,7 +727,7 @@ export default function Files() {
             <Lock className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
               {selectedInUse.length} of the selected file{selectedInUse.length === 1 ? ' is' : 's are'} still
-              used by a template and will be kept. Detach {selectedInUse.length === 1 ? 'it' : 'them'} there first.
+              used by a playbook and will be kept. Detach {selectedInUse.length === 1 ? 'it' : 'them'} there first.
             </span>
           </p>
         )}

@@ -1,5 +1,4 @@
 import { runAuthoringAI } from './authoringAI';
-import { TONE_LABELS } from './compileBrandVoice';
 import type { BrandProfile, PromptKind } from '../types';
 
 // SQEM-106 Phase 3 — adapt a marketplace template to the workspace brand profile.
@@ -9,14 +8,14 @@ function brandContextLines(p: BrandProfile): string {
   if (p.brandName?.trim()) lines.push(`Brand name: ${p.brandName.trim()}`);
   if (p.whatItDoes?.trim()) lines.push(`What the brand does: ${p.whatItDoes.trim()}`);
   if (p.audience?.trim()) lines.push(`Audience: ${p.audience.trim()}`);
-  if (p.useCase?.trim()) lines.push(`Primary use case: ${p.useCase.trim()}`);
-  lines.push(`Preferred tone: ${TONE_LABELS[p.tone]}`);
+  // SQEM-395 — the three facts from Settings → Brand, and only those. A "preferred tone" line used to
+  // follow, from a 1–5 level nobody chose consciously; the owner's decision (2026-09-13) is that
+  // adaptation reads the brand fields a person maintains — not a generated skill they may delete.
   return lines.join('\n');
 }
 
 const KIND_NOUN: Record<PromptKind, string> = {
   prompt: 'prompt template',
-  assistant: 'assistant system instruction',
   skill: 'skill',
 };
 

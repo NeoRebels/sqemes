@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePrompts, useData } from '../store';
-import { Search, X, Loader2, Upload, Trash2, FileText as FileIcon, ChevronRight, Star, PenTool, Bot, Wand2 } from 'lucide-react';
+import { Search, X, Loader2, Upload, Trash2, FileText as FileIcon, ChevronRight, Star, PenTool, Wand2 } from 'lucide-react';
 import Modal from './ui/Modal';
 import SegmentedTabs from './ui/SegmentedTabs';
 import KindBadge from './ui/KindBadge';
@@ -21,8 +21,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onInsert: (text: string, template: Prompt, images: ContextImage[]) => void;
-  onAssistantSelect: (template: Prompt, systemInstruction: string, images: ContextImage[]) => void;
-  /** SQEM-371 — a skill is APPLIED like an assistant, not pasted into the composer. */
+  /** SQEM-371 — a skill is APPLIED (system context), not pasted into the composer. */
   onSkillSelect: (template: Prompt, context: string, images: ContextImage[]) => void;
   initialTemplateId?: string | null;
 }
@@ -30,8 +29,7 @@ interface Props {
 type Step = 'pick' | 'variables';
 type KindFilter = 'all' | PromptKind;
 
-export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssistantSelect,
-  onSkillSelect, initialTemplateId }: Props) {
+export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkillSelect, initialTemplateId }: Props) {
   const { prompts, toggleFavorite } = usePrompts();
   const { workspaceFiles } = useData();
 
@@ -100,14 +98,13 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssis
   const resolveAndLaunch = async (template: Prompt, variableInputs: Record<string, string>) => {
     setIsResolving(true);
     try {
-      // SQEM-371 — assistant and skill both become system context; only a prompt goes to the
-      // composer. ⛔ Until now there was one branch here and a skill fell through to the prompt
-      // path — while the header chip already announced it as applied. The header was right and the
-      // mechanism was wrong.
-      if (template.kind === 'assistant' || template.kind === 'skill') {
+      // SQEM-371 — a skill becomes system context; only a prompt goes to the composer. ⛔ Until
+      // that ticket a skill fell through to the prompt path — while the header chip already
+      // announced it as applied. The header was right and the mechanism was wrong.
+      // (SQEM-390: the assistant branch that sat beside this one went with the kind.)
+      if (template.kind === 'skill') {
         const { text, images } = await resolveAppliedContext(template, workspaceFiles);
-        if (template.kind === 'assistant') onAssistantSelect(template, text, images);
-        else onSkillSelect(template, text, images);
+        onSkillSelect(template, text, images);
         handleClose();
         return;
       }
@@ -183,7 +180,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssis
             </button>
           )}
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
-            {step === 'pick' ? 'Use a template' : selected?.title}
+            {step === 'pick' ? 'Use a playbook' : selected?.title}
           </h2>
         </div>
         <button onClick={handleClose} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
@@ -202,7 +199,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssis
                 type="text"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search templates..."
+                placeholder="Search playbooks..."
                 className="w-full pl-9 pr-4 py-2.5 border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400"
               />
             </div>
@@ -213,7 +210,6 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssis
                 tabs={[
                   { value: 'all', label: 'All' },
                   { value: 'prompt', label: 'Prompts', icon: <PenTool className="w-3 h-3" /> },
-                  { value: 'assistant', label: 'Assistants', icon: <Bot className="w-3 h-3" /> },
                   { value: 'skill', label: 'Skills', icon: <Wand2 className="w-3 h-3" /> },
                 ]}
               />
@@ -231,7 +227,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssis
           <div className="flex-1 overflow-y-auto px-4 pb-4">
             {filteredPrompts.length === 0 ? (
               <div className="text-center py-10 text-slate-400 dark:text-slate-500 text-sm">
-                {showFavoritesOnly ? 'No favourite templates yet' : 'No templates found'}
+                {showFavoritesOnly ? 'No favourite playbooks yet' : 'No playbooks found'}
               </div>
             ) : (
               <div className="space-y-1.5">
@@ -275,15 +271,18 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssis
             {selected?.description && (
               <p className="text-xs text-slate-500 dark:text-slate-400">{selected.description}</p>
             )}
-            {templateVars.length === 0 && selected?.kind !== 'assistant' && (
+            {templateVars.length === 0 && selected?.kind === 'prompt' && (
               <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 px-4 py-3">
-                <p className="text-xs text-slate-500 dark:text-slate-400">No inputs required — the template will be inserted into the chat as-is.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">No inputs required — the playbook will be inserted into the chat as-is.</p>
               </div>
             )}
-            {selected?.kind === 'assistant' && (
-              <div className="rounded-xl border border-violet-100 dark:border-violet-800/40 bg-violet-50 dark:bg-violet-900/10 px-4 py-3">
-                <p className="text-xs text-violet-700 dark:text-violet-300 font-semibold mb-0.5">Assistant template</p>
-                <p className="text-xs text-violet-600 dark:text-violet-400">Selecting this will apply the assistant&apos;s system instruction to your chat session — no text will be inserted into the input.</p>
+            {/* SQEM-390 — the note a skill gets. Until now the "inserted as-is" line above showed for a
+                skill too, and it was false: a skill is applied (SQEM-371). The box the assistant kind
+                had said the right thing for the wrong kind; now it says it for the one that is left. */}
+            {selected?.kind === 'skill' && (
+              <div className="rounded-xl border border-emerald-100 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-900/10 px-4 py-3">
+                <p className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold mb-0.5">Skill</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">Applying it adds this knowledge to the chat as context for every message — nothing is inserted into the input.</p>
               </div>
             )}
             {templateVars.map(v => (
@@ -364,8 +363,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onAssis
             >
               {isResolving
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing…</>
-                : selected?.kind === 'assistant' ? 'Apply assistant'
-                  : selected?.kind === 'skill' ? 'Apply skill' : 'Insert into chat'
+                : selected?.kind === 'skill' ? 'Apply skill' : 'Insert into chat'
               }
             </button>
           </div>

@@ -48,7 +48,7 @@ export const LIBRARY_TOOLS: ToolDefinition[] = [
   {
     name: 'search_templates',
     description:
-      "Search this workspace's library of reusable templates (prompts, assistants, and skills the team has curated) by keyword; matches title and description. " +
+      "Search this workspace's library of reusable templates (prompts and skills the team has curated) by keyword; matches title and description. " +
       'Call this before writing, drafting, reviewing or rewriting anything substantial from scratch — if the team already has a template for it, following theirs beats improvising. ' +
       'Returns id, name, kind and description. Load one with get_template. ' +
       'A match that carries context files also reports contextFileCount and contextBytes; use them to decide how to load it.',
@@ -56,7 +56,7 @@ export const LIBRARY_TOOLS: ToolDefinition[] = [
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Keyword to match against template titles and descriptions.' },
-        kind: { type: 'string', enum: ['prompt', 'assistant', 'skill'], description: 'Optional filter by template kind.' },
+        kind: { type: 'string', enum: ['prompt', 'skill'], description: 'Optional filter by template kind.' },
       },
       required: ['query'],
     },
@@ -193,12 +193,12 @@ export interface ToolRuntime {
    */
   maxRounds: number;
   /**
-   * ⛔ **The binding constraint is TIME, not rounds.** A Supabase edge function has ~150 s of wall
-   * clock for the whole invocation, `EdgeRuntime.waitUntil` included, and a single provider call may
-   * take up to 120 s (`fetchWithTimeout`). Six rounds of a slow model would therefore be killed by
-   * the runtime — and a killed function broadcasts nothing at all, so the user watches a spinner
-   * until the client's own 180 s timeout fires. A round cap alone cannot prevent that; only a
-   * deadline can.
+   * ⛔ **The binding constraint is TIME, not rounds.** The client gives up at 180 s
+   * (`CLIENT_JOB_TIMEOUT_MS.default`), and a single provider call may take 120 s. Six rounds of a
+   * slow model would run past the client, which then shows a timeout while the worker is still busy
+   * — and on a free-tier self-host the worker itself is killed at 150 s and broadcasts nothing. A
+   * round cap alone cannot prevent that; only a deadline can. (SQEM-381 corrected this from a
+   * free-plan wall clock (150 s) as if it were ours; see `_shared/chatTimeouts.ts`.)
    *
    * Epoch milliseconds. Past it, no NEW tool round is started — the round already in flight still
    * finishes, which is why the budget leaves headroom rather than filling the window.

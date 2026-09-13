@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useUI, useWorkspace } from '../store';
 import { can } from '../lib/permissions';
 import { useLocation, useNavigate } from 'react-router';
-import { PLANS, TRIAL_DAYS, VAT_NOTE, LIBRARY_SYSTEM_PROMPT } from '../constants';
+import { PLANS, TRIAL_DAYS, VAT_NOTE } from '../constants';
+import { LIBRARY_SYSTEM_PROMPT } from '../lib/libraryPrompt';
 import { hasActiveSubscription, isTrialing } from '../lib/subscription';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { fetchCanPublish, setPublisherToken } from '../lib/api/library';
@@ -118,7 +119,7 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
           MCP Server
         </h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Connect any MCP-compatible AI client (Claude Desktop, Cursor) to your full template library — prompts, skills, and assistants.
+          Connect any MCP-compatible AI client (Claude Desktop, Cursor) to your full playbook library — prompts and skills — and to your personas.
         </p>
       </div>
       {locked ? (
@@ -434,8 +435,6 @@ const Settings = () => {
         brandName: brandForm.brandName.trim(),
         whatItDoes: brandForm.whatItDoes.trim(),
         audience: brandForm.audience.trim(),
-        tone: brandForm.tone,
-        useCase: brandForm.useCase.trim(),
         website: brandForm.website.trim(),
         updatedAt: new Date().toISOString(),
       },
@@ -999,7 +998,7 @@ const Settings = () => {
                 <Card className="p-6 md:p-8">
                   <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Marketplace Publisher</h2>
                   <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                    A publisher token lets this instance <span className="font-semibold">submit</span> templates to the Sqemes community marketplace (browsing + copying works without one). It&apos;s stored encrypted and never shown again.{' '}
+                    A publisher token lets this instance <span className="font-semibold">submit</span> playbooks to the Sqemes community marketplace (browsing + copying works without one). It&apos;s stored encrypted and never shown again.{' '}
                     <a href="https://sqemes.com/publisher" target="_blank" rel="noopener noreferrer" className="text-brand-600 dark:text-brand-400 font-semibold hover:underline">Apply for a publisher key →</a>
                   </p>
                   <div className="mb-2">
@@ -1040,15 +1039,15 @@ const Settings = () => {
                   hides no state. The templates it created keep their own control. */}
               {!IS_SELF_HOSTED && isMultiSeat(workspace) && can(currentUser, workspace, 'team:manage') && (
                 <Card className="p-6 md:p-8">
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Template Access</h2>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Playbook Access</h2>
                   {/* SQEM-211 — this setting decides *whether* new templates start restricted, not
                       who may use them. Who may use a template is chosen in the template itself, by
                       name; a workspace-wide list of people would be a second place to maintain the
                       same thing and would drift from the first. */}
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">How newly-created templates start. Who may use one is chosen in the template itself.</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">How newly-created playbooks start. Who may use one is chosen in the playbook itself.</p>
                   <TemplateAccessControl
-                    label="Default for new templates"
-                    hint="Applies to templates created after this is saved"
+                    label="Default for new playbooks"
+                    hint="Applies to playbooks created after this is saved"
                     value={workspaceDefaultToValue(workspace.defaultTemplateAccess ?? [])}
                     onChange={v => updateWorkspace({ defaultTemplateAccess: valueToWorkspaceDefault(v) })}
                   />
@@ -1101,10 +1100,10 @@ const Settings = () => {
                   <div className="mb-6">
                     <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                       <Lock className="w-5 h-5 text-brand-500" />
-                      Template Access
+                      Playbook Access
                     </h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                      Every template in this workspace is available to all of its members.
+                      Every playbook in this workspace is available to all of its members.
                     </p>
                   </div>
                   <div className="rounded-2xl border border-brand-100 dark:border-brand-900/40 bg-gradient-to-br from-brand-50 to-white dark:from-brand-900/20 dark:to-slate-800/50 p-6 text-center">
@@ -1117,7 +1116,7 @@ const Settings = () => {
                     </div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Access control and groups</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 max-w-md mx-auto">
-                      Decide per template who may see and use it: everyone, only you, or named people
+                      Decide per playbook who may see and use it: everyone, only you, or named people
                       and groups that keep following your team as it changes. Available on Sqemes Cloud.
                     </p>
                     <a
@@ -1225,7 +1224,7 @@ const Settings = () => {
                   <div>
                     <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Brand Profile</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                      Captured during onboarding. Used to tailor AI generation and to adapt marketplace templates to your brand.
+                      Captured during onboarding. Used to tailor AI generation and to adapt marketplace playbooks to your brand.
                     </p>
                   </div>
                   <button
@@ -1740,7 +1739,7 @@ const Settings = () => {
                       Public API Keys
                     </h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                      Generate keys to access your templates via the API or MCP clients.
+                      Generate keys to access your playbooks via the API or MCP clients.
                     </p>
                   </div>
                   <button
@@ -1983,7 +1982,7 @@ const Settings = () => {
               <Card className="p-8">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Your data</h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-                  Download everything in <strong>{workspace.name}</strong> as a ZIP — templates, chats, files and your
+                  Download everything in <strong>{workspace.name}</strong> as a ZIP — playbooks, chats, files and your
                   profile. The archive includes a README listing exactly what is and isn&apos;t in it.
                   {(workspace.members?.length ?? 0) > 0 && ' Belong to several workspaces? Switch workspace and export again.'}
                 </p>
@@ -2031,7 +2030,7 @@ const Settings = () => {
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
           Members can use the library but not change it. {demoteTarget?.name} has{' '}
           <span className="font-semibold text-slate-700 dark:text-slate-200">
-            {demoteTarget?.templates ?? 0} restricted template{(demoteTarget?.templates ?? 0) === 1 ? '' : 's'}
+            {demoteTarget?.templates ?? 0} restricted playbook{(demoteTarget?.templates ?? 0) === 1 ? '' : 's'}
             {(demoteTarget?.personas ?? 0) > 0
               ? ` and ${demoteTarget?.personas} restricted persona${demoteTarget?.personas === 1 ? '' : 's'}`
               : ''}
@@ -2147,8 +2146,8 @@ const Settings = () => {
             ⚠️ Its own label was already wrong — it promised "every template, ignoring per-template
             restrictions", which stopped being true with SQEM-210 three months before it was removed. */}
         <div className="mb-5">
-          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Template access</label>
-          <p className="text-xs text-slate-400 dark:text-slate-500">This key inherits your template access — it can only reach templates you can access, and it is removed if you leave the workspace.</p>
+          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Playbook access</label>
+          <p className="text-xs text-slate-400 dark:text-slate-500">This key inherits your playbook access — it can only reach playbooks you can access, and it is removed if you leave the workspace.</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowGenerateKeyModal(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>

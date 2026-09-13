@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { LIBRARY_SYSTEM_PROMPT } from '../../supabase/functions/_shared/libraryPrompt';
-import { LIBRARY_SYSTEM_PROMPT as VIA_CONSTANTS } from '../../constants';
+import { LIBRARY_SYSTEM_PROMPT as VIA_CONSTANTS } from '../../lib/libraryPrompt'; // SQEM-398 — no longer via constants.ts
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -48,10 +48,14 @@ describe('LIBRARY_SYSTEM_PROMPT', () => {
     expect(LIBRARY_SYSTEM_PROMPT).not.toMatch(/pick the most specific/i);
   });
 
-  it('covers all three kinds, since a reader has to tell them apart', () => {
-    for (const kind of ['prompt', 'assistant', 'skill']) {
+  it('covers both kinds, since a reader has to tell them apart — and no longer a third', () => {
+    for (const kind of ['prompt', 'skill']) {
       expect(LIBRARY_SYSTEM_PROMPT).toContain(kind);
     }
+    // SQEM-390 — the assistant line went with the kind; a model told about three kinds would look
+    // for one the tools never return.
+    expect(LIBRARY_SYSTEM_PROMPT).not.toMatch(/assistant/i);
+    expect(LIBRARY_SYSTEM_PROMPT).toContain('two kinds');
   });
   // ── SQEM-378 — the three surfaces, and that they really are one text ──────────────────────────
 

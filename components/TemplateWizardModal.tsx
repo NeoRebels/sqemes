@@ -24,7 +24,6 @@ import type { Prompt, PromptKind, WorkspaceFile } from '../types';
 
 const KINDS: readonly SegmentedTab<PromptKind>[] = [
   { value: 'prompt', label: 'Prompt' },
-  { value: 'assistant', label: 'Assistant' },
   { value: 'skill', label: 'Skill' },
 ];
 
@@ -168,8 +167,6 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
           brandName: workspace.brandProfile.brandName,
           whatItDoes: workspace.brandProfile.whatItDoes,
           audience: workspace.brandProfile.audience,
-          tone: workspace.brandProfile.tone,
-          useCase: workspace.brandProfile.useCase,
         },
         { workspaceId: workspace.id, modelId: authoringModelId(workspace) },
         [...binaries, ...attachments.binary],
@@ -249,7 +246,6 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
         tag: null,
         variables: draft.variables,
         content: draft.content,
-        systemInstruction: draft.systemInstruction,
         contextFileIds: keep,
         createdAt: now,
         updatedAt: now,
@@ -258,7 +254,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
         published: true,
       } as Prompt);
 
-      if (!created) throw new Error('The template was generated but could not be saved. Try again.');
+      if (!created) throw new Error('The playbook was generated but could not be saved. Try again.');
 
       // ⛔ SQEM-318 — the workspace's access default applies here too, and it did not before.
       //
@@ -282,7 +278,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
         } catch (accessErr) {
           await deletePromptApi(created.id).catch(() => { /* nothing better to try */ });
           throw new Error(
-            `Generated, but the workspace's access default could not be applied — the template was removed rather than left open to everyone. ${accessErr instanceof Error ? accessErr.message : ''}`.trim(),
+            `Generated, but the workspace's access default could not be applied — the playbook was removed rather than left open to everyone. ${accessErr instanceof Error ? accessErr.message : ''}`.trim(),
           );
         }
       }
@@ -295,9 +291,9 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
       // finished by opening the template in a chat instead of the editor. ⛔ It looked like success:
       // no error, no 404, the template right there. The editor is also where the attached context
       // files are visible, which SQEM-308 required and Chat cannot show.
-      navigate(`/prompts/${created.id}/edit`);
+      navigate(`/playbooks/${created.id}/edit`);
     } catch (err) {
-      setError(describeAIError(err, 'Generating the template failed.', { alternativesAvailable: hasAuthoringAlternatives(workspace) }));
+      setError(describeAIError(err, 'Generating the playbook failed.', { alternativesAvailable: hasAuthoringAlternatives(workspace) }));
     } finally {
       setBusy(false); setStage('');
     }
@@ -324,7 +320,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
               <Sparkles className="w-5 h-5 text-brand-600 dark:text-brand-400" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Template Wizard</h2>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Playbook Wizard</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Describe what you need. Your brand fills in the rest.</p>
             </div>
           </div>
@@ -333,7 +329,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
           <SegmentedTabs<PromptKind> tabs={KINDS} value={kind} onChange={setKind} className="mb-5" />
 
           <label htmlFor="wizard-goal" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-            What do you want to achieve with your template?
+            What do you want to achieve with your playbook?
           </label>
           <textarea
             id="wizard-goal"
@@ -344,7 +340,11 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
             className="w-full p-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
 
-          <div className="flex items-center gap-2 mt-4">
+          {/* SQEM-396 — a question, like the two above it, and the attach/upload difference BEFORE
+              the click: SQEM-315 explains it under the lists, i.e. after the choice was made. */}
+          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mt-5 mb-1">Which context should it draw on?</label>
+          <p className="text-2xs text-slate-400 dark:text-slate-500 mb-2">Optional. Attach keeps a file on the playbook · Upload reads a document once and throws it away.</p>
+          <div className="flex items-center gap-2">
             <button type="button" onClick={() => setPicking(true)} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
               <Paperclip className="w-3.5 h-3.5" /> Attach a file
             </button>
@@ -360,7 +360,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
               difference between a person choosing the right button and finding out afterwards. */}
           {files.length > 0 && (
             <div className="mt-3">
-              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Attached — kept on the template</p>
+              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Attached — kept on the playbook</p>
               <div className="flex flex-wrap gap-1.5">
                 {files.map(f => (
                   <span key={f.id} className="inline-flex items-center gap-1 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-lg px-2 py-1 text-slate-600 dark:text-slate-300">
@@ -388,7 +388,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
                   </span>
                 ))}
               </div>
-              <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2">Read, then discarded — these files are not added to your library. What the template needs from them is written into new context files, and existing files that help are attached.</p>
+              <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2">Read, then discarded — these files are not added to your library. What the playbook needs from them is written into new context files, and existing files that help are attached.</p>
             </div>
           )}
 
@@ -407,7 +407,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
               disabled={!goal.trim()}
               className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
             >
-              <Sparkles className="w-4 h-4" /> Create template
+              <Sparkles className="w-4 h-4" /> Create playbook
             </button>
           </div>
         </>

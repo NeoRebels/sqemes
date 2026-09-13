@@ -13,19 +13,33 @@ export function useExtensionInstalled(): boolean {
   const [installed, setInstalled] = useState(false);
 
   useEffect(() => {
-    const runtime = (window as any).chrome?.runtime;
-    if (!runtime?.sendMessage) return;
-    try {
-      runtime.sendMessage(EXTENSION_ID, { type: 'sqemes:ping' }, (resp: { installed?: boolean } | undefined) => {
-        // Reading lastError marks it handled (suppresses the console warning) and
-        // tells us the extension isn't there / didn't respond.
-        if ((window as any).chrome?.runtime?.lastError) return;
-        if (resp?.installed) setInstalled(true);
-      });
-    } catch {
-      /* messaging unavailable — treat as not installed */
-    }
-  }, []);
+    if (installed) return;
+    const ping = () => {
+      const runtime = (window as any).chrome?.runtime;
+      if (!runtime?.sendMessage) return;
+      try {
+        runtime.sendMessage(EXTENSION_ID, { type: 'sqemes:ping' }, (resp: { installed?: boolean } | undefined) => {
+          // Reading lastError marks it handled (suppresses the console warning) and
+          // tells us the extension isn't there / didn't respond.
+          if ((window as any).chrome?.runtime?.lastError) return;
+          if (resp?.installed) setInstalled(true);
+        });
+      } catch {
+        /* messaging unavailable — treat as not installed */
+      }
+    };
+    ping();
+    // SQEM-386 (round 3) — ping again when the tab comes back. The install happens in the Chrome
+    // Web Store in ANOTHER tab; a single ping on mount meant the setup wizard never noticed and kept
+    // offering the install until the next reload. Focus + visibility cover "came back to this tab".
+    const again = () => { if (document.visibilityState === 'visible') ping(); };
+    window.addEventListener('focus', again);
+    document.addEventListener('visibilitychange', again);
+    return () => {
+      window.removeEventListener('focus', again);
+      document.removeEventListener('visibilitychange', again);
+    };
+  }, [installed]);
 
   return installed;
 }

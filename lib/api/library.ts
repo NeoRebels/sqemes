@@ -1,6 +1,6 @@
 import { supabase } from '../supabase';
 import type { Database } from '../database.types';
-import type { LibraryTemplate, TemplateCategory, Variable, Step, PromptKind, AssistantBrandConfig, Prompt, WorkspaceFile } from '../../types';
+import type { LibraryTemplate, TemplateCategory, Variable, Step, PromptKind, Prompt, WorkspaceFile } from '../../types';
 // SQEM-186 — templateBundle (which statically imports jszip) and injectionScan are dynamically imported
 // at their marketplace call sites below, so jszip stays out of the eager boot chunk (this module is
 // loaded at app start via the store). They only load when a user actually publishes/copies a bundle.
@@ -67,8 +67,6 @@ export function rowToLibraryTemplate(row: LibraryTemplateRow): LibraryTemplate {
     tags: row.tags || [],
     variables: (row.variables || []) as unknown as Variable[],
     steps: (row.steps || []) as unknown as Step[],
-    systemInstruction: row.system_instruction ?? undefined,
-    brandConfig: row.brand_config ? (row.brand_config as unknown as AssistantBrandConfig) : undefined,
     createdBy: row.created_by || '',
     usageCount: row.usage_count,
     published: row.published,
@@ -100,8 +98,6 @@ function libraryTemplateToRow(template: Partial<LibraryTemplate>) {
   if (template.tags !== undefined) row.tags = template.tags;
   if (template.variables !== undefined) row.variables = JSON.parse(JSON.stringify(template.variables));
   if (template.steps !== undefined) row.steps = JSON.parse(JSON.stringify(template.steps));
-  if (template.systemInstruction !== undefined) row.system_instruction = template.systemInstruction || null;
-  if (template.brandConfig !== undefined) row.brand_config = template.brandConfig ? JSON.parse(JSON.stringify(template.brandConfig)) : null;
   if (template.createdBy) row.created_by = template.createdBy;
   if (template.published !== undefined) row.published = template.published;
   row.updated_at = new Date().toISOString();
@@ -117,7 +113,7 @@ export async function fetchLibraryTemplates(): Promise<LibraryTemplate[]> {
   }
   const { data, error } = await supabase
     .from('library_templates')
-    .select(`id, kind, title, description, category, tags, steps, variables, system_instruction, brand_config, usage_count, published, created_by, created_at, updated_at, ${UGC_COLS}`)
+    .select(`id, kind, title, description, category, tags, steps, variables, usage_count, published, created_by, created_at, updated_at, ${UGC_COLS}`)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -205,7 +201,7 @@ export async function copyTemplateToWorkspace(
     .eq('id', templateId)
     .single();
 
-  if (fetchErr || !tpl) throw fetchErr || new Error('Template not found');
+  if (fetchErr || !tpl) throw fetchErr || new Error('Playbook not found');
 
   // 2. Build new prompt row with fresh step IDs
   const steps = ((tpl.steps || []) as unknown as Step[]).map(s => ({
@@ -222,8 +218,6 @@ export async function copyTemplateToWorkspace(
     variables: tpl.variables,
     steps: JSON.parse(JSON.stringify(steps)),
     content: (steps[0]?.content as string | undefined) ?? '',
-    system_instruction: (tpl.system_instruction as string | null) ?? null,
-    brand_config: (tpl.brand_config as unknown) ?? null,
     created_by: userId,
     usage_count: 0,
     is_favorite: false,
@@ -262,14 +256,14 @@ export async function publishToMarketplace(input: {
     .eq('workspace_id', workspaceId)
     .in('status', ['pending', 'published'])
     .or(`source_prompt_id.eq.${template.id},content_hash.eq.${contentHash}`);
-  if (dupes && dupes.length) throw new Error('This template is already in the Marketplace (published or pending review).');
+  if (dupes && dupes.length) throw new Error('This playbook is already in the Marketplace (published or pending review).');
 
   const { buildBundle } = await import('../templateBundle');
   const { blob, manifest } = await buildBundle([template], allFiles);
 
   // SQEM-169 — heuristic injection scan (advisory; shown to admins in the review queue).
   const { scanForInjection } = await import('../injectionScan');
-  const scan = scanForInjection(template.content, template.systemInstruction, template.description);
+  const scan = scanForInjection(template.content, template.description);
 
   const path = `${workspaceId}/${crypto.randomUUID()}/bundle.sqemes.zip`;
   const { error: upErr } = await supabase.storage.from('library-files').upload(path, blob, { contentType: 'application/zip' });
@@ -288,8 +282,6 @@ export async function publishToMarketplace(input: {
     tags: template.tag ? [template.tag] : [],
     variables: JSON.parse(JSON.stringify(template.variables || [])),
     content: template.content,
-    system_instruction: template.systemInstruction || null,
-    brand_config: template.brandConfig ?? null,
     created_by: userId,
     published: false,   // submit-for-review — an admin approves
     status: 'pending',
@@ -299,11 +291,11 @@ export async function publishToMarketplace(input: {
     content_hash: contentHash,
     scan_risk: scan.risk,
     scan_reasons: scan.reasons,
-  }).select(`id, kind, title, description, category, tags, steps, variables, system_instruction, brand_config, usage_count, published, created_by, created_at, updated_at, ${UGC_COLS}`).single();
+  }).select(`id, kind, title, description, category, tags, steps, variables, usage_count, published, created_by, created_at, updated_at, ${UGC_COLS}`).single();
   if (error) {
     await supabase.storage.from('library-files').remove([path]);
     // A race that hit the partial-unique dedup index → the same friendly message.
-    if ((error as { code?: string }).code === '23505') throw new Error('This template is already in the Marketplace (published or pending review).');
+    if ((error as { code?: string }).code === '23505') throw new Error('This playbook is already in the Marketplace (published or pending review).');
     throw error;
   }
   return rowToLibraryTemplate(data as unknown as LibraryTemplateRow);
@@ -323,8 +315,6 @@ async function copyListingFieldsToWorkspace(listing: LibraryTemplate, workspaceI
     variables: JSON.parse(JSON.stringify(listing.variables || [])),
     steps: JSON.parse(JSON.stringify(steps)),
     content: listing.content ?? (steps[0]?.content as string | undefined) ?? '',
-    system_instruction: listing.systemInstruction ?? null,
-    brand_config: listing.brandConfig ? JSON.parse(JSON.stringify(listing.brandConfig)) : null,
     created_by: userId,
     usage_count: 0,
     is_favorite: false,

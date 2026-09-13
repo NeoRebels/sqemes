@@ -20,8 +20,8 @@ describe('brandIsComplete', () => {
   });
 
   // The optional fields are optional. Requiring them would block people for no gain.
-  it('does not require useCase or website', () => {
-    expect(brandIsComplete({ ...full, useCase: '', website: '' })).toBe(true);
+  it('does not require the website', () => {
+    expect(brandIsComplete({ ...full, website: '' })).toBe(true);
   });
 
   it.each([[null], [undefined], [{}]])('rejects %s', brand => {

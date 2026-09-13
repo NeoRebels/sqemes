@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -20,6 +20,27 @@ const sizeClasses: Record<ModalSize, string> = {
 };
 
 const Modal = ({ open, onClose, size = 'sm', overlayOpacity = 'low', className = '', children }: ModalProps) => {
+  const panelRef = useRef<HTMLDivElement>(null);
+  /**
+   * SQEM-382 — where the press BEGAN, so a drag-select cannot close the dialog.
+   *
+   * ⛔ A `click` fires on the nearest common ancestor of mouse-down and mouse-up. Start a text
+   * selection inside the panel, release outside it, and the browser reports a click on the
+   * overlay — which used to close the modal. In a UX test (2026-09-08) that dismissed the Setup
+   * Wizard mid-sentence, and `SetupWizard` treats a dismissal as "not finished", not "done".
+   *
+   * Tri-state on purpose: `null` = no mouse-down observed (a keyboard or programmatic click on the
+   * overlay), and that still closes, exactly as before. Only a press that provably began INSIDE
+   * the panel is refused. A press that began outside and was released inside still closes — the
+   * press decides, which is what Radix and Headless UI do too.
+   *
+   * ⛔ Do NOT "simplify" this to `stopPropagation` on the panel's `mousedown`. Eight components
+   * (`PickerDropdown`, `ModelSelect`, `PersonaSelect`, `Sidebar`, `Files`, three in `Chat`)
+   * close their dropdowns from a `mousedown` listener on `document`; a stopped `mousedown` never
+   * gets there, and every dropdown inside a modal would stop closing. The `contains` check below
+   * changes nothing about propagation. `tests/unit/modalDragSelect.test.ts` pins both halves.
+   */
+  const pressBeganInside = useRef<boolean | null>(null);
   if (!open) return null;
 
   // Portal to <body> so the overlay is always viewport-fixed and full-page (backdrop blur + centred),
@@ -46,12 +67,18 @@ const Modal = ({ open, onClose, size = 'sm', overlayOpacity = 'low', className =
         'fixed inset-0 backdrop-blur-sm z-50 overflow-y-auto overscroll-contain',
         overlayOpacity === 'high' ? 'bg-slate-900/50' : 'bg-slate-900/20',
       ].join(' ')}
-      onClick={onClose}
+      onMouseDown={e => { pressBeganInside.current = panelRef.current?.contains(e.target as Node) ?? false; }}
+      onClick={() => {
+        const refuse = pressBeganInside.current === true;
+        pressBeganInside.current = null;
+        if (!refuse) onClose?.();
+      }}
     >
       {/* `min-h-full` keeps short dialogs vertically centred (the previous behaviour, unchanged);
           a tall one grows past it and scrolls the overlay instead of being clipped. */}
       <div className="flex min-h-full items-center justify-center p-4">
         <div
+          ref={panelRef}
           className={[
             'bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 animate-scale-up w-full',
             sizeClasses[size],

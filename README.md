@@ -2,18 +2,19 @@
 
 **Sqemes is where your team's AI know-how lives.**
 
-Build and organize reusable **prompts, assistants, and skills** once — then use them everywhere you
-work, through three channels:
+Build your team's **playbooks** once — prompts and skills — and the **personas** that know which
+playbook to use when; then use them everywhere you work, through three channels:
 
 - 🧩 **Browser extension** — drop them into ChatGPT, Claude, Gemini, or any chat site
 - 💬 **Sqemes chat** — run them against your own model keys (bring-your-own-key)
 - 🔌 **MCP** — expose them to Claude Desktop, Cursor, or any MCP client
 
-Self-hostable and fair-code — own your data. Under the hood everything is one `Template` model
-distinguished by `kind` (prompt / assistant / skill), so what you author once works across all three
-channels.
+Self-hostable and fair-code — own your data. Under the hood every playbook is one `Template` model
+distinguished by `kind` (prompt / skill), so what you author once works across all three channels.
+A **persona** is a separate object: a role over your playbooks, with a condition per playbook saying
+when to load it.
 
-Your instance also reads the **community marketplace** (browse, vote, copy a published template —
+Your instance also reads the **community marketplace** (browse, vote, copy a published playbook —
 no setup needed) and can attach **connectors** for external tools such as Notion, Shopify and
 Outlook. Both are covered in [SELF_HOSTING.md](./SELF_HOSTING.md).
 

@@ -8,11 +8,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
   Save, Trash2, Plus, GripVertical, Sparkles, Loader2, X, AlertTriangle,
-  Settings, PenTool, ListTree, Search, Bot, Wand2, UserRound, Lock,
+  Settings, PenTool, ListTree, Search, Wand2, UserRound, Lock,
 } from 'lucide-react';
 import { useWorkspace, useUI, usePrompts } from '../store';
+import { TagPicker } from '../components/TagPicker';
 import { can } from '../lib/permissions';
 import { runAuthoringAI, authoringModelId } from '../lib/authoringAI';
+import { enhancePrompt, enhanceInput, describePrompt } from '../supabase/functions/_shared/authoringPrompts.ts';
 import {
   fetchPersona, createPersona, updatePersona, setPersonaRoutes, deletePersona,
 } from '../lib/api/personas';
@@ -39,7 +41,7 @@ import {
 export default function PersonaEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { workspace, currentUser } = useWorkspace();
+  const { workspace, currentUser, updateWorkspace } = useWorkspace();
   const { showToast } = useUI();
   const { prompts } = usePrompts();
 
@@ -47,6 +49,9 @@ export default function PersonaEditor() {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  // SQEM-393 — one tag in the UI, stored as `tags: [tag]`: the column is an array (SQEM-324) and
+  // the bundle format carries it, so nothing below the editor changes.
+  const [tag, setTag] = useState<string | null>(null);
   const [content, setContent] = useState('');
   const [routes, setRoutes] = useState<PersonaRoute[]>([]);
   const [loading, setLoading] = useState(!!id);
@@ -87,6 +92,7 @@ export default function PersonaEditor() {
         }
         setTitle(persona.title);
         setDescription(persona.description);
+        setTag(persona.tags[0] ?? null);
         setContent(persona.content);
         setRoutes(persona.routes);
         setOwnerId(persona.createdBy || null);
@@ -206,31 +212,17 @@ export default function PersonaEditor() {
     }
     setEnhancing(true);
     try {
-      const routeSummary = routes.length
-        ? routes.map(r => `- ${r.templateTitle || 'Untitled'}${r.condition ? `: ${r.condition}` : ''}`).join('\n')
-        : '(none attached yet)';
+      const routeSummary = routes
+        .map(r => `- ${r.templateTitle || 'Untitled'}${r.condition ? `: ${r.condition}` : ''}`)
+        .join('\n');
 
-      const systemInstruction = `You refine the role description of a PERSONA — a working role that an AI assistant adopts.
-
-A persona has two parts, and you are given both but may only rewrite the first:
-1. The ROLE DESCRIPTION — who this role is, how it works, what it asks for before acting, what it never does. This is what you rewrite.
-2. The ROUTES — attached templates with the condition under which each is loaded. These are managed elsewhere. They are given to you as context so the role description fits them.
-
-Rules:
-- Keep the author's intent and voice; sharpen structure and specificity.
-- Write in the second person, addressing the assistant that will adopt the role.
-- ⛔ Do NOT write a routing table, a list of the templates, or any "if X then load Y" instructions. The routing is added automatically after you.
-- Do not invent capabilities the routes do not support.
-- Output only the refined role description, with no commentary.
-
-ATTACHED ROUTES (context only, do not reproduce):
-${routeSummary}`;
-
+      // SQEM-390 — the persona text lives in the shared authoring module now, unchanged; the routes
+      // stay context only (the module's text forbids a routing table — see SQEM-324).
       const enhanced = await runAuthoringAI({
         workspaceId: workspace.id,
         modelId: authoringModelId(workspace),
-        systemInstruction,
-        prompt: `<persona_role>\n${content.trim()}\n</persona_role>`,
+        systemInstruction: enhancePrompt('persona', { routeSummary }),
+        prompt: enhanceInput('persona', content.trim()),
       });
       if (enhanced) {
         setContent(enhanced);
@@ -253,7 +245,7 @@ ${routeSummary}`;
    */
   const handleGenerateDescription = async () => {
     if (!content.trim() && routes.length === 0) {
-      showToast('Write the role or attach a template first — there is nothing to describe yet.', 'error');
+      showToast('Write the role or attach a playbook first — there is nothing to describe yet.', 'error');
       return;
     }
     setDescribing(true);
@@ -265,21 +257,11 @@ ${routeSummary}`;
         })
         .join('\n');
 
-      const systemInstruction = `You write the one-line description of a PERSONA — a working role an AI assistant can adopt, bundling several templates behind conditions.
-
-This description is displayed in an MCP client's picker and in tool output. It is usually the ONLY thing a person or a model sees before deciding whether to load this persona.
-
-Write 1-2 sentences that answer: **for which kind of task should someone pick this role?**
-- Lead with the situation, not with the word "persona" or the name.
-- Name the concrete areas it covers, drawn from the attached templates below.
-- No marketing, no "helps you to", no restating the title.
-- Output only the description, with no quotes or commentary.`;
-
       const generated = await runAuthoringAI({
         workspaceId: workspace.id,
         modelId: authoringModelId(workspace),
-        systemInstruction,
-        prompt: `Persona name: ${title || '(unnamed)'}\n\nRole description:\n${content.trim() || '(empty)'}\n\nAttached templates:\n${routeSummary || '(none)'}`,
+        systemInstruction: describePrompt('persona'), // SQEM-390 — text unchanged, one home
+        prompt: `Persona name: ${title || '(unnamed)'}\n\nRole description:\n${content.trim() || '(empty)'}\n\nAttached playbooks:\n${routeSummary || '(none)'}`,
       });
       if (generated) {
         setDescription(generated.trim());
@@ -306,7 +288,7 @@ Write 1-2 sentences that answer: **for which kind of task should someone pick th
     try {
       const systemInstruction = `You write the ROUTING CONDITION for one template inside a persona.
 
-The condition completes the sentence "load this template when …". It is read by an AI assistant that has adopted the persona and must decide, mid-conversation, whether this template applies.
+The condition completes the sentence "load this playbook when …". It is read by an AI assistant that has adopted the persona and must decide, mid-conversation, whether this template applies.
 
 Rules:
 - One short clause. No sentence case ceremony, no "when the user" preamble if it can be dropped.
@@ -336,7 +318,7 @@ Rules:
     setSaving(true);
     try {
       if (id) {
-        await updatePersona(id, { title: title.trim(), description: description.trim(), content });
+        await updatePersona(id, { title: title.trim(), description: description.trim(), content, tags: tag ? [tag] : [] });
         await setPersonaRoutes(id, routes);
         if (!IS_SELF_HOSTED) {
           await setPersonaAccess(id, workspace.id, accessValueToPersonaAccess(access, ownerId));
@@ -344,7 +326,7 @@ Rules:
       } else {
         const created = await createPersona(
           workspace.id,
-          { title: title.trim(), description: description.trim(), content, routes },
+          { title: title.trim(), description: description.trim(), content, routes, tags: tag ? [tag] : [] },
           currentUser.id || null,
         );
         // ⚠️ Access is written AFTER the persona exists, so a failure here leaves a persona that is
@@ -448,8 +430,11 @@ Rules:
         {/* ── Left: what the persona IS ─────────────────────────────────────
             Name, description and who may use it. Same width and tone as the template editor's
             settings rail, because it answers the same class of question: metadata about the thing,
-            not the thing itself. */}
-        <div className={`w-full xl:w-[420px] bg-slate-50/50 dark:bg-slate-800/50 border-r border-slate-100 dark:border-slate-700 overflow-y-auto p-6 shrink-0 ${mobileTab === 'details' ? 'block' : 'hidden xl:block'}`}>
+            not the thing itself.
+            SQEM-387 — `flex-1 min-h-0` below `xl` (a column there): with `shrink-0` the panel grew
+            to its content and the parent's `overflow-hidden` cut it off — nothing to scroll. Same
+            on the routes rail. On `xl` it is a row and `xl:flex-none` keeps the fixed width. */}
+        <div className={`w-full xl:w-[420px] bg-slate-50/50 dark:bg-slate-800/50 border-r border-slate-100 dark:border-slate-700 overflow-y-auto p-6 flex-1 min-h-0 xl:flex-none ${mobileTab === 'details' ? 'block' : 'hidden xl:block'}`}>
           <div className="space-y-8">
             <div>
               <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Name</label>
@@ -488,6 +473,25 @@ Rules:
                 Shown in your MCP client&apos;s picker, and often the only thing a person or a model sees
                 before choosing. Write it for the decision: <span className="italic">for which task is this the right role?</span>
               </p>
+            </div>
+
+            {/* SQEM-393 — the same picker and the same registry as the playbook editor: one tag, from
+                `workspace.tags`, a new one added to the registry on the spot. */}
+            <div>
+              <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Tag</label>
+              <TagPicker
+                value={tag}
+                tags={workspace.tags}
+                onChange={t => { setTag(t); setIsDirty(true); }}
+                onCreate={name => {
+                  const created = name.trim();
+                  if (!created) return;
+                  if (!workspace.tags.includes(created)) updateWorkspace({ tags: [...workspace.tags, created] });
+                  setTag(created);
+                  setIsDirty(true);
+                }}
+                disabled={!canEdit}
+              />
             </div>
 
             {/* SQEM-326 — who may use the persona. Cloud-only, like every other access surface
@@ -593,7 +597,7 @@ Rules:
             Its own rail rather than a section under the prose: attaching a template and writing the
             role are two different activities, and the routes have to stay visible while the role is
             written — the role is *about* them. */}
-        <div className={`w-full xl:w-[380px] bg-slate-50/50 dark:bg-slate-800/50 border-l border-slate-100 dark:border-slate-700 overflow-y-auto p-6 shrink-0 ${mobileTab === 'routes' ? 'block' : 'hidden xl:block'}`}>
+        <div className={`w-full xl:w-[380px] bg-slate-50/50 dark:bg-slate-800/50 border-l border-slate-100 dark:border-slate-700 overflow-y-auto p-6 flex-1 min-h-0 xl:flex-none ${mobileTab === 'routes' ? 'block' : 'hidden xl:block'}`}>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Routes</label>
@@ -602,14 +606,14 @@ Rules:
                   onClick={() => { setPickSearch(''); setPicking(true); }}
                   className="flex items-center gap-1 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 transition-colors"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Attach template
+                  <Plus className="w-3.5 h-3.5" /> Attach playbook
                 </button>
               )}
             </div>
             <p className="text-2xs text-slate-400 dark:text-slate-500 -mt-2">
-              A route says <span className="font-semibold">when</span> to load a template — the client
+              A route says <span className="font-semibold">when</span> to load a playbook — the client
               fetches one only once its condition applies, which is what keeps a persona cheap.
-              Leave the condition empty and the template&apos;s own description is used.
+              Leave the condition empty and the playbook&apos;s own description is used.
             </p>
 
             {routes.length === 0 && (
@@ -653,7 +657,7 @@ Rules:
                       )}
                     </div>
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate" title={route.templateTitle}>
-                      {route.templateTitle || 'Untitled template'}
+                      {route.templateTitle || 'Untitled playbook'}
                     </p>
                   </div>
                   {canEdit && (
@@ -698,8 +702,8 @@ Rules:
                 {!route.condition.trim() && (
                   <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1.5">
                     {templateById.get(route.templateId)?.description
-                      ? <>Using the template&apos;s own description. Write something here only if it means something different <span className="italic">in this persona</span>.</>
-                      : <>This template has no description either — without one the model gets only its title. Write a condition, or give the template a description.</>}
+                      ? <>Using the playbook&apos;s own description. Write something here only if it means something different <span className="italic">in this persona</span>.</>
+                      : <>This playbook has no description either — without one the model gets only its title. Write a condition, or give the playbook a description.</>}
                   </p>
                 )}
               </div>
@@ -715,7 +719,7 @@ Rules:
                 about are. In the metadata column it was a sentence about something the reader could
                 not see while reading it.
 
-                ⚠️ Rendered only when there is something to report. "All templates are open" is a
+                ⚠️ Rendered only when there is something to report. "All playbooks are open" is a
                 sentence nobody needs, and a permanently visible box about access is how a warning
                 stops being read. */}
             {!IS_SELF_HOSTED && restrictedRouteIds.size > 0 && (
@@ -723,12 +727,12 @@ Rules:
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
                 <div className="text-2xs text-amber-800 dark:text-amber-200">
                   <p className="font-semibold">
-                    {restrictedRouteIds.size} of {routes.length} template{routes.length === 1 ? '' : 's'} {restrictedRouteIds.size === 1 ? 'is' : 'are'} restricted
+                    {restrictedRouteIds.size} of {routes.length} playbook{routes.length === 1 ? '' : 's'} {restrictedRouteIds.size === 1 ? 'is' : 'are'} restricted
                   </p>
                   <p className="mt-1.5">
                     Colleagues who cannot open {restrictedRouteIds.size === 1 ? 'it' : 'them'} receive this
                     persona <span className="font-semibold">without {restrictedRouteIds.size === 1 ? 'that route' : 'those routes'}</span> —
-                    the route is left out entirely, never shown as unavailable. Share the template if they should have it.
+                    the route is left out entirely, never shown as unavailable. Share the playbook if they should have it.
                   </p>
                 </div>
               </div>
@@ -744,7 +748,7 @@ Rules:
           is shared is the *look*, which is what somebody recognises. */}
       <Modal open={picking} onClose={() => setPicking(false)} size="lg" className="flex flex-col max-h-[80vh]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700 shrink-0">
-          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Attach a template</h2>
+          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Attach a playbook</h2>
           <button onClick={() => setPicking(false)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
             <X className="w-4 h-4" />
           </button>
@@ -758,7 +762,7 @@ Rules:
               autoFocus
               value={pickSearch}
               onChange={e => setPickSearch(e.target.value)}
-              placeholder="Search templates..."
+              placeholder="Search playbooks..."
               className="w-full pl-9 pr-4 py-2.5 border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400"
             />
           </div>
@@ -768,7 +772,6 @@ Rules:
             tabs={[
               { value: 'all', label: 'All' },
               { value: 'prompt', label: 'Prompts', icon: <PenTool className="w-3 h-3" /> },
-              { value: 'assistant', label: 'Assistants', icon: <Bot className="w-3 h-3" /> },
               { value: 'skill', label: 'Skills', icon: <Wand2 className="w-3 h-3" /> },
             ]}
           />
@@ -779,9 +782,9 @@ Rules:
             <div className="text-center py-10 text-sm text-slate-400 dark:text-slate-500">
               {/* Three different empty states, because they call for three different actions. */}
               {prompts.length === 0
-                ? 'This workspace has no templates yet — a persona needs something to route to.'
+                ? 'This workspace has no playbooks yet — a persona needs something to route to.'
                 : routes.length > 0 && pickSearch.trim() === '' && pickKind === 'all'
-                  ? 'Every template is already attached.'
+                  ? 'Every playbook is already attached.'
                   : 'Nothing matches.'}
             </div>
           ) : (
@@ -805,7 +808,7 @@ Rules:
       >
         <p>
           The persona and its routes are removed.{' '}
-          <span className="font-semibold text-slate-600 dark:text-slate-300">The templates themselves are not touched</span> — they keep working on their own.
+          <span className="font-semibold text-slate-600 dark:text-slate-300">The playbooks themselves are not touched</span> — they keep working on their own.
         </p>
       </ConfirmModal>
 

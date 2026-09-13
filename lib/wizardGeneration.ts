@@ -1,15 +1,20 @@
-import type { AssistantBrandConfig, BrandVoiceExample, PromptKind, ToneLevel, Variable } from '../types';
+import type { PromptKind, Variable } from '../types';
 import { runAuthoringAI } from './authoringAI';
-import { compileAssistantInstruction, TONE_LABELS } from './compileBrandVoice';
+import {
+  starterPromptsInstruction, starterSkillsInstruction, BRAND_VOICE_SKILL_INSTRUCTION,
+  SINGLE_TEMPLATE_RULE, SINGLE_TEMPLATE_SHAPE,
+} from '../supabase/functions/_shared/authoringPrompts.ts';
 import { supabase } from './supabase';
 
+/**
+ * The three facts every generation starts from. SQEM-395 — `tone` (a 1–5 level) and `useCase` were
+ * here; the brand-voice skill now infers the tone from the brand's own words, and what a playbook
+ * is FOR is the Playbook Wizard's question, per playbook.
+ */
 export interface BrandInput {
   brandName: string;
   whatItDoes: string;
   audience: string;
-  tone: ToneLevel;
-  /** Optional — what the team wants to use AI for. Sharpens prompt/skill generation. */
-  useCase?: string;
 }
 
 export interface GenContext {
@@ -24,28 +29,30 @@ export interface TemplateDraft {
   title: string;
   description: string;
   content: string;
-  systemInstruction?: string;
-  brandConfig?: AssistantBrandConfig;
   variables: Variable[];
 }
 
 function brandSummary(b: BrandInput): string {
-  const lines = [
+  return [
     `Brand name: ${b.brandName}`,
     `What it does: ${b.whatItDoes}`,
     `Audience: ${b.audience}`,
-    `Tone: ${TONE_LABELS[b.tone]}`,
-  ];
-  if (b.useCase?.trim()) lines.push(`Primary AI use case: ${b.useCase.trim()}`);
-  return lines.join('\n');
+  ].join('\n');
 }
 
 function titleCase(name: string): string {
   return name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-/** Extract {{placeholder}} tokens from content into Variable definitions (kind=prompt). */
-export function extractVariables(content: string): Variable[] {
+/**
+ * Extract {{placeholder}} tokens from content into Variable definitions (kind=prompt).
+ *
+ * SQEM-390 — `labels` are the model's own, phrased as the QUESTION the person answers ("What's the
+ * name of your client?"); a placeholder the model did not label keeps the title-cased name. ⛔ The
+ * placeholders in `content` decide which variables exist — a label for a name that is not in the
+ * body is dropped, never turned into a variable.
+ */
+export function extractVariables(content: string, labels: Record<string, string> = {}): Variable[] {
   const re = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
   const seen = new Set<string>();
   const vars: Variable[] = [];
@@ -54,9 +61,21 @@ export function extractVariables(content: string): Variable[] {
     const name = m[1];
     if (seen.has(name)) continue;
     seen.add(name);
-    vars.push({ id: crypto.randomUUID(), name, label: titleCase(name), type: 'text' });
+    vars.push({ id: crypto.randomUUID(), name, label: labels[name]?.trim() || titleCase(name), type: 'text' });
   }
   return vars;
+}
+
+/** The `variables` array a generator returns → name → question. Tolerates any shape the model sends. */
+export function questionLabels(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!Array.isArray(raw)) return out;
+  for (const v of raw) {
+    const name = String((v as { name?: unknown })?.name ?? '').trim();
+    const label = String((v as { label?: unknown })?.label ?? '').trim();
+    if (name && label) out[name] = label;
+  }
+  return out;
 }
 
 /** Defensively parse a JSON array out of an LLM response (tolerates code fences / surrounding prose). */
@@ -82,12 +101,6 @@ function parseJsonObject(raw: string): any {
   try { return JSON.parse(text); } catch { return {}; }
 }
 
-function clampTone(n: unknown): ToneLevel {
-  const v = Math.round(Number(n));
-  if (v >= 1 && v <= 5) return v as ToneLevel;
-  return 3;
-}
-
 /**
  * SQEM-035 Part 3 (Option B): the `analyze-website` edge function fetches + strips
  * the page to text (SSRF-guarded, no AI); the brand-field extraction runs here on
@@ -106,66 +119,39 @@ export async function analyzeWebsite(url: string, ctx: GenContext): Promise<Part
   if (!res.ok) throw new Error(data?.error || 'Could not read that website.');
 
   const systemInstruction =
-    'Extract brand details from the website text below. Return ONLY a JSON object — no prose, no code fences — with keys "brandName" (string), "whatItDoes" (one sentence), "audience" (string), and "tone" (integer 1-5, where 1 = very formal and 5 = very casual). If a field is unknown, use an empty string (or 3 for tone).';
+    'Extract brand details from the website text below. Return ONLY a JSON object — no prose, no code fences — with keys "brandName" (string), "whatItDoes" (one sentence), and "audience" (string). If a field is unknown, use an empty string.';
   const raw = await runAuthoringAI({ ...ctx, systemInstruction, prompt: String(data.text ?? '') });
   const obj = parseJsonObject(raw);
   return {
     brandName: String(obj.brandName ?? '').slice(0, 120),
     whatItDoes: String(obj.whatItDoes ?? '').slice(0, 300),
     audience: String(obj.audience ?? '').slice(0, 300),
-    tone: clampTone(obj.tone),
   };
 }
 
-export async function generateBrandAssistant(b: BrandInput, ctx: GenContext): Promise<TemplateDraft> {
-  const roleSys =
-    'Write the ROLE description for an AI assistant that writes in this brand\'s voice. Address the assistant in the second person, e.g. "You are a [role] for [brand], which [does X] for [audience]. You help with…". 2–4 sentences. Output ONLY the role text — no labels, headings, or quotes.';
-  const exampleSys =
-    'Write 2 short examples that demonstrate this brand\'s voice at the given tone. Return ONLY a JSON array — no prose, no code fences — of objects with keys "input" (a realistic user request) and "output" (how the brand would respond, in voice).';
-
-  const [brandContext, examplesRaw] = await Promise.all([
-    runAuthoringAI({ ...ctx, systemInstruction: roleSys, prompt: brandSummary(b) }).then(t => t.trim()),
-    runAuthoringAI({ ...ctx, systemInstruction: exampleSys, prompt: brandSummary(b) }).catch(() => ''),
-  ]);
-
-  const examples: BrandVoiceExample[] = parseJsonArray(examplesRaw)
-    .filter(x => x?.input && x?.output)
-    .slice(0, 2)
-    .map(x => ({ id: crypto.randomUUID(), input: String(x.input), output: String(x.output) }));
-
-  const brandConfig: AssistantBrandConfig = { tone: b.tone, brandContext, examples };
+/**
+ * SQEM-390 — the brand voice is a **text skill**, one model call, no JSON.
+ *
+ * It used to be an assistant built from a structured form (role prose + tone + two example pairs,
+ * compiled into a system instruction). The form went with the assistant kind; what a team actually
+ * wants from "brand voice" is a block of knowledge every piece of writing follows, and that is what a
+ * skill is. ⚠️ Still the one section that needs no JSON — it survives a model that answers in prose,
+ * and the tests lean on that.
+ */
+export async function generateBrandVoiceSkill(b: BrandInput, ctx: GenContext): Promise<TemplateDraft> {
+  const content = (await runAuthoringAI({ ...ctx, systemInstruction: BRAND_VOICE_SKILL_INSTRUCTION, prompt: brandSummary(b) })).trim();
+  if (!content) throw new Error('The brand voice came back empty.');
   return {
-    kind: 'assistant',
+    kind: 'skill',
     title: `${b.brandName} Brand Voice`,
-    description: `Writes in ${b.brandName}'s brand voice and tone.`,
-    content: '',
-    brandConfig,
-    systemInstruction: compileAssistantInstruction(brandConfig, ''),
+    description: `How ${b.brandName} sounds — apply whenever writing on the brand's behalf.`,
+    content,
     variables: [],
   };
 }
 
-export async function generateStarterAssistants(b: BrandInput, ctx: GenContext, count = 2): Promise<TemplateDraft[]> {
-  const systemInstruction =
-    `You build a starter set of AI assistants (personas) for a brand's team. An assistant is a reusable persona: a system instruction that sets its role, expertise, and behaviour for this brand. Generate exactly ${count} distinct, useful assistants (e.g. a customer-support agent, a content writer, a research analyst — tailored to this brand). Return ONLY a JSON array — no prose, no code fences — of objects with keys "title" (short), "description" (one sentence on what it's for), and "instruction" (the full system instruction / persona, addressing the assistant in the second person, 3–6 sentences).`;
-  const raw = await runAuthoringAI({ ...ctx, systemInstruction, prompt: brandSummary(b) });
-  return parseJsonArray(raw)
-    .filter(x => x?.title && x?.instruction)
-    .slice(0, count)
-    .map(x => ({
-      kind: 'assistant' as const,
-      title: String(x.title).slice(0, 120),
-      description: String(x.description ?? '').slice(0, 300),
-      content: '',
-      systemInstruction: String(x.instruction),
-      variables: [],
-    }));
-}
-
 export async function generateStarterPrompts(b: BrandInput, ctx: GenContext, count = 5): Promise<TemplateDraft[]> {
-  const systemInstruction =
-    `You build a starter prompt library for a brand's team. Generate exactly ${count} reusable, practical prompt templates tailored to this brand's work. If a "Primary AI use case" is given, prioritise prompts that serve it. Each prompt MUST use {{variable_name}} placeholders for the user's inputs (snake_case names). Return ONLY a JSON array — no prose, no code fences — of objects with keys "title" (short), "description" (one sentence on when to use it), and "content" (the prompt body with {{placeholders}}).`;
-  const raw = await runAuthoringAI({ ...ctx, systemInstruction, prompt: brandSummary(b) });
+  const raw = await runAuthoringAI({ ...ctx, systemInstruction: starterPromptsInstruction(count), prompt: brandSummary(b) });
   return parseJsonArray(raw)
     .filter(x => x?.title && x?.content)
     .slice(0, count)
@@ -174,14 +160,13 @@ export async function generateStarterPrompts(b: BrandInput, ctx: GenContext, cou
       title: String(x.title).slice(0, 120),
       description: String(x.description ?? '').slice(0, 300),
       content: String(x.content),
-      variables: extractVariables(String(x.content)),
+      // SQEM-390 — the model's labels are questions; the placeholders decide which variables exist.
+      variables: extractVariables(String(x.content), questionLabels(x.variables)),
     }));
 }
 
 export async function generateStarterSkills(b: BrandInput, ctx: GenContext, count = 1): Promise<TemplateDraft[]> {
-  const systemInstruction =
-    `You build reusable AI "skills" for a brand. A skill is durable knowledge/instructions an AI agent applies when relevant — not a fill-in template. If a "Primary AI use case" is given, make the skill serve it. Generate exactly ${count}. Return ONLY a JSON array — no prose, no code fences — of objects with keys "title", "description" (one sentence describing WHEN to use the skill; agents use this to discover it), and "content" (the skill's instructions/knowledge).`;
-  const raw = await runAuthoringAI({ ...ctx, systemInstruction, prompt: brandSummary(b) });
+  const raw = await runAuthoringAI({ ...ctx, systemInstruction: starterSkillsInstruction(count), prompt: brandSummary(b) });
   return parseJsonArray(raw)
     .filter(x => x?.title && x?.content)
     .slice(0, count)
@@ -208,8 +193,12 @@ export interface StarterLibraryResult {
 }
 
 /**
- * Generate the full starter library in parallel — **9 templates: 3 assistants, 3 prompts, 3 skills**
- * (SQEM-170; Cloud-only onboarding). The 3 assistants = the brand-voice assistant + 2 role personas.
+ * Generate the full starter library in parallel — **8 templates: 4 prompts, 4 skills** (SQEM-390;
+ * Cloud-only onboarding, SQEM-170). The 4 skills = the brand-voice skill + 3 knowledge skills.
+ *
+ * ⚠️ Until SQEM-390 this was 9: the brand-voice assistant, 2 role assistants, 3 prompts, 3 skills.
+ * The role generators went with the assistant kind — a role is a persona now, and the wizard does
+ * not write personas (owner's decision, 2026-09-13: 4 + 4, no role generators).
  *
  * SQEM-200 — this used to be `Promise.all` with `.catch(() => [])` per section. The intent was right
  * (one failing section shouldn't cost the whole library) but the reason was thrown away with the
@@ -225,9 +214,8 @@ export interface StarterLibraryResult {
  */
 export async function generateStarterLibrary(b: BrandInput, ctx: GenContext): Promise<StarterLibraryResult> {
   const sections: { label: string; run: () => Promise<TemplateDraft[]> }[] = [
-    { label: 'brand voice', run: () => generateBrandAssistant(b, ctx).then(a => [a]) },
-    { label: 'assistants', run: () => generateStarterAssistants(b, ctx, 2) },
-    { label: 'prompts', run: () => generateStarterPrompts(b, ctx, 3) },
+    { label: 'brand voice', run: () => generateBrandVoiceSkill(b, ctx).then(s => [s]) },
+    { label: 'prompts', run: () => generateStarterPrompts(b, ctx, 4) },
     { label: 'skills', run: () => generateStarterSkills(b, ctx, 3) },
   ];
 
@@ -302,15 +290,9 @@ export async function generateSingleTemplate(
   /** SQEM-316 — PDFs and images from the upload path, sent as model parts rather than as text. */
   binaries: { name: string; mimeType: string; data: string }[] = [],
 ): Promise<TemplateDraft & { newFiles: GeneratedFile[]; inspectFiles: string[] }> {
-  const shape = kind === 'assistant'
-    ? '"instruction" (the system instruction, second person, no preamble)'
-    : '"content" (the body; use {{variable_name}} placeholders in snake_case wherever the user must supply something)';
-
-  const kindRule = {
-    prompt: 'A prompt is one task the person runs repeatedly. It must be specific enough to produce the same shape of result every time.',
-    assistant: 'An assistant is a persona: who it is, how it writes, what it must never do. Not a task.',
-    skill: 'A skill is a reusable block of company knowledge — a rule set, a policy, a way of doing something. Not a task and not a persona.',
-  }[kind];
+  // SQEM-390 — what the kind is and what it returns come from the shared authoring module.
+  const shape = SINGLE_TEMPLATE_SHAPE[kind];
+  const kindRule = SINGLE_TEMPLATE_RULE[kind];
 
   /**
    * SQEM-317 — how much of a document reaches the model, and saying so when it is not all of it.
@@ -373,9 +355,8 @@ ${goal}${filesBlock}`,
   // is how two functions that must agree start disagreeing.
   const x = parseJsonObject(raw);
   const content = String(x?.content ?? '');
-  const instruction = String(x?.instruction ?? '');
-  if (!x?.title || (!content && !instruction)) {
-    throw new Error('The model returned something this could not read as a template. Try describing the goal a little more concretely.');
+  if (!x?.title || !content) {
+    throw new Error('The model returned something this could not read as a playbook. Try describing the goal a little more concretely.');
   }
 
   return {
@@ -383,8 +364,7 @@ ${goal}${filesBlock}`,
     title: String(x.title).slice(0, 120),
     description: String(x.description ?? '').slice(0, 300),
     content,
-    systemInstruction: instruction || undefined,
-    variables: extractVariables(content),
+    variables: kind === 'prompt' ? extractVariables(content, questionLabels(x.variables)) : [],
     // A model that returns the wrong shape here costs a context file, not the template the person
     // is already looking at — so both degrade to empty rather than throwing.
     newFiles: Array.isArray(x.newFiles)

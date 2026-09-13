@@ -22,6 +22,28 @@ const PromptRunnerRedirect = () => {
   }, [id, nav]);
   return null;
 };
+// SQEM-389 — a persona card lands in Chat with the persona applied, the way a template card does.
+// Editing stays on the card's pencil (`/personas/:id/edit`).
+const PersonaChatRedirect = () => {
+  const { id } = useParams<{ id: string }>();
+  const nav = useNavigate();
+  React.useEffect(() => {
+    nav('/chat', { replace: true, state: { launchPersonaId: id } });
+  }, [id, nav]);
+  return null;
+};
+// SQEM-394 — the old playbook paths. `/prompts/:id` was the PromptRunner shim and `/prompts/:id/edit`
+// the editor; both keep working by landing on their `/playbooks/…` twin. Two components rather than
+// one with a flag: the list redirect has to carry the QUERY (a bookmarked `?kind=skill` tab), the
+// item redirect has to carry the ID, and a component that does both is one that gets one wrong.
+const LegacyPlaybookRedirect = ({ suffix = '' }: { suffix?: string }) => {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/playbooks/${id}${suffix}`} replace />;
+};
+const LegacyListRedirect = () => {
+  const { search } = useLocation();
+  return <Navigate to={`/playbooks${search}`} replace />;
+};
 const Library = React.lazy(() => import('./pages/Library'));
 const MarketplaceTemplate = React.lazy(() => import('./pages/MarketplaceTemplate'));
 const PublicListing = React.lazy(() => import('./pages/PublicListing')); // SQEM-258
@@ -34,6 +56,8 @@ const Auth = React.lazy(() => import('./pages/Auth'));
 const NotFound = React.lazy(() => import('./pages/NotFound'));
 import { AppProvider, useUI, useToast, useWorkspace } from './store';
 import { useAuth } from './hooks/useAuth';
+import { usePullToRefresh } from './hooks/usePullToRefresh';
+import PullToRefreshIndicator from './components/PullToRefreshIndicator';
 import { CheckCircle, AlertTriangle, Info, X, Menu, Plus, LogOut } from 'lucide-react';
 import { isStagingSupabaseEnvironment } from './lib/environment';
 
@@ -98,6 +122,9 @@ const ToastContainer = () => {
 
 const Layout = ({ children }: React.PropsWithChildren<{}>) => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  // SQEM-385 — pull down at the top of the page to reload the installed app (no-op in a browser tab).
+  const mainRef = React.useRef<HTMLElement>(null);
+  const pull = usePullToRefresh(mainRef);
 
   return (
     <div className="flex h-dvh w-full bg-slate-50 dark:bg-slate-900 overflow-hidden">
@@ -118,7 +145,8 @@ const Layout = ({ children }: React.PropsWithChildren<{}>) => {
             </button>
          </div>
 
-         <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth bg-slate-50 dark:bg-slate-900">
+         <main ref={mainRef} className="flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain scroll-smooth bg-slate-50 dark:bg-slate-900">
+            <PullToRefreshIndicator {...pull} />
             <ErrorBoundary>
               {children}
             </ErrorBoundary>
@@ -219,28 +247,38 @@ const AppRoutes = () => {
     <Suspense fallback={<LoadingScreen />}>
       <Routes>
         {/* Full Screen Routes */}
-        <Route path="/prompts/new" element={<TemplateEditor />} />
-        <Route path="/prompts/:id/edit" element={<TemplateEditor />} />
-        {/* ⛔ NOT the editor route — that is `/prompts/:id/edit` above. This one is a shim that
+        {/* SQEM-394 — playbooks live under /playbooks; every /prompts/* and /templates path below
+            redirects here, so old links, bookmarks and the extension keep working. */}
+        <Route path="/playbooks/new" element={<TemplateEditor />} />
+        <Route path="/playbooks/:id/edit" element={<TemplateEditor />} />
+        {/* ⛔ NOT the editor route — that is `/playbooks/:id/edit` above. This one is a shim that
             catches links to the PromptRunner removed in SQEM-042 and sends them to Chat.
             SQEM-313: two call sites navigated here meaning the editor, and neither failed
-            visibly — the template opened, just in the wrong place. If you are writing a link
-            to a template, you almost certainly want `/edit`. */}
-        <Route path="/prompts/:id" element={<PromptRunnerRedirect />} />
+            visibly — the playbook opened, just in the wrong place. If you are writing a link
+            to a playbook, you almost certainly want `/edit`. */}
+        <Route path="/playbooks/:id" element={<PromptRunnerRedirect />} />
+        <Route path="/prompts/new" element={<Navigate to="/playbooks/new" replace />} />
+        <Route path="/prompts/:id/edit" element={<LegacyPlaybookRedirect suffix="/edit" />} />
+        <Route path="/prompts/:id" element={<LegacyPlaybookRedirect />} />
         {/* SQEM-324 — the persona editor is full-screen like the template editor: same job,
             same amount of screen it wants. */}
         <Route path="/personas/new" element={<PersonaEditor />} />
         <Route path="/personas/:id/edit" element={<PersonaEditor />} />
+        <Route path="/personas/:id" element={<PersonaChatRedirect />} />
         <Route path="/library/new" element={<TemplateEditor />} />
         <Route path="/library/:id/edit" element={<TemplateEditor />} />
         <Route path="/library/:id" element={<MarketplaceTemplate />} />
 
         {/* Dashboard Layout Routes */}
         <Route path="/" element={<LayoutPage><Dashboard /></LayoutPage>} />
-        <Route path="/templates" element={<LayoutPage><Templates /></LayoutPage>} />
+        <Route path="/playbooks" element={<LayoutPage><Templates /></LayoutPage>} />
         <Route path="/personas" element={<LayoutPage><Personas /></LayoutPage>} />
-        <Route path="/prompts" element={<Navigate to="/templates" replace />} />
-        <Route path="/assistants" element={<Navigate to="/templates?kind=assistant" replace />} />
+        {/* SQEM-394 — the list's old paths. `/templates` keeps its query (?kind=…), which is what a
+            bookmarked filter tab carries. */}
+        <Route path="/templates" element={<LegacyListRedirect />} />
+        <Route path="/prompts" element={<Navigate to="/playbooks" replace />} />
+        {/* SQEM-390 — assistants are skills now; the old deep link lands on the skills tab. */}
+        <Route path="/assistants" element={<Navigate to="/playbooks?kind=skill" replace />} />
         <Route path="/files" element={<LayoutPage><Files /></LayoutPage>} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/chat/:sessionId" element={<Chat />} />
@@ -261,8 +299,10 @@ const AppRoutes = () => {
 const pageTitleForPath = (pathname: string): string => {
   if (pathname === '/') return 'Dashboard';
   if (pathname.startsWith('/chat')) return 'Chat';
-  if (pathname.startsWith('/prompts/')) return 'Template editor';
-  if (pathname.startsWith('/templates') || pathname === '/prompts' || pathname.startsWith('/assistants')) return 'Templates';
+  if (pathname.startsWith('/playbooks/') || pathname.startsWith('/prompts/')) return 'Playbook editor';
+  if (pathname.startsWith('/personas/')) return 'Persona editor';
+  if (pathname.startsWith('/personas')) return 'Personas'; // SQEM-388 — was missing, tab said just "sqemes"
+  if (pathname.startsWith('/playbooks') || pathname.startsWith('/templates') || pathname === '/prompts' || pathname.startsWith('/assistants')) return 'Playbooks';
   if (pathname.startsWith('/library/')) return 'Marketplace editor';
   if (pathname === '/library') return 'Marketplace';
   if (pathname.startsWith('/files')) return 'Files';

@@ -64,27 +64,21 @@ export interface BrandProfile {
   brandName: string;
   whatItDoes: string;
   audience: string;
-  tone: ToneLevel;
-  useCase?: string;
   website?: string;
   updatedAt?: string;
+  // ⛔ SQEM-395 — `tone` (1–5) and `useCase` were here. A saved profile may still carry the keys in
+  // `workspaces.brand_profile` (jsonb); nothing reads them, and the type does not describe them.
 }
 
-export type PromptKind = 'prompt' | 'assistant' | 'skill';
-
-export type ToneLevel = 1 | 2 | 3 | 4 | 5;
-
-export interface BrandVoiceExample {
-  id: string;
-  input: string;
-  output: string;
-}
-
-export interface AssistantBrandConfig {
-  tone: ToneLevel;
-  brandContext: string;
-  examples: BrandVoiceExample[];
-}
+/**
+ * SQEM-390 — two kinds. A **prompt** is a task (with `{{variables}}`); a **skill** is knowledge,
+ * applied whenever it fits. The third kind, `assistant`, was retired on 2026-09-13 and every row
+ * that carried it became a skill: in the code the two were one mechanism (both ended up as text in
+ * the same system instruction), and the role an assistant was meant to hold is what a **Persona**
+ * is for. ⛔ Do not re-add it — the kind check constraints reject it, and the guard test
+ * `tests/unit/assistantsBecomeSkills.test.ts` reads this line.
+ */
+export type PromptKind = 'prompt' | 'skill';
 
 export type VariableType = 'text' | 'textarea' | 'select' | 'file';
 
@@ -119,7 +113,6 @@ export interface Prompt {
   tag: string | null;
   variables: Variable[];
   content: string;
-  systemInstruction?: string;
   contextFileIds: string[];
   model?: string;
   /**
@@ -136,7 +129,9 @@ export interface Prompt {
   sourceTemplateId?: string;
   published?: boolean;
   hadMultipleSteps?: boolean;
-  brandConfig?: AssistantBrandConfig;
+  // ⛔ SQEM-390 — `systemInstruction` and `brandConfig` were here and are gone with the assistant
+  // kind. The columns survive as unread legacy (`system_instruction`, `brand_config`); the type does
+  // not describe what nothing reads.
 }
 
 /**
@@ -177,6 +172,8 @@ export interface Persona {
   updatedAt: string;
   createdBy: string;
   usageCount: number;
+  /** SQEM-393 — per user, from `user_persona_favorites`; only set by readers that were given the user. */
+  isFavorite?: boolean;
 }
 
 export interface WorkspaceFile {
@@ -210,8 +207,6 @@ export interface LibraryTemplate {
   tags: string[];
   variables: Variable[];
   steps: Step[];
-  systemInstruction?: string;
-  brandConfig?: AssistantBrandConfig;
   createdBy: string;
   usageCount: number;
   published: boolean;
@@ -239,9 +234,10 @@ export interface ChatSession {
   userId: string;
   title: string;
   model: string;
-  assistantId?: string;
-  /** SQEM-371 — skills applied to this session, in application order. Assistants stay in `assistantId`. */
+  /** SQEM-371 — skills applied to this session, in application order. (SQEM-390: an assistant applied before the kind was retired is the first entry.) */
   appliedSkillIds: string[];
+  /** SQEM-389 — the persona applied to this session: the role. */
+  personaId?: string;
   visibility: 'private' | 'workspace';
   createdAt: string;
   lastActiveAt: string;

@@ -1,5 +1,5 @@
 
-import { PlanTier } from './types';
+import { PlanTier, PromptKind } from './types';
 
 // SQEM-082 — decided monthly AI-credit allowances per tier (1 credit = 1,000 tokens).
 // Used for the Dashboard "AI credits" display when the workspace has no provisioned
@@ -35,9 +35,11 @@ export const PLAN_AI_CREDITS: Record<PlanTier, number> = {
 // (a customer had assistant and skill the wrong way round). The MCP prompt matters most: the same
 // server now advertises `[persona]` entries, so a model would have read a contradiction about its
 // own tools. If the owner would rather rename the new object instead, this is the line to revert.
-export const KIND_HELP: Record<'prompt' | 'assistant' | 'skill', string> = {
+// SQEM-390 — two kinds. The assistant line is gone with the kind: a standing role is a **Persona**
+// now, and the sentence that explained an assistant would only have re-created the question it
+// answered ("so what is the difference to a persona?").
+export const KIND_HELP: Record<PromptKind, string> = {
   prompt: 'A task you reuse and fill in each time. Example: \u201cCold Outreach Email\u201d \u2014 you supply the customer and the product.',
-  assistant: 'A standing role to work with, with its own instructions and context files. Example: \u201cEditor-in-Chief\u201d \u2014 sharpens clarity, flow and structure.',
   skill: 'A piece of your company\u2019s knowledge that AI applies whenever it fits \u2014 no filling in. Example: \u201cAIDA Copywriting Framework\u201d, or your brand voice.',
 };
 
@@ -65,7 +67,17 @@ export const KIND_HELP: Record<'prompt' | 'assistant' | 'skill', string> = {
 //
 // ⭐ A real import, not a twin with a comparison test: the module is import-free, so the browser
 // bundle can read it — measured, not assumed. See its header for why that beats `lib/storageKey.ts`.
-export { LIBRARY_SYSTEM_PROMPT } from './supabase/functions/_shared/libraryPrompt.ts';
+//
+// ⛔ SQEM-398 — the re-export moved to `lib/libraryPrompt.ts`, and this file must stay a LEAF.
+// `api/extension-config.ts` imports `../constants.js`: Vercel transpiles that function and every
+// TypeScript file it reaches, but rewrites no specifier — so a `from '…/libraryPrompt.ts'` line here
+// survived into the emitted `constants.js`, pointed at a file that no longer existed under that
+// name, and `/.well-known/sqemes-extension-config` answered 500 (FUNCTION_INVOCATION_FAILED) on
+// production from the SQEM-378 promotion (2026-09-11) until 2026-09-13 — the endpoint every
+// extension setup fetches first. Same rule as the `.js` extension on the import in `api/`
+// (SQEM-309): what this file imports is what the serverless function has to resolve at runtime.
+// `tests/unit/extensionConfigLeaf.test.ts` pins it.
+// (`import { PlanTier, PromptKind } from './types'` above is type-only and is erased.)
 
 export const VAT_NOTE = 'Includes VAT. Business customers with a valid VAT ID are charged net.';
 
@@ -85,7 +97,7 @@ export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly
       '2,000 AI credits / month',
       'MCP server access',
       'Unlimited AI with your own key (BYOK)',
-      'Unlimited templates',
+      'Unlimited playbooks',
       'Marketplace access',
     ],
   },
@@ -102,7 +114,7 @@ export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly
       'MCP server access',
       'Roles & permissions',
       'Unlimited AI with your own key (BYOK)',
-      'Unlimited templates',
+      'Unlimited playbooks',
       'Marketplace access',
     ],
   },
@@ -119,7 +131,7 @@ export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly
       'MCP server access',
       'Roles & permissions',
       'Unlimited AI with your own key (BYOK)',
-      'Unlimited templates',
+      'Unlimited playbooks',
       'Marketplace access',
       'Priority support',
     ],
@@ -451,7 +463,7 @@ export const AVAILABLE_MODELS = [
 
 // Mock assistants removed — assistants are now stored in the database
 
-export const CACHE_VERSION = '2';
+export const CACHE_VERSION = '3'; // SQEM-390 — a cached list may still hold kind='assistant' rows
 export const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // SQEM-106 — function-based marketplace taxonomy (spans prompts/assistants/skills).

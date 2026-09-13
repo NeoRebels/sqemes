@@ -73,15 +73,15 @@ export default function MarketplaceTemplate() {
     catch (e) { setMyVote(prev); setScore(s => s - next + prev); showToast(e instanceof Error ? e.message : 'Vote failed', 'error'); }
   };
 
-  const body = listing?.content || (listing?.steps as Step[] | undefined)?.[0]?.content || listing?.systemInstruction || '';
+  const body = listing?.content || (listing?.steps as Step[] | undefined)?.[0]?.content || '';
 
   const handleCopy = async () => {
     if (!listing) return;
     setCopying(true);
     try {
       await copyListingToWorkspace(listing, workspace.id, currentUser.id);
-      showToast('Added to your templates ✨', 'success');
-      navigate('/templates');
+      showToast('Added to your playbooks ✨', 'success');
+      navigate('/playbooks');
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Copy failed', 'error');
     } finally {
@@ -95,8 +95,8 @@ export default function MarketplaceTemplate() {
   // the one the public page uses — one behaviour to reason about, not two.
   //
   // ⚠️ Until SQEM-302 this converted the bundle into an Agent Skill folder, and the button was shown
-  // only for skills — a prompt's variables and an assistant's brand config have no place in a
-  // SKILL.md. The bundle expresses all three kinds, so that restriction lost its reason and went.
+  // only for skills — a prompt's variables have no place in a SKILL.md. The bundle expresses both
+  // kinds, so that restriction lost its reason and went.
   const handleDownload = async () => {
     if (!listing) return;
     setDownloading(true);
@@ -116,9 +116,7 @@ export default function MarketplaceTemplate() {
     if (!canAdapt || !workspace.brandProfile) return;
     setAdapting(true);
     try {
-      const isAssistant = listing.kind === 'assistant';
-      const source = isAssistant ? (listing.systemInstruction ?? '') : body;
-      const adapted = await adaptToBrand(source, listing.kind, workspace.brandProfile, { workspaceId: workspace.id, modelId });
+      const adapted = await adaptToBrand(body, listing.kind, workspace.brandProfile, { workspaceId: workspace.id, modelId });
       const now = new Date().toISOString();
       const created = await addPrompt({
         id: crypto.randomUUID(),
@@ -128,8 +126,7 @@ export default function MarketplaceTemplate() {
         description: listing.description,
         tag: listing.tags?.[0] ?? null,
         variables: listing.variables,
-        content: isAssistant ? '' : adapted,
-        systemInstruction: isAssistant ? adapted : listing.systemInstruction,
+        content: adapted,
         contextFileIds: [],
         createdAt: now,
         updatedAt: now,
@@ -140,7 +137,7 @@ export default function MarketplaceTemplate() {
       } as Prompt);
       if (created) {
         showToast('Adapted to your brand ✨', 'success');
-        navigate(`/prompts/${created.id}/edit`);
+        navigate(`/playbooks/${created.id}/edit`);
       }
     } catch (e) {
       showToast(describeAIError(e, 'Adaptation failed', { alternativesAvailable: hasAuthoringAlternatives(workspace) }), 'error');
@@ -182,13 +179,13 @@ export default function MarketplaceTemplate() {
       adapting={adapting}
       adaptLabel={hasBrand ? 'Adapt to brand' : 'Set up brand'}
       adaptDisabled={hasBrand && !canAdapt}
-      adaptTitle={!hasBrand ? 'Set up your brand profile to adapt' : !canUseAI ? 'Connect an AI provider key to adapt' : 'Adapt this template to your brand'}
+      adaptTitle={!hasBrand ? 'Set up your brand profile to adapt' : !canUseAI ? 'Connect an AI provider key to adapt' : 'Adapt this playbook to your brand'}
       onDownload={handleDownload}
       downloading={downloading}
     >
       {/* Report modal */}
       <Modal open={reportOpen} onClose={() => !reporting && setReportOpen(false)} size="sm" className="p-6">
-        <div className="flex items-center gap-2.5 mb-2"><Flag className="w-6 h-6 text-red-500" /><h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Report this template</h3></div>
+        <div className="flex items-center gap-2.5 mb-2"><Flag className="w-6 h-6 text-red-500" /><h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Report this playbook</h3></div>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Tell us what&apos;s wrong. Our team reviews reports and can unpublish a listing.</p>
         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Reason</label>
         <select value={reportReason} onChange={e => setReportReason(e.target.value)} className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">

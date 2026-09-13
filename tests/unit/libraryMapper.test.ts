@@ -8,8 +8,8 @@ const { rowToLibraryTemplate } = await import('../../lib/api/library');
 // SQEM-184 — the row→domain mapper behind the marketplace source split (Cloud + self-host public feed).
 describe('rowToLibraryTemplate', () => {
   const base = {
-    id: 'lt-1', kind: 'assistant', title: 'T', description: 'D', category: 'General',
-    tags: ['a'], variables: [], steps: [], system_instruction: 'sys', brand_config: null,
+    id: 'lt-1', kind: 'skill', title: 'T', description: 'D', category: 'General',
+    tags: ['a'], variables: [], steps: [], content: 'body',
     created_by: 'u1', usage_count: 3, published: true,
     created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-02T00:00:00Z',
   };
@@ -17,9 +17,9 @@ describe('rowToLibraryTemplate', () => {
   it('maps core columns', () => {
     const t = rowToLibraryTemplate(base as never);
     expect(t.id).toBe('lt-1');
-    expect(t.kind).toBe('assistant');
+    expect(t.kind).toBe('skill');
     expect(t.usageCount).toBe(3);
-    expect(t.systemInstruction).toBe('sys');
+    expect(t.content).toBe('body');
   });
 
   it('applies fallbacks for missing UGC columns', () => {

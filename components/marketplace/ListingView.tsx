@@ -47,7 +47,7 @@ export default function ListingView({
   onReport, onCopy, copying, onAdapt, adapting, adaptLabel, adaptDisabled, adaptTitle,
   onDownload, downloading, offer, children,
 }: ListingViewProps) {
-  const body = listing.content || (listing.steps as Step[] | undefined)?.[0]?.content || listing.systemInstruction || '';
+  const body = listing.content || (listing.steps as Step[] | undefined)?.[0]?.content || '';
   const fileNames = listing.preview?.fileNames ?? [];
 
   return (
@@ -116,7 +116,7 @@ export default function ListingView({
         <div className="flex flex-wrap items-center gap-3 mt-6">
           {onCopy && (
             <button onClick={onCopy} disabled={copying || adapting} className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-brand-200 dark:shadow-none disabled:opacity-50">
-              {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <FilePlus className="w-4 h-4" />} Add to templates
+              {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <FilePlus className="w-4 h-4" />} Add to playbooks
             </button>
           )}
           {onAdapt && (
@@ -127,9 +127,9 @@ export default function ListingView({
           {/* A text link, not a third button: it is an alternative to taking the template in, not a
               competing primary action.
               SQEM-302 — shown for every listing now. It used to be skills only, because the download
-              was an Agent Skill folder and a prompt's variables or an assistant's brand config
-              cannot be expressed as a SKILL.md. The Sqemes bundle expresses all three kinds, so the
-              restriction lost the reason it was built on. */}
+              was an Agent Skill folder and a prompt's variables cannot be expressed as a SKILL.md.
+              The Sqemes bundle expresses both kinds, so the restriction lost the reason it was
+              built on. */}
           {onDownload && (
             <button
               onClick={onDownload}
@@ -137,7 +137,7 @@ export default function ListingView({
               title={fileNames.length ? `A .sqemes.zip with ${fileNames.length} file${fileNames.length === 1 ? '' : 's'}` : 'A .sqemes.zip — this listing carries no files'}
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 underline underline-offset-4 decoration-slate-300 dark:decoration-slate-600 hover:decoration-brand-400 transition-colors disabled:opacity-50 disabled:no-underline"
             >
-              {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Download Template
+              {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Download Playbook
             </button>
           )}
         </div>
@@ -198,7 +198,7 @@ export default function ListingView({
 export function ListingUnavailable({ onExit }: { onExit?: () => void }) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50 dark:bg-slate-900 text-center px-6">
-      <p className="text-slate-500 dark:text-slate-400">This template isn&apos;t available.</p>
+      <p className="text-slate-500 dark:text-slate-400">This playbook isn&apos;t available.</p>
       {/* SQEM-208 — the dead-end state needs the exit most of all: there is nothing else here.
           Except when there is nowhere to send them: a signed-out visitor has no marketplace to go
           back to, and an exit into the sign-in wall is not an exit (SQEM-258). */}

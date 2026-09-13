@@ -11,8 +11,9 @@ import { publishToMarketplace, submitToMarketplaceViaProxy, fetchCanPublish } fr
 import { TEMPLATE_CATEGORIES, KIND_HELP } from '../constants';
 import type JSZip from 'jszip';
 import { Link, useSearchParams } from 'react-router';
-import { Search, Plus, Edit, Trash2, Copy, Star, Bot, PenTool, Wand2, Sparkles, Loader2, Store, Lock, Upload, Package, FolderDown } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Copy, Star, PenTool, Wand2, Sparkles, Loader2, Store, Lock, Upload, Package, FolderDown } from 'lucide-react';
 import Card from '../components/ui/Card';
+import PageHeader from '../components/ui/PageHeader';
 import TemplateCard from '../components/ui/TemplateCard';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -119,11 +120,11 @@ const PromptCard = memo(function PromptCard({
       </>
     )}
     title={prompt.title}
-    titleHref={`/prompts/${prompt.id}`}
+    titleHref={`/playbooks/${prompt.id}`}
     description={prompt.description}
     footerLeft={canEdit && (
       <>
-        <Link to={`/prompts/${prompt.id}/edit`} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors" title="Edit">
+        <Link to={`/playbooks/${prompt.id}/edit`} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors" title="Edit">
           <Edit className="w-4 h-4" />
         </Link>
         <button
@@ -135,14 +136,14 @@ const PromptCard = memo(function PromptCard({
         </button>
         {/* SQEM-302 — one template leaves as a `.sqemes.zip`, the same format the multi-select export
             has always produced. Until now this wrote an Agent Skill folder and was shown for skills
-            only, because a prompt's variables and an assistant's brand config have no place in a
+            only, because a prompt's variables (and, back then, an assistant's brand config) have no place in a
             SKILL.md. The bundle carries all three kinds, so the restriction lost its reason and the
             button belongs on every card.
             ⚠️ Import is untouched: an Agent Skill folder can still be uploaded (SQEM-243). */}
         <button
           onClick={(e) => { e.preventDefault(); onExportSkill(prompt); }}
           className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-          title="Download Template (.sqemes.zip)"
+          title="Download Playbook (.sqemes.zip)"
         >
           <FolderDown className="w-4 h-4" />
         </button>
@@ -255,7 +256,7 @@ const Templates = () => {
         onClick={() => setWizardOpen(true)}
         className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 px-5 py-2.5 rounded-xl font-medium text-sm transition-all"
       >
-        <Sparkles className="w-4 h-4" /> Template Wizard
+        <Sparkles className="w-4 h-4" /> Playbook Wizard
       </button>
     ) : (
       /* The same slot, saying what is missing rather than sitting there disabled. A disabled button
@@ -263,7 +264,7 @@ const Templates = () => {
       <Link
         to="/settings"
         state={{ initialTab: 'brand' }}
-        title="The Template Wizard writes in your brand's voice — it needs the brand set up first"
+        title="The Playbook Wizard writes in your brand's voice — it needs the brand set up first"
         className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 px-5 py-2.5 rounded-xl font-medium text-sm transition-all"
       >
         <Sparkles className="w-4 h-4" /> Set up brand
@@ -354,10 +355,10 @@ const Templates = () => {
     try {
       const blob = await exportTemplatesToZip(selected, workspaceFiles);
       const base = selected.length === 1
-        ? selected[0].title.replace(/[^\w.-]+/g, '_').slice(0, 60) || 'template'
-        : `sqemes-templates-${selected.length}`;
+        ? selected[0].title.replace(/[^\w.-]+/g, '_').slice(0, 60) || 'playbook'
+        : `sqemes-playbooks-${selected.length}`;
       downloadBlob(blob, `${base}.sqemes.zip`);
-      showToast(`Exported ${selected.length} template${selected.length === 1 ? '' : 's'}`, 'success');
+      showToast(`Exported ${selected.length} playbook${selected.length === 1 ? '' : 's'}`, 'success');
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Export failed', 'error');
     } finally {
@@ -371,7 +372,7 @@ const Templates = () => {
     setExporting(true);
     try {
       downloadBlob(await exportTemplatesToZip([template], workspaceFiles), `${toSlug(template.title)}.sqemes.zip`);
-      showToast('Template downloaded', 'success');
+      showToast('Playbook downloaded', 'success');
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Export failed', 'error');
     } finally {
@@ -456,7 +457,7 @@ const Templates = () => {
       // SQEM-330 — personas only appear in the count when the bundle carried any, so an ordinary
       // template import reads exactly as it did before.
       showToast(
-        `Imported ${templates} template${templates === 1 ? '' : 's'}` +
+        `Imported ${templates} playbook${templates === 1 ? '' : 's'}` +
         (personas ? ` and ${personas} persona${personas === 1 ? '' : 's'}` : ''),
         'success',
       );
@@ -470,13 +471,11 @@ const Templates = () => {
 
   return (
     <div className="p-4 md:p-8 pb-16 md:pb-20 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 md:mb-10 gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Templates</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-2">Manage and organize your team&apos;s prompts, assistants, and skills</p>
-        </div>
-        {canEdit && (
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+      <PageHeader
+        title="Playbooks"
+        subtitle="Manage and organize your team's prompts and skills"
+        actions={canEdit && (
+          <>
             <input ref={importInputRef} type="file" accept=".zip,.sqemes" onChange={handleImportFile} className="hidden" />
             <button
               onClick={() => importInputRef.current?.click()}
@@ -486,19 +485,19 @@ const Templates = () => {
               <Upload className="w-4 h-4" /> Import
             </button>
             {wizardButton}
-            <Link to="/prompts/new" className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-brand-200 hover:shadow-brand-300 dark:shadow-none dark:hover:shadow-none flex-1 sm:flex-none justify-center">
-              <Plus className="w-5 h-5" /> New Template
+            <Link to="/playbooks/new" className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-brand-200 hover:shadow-brand-300 dark:shadow-none dark:hover:shadow-none flex-1 sm:flex-none justify-center">
+              <Plus className="w-5 h-5" /> New Playbook
             </Link>
-          </div>
+          </>
         )}
-      </div>
+      />
 
       {/* Search + Sort + Filters */}
       <div className="flex items-center gap-2 mb-8 flex-wrap">
         <SearchInput
           value={searchTerm}
           onChange={setSearchTerm}
-          placeholder="Search templates..."
+          placeholder="Search playbooks..."
         />
         {/* Favorites */}
         <button
@@ -516,9 +515,9 @@ const Templates = () => {
           className="self-stretch"
           tabs={[
             { value: 'all', label: 'All' },
-            { value: 'prompt', label: 'Prompts', icon: <PenTool className="w-3 h-3" /> },
-            { value: 'assistant', label: 'Assistants', icon: <Bot className="w-3 h-3" /> },
-            { value: 'skill', label: 'Skills', icon: <Wand2 className="w-3 h-3" /> },
+            // SQEM-384 — the same one-liners the cards show on hover, at the place people filter.
+            { value: 'prompt', label: 'Prompts', icon: <PenTool className="w-3 h-3" />, title: KIND_HELP.prompt },
+            { value: 'skill', label: 'Skills', icon: <Wand2 className="w-3 h-3" />, title: KIND_HELP.skill },
           ]}
         />
 
@@ -538,7 +537,7 @@ const Templates = () => {
           onToggleSelectAll={toggleSelectAll}
           onDelete={() => setBulkConfirm(true)}
           onClear={() => setSelectedIds(new Set())}
-          noun="template"
+          noun="playbook"
           onExport={handleBulkExport}
           exporting={exporting}
         />
@@ -550,8 +549,8 @@ const Templates = () => {
         </div>
       )}
 
-      {/* SQEM-287 — this used to read "Create your first prompt, assistant, or skill": it names the
-          three kinds and explains none. It is the first screen every new user sees, because a
+      {/* SQEM-287 — this used to read "Create your first prompt, assistant, or skill": it named the
+          kinds and explained none. It is the first screen every new user sees, because a
           library is necessarily empty on day one — the worst possible place to assume the words are
           self-evident. A customer had assistant and skill the wrong way round after using the
           product, which is how we know they are not. Text comes from KIND_HELP so this screen and
@@ -560,11 +559,11 @@ const Templates = () => {
         <EmptyState
           icon={<Plus className="w-8 h-8 text-brand-400" />}
           iconWrapClassName="bg-brand-50 dark:bg-brand-900/20"
-          title="No templates yet"
-          description="Three kinds, depending on what you need:"
+          title="No playbooks yet"
+          description="Two kinds, depending on what you need:"
           extra={
             <dl className="mt-4 space-y-2 text-left max-w-md mx-auto">
-              {(['prompt', 'assistant', 'skill'] as const).map(k => (
+              {(['prompt', 'skill'] as const).map(k => (
                 <div key={k} className="flex gap-2.5">
                   <dt className="text-xs font-bold text-slate-700 dark:text-slate-200 w-[4.5rem] shrink-0 capitalize pt-px">{k}</dt>
                   <dd className="text-xs text-slate-500 dark:text-slate-400">{KIND_HELP[k]}</dd>
@@ -574,8 +573,8 @@ const Templates = () => {
           }
           action={canEdit ? (
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Link to="/prompts/new" className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-brand-200 dark:shadow-none">
-                <Plus className="w-4 h-4" /> Create your first template
+              <Link to="/playbooks/new" className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-brand-200 dark:shadow-none">
+                <Plus className="w-4 h-4" /> Create your first playbook
               </Link>
               <Link to="/library" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">
                 <Store className="w-4 h-4" /> Browse Marketplace
@@ -589,8 +588,8 @@ const Templates = () => {
       {!isLoading && prompts.length > 0 && filteredPrompts.length === 0 && (
         <EmptyState
           icon={showFavoritesOnly ? <Star className="w-8 h-8 text-amber-300" /> : <Search className="w-8 h-8 text-slate-300 dark:text-slate-500" />}
-          title={showFavoritesOnly ? 'No favourite templates' : 'No templates found'}
-          description={showFavoritesOnly ? 'Star templates to see them here.' : 'Try adjusting your search or filters.'}
+          title={showFavoritesOnly ? 'No favourite playbooks' : 'No playbooks found'}
+          description={showFavoritesOnly ? 'Star playbooks to see them here.' : 'Try adjusting your search or filters.'}
         />
       )}
 
@@ -619,8 +618,8 @@ const Templates = () => {
 
       {/* Delete Confirmation Modal */}
       <Modal open={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} size="sm" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Delete Template?</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Are you sure you want to delete this template? This action cannot be undone.</p>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Delete Playbook?</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Are you sure you want to delete this playbook? This action cannot be undone.</p>
         <div className="flex gap-2">
           <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
           <Button variant="danger" onClick={confirmDelete} className="flex-1 py-2.5 text-xs shadow-lg hover:shadow-red-200">Yes, Delete</Button>
@@ -630,10 +629,10 @@ const Templates = () => {
       {/* Bulk Delete Confirmation Modal */}
       <Modal open={bulkConfirm} onClose={() => !bulkDeleting && setBulkConfirm(false)} size="sm" className="p-6">
         <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
-          Delete {selectedIds.size} template{selectedIds.size === 1 ? '' : 's'}?
+          Delete {selectedIds.size} playbook{selectedIds.size === 1 ? '' : 's'}?
         </h3>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-          This permanently deletes the selected template{selectedIds.size === 1 ? '' : 's'}. This action cannot be undone.
+          This permanently deletes the selected playbook{selectedIds.size === 1 ? '' : 's'}. This action cannot be undone.
         </p>
         <div className="flex gap-2">
           <button
@@ -689,7 +688,7 @@ const Templates = () => {
           <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">You need a publisher key</h3>
         </div>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-          Submitting your templates to the Sqemes community marketplace requires a <span className="font-semibold">publisher key</span>. Request one, then add it in <span className="font-semibold">Settings → General → Marketplace Publisher</span>.
+          Submitting your playbooks to the Sqemes community marketplace requires a <span className="font-semibold">publisher key</span>. Request one, then add it in <span className="font-semibold">Settings → General → Marketplace Publisher</span>.
         </p>
         <div className="flex gap-2">
           <button onClick={() => setShowApplyModal(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
@@ -711,14 +710,14 @@ const Templates = () => {
             <>
               <div className="flex items-center gap-2.5 mb-2">
                 <Package className="w-6 h-6 text-brand-500" />
-                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Import templates</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Import playbooks</h3>
               </div>
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                This bundle will be added to <span className="font-semibold">{workspace.name}</span>. Imported templates
+                This bundle will be added to <span className="font-semibold">{workspace.name}</span>. Imported playbooks
                 come from another source — review what lands before continuing.
               </p>
               <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 p-4 mb-4 text-sm">
-                <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Templates</span><span className="font-bold text-slate-800 dark:text-slate-100">{(templates || []).length}</span></div>
+                <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Playbooks</span><span className="font-bold text-slate-800 dark:text-slate-100">{(templates || []).length}</span></div>
                 <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Context files</span><span className="font-bold text-slate-800 dark:text-slate-100">{(files || []).length}{totalBytes ? ` · ${mb < 0.1 ? '<0.1' : mb.toFixed(1)} MB` : ''}</span></div>
                 {/* ⛔ SQEM-330 — this row was missing, and its absence was the bug. `importBundle`
                     has created personas since SQEM-330 and the success toast counts them, but this

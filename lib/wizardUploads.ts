@@ -150,7 +150,7 @@ export function classifyUpload(
       // ⛔ The one place in the product where "choose a different model" is honest advice: the limit
       // is structural — this provider has no way to accept a document at all — not a passing 503.
       // SQEM-310 had to withdraw that sentence because the setting did not exist; SQEM-311 built it.
-      reason: `${file.name} is a PDF, and ${provider ?? 'the selected provider'} has no way to accept a document — it would be dropped without a word and the template written as if you had attached nothing. Pick a Gemini, OpenAI, Claude, Mistral or OpenRouter model under Settings → General → AI for authoring.`,
+      reason: `${file.name} is a PDF, and ${provider ?? 'the selected provider'} has no way to accept a document — it would be dropped without a word and the playbook written as if you had attached nothing. Pick a Gemini, OpenAI, Claude, Mistral or OpenRouter model under Settings → General → AI for authoring.`,
     };
   }
   return { ok: true, binary: true };

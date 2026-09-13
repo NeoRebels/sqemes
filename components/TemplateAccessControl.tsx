@@ -172,7 +172,7 @@ export function TemplateAccessControl({
   value,
   onChange,
   label = 'Access',
-  hint = 'Who can see & use this template',
+  hint = 'Who can see & use this playbook',
   members,
   groups,
   onCreateGroup,
@@ -306,7 +306,7 @@ export function TemplateAccessControl({
         <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
           <p className="text-xs text-amber-800 dark:text-amber-200">
-            This template carries an older rule granting{' '}
+            This playbook carries an older rule granting{' '}
             <span className="font-semibold">{legacyRoles.join(' & ')}s</span> as a group, which this
             list cannot show — it grants roles, not people.{' '}
             <span className="font-semibold">Saving replaces it with your selection below.</span>
@@ -351,7 +351,7 @@ export function TemplateAccessControl({
               <span className="block text-xs text-slate-400">
                 {members
                   ? 'Pick the people who can use it'
-                  : 'New templates start restricted — choose who can use each one in the template itself'}
+                  : 'New playbooks start restricted — choose who can use each one in the playbook itself'}
               </span>
             </span>
           </button>
@@ -392,7 +392,7 @@ export function TemplateAccessControl({
                    the reason instead of a control that fails. */
                 <div className="text-xs text-slate-500 dark:text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
                   <p className="font-semibold text-slate-600 dark:text-slate-300">No groups yet</p>
-                  <p className="mt-1">A group keeps working as the team changes — add someone once, and every template that group reaches follows.</p>
+                  <p className="mt-1">A group keeps working as the team changes — add someone once, and every playbook that group reaches follows.</p>
                   {onCreateGroup ? (
                     <button type="button" onClick={onCreateGroup} className="mt-2 text-brand-600 dark:text-brand-400 font-semibold hover:underline">
                       Create your first group →
@@ -475,7 +475,7 @@ export function TemplateAccessControl({
               untruth this comment was written about. */}
           <p className="text-2xs text-slate-400 dark:text-slate-500 pt-1">
             {selectedUserIds.length > 0 || selectedGroupIds.length > 0
-              ? 'Only the people and groups named here, plus whoever created the template. Naming a person is per person — somebody who joins later does not get it automatically; a group does follow the team.'
+              ? 'Only the people and groups named here, plus whoever created the playbook. Naming a person is per person — somebody who joins later does not get it automatically; a group does follow the team.'
               : 'Nobody is named yet, so this is the same as Only me — the creator alone.'}
           </p>
         </div>

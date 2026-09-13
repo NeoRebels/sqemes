@@ -1,7 +1,7 @@
 import { supabase } from '../supabase';
 import { fetchTemplateAccess, setTemplateAccess } from './templateAccess';
 import type { Database } from '../database.types';
-import type { Prompt, PromptKind, Variable, AssistantBrandConfig } from '../../types';
+import type { Prompt, PromptKind, Variable } from '../../types';
 
 export type PromptRow = {
   id: string;
@@ -13,7 +13,8 @@ export type PromptRow = {
   variables: unknown;
   steps?: unknown;
   content?: string;
-  system_instruction?: string | null;
+  // SQEM-390 — `system_instruction` and `brand_config` still exist on the table (legacy, unread);
+  // they are not selected and not mapped. The assistant kind they served is gone.
   context_file_ids?: string[];
   model?: string | null;
   created_by: string | null;
@@ -25,7 +26,6 @@ export type PromptRow = {
   // type-checked it either, because `tsc` was not part of CI.
   ai_generated_at?: string | null;
   published?: boolean;
-  brand_config?: unknown;
   created_at: string;
   updated_at: string;
 };
@@ -43,7 +43,6 @@ export function rowToPrompt(row: PromptRow, favoriteIds?: Set<string>): Prompt {
     tag: row.tag ?? null,
     variables: (row.variables || []) as Variable[],
     content,
-    systemInstruction: row.system_instruction ?? undefined,
     contextFileIds: row.context_file_ids || [],
     model: row.model ?? undefined,
     aiGeneratedAt: row.ai_generated_at ?? null,
@@ -55,7 +54,6 @@ export function rowToPrompt(row: PromptRow, favoriteIds?: Set<string>): Prompt {
     sourceTemplateId: row.source_template_id ?? undefined,
     published: row.published,
     hadMultipleSteps: steps.length > 1,
-    brandConfig: row.brand_config as AssistantBrandConfig | undefined,
   };
 }
 
@@ -69,18 +67,16 @@ function promptToRow(prompt: Partial<Prompt>, workspaceId: string) {
   if (prompt.tag !== undefined) row.tag = prompt.tag;
   if (prompt.variables !== undefined) row.variables = JSON.parse(JSON.stringify(prompt.variables));
   if (prompt.content !== undefined) row.content = prompt.content;
-  if (prompt.systemInstruction !== undefined) row.system_instruction = prompt.systemInstruction || null;
   if (prompt.contextFileIds !== undefined) row.context_file_ids = prompt.contextFileIds;
   if (prompt.model !== undefined) row.model = prompt.model || null;
   if (prompt.createdBy) row.created_by = prompt.createdBy;
   if (prompt.usageCount !== undefined) row.usage_count = prompt.usageCount;
   if (prompt.published !== undefined) row.published = prompt.published;
-  if (prompt.brandConfig !== undefined) row.brand_config = prompt.brandConfig ?? null;
   row.updated_at = new Date().toISOString();
   return row;
 }
 
-const PROMPT_SELECT = 'id, workspace_id, kind, title, description, tag, steps, content, system_instruction, brand_config, context_file_ids, model, variables, created_at, updated_at, usage_count, published, source_template_id, created_by';
+const PROMPT_SELECT = 'id, workspace_id, kind, title, description, tag, steps, content, context_file_ids, model, variables, created_at, updated_at, usage_count, published, source_template_id, created_by';
 
 export async function fetchPrompts(workspaceId: string, userId: string) {
   const [promptsResult, favoritesResult] = await Promise.all([
@@ -104,10 +100,10 @@ export async function fetchPrompts(workspaceId: string, userId: string) {
 }
 
 /**
- * SQEM-267 — every template in the workspace, all three kinds, for a complete export.
+ * SQEM-267 — every template in the workspace, both kinds, for a complete export.
  *
  * `fetchPrompts` filters `kind = 'prompt'` and `fetchSkills` filters `kind = 'skill'`, so neither is
- * "everything" and composing them would still miss assistants. **Article 20 GDPR is about the data
+ * "everything" on its own (and until SQEM-390 a third kind fell between them). **Article 20 GDPR is about the data
  * the person provided, not about the subset one page happens to list** — an export that silently
  * omitted a kind would be worse than no export, because it looks complete.
  */
@@ -143,8 +139,8 @@ export async function fetchSkills(workspaceId: string): Promise<Prompt[]> {
 }
 
 // SQEM-087 — the user's favourite prompt ids, for wiring `isFavorite` onto templates of
-// every kind. `fetchPrompts` already applies this to prompts; skills/assistants are loaded
-// by separate fetchers that don't, so the store applies this set to them.
+// every kind. `fetchPrompts` already applies this to prompts; skills are loaded by a separate
+// fetcher that doesn't, so the store applies this set to them.
 export async function fetchFavoriteIds(userId: string): Promise<Set<string>> {
   const { data, error } = await supabase
     .from('user_prompt_favorites')
@@ -241,13 +237,11 @@ export async function duplicatePrompt(prompt: Prompt, workspaceId: string, userI
     tag: prompt.tag ?? null,
     variables: JSON.parse(JSON.stringify(prompt.variables)),
     content: prompt.content,
-    system_instruction: prompt.systemInstruction || null,
     context_file_ids: prompt.contextFileIds || [],
     model: prompt.model || null,
     created_by: userId || null,
     usage_count: 0,
     is_favorite: false,
-    brand_config: prompt.brandConfig ?? null,
   };
 
   const { data, error } = await supabase

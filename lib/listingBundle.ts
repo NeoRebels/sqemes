@@ -36,7 +36,7 @@ function bodyOf(listing: Pick<LibraryTemplate, 'content' | 'steps'>): string {
  * returned untouched: it was written by the exporter and re-packing it could only lose fidelity.
  */
 export async function listingToBundle(
-  listing: Pick<LibraryTemplate, 'title' | 'description' | 'content' | 'kind' | 'steps' | 'variables' | 'systemInstruction' | 'brandConfig'>,
+  listing: Pick<LibraryTemplate, 'title' | 'description' | 'content' | 'kind' | 'steps' | 'variables'>,
   bundle: Blob | null,
 ): Promise<Blob> {
   if (bundle) return bundle;
@@ -58,8 +58,6 @@ export async function listingToBundle(
       tag: null,
       variables: listing.variables || [],
       content: bodyOf(listing),
-      systemInstruction: listing.systemInstruction,
-      brandConfig: listing.brandConfig,
       contextFileRefs: [],
     }],
     files: [],

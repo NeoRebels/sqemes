@@ -24,7 +24,9 @@ export default function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="text-center py-20 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 border-dashed">
+    // SQEM-388 — `px-6`: the `extra` block (Templates: the three kinds; Personas: the "Sales" example)
+    // used to touch the card edge on a phone — there was no horizontal padding at all.
+    <div className="text-center py-20 px-6 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 border-dashed">
       <div className={`w-16 h-16 ${iconWrapClassName} rounded-full flex items-center justify-center mx-auto mb-4`}>
         {icon}
       </div>

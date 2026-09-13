@@ -11,7 +11,7 @@
 // Writing a bundle (`buildBundle`) and applying one (`importBundle`) stay in `templateBundle.ts`:
 // they genuinely need the network. It re-exports everything below, so existing imports are unchanged.
 import JSZip from 'jszip';
-import type { PromptKind, Variable, AssistantBrandConfig } from '../types';
+import type { PromptKind, Variable } from '../types';
 
 export const BUNDLE_SCHEMA = 'sqemes-bundle/v1';
 const MAX_BUNDLE_FILES = 100;
@@ -21,15 +21,22 @@ const MAX_BUNDLE_BYTES = 200 * 1024 * 1024; // 200 MB total (zip-bomb guard)
 export type BundleFile = { ref: string; name: string; mimeType: string; sizeBytes: number; path: string };
 export type BundleTemplate = {
   ref: string;
-  kind: PromptKind;
+  /**
+   * SQEM-390 — `'assistant'` is accepted on READ only. A bundle written before 2026-09-13 may carry
+   * one; the importer turns it into a skill whose body is the old `systemInstruction`, the same
+   * rule the database migration applied. The writer never emits it. Kept as a reader rather than
+   * dropped like `skills` (SQEM-298) because the marketplace's download button produced bundles
+   * for months and "no bundle has ever been downloaded" is not a fact we hold for that period.
+   */
+  kind: PromptKind | 'assistant';
   title: string;
   description: string;
   tag: string | null;
   variables: Variable[];
   content: string;
+  /** Legacy, read only (SQEM-390): the body of a pre-2026-09-13 assistant. Never written. */
   systemInstruction?: string;
   model?: string;
-  brandConfig?: AssistantBrandConfig;
   contextFileRefs: string[]; // → BundleFile.ref
 };
 // ⚠️ SQEM-298 — `skills` and `skillRefs` are gone from this format, not deprecated.

@@ -77,10 +77,14 @@ export async function resolveFileBlocks(
 }
 
 /**
- * The system-context a template contributes when it is **applied** — an assistant or a skill.
+ * The system-context a template contributes when it is **applied** — a skill.
  *
  * ⛔ Not for prompts. A prompt is a task the person should still be able to edit before sending;
  * turning it into system context would take exactly that away. It keeps going into the composer.
+ *
+ * SQEM-390 — this used to branch on the kind: an assistant led with its `systemInstruction`, a
+ * skill with its body. The branch was the only place the two kinds differed in mechanism, and the
+ * migration moved every assistant's instruction into `content`. One path now.
  */
 export async function resolveAppliedContext(
   template: Prompt,
@@ -92,10 +96,8 @@ export async function resolveAppliedContext(
     resolveAttachmentFiles(files, fileIds),
   ]);
 
-  // An assistant leads with its system instruction; a skill has none and leads with its body.
-  // Both then carry their context files.
-  const head = template.kind === 'assistant' ? template.systemInstruction : template.content;
-  const text = [head, ...blocks].filter(Boolean).join('\n\n');
+  // The skill's body first, then its context files.
+  const text = [template.content, ...blocks].filter(Boolean).join('\n\n');
   return { text, images };
 }
 

@@ -155,7 +155,7 @@ const Dashboard = () => {
   // SQEM-086 — primary create actions, shown above Connections in the right column.
   const actions = [
     { label: 'New chat', to: '/chat', icon: MessageSquarePlus },
-    ...(canCreate ? [{ label: 'New template', to: '/prompts/new', icon: FilePlus }] : []),
+    ...(canCreate ? [{ label: 'New playbook', to: '/playbooks/new', icon: FilePlus }] : []),
   ];
 
   return (
@@ -243,12 +243,13 @@ const Dashboard = () => {
                   <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Finish setting up your workspace</p>
                   {/* SQEM-201 — no longer mentions MCP: it left the wizard and lives in the
                       Connections card right below this banner. */}
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Add a provider key, install the extension, and let AI build your first templates.</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Add a provider key, install the extension, and let AI build your first playbooks.</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowWizard(true)}
-                className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none"
+                // SQEM-386 — full width on a phone: a tester called this "too unobtrusive, stretch it across".
+                className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none"
               >
                 Finish setup <ArrowRight className="w-4 h-4" />
               </button>
@@ -265,17 +266,17 @@ const Dashboard = () => {
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-slate-800 dark:text-slate-100 text-lg">Favourites</h2>
-              <Link to="/templates" className="text-sm font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1">
-                All templates <ArrowRight className="w-3.5 h-3.5" />
+              <Link to="/playbooks" className="text-sm font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1">
+                All playbooks <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
             {isLoading && quickTemplates.length === 0 ? (
               <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-slate-300" /></div>
             ) : quickTemplates.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <p className="text-sm text-slate-400 dark:text-slate-500">No favourite templates yet.</p>
-                <Link to="/templates" className="text-sm font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1">
-                  Star a template to pin it here <ArrowRight className="w-3.5 h-3.5" />
+                <p className="text-sm text-slate-400 dark:text-slate-500">No favourite playbooks yet.</p>
+                <Link to="/playbooks" className="text-sm font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1">
+                  Star a playbook to pin it here <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
             ) : (
@@ -344,7 +345,7 @@ const Dashboard = () => {
                         noise where nothing is unclear. */}
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-semibold text-slate-800 dark:text-slate-200">MCP server</span>
-                      <span className="block text-xs text-slate-500 dark:text-slate-400">Use your templates in Claude Desktop, Cursor and other AI tools</span>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">Use your playbooks in Claude Desktop, Cursor and other AI tools</span>
                     </span>
                     {/* SQEM-226 — null while the count is still loading: no state is better than
                         telling a connected user to set it up. Expired keys do not count as active. */}

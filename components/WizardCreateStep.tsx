@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router';
 import { useWorkspace, useUI, usePrompts } from '../store';
 import { authoringModelId, hasAuthoringAlternatives } from '../lib/authoringAI';
 import { generateStarterLibrary, type TemplateDraft } from '../lib/wizardGeneration';
@@ -11,7 +10,6 @@ import Checkbox from './ui/Checkbox';
 import { describeAIError } from '../lib/aiErrors';
 
 const KIND_BADGE: Record<string, { label: string; cls: string }> = {
-  assistant: { label: 'Assistant', cls: 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20' },
   prompt: { label: 'Prompt', cls: 'text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20' },
   skill: { label: 'Skill', cls: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20' },
 };
@@ -24,9 +22,9 @@ export interface WizardAction {
 }
 
 interface WizardCreateStepProps {
-  /** Called after templates are created so the wizard can complete. */
-  onComplete: () => void;
-  /** Jump back to the provider-key step (step 1). */
+  /** Called after templates are created, with how many — the wizard moves on and keeps the count for its ledger. */
+  onComplete: (createdCount: number) => void;
+  /** Jump to the AI-key step (the last one since SQEM-386). */
   onConnectKey: () => void;
   /** Reports this step's primary action so the wizard renders it in the footer (Next slot). */
   onActionChange: (action: WizardAction | null) => void;
@@ -36,7 +34,6 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
   const { workspace, currentUser, updateWorkspace } = useWorkspace();
   const { showToast } = useUI();
   const { addPrompt } = usePrompts();
-  const navigate = useNavigate();
 
   // BYOK text model if one exists; otherwise null → route to Sqemes-funded credits.
   const modelId = authoringModelId(workspace);
@@ -67,15 +64,13 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
         brandName: brand.brandName.trim(),
         whatItDoes: brand.whatItDoes.trim(),
         audience: brand.audience.trim(),
-        tone: brand.tone,
-        useCase: brand.useCase.trim(),
         website: brand.website.trim(),
         updatedAt: new Date().toISOString(),
       },
     });
     try {
       const { drafts: result, failures } = await generateStarterLibrary(
-        { brandName: brand.brandName.trim(), whatItDoes: brand.whatItDoes.trim(), audience: brand.audience.trim(), tone: brand.tone, useCase: brand.useCase.trim() },
+        { brandName: brand.brandName.trim(), whatItDoes: brand.whatItDoes.trim(), audience: brand.audience.trim() },
         { workspaceId: workspace.id, modelId },
       );
       if (result.length === 0) {
@@ -83,8 +78,8 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
         // credits does not get better by retrying, so don't tell the user to try again for those.
         showToast(
           failures.length > 0
-            ? `Couldn't generate your starter templates. ${describeAIError(failures[0], 'Try again in a moment.', { alternativesAvailable: hasAuthoringAlternatives(workspace) })}`
-            : "The AI didn't return anything usable. Try again, or browse the Marketplace for ready-made templates.",
+            ? `Couldn't generate your starter playbooks. ${describeAIError(failures[0], 'Try again in a moment.', { alternativesAvailable: hasAuthoringAlternatives(workspace) })}`
+            : "The AI didn't return anything usable. Try again, or browse the Marketplace for ready-made playbooks.",
           'error',
         );
         return;
@@ -130,8 +125,6 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
         tag: null,
         variables: d.variables,
         content: d.content,
-        systemInstruction: d.systemInstruction,
-        brandConfig: d.brandConfig,
         contextFileIds: [],
         // SQEM-265 — the wizard writes whole templates and the person only picks which to keep.
         // That is generation under EU AI Act Art. 50(2), unlike the editor's Enhance, which works
@@ -143,12 +136,12 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
         usageCount: 0,
         published: true,
       } as Prompt)));
-      showToast(`Created ${chosen.length} template${chosen.length > 1 ? 's' : ''}`, 'success');
-      // Land on Templates so the user immediately sees what was generated.
-      navigate('/templates');
-      onComplete();
+      showToast(`Created ${chosen.length} playbook${chosen.length > 1 ? 's' : ''}`, 'success');
+      // SQEM-386 — no navigation here any more: the wizard continues to the extension step and lands
+      // on Templates from its final "Done", so the person sees what was generated once they leave.
+      onComplete(chosen.length);
     } catch (err: any) {
-      showToast(err.message || 'Failed to create templates', 'error');
+      showToast(err.message || 'Failed to create playbooks', 'error');
     } finally {
       setSaving(false);
     }
@@ -163,8 +156,8 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
   useEffect(() => {
     onActionChange(
       phase === 'form'
-        ? { label: generating ? 'Generating your library…' : 'Generate library', onClick: runAction, disabled: !canGenerate || generating, loading: generating }
-        : { label: saving ? 'Creating…' : `Create ${selected.size} template${selected.size === 1 ? '' : 's'}`, onClick: runAction, disabled: selected.size === 0 || saving, loading: saving },
+        ? { label: generating ? 'Generating your starter playbooks…' : 'Generate my starter playbooks', onClick: runAction, disabled: !canGenerate || generating, loading: generating }
+        : { label: saving ? 'Creating…' : `Create ${selected.size} playbook${selected.size === 1 ? '' : 's'}`, onClick: runAction, disabled: selected.size === 0 || saving, loading: saving },
     );
   }, [phase, generating, canGenerate, saving, selected.size, runAction, onActionChange]);
 
@@ -179,8 +172,9 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
             <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Review your starter templates</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Edit titles and descriptions, untick anything you don&apos;t want, then create them.</p>
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Review your starter playbooks</h3>
+            {/* SQEM-386 — say whose they are: a tester did not realise these were generated for HIM. */}
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Generated for {brand.brandName.trim() || 'your brand'} from what you told us. Edit titles and descriptions, untick anything you don&apos;t want, then create them.</p>
           </div>
         </div>
 
@@ -241,8 +235,8 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
           <Wand2 className="w-5 h-5" />
         </div>
         <div>
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Create your starter templates</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Tell us about your brand and AI will generate a brand-voice assistant, starter prompts, and a skill — all editable before they&apos;re saved.</p>
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Create your starter playbooks</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Your website is enough — AI drafts four prompts and four skills, your brand voice among them. You review every one before it is saved.</p>
         </div>
       </div>
 
@@ -252,12 +246,13 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange }: WizardCr
           className="w-full flex items-center gap-2.5 p-3 mb-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 text-left hover:bg-amber-100/70 dark:hover:bg-amber-900/30 transition-colors"
         >
           <Key className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-          <span className="flex-1 text-xs text-amber-700 dark:text-amber-300">A provider key is needed to generate templates.</span>
-          <span className="text-xs font-bold text-amber-700 dark:text-amber-300 shrink-0 inline-flex items-center gap-1">Add a key <ArrowRight className="w-3.5 h-3.5" /></span>
+          <span className="flex-1 text-xs text-amber-700 dark:text-amber-300">A provider key is needed to generate playbooks here — that is step 3. You can add it first and come back.</span>
+          <span className="text-xs font-bold text-amber-700 dark:text-amber-300 shrink-0 inline-flex items-center gap-1">Go to step 3 <ArrowRight className="w-3.5 h-3.5" /></span>
         </button>
       )}
 
-      <BrandProfileForm value={brand} onChange={patch => setBrand(b => ({ ...b, ...patch }))} />
+      {/* Round 2 (owner): the website field alone, the manual fields behind a link — the modal was crowded. */}
+      <BrandProfileForm value={brand} onChange={patch => setBrand(b => ({ ...b, ...patch }))} collapsible />
     </div>
   );
 };

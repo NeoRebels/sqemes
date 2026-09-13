@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import {
   LayoutDashboard,
-  FileText,
+  BookMarked,
   Store,
   Chrome,
   MessageSquare,
@@ -21,7 +21,7 @@ import {
   Moon,
   BookOpen,
   Loader2,
-  Users,
+  Bot,
 } from 'lucide-react';
 import { useUI, useWorkspace } from '../store';
 import PersonCard from './ui/PersonCard';
@@ -160,16 +160,27 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
    * The boolean shipped with a finished badge and no user, so adding a second mechanism beside it
    * would have left two ways to label a nav item — and two ways drift apart the moment somebody
    * extends the wrong one.
+   *
+   * ⚠️ SQEM-384 — and now, again, no entry sets it. The one user ("MCP only" on Personas) became
+   * false with SQEM-373. The mechanism stays: it is one line, it is the one way to label a nav item,
+   * and removing it would only invite the next person to add a second one.
    */
   const navLinks: { to: string; icon: any; label: string; badge?: string; arrow?: boolean }[] = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-    { to: "/templates", icon: FileText, label: "Templates" },
-    // SQEM-324 — directly under Templates, because a persona is made of them; anywhere else in
+    // SQEM-394 — "Playbooks", the word the landing page uses; "Templates" was the app's own word and
+    // two UX testers tripped over the mismatch. The route moved with it (/templates redirects).
+    { to: "/playbooks", icon: BookMarked, label: "Playbooks" },
+    // SQEM-324 — directly under Playbooks, because a persona is made of them; anywhere else in
     // this list and the relationship has to be explained instead of seen.
-    // SQEM-350 — a persona is the one object that only ever acts through MCP: it is maintained here
-    // and invoked nowhere else in the app. Sitting between Templates and Chat, nothing says so, and
-    // the next move is to go looking for it in Chat. The label answers that before it is asked.
-    { to: "/personas", icon: Users, label: "Personas", badge: "MCP only" },
+    // ⛔ SQEM-384 — this entry carried `badge: "MCP only"` from SQEM-350 to SQEM-384. It was true
+    // when written (a persona acted through MCP and nowhere else) and false from SQEM-373 on, when
+    // Chat gained tool calling over the library and personas with it. It stayed for two days past
+    // that, and a UX tester (2026-09-11) read it and concluded personas were not for Chat. A label
+    // that states WHERE something works has to be revisited every time that changes — that is the
+    // cost of the SQEM-350 decision, and this is the bill.
+    // SQEM-390 — the Bot, not the Users icon: a persona is an AI role, and "Users" read as people
+    // (UX test, 2026-09-11). The icon was the assistant kind's until that kind was retired.
+    { to: "/personas", icon: Bot, label: "Personas" },
     { to: "/library", icon: Store, label: "Marketplace" },
     { to: "/files", icon: Paperclip, label: "Files" },
     { to: "/chat", icon: MessageSquare, label: "Chat", arrow: true },

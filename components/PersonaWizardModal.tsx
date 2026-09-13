@@ -75,7 +75,7 @@ export default function PersonaWizardModal({
   const handleGenerate = async () => {
     if (!goal.trim()) { showToast('Describe the role first.', 'error'); return; }
     setBusy(true);
-    setStage(pickedTemplates.length ? 'Reading your templates' : 'Writing the role');
+    setStage(pickedTemplates.length ? 'Reading your playbooks' : 'Writing the role');
     try {
       // The model is given the templates it may route to, by index. Asking it to echo ids invites
       // invented ones; an index it can only get wrong within a range we control.
@@ -99,7 +99,7 @@ Rules for "content":
 
 Rules for "routes":
 - One entry per template listed below, using its INDEX. Keep the given order.
-- The condition completes "load this template when …". One short clause, naming the SITUATION.
+- The condition completes "load this playbook when …". One short clause, naming the SITUATION.
 - ⚠️ A template's own description is already used when no condition is given, so a condition that merely restates it is worthless. Write what this template means **for this persona specifically** — and if the description truly is the whole answer, return "" for that entry rather than padding it.`;
 
       setStage('Writing the role and its routes');
@@ -189,15 +189,15 @@ Rules for "routes":
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-              Templates it may reach for
+              Playbooks it may reach for
             </label>
             <span className="text-2xs text-slate-400">{picked.length} selected</span>
           </div>
 
           {prompts.length === 0 ? (
             <div className="text-xs text-slate-500 dark:text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
-              This workspace has no templates yet. A persona without routes is only a role
-              description — you can still create one and attach templates later.
+              This workspace has no playbooks yet. A persona without routes is only a role
+              description — you can still create one and attach playbooks later.
             </div>
           ) : (
             <>
@@ -209,7 +209,7 @@ Rules for "routes":
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     disabled={busy}
-                    placeholder="Search templates..."
+                    placeholder="Search playbooks..."
                     className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500"
                   />
                 </div>
@@ -219,7 +219,6 @@ Rules for "routes":
                   tabs={[
                     { value: 'all', label: 'All' },
                     { value: 'prompt', label: 'Prompts' },
-                    { value: 'assistant', label: 'Assistants' },
                     { value: 'skill', label: 'Skills' },
                   ]}
                 />
@@ -249,7 +248,7 @@ Rules for "routes":
         {picked.length === 0 && prompts.length > 0 && (
           <p className="text-2xs text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-            Without templates this persona can load nothing — it will be a role description only. You
+            Without playbooks this persona can load nothing — it will be a role description only. You
             can attach them afterwards.
           </p>
         )}
