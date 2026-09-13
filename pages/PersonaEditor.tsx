@@ -37,6 +37,7 @@ import {
   fetchPersonaAccess, setPersonaAccess, accessValueToPersonaAccess, personaAccessToValue,
   fetchRestrictedTemplateIdsAmong,
 } from '../lib/api/personaAccess';
+import { ACCESS_BADGE_LABEL, type AccessBadgeMode } from '../lib/accessBadge';
 
 export default function PersonaEditor() {
   const { id } = useParams<{ id: string }>();
@@ -68,7 +69,7 @@ export default function PersonaEditor() {
   );
   const [groups, setGroups] = useState<{ id: string; name: string; memberIds: string[] }[]>([]);
   const [ownerId, setOwnerId] = useState<string | null>(null);
-  const [restrictedRouteIds, setRestrictedRouteIds] = useState<Set<string>>(new Set());
+  const [restrictedRouteIds, setRestrictedRouteIds] = useState<Map<string, AccessBadgeMode>>(new Map()); // SQEM-400 — the word per route
   const [mobileTab, setMobileTab] = useState<'details' | 'role' | 'routes'>('role');
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -129,7 +130,7 @@ export default function PersonaEditor() {
   // every route change because attaching a restricted template is exactly the moment the author
   // should learn what it means.
   useEffect(() => {
-    if (IS_SELF_HOSTED || !workspace?.id || routes.length === 0) { setRestrictedRouteIds(new Set()); return; }
+    if (IS_SELF_HOSTED || !workspace?.id || routes.length === 0) { setRestrictedRouteIds(new Map()); return; }
     let cancelled = false;
     fetchRestrictedTemplateIdsAmong(workspace.id, routes.map(r => r.templateId))
       .then(ids => { if (!cancelled) setRestrictedRouteIds(ids); })
@@ -646,13 +647,17 @@ Rules:
                           team — and it is the same amber as the sentence that spells the
                           consequence out, so the two read as one statement. Different weight, not a
                           second vocabulary: change the word here and the two screens start
-                          disagreeing about what restricted means. */}
+                          disagreeing about what restricted means. SQEM-400 — and the word is now
+                          the one the rule deserves: "Only me" for the principal-less row,
+                          "Restricted" for people or groups, from `lib/accessBadge.ts` like the cards. */}
                       {!IS_SELF_HOSTED && restrictedRouteIds.has(route.templateId) && (
                         <span
                           className="text-2xs font-bold px-2 py-0.5 rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
-                          title="Restricted — colleagues who cannot open it receive this persona without this route"
+                          title={restrictedRouteIds.get(route.templateId) === 'private'
+                            ? 'Only me — colleagues receive this persona without this route'
+                            : 'Restricted — colleagues who cannot open it receive this persona without this route'}
                         >
-                          <Lock className="w-3 h-3" /> Restricted
+                          <Lock className="w-3 h-3" /> {ACCESS_BADGE_LABEL[restrictedRouteIds.get(route.templateId) ?? 'restricted']}
                         </span>
                       )}
                     </div>

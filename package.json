@@ -1,7 +1,7 @@
 {
   "name": "sqemes",
   "private": true,
-  "version": "1.11.14",
+  "version": "1.11.15",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {

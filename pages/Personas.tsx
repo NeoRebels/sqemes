@@ -8,7 +8,7 @@
 // If personas ever reach the Dashboard, this is the moment to reconsider — not before.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Plus, Users, Loader2, Route as RouteIcon, Edit, Copy, FolderDown, Trash2, Sparkles, Lock, Upload, Star } from 'lucide-react';
+import { Plus, Loader2, Route as RouteIcon, Edit, Copy, FolderDown, Trash2, Sparkles, Upload, Star, Bot } from 'lucide-react';
 import { useWorkspace, useUI, usePrompts, useData } from '../store';
 import { can } from '../lib/permissions';
 import { fetchPersonas, duplicatePersona, deletePersona, setPersonaFavorite, updatePersona } from '../lib/api/personas';
@@ -16,6 +16,8 @@ import { collectWorkspaceTags } from '../lib/workspaceTags';
 import TagFilter from '../components/ui/TagFilter';
 import TagEditor from '../components/ui/TagEditor';
 import { fetchRestrictedPersonaIds } from '../lib/api/personaAccess';
+import AccessBadge from '../components/ui/AccessBadge';
+import type { AccessBadgeMode } from '../lib/accessBadge';
 import { buildBundle, downloadBlob, readBundle, importBundle } from '../lib/templateBundle';
 import type { BundleManifest } from '../lib/bundleFormat';
 import type { Persona } from '../types';
@@ -82,7 +84,7 @@ export default function Personas() {
   const [pendingDelete, setPendingDelete] = useState<Persona[] | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [restrictedIds, setRestrictedIds] = useState<Set<string>>(new Set());
+  const [restrictedIds, setRestrictedIds] = useState<Map<string, AccessBadgeMode>>(new Map()); // SQEM-400 — the word per persona
   const [importData, setImportData] = useState<{ zip: any; manifest: BundleManifest } | null>(null);
   const [importing, setImporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -371,7 +373,7 @@ export default function Personas() {
           screen a new user sees is the worst possible place to assume the word is self-evident. */}
       {personas !== null && personas.length === 0 && (
         <EmptyState
-          icon={<Users className="w-8 h-8 text-brand-400" />}
+          icon={<Bot className="w-8 h-8 text-brand-400" />}
           iconWrapClassName="bg-brand-50 dark:bg-brand-900/20"
           title="No personas yet"
           description="A persona bundles the playbooks one role needs, with a condition for each."
@@ -401,7 +403,7 @@ export default function Personas() {
 
       {personas !== null && personas.length > 0 && visible.length === 0 && (
         <EmptyState
-          icon={showFavoritesOnly ? <Star className="w-8 h-8 text-amber-300" /> : <Users className="w-8 h-8 text-slate-400" />}
+          icon={showFavoritesOnly ? <Star className="w-8 h-8 text-amber-300" /> : <Bot className="w-8 h-8 text-slate-400" />}
           title={showFavoritesOnly ? 'No favourite personas' : 'Nothing matches'}
           description={showFavoritesOnly ? 'Star personas to see them here.' : 'No persona matches your search or filters.'}
         />
@@ -490,14 +492,7 @@ export default function Personas() {
                   {/* SQEM-330 — the same badge as a restricted template card, in the same words. A
                       second vocabulary for one state is how two screens begin disagreeing about what
                       "restricted" means. */}
-                  {restrictedIds.has(persona.id) && (
-                    <span
-                      className="text-2xs font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded-lg uppercase tracking-wider flex items-center gap-1"
-                      title="Restricted — not visible to everyone in this workspace"
-                    >
-                      <Lock className="w-3 h-3" /> Restricted
-                    </span>
-                  )}
+                  <AccessBadge mode={restrictedIds.get(persona.id)} />
                   <span className="text-2xs text-slate-400 dark:text-slate-500 flex items-center gap-1" title={`${persona.routes.length} route${persona.routes.length === 1 ? '' : 's'}`}>
                     <RouteIcon className="w-3 h-3" />
                     {persona.routes.length}

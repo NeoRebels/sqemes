@@ -4,6 +4,8 @@ import { collectWorkspaceTags } from '../lib/workspaceTags';
 import { can } from '../lib/permissions';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { fetchRestrictedTemplateIds } from '../lib/api/templateAccess';
+import AccessBadge from '../components/ui/AccessBadge';
+import type { AccessBadgeMode } from '../lib/accessBadge';
 import { exportTemplatesToZip, downloadBlob, readBundle, importBundle, type BundleManifest } from '../lib/templateBundle';
 import { importErrorMessage, readSkillZip, toSlug, type SkillBundle } from '../lib/skillBundle';
 import { importSkillBundle } from '../lib/skillBundleIo';
@@ -11,7 +13,7 @@ import { publishToMarketplace, submitToMarketplaceViaProxy, fetchCanPublish } fr
 import { TEMPLATE_CATEGORIES, KIND_HELP } from '../constants';
 import type JSZip from 'jszip';
 import { Link, useSearchParams } from 'react-router';
-import { Search, Plus, Edit, Trash2, Copy, Star, PenTool, Wand2, Sparkles, Loader2, Store, Lock, Upload, Package, FolderDown } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Copy, Star, PenTool, Wand2, Sparkles, Loader2, Store, Upload, Package, FolderDown } from 'lucide-react';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import TemplateCard from '../components/ui/TemplateCard';
@@ -52,7 +54,7 @@ const PromptCard = memo(function PromptCard({
   prompt,
   canEdit,
   workspaceTags,
-  restricted,
+  accessMode,
   selected,
   onToggleSelect,
   onFavorite,
@@ -66,7 +68,7 @@ const PromptCard = memo(function PromptCard({
   prompt: Prompt;
   canEdit: boolean;
   workspaceTags: string[];
-  restricted: boolean;
+  accessMode?: AccessBadgeMode; // SQEM-400 — undefined = open to everyone (no badge)
   selected: boolean;
   onToggleSelect: (id: string) => void;
   onFavorite: (prompt: Prompt) => void;
@@ -176,14 +178,7 @@ const PromptCard = memo(function PromptCard({
 
        ⚠️ Nothing is lost: `/chat` still accepts `launchTemplateId` in its route state, so any deep
        link into a template continues to work. Only this entry point is removed. */
-    footerRight={restricted ? (
-      <span
-        className="text-2xs font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0"
-        title="Restricted — not visible to everyone in this workspace"
-      >
-        <Lock className="w-3 h-3" /> Restricted
-      </span>
-    ) : undefined}
+    footerRight={accessMode ? <AccessBadge mode={accessMode} /> : undefined}
   />
   );
 });
@@ -222,10 +217,11 @@ const Templates = () => {
   // (the api-sidecar reports it). Gates the per-card Publish action.
   const [canPublish, setCanPublish] = useState(!IS_SELF_HOSTED);
 
-  // SQEM-143 — which templates are restricted (have any access rule), for the card indicator.
+  // SQEM-143 — which templates carry an access rule, and (SQEM-400) which word the badge says for
+  // each: "Only me" for the principal-less row, "Restricted" for rules naming people or groups.
   // Re-fetches on mount (returning from the editor remounts this page) and when the set of
   // templates changes. Non-fatal — a failure just hides the badge.
-  const [restrictedIds, setRestrictedIds] = useState<Set<string>>(new Set());
+  const [restrictedIds, setRestrictedIds] = useState<Map<string, AccessBadgeMode>>(new Map());
   useEffect(() => {
     if (!workspace?.id || IS_SELF_HOSTED) return; // SQEM-170 — template access is Cloud-only
     fetchRestrictedTemplateIds(workspace.id).then(setRestrictedIds).catch(() => {});
@@ -601,7 +597,7 @@ const Templates = () => {
               prompt={prompt}
               canEdit={canEdit}
               workspaceTags={workspace.tags}
-              restricted={restrictedIds.has(prompt.id)}
+              accessMode={restrictedIds.get(prompt.id)}
               selected={selectedIds.has(prompt.id)}
               onToggleSelect={toggleSelect}
               onFavorite={toggleFavorite}

@@ -329,7 +329,10 @@ const AuthenticatedApp = () => {
           <PageTitle />
           <ToastContainer />
           <AppRoutes />
-          <SpeedInsights />
+          {/* SQEM-402 — Cloud only. On self-host the component injects `/_vercel/speed-insights/script.js`,
+              nginx answers with the SPA fallback page, and every page load logs a SyntaxError for a
+              Vercel script an instance without Vercel never needed. */}
+          {!IS_SELF_HOSTED && <SpeedInsights />}
         </HashRouter>
       </AppProvider>
     </ErrorBoundary>

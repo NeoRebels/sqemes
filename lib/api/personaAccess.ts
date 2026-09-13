@@ -13,6 +13,7 @@ import type { PersonaAccess } from '../personaAccessValue';
 type AccessClient = {
   from: (t: string) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
 };
+import { accessBadgeModes, type AccessBadgeMode, type AccessRuleRow } from '../accessBadge';
 const client = supabase as unknown as AccessClient;
 
 // The type and the pure mapping live in `lib/personaAccessValue.ts` — see the header there for
@@ -23,18 +24,19 @@ export { accessValueToPersonaAccess, personaAccessToValue } from '../personaAcce
 /**
  * SQEM-330 — the personas in a workspace that carry ANY access rule, for the card badge.
  *
- * One row per rule, deduped into a Set. ⚠️ It answers "is this restricted at all", not "can you see
- * it" — the list the caller already holds went through RLS, so anything they can see is either open
+ * One row per rule, folded into a Map of id → badge word (SQEM-400). ⚠️ `has(id)` answers "is this
+ * restricted at all", not "can you see it" — the list the caller already holds went through RLS, so anything they can see is either open
  * or open *to them*, and the badge is a statement about the persona rather than about the reader.
  * The template twin (`fetchRestrictedTemplateIds`) works the same way and for the same reason.
  */
-export async function fetchRestrictedPersonaIds(workspaceId: string): Promise<Set<string>> {
+export async function fetchRestrictedPersonaIds(workspaceId: string): Promise<Map<string, AccessBadgeMode>> {
   const { data, error } = await client
     .from('persona_access')
-    .select('persona_id')
+    .select('persona_id, user_id, group_id')
     .eq('workspace_id', workspaceId);
   if (error) throw error;
-  return new Set((data || []).map((r: { persona_id: string }) => r.persona_id));
+  // SQEM-400 — the word per persona: "Only me" for the principal-less row, "Restricted" otherwise.
+  return accessBadgeModes((data || []) as (AccessRuleRow & { persona_id: string })[], 'persona_id');
 }
 
 /** The principals explicitly granted access. Both lists empty + `hasRules` ⇒ "only me". */
@@ -97,13 +99,14 @@ export async function setPersonaAccess(
 export async function fetchRestrictedTemplateIdsAmong(
   workspaceId: string,
   templateIds: string[],
-): Promise<Set<string>> {
-  if (templateIds.length === 0) return new Set();
+): Promise<Map<string, AccessBadgeMode>> {
+  if (templateIds.length === 0) return new Map();
   const { data, error } = await client
     .from('template_access')
-    .select('template_id')
+    .select('template_id, role, user_id, group_id')
     .eq('workspace_id', workspaceId)
     .in('template_id', templateIds);
   if (error) throw error;
-  return new Set((data || []).map((r: { template_id: string }) => r.template_id));
+  // SQEM-400 — the chip says "Only me" or "Restricted", the same word the template's own card says.
+  return accessBadgeModes((data || []) as (AccessRuleRow & { template_id: string })[], 'template_id');
 }

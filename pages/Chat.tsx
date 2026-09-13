@@ -1464,125 +1464,133 @@ const Chat = () => {
                   </div>
                 )}
                 <div
-                  className={`flex items-center gap-3 ${dragActive ? 'ring-2 ring-brand-500 ring-offset-2 rounded-xl' : ''}`}
+                  className={`flex flex-col gap-2 md:flex-row md:items-center md:gap-3 ${dragActive ? 'ring-2 ring-brand-500 ring-offset-2 rounded-xl' : ''}`}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 >
                   <input ref={fileInputRef} type="file" accept={ACCEPT_STRING} multiple onChange={handleFileSelect} className="hidden" />
-                  <div ref={attachMenuRef} className="relative shrink-0">
-                    <button
-                      onClick={() => setAttachMenuOpen(o => !o)}
-                      disabled={isLoading || enabledModels.length === 0}
-                      className="p-3 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                      title="Attach file"
-                    >
-                      <Paperclip className="w-4 h-4" />
-                    </button>
-                    {attachMenuOpen && (
-                      <div className="absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-xl z-30 p-1.5 animate-scale-up">
-                        <button
-                          onClick={() => { setAttachMenuOpen(false); setWorkspacePickerOpen(true); }}
-                          className="w-full text-left px-3 py-2 flex items-center gap-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                        >
-                          <Files className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span className="text-sm text-slate-700 dark:text-slate-200">Choose from workspace</span>
-                        </button>
-                        <button
-                          onClick={() => { setAttachMenuOpen(false); fileInputRef.current?.click(); }}
-                          className="w-full text-left px-3 py-2 flex items-center gap-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                        >
-                          <Upload className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span className="text-sm text-slate-700 dark:text-slate-200">Upload from device</span>
-                        </button>
-                        <label className="flex items-center gap-2 px-3 py-2 mt-1 border-t border-slate-100 dark:border-slate-700 cursor-pointer">
-                          <Checkbox
-                            checked={saveToWorkspace}
-                            onChange={() => setSaveToWorkspace(!saveToWorkspace)}
-                            align="center"
-                          />
-                          <span className="text-xs text-slate-600 dark:text-slate-400">Save uploads to workspace</span>
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => { setTemplateModalInitId(null); setTemplateModalOpen(true); }}
-                    disabled={enabledModels.length === 0}
-                    title="Use template  (/)"
-                    className="p-3 text-slate-400 dark:text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </button>
-                  {/* SQEM-149 — connectors for this session. Only shown with a Claude or OpenAI key
-                      configured — v1 passthrough runs on Claude (Messages API) + OpenAI (Responses API). */}
-                  {connectors.length > 0 && enabledModels.some(m => m.provider === 'claude' || m.provider === 'openai') && (
-                    <div ref={connectorMenuRef} className="relative shrink-0">
+                  {/* SQEM-401 — two rows on a phone, one on a desktop. Below `md` the input row comes first
+                      (`order-1`) and these tools sit centred underneath; from `md` up the wrapper is the row it
+                      always was, tools first. The two menus anchor to the button's centre on a phone — `left-0`
+                      under a centred toolbar overflows a 375 px screen to the right. Owner's request, 2026-09-13. */}
+                  <div className="flex items-center justify-center gap-2 order-2 md:order-1 md:justify-start md:gap-3">
+                    <div ref={attachMenuRef} className="relative shrink-0">
                       <button
-                        onClick={() => setConnectorMenuOpen(o => !o)}
-                        disabled={enabledModels.length === 0}
-                        title="Connectors"
-                        className={`relative p-3 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed ${enabledConnectorIds.length ? 'text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20'}`}
+                        onClick={() => setAttachMenuOpen(o => !o)}
+                        disabled={isLoading || enabledModels.length === 0}
+                        className="p-3 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Attach file"
                       >
-                        <Plug className="w-4 h-4" />
-                        {enabledConnectorIds.length > 0 && (
-                          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-brand-600 text-white text-2xs font-bold flex items-center justify-center">{enabledConnectorIds.length}</span>
-                        )}
+                        <Paperclip className="w-4 h-4" />
                       </button>
-                      {connectorMenuOpen && (
-                        <div className="absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-xl z-30 p-1.5 animate-scale-up">
-                          <p className="px-3 pt-1.5 pb-1 text-2xs font-bold text-slate-400 uppercase tracking-wider">Connectors</p>
-                          {connectors.map(c => {
-                            const on = enabledConnectorIds.includes(c.id);
-                            return (
-                              <label key={c.id} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={on}
-                                  onChange={() => setEnabledConnectorIds(prev => on ? prev.filter(id => id !== c.id) : [...prev, c.id])}
-                                  className="w-4 h-4 rounded accent-brand-600 cursor-pointer shrink-0"
-                                />
-                                <span className="min-w-0">
-                                  <span className="block text-sm text-slate-700 dark:text-slate-200 truncate">{c.name}</span>
-                                  <span className="block text-2xs text-slate-400 truncate">{c.mcp_url}</span>
-                                </span>
-                              </label>
-                            );
-                          })}
-                          <div className="px-3 pt-2 pb-1 mt-1 border-t border-slate-100 dark:border-slate-700">
-                            <p className="text-2xs text-slate-400">Works with:</p>
-                            <div className="flex items-center gap-2 mt-1.5">
-                              <ProviderIcon provider="claude" className="w-4 h-4" />
-                              <ProviderIcon provider="openai" className="w-4 h-4" />
-                            </div>
-                          </div>
+                      {attachMenuOpen && (
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 mb-2 w-64 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-xl z-30 p-1.5 animate-scale-up">
+                          <button
+                            onClick={() => { setAttachMenuOpen(false); setWorkspacePickerOpen(true); }}
+                            className="w-full text-left px-3 py-2 flex items-center gap-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                          >
+                            <Files className="w-4 h-4 text-slate-400 shrink-0" />
+                            <span className="text-sm text-slate-700 dark:text-slate-200">Choose from workspace</span>
+                          </button>
+                          <button
+                            onClick={() => { setAttachMenuOpen(false); fileInputRef.current?.click(); }}
+                            className="w-full text-left px-3 py-2 flex items-center gap-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                          >
+                            <Upload className="w-4 h-4 text-slate-400 shrink-0" />
+                            <span className="text-sm text-slate-700 dark:text-slate-200">Upload from device</span>
+                          </button>
+                          <label className="flex items-center gap-2 px-3 py-2 mt-1 border-t border-slate-100 dark:border-slate-700 cursor-pointer">
+                            <Checkbox
+                              checked={saveToWorkspace}
+                              onChange={() => setSaveToWorkspace(!saveToWorkspace)}
+                              align="center"
+                            />
+                            <span className="text-xs text-slate-600 dark:text-slate-400">Save uploads to workspace</span>
+                          </label>
                         </div>
                       )}
                     </div>
-                  )}
-                  <div className="flex-1 relative">
-                    <textarea
-                      ref={textareaRef}
-                      value={input}
-                      onChange={e => setInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder={dragActive ? 'Drop file here...' : 'Type a message...'}
-                      rows={1}
-                      disabled={isLoading || enabledModels.length === 0}
-                      className="w-full resize-none bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all disabled:opacity-50 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                    />
+                    <button
+                      onClick={() => { setTemplateModalInitId(null); setTemplateModalOpen(true); }}
+                      disabled={enabledModels.length === 0}
+                      title="Use template  (/)"
+                      className="p-3 text-slate-400 dark:text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                    >
+                      <FileText className="w-4 h-4" />
+                    </button>
+                    {/* SQEM-149 — connectors for this session. Only shown with a Claude or OpenAI key
+                        configured — v1 passthrough runs on Claude (Messages API) + OpenAI (Responses API). */}
+                    {connectors.length > 0 && enabledModels.some(m => m.provider === 'claude' || m.provider === 'openai') && (
+                      <div ref={connectorMenuRef} className="relative shrink-0">
+                        <button
+                          onClick={() => setConnectorMenuOpen(o => !o)}
+                          disabled={enabledModels.length === 0}
+                          title="Connectors"
+                          className={`relative p-3 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed ${enabledConnectorIds.length ? 'text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20'}`}
+                        >
+                          <Plug className="w-4 h-4" />
+                          {enabledConnectorIds.length > 0 && (
+                            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-brand-600 text-white text-2xs font-bold flex items-center justify-center">{enabledConnectorIds.length}</span>
+                          )}
+                        </button>
+                        {connectorMenuOpen && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 mb-2 w-64 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-xl z-30 p-1.5 animate-scale-up">
+                            <p className="px-3 pt-1.5 pb-1 text-2xs font-bold text-slate-400 uppercase tracking-wider">Connectors</p>
+                            {connectors.map(c => {
+                              const on = enabledConnectorIds.includes(c.id);
+                              return (
+                                <label key={c.id} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={on}
+                                    onChange={() => setEnabledConnectorIds(prev => on ? prev.filter(id => id !== c.id) : [...prev, c.id])}
+                                    className="w-4 h-4 rounded accent-brand-600 cursor-pointer shrink-0"
+                                  />
+                                  <span className="min-w-0">
+                                    <span className="block text-sm text-slate-700 dark:text-slate-200 truncate">{c.name}</span>
+                                    <span className="block text-2xs text-slate-400 truncate">{c.mcp_url}</span>
+                                  </span>
+                                </label>
+                              );
+                            })}
+                            <div className="px-3 pt-2 pb-1 mt-1 border-t border-slate-100 dark:border-slate-700">
+                              <p className="text-2xs text-slate-400">Works with:</p>
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <ProviderIcon provider="claude" className="w-4 h-4" />
+                                <ProviderIcon provider="openai" className="w-4 h-4" />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={handleEnhanceInput}
-                    disabled={isEnhancing || isLoading || !input.trim() || enabledModels.length === 0}
-                    title="Enhance with AI"
-                    className="p-3 text-brand-500 hover:text-brand-700 hover:bg-brand-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-                  >
-                    {isEnhancing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  </button>
-                  <button onClick={handleSend} disabled={isLoading || !input.trim() || enabledModels.length === 0} className="p-3 bg-brand-600 text-white rounded-xl hover:bg-brand-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm hover:shadow-md dark:shadow-none dark:hover:shadow-none shrink-0">
-                    <Send className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-3 order-1 md:order-2 flex-1 min-w-0">
+                    <div className="flex-1 relative">
+                      <textarea
+                        ref={textareaRef}
+                        value={input}
+                        onChange={e => setInput(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder={dragActive ? 'Drop file here...' : 'Type a message...'}
+                        rows={1}
+                        disabled={isLoading || enabledModels.length === 0}
+                        className="w-full resize-none bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all disabled:opacity-50 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                      />
+                    </div>
+                    <button
+                      onClick={handleEnhanceInput}
+                      disabled={isEnhancing || isLoading || !input.trim() || enabledModels.length === 0}
+                      title="Enhance with AI"
+                      className="p-3 text-brand-500 hover:text-brand-700 hover:bg-brand-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                    >
+                      {isEnhancing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    </button>
+                    <button onClick={handleSend} disabled={isLoading || !input.trim() || enabledModels.length === 0} className="p-3 bg-brand-600 text-white rounded-xl hover:bg-brand-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm hover:shadow-md dark:shadow-none dark:hover:shadow-none shrink-0">
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
               {/* SQEM-265 — EU AI Act Art. 50(1): the person has to be told they are interacting with

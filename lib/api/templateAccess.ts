@@ -5,6 +5,7 @@
 // prompts_select policy. v1 wrote role rows only; v2 (SQEM-143) also writes per-user rows.
 import { supabase } from '../supabase';
 import type { UserRole } from '../../types';
+import { accessBadgeModes, type AccessBadgeMode, type AccessRuleRow } from '../accessBadge';
 
 // The template_access table is intentionally not in the generated database.types yet (added by
 // migration 20260726120000); a thin cast keeps this typed at the call sites without regenerating.
@@ -24,17 +25,19 @@ const client = supabase as unknown as AccessClient;
 export type TemplateAccess = { roles: UserRole[]; userIds: string[]; groupIds?: string[]; hasRules: boolean };
 
 /**
- * The set of template ids in a workspace that have ANY access rule (i.e. are restricted, not
- * open to everyone). Used to show a "restricted" indicator on template cards. One row per rule,
- * so we dedupe into a Set. RLS lets any workspace member read these rows.
+ * The templates in a workspace that carry ANY access rule, each with the word the card badge says
+ * (SQEM-400): `private` for the principal-less "only me" row, `restricted` for rules naming people,
+ * groups or a legacy role. Used for the badge on template cards. `Map.has(id)` answers what the old
+ * `Set` answered — "is this restricted at all" — so existing call sites keep their meaning. RLS lets
+ * any workspace member read these rows.
  */
-export async function fetchRestrictedTemplateIds(workspaceId: string): Promise<Set<string>> {
+export async function fetchRestrictedTemplateIds(workspaceId: string): Promise<Map<string, AccessBadgeMode>> {
   const { data, error } = await client
     .from('template_access')
-    .select('template_id')
+    .select('template_id, role, user_id, group_id')
     .eq('workspace_id', workspaceId);
   if (error) throw error;
-  return new Set((data || []).map((r: { template_id: string }) => r.template_id));
+  return accessBadgeModes((data || []) as (AccessRuleRow & { template_id: string })[], 'template_id');
 }
 
 /** Roles + users explicitly granted access to a template. Both empty ⇒ open to everyone. */
