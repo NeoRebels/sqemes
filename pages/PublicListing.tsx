@@ -15,10 +15,19 @@ import { downloadBlob } from '../lib/bundleFormat';
 import { toSlug } from '../lib/skillBundle';
 import type { LibraryTemplate } from '../types';
 import ListingView, { ListingLoading, ListingUnavailable } from '../components/marketplace/ListingView';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ArrowRight, Check, Sparkles } from 'lucide-react';
+import { IS_SELF_HOSTED, MARKETPLACE_API_URL, CLOUD_PROD_MARKETPLACE } from '../lib/env';
+import { publicListingOffer } from '../lib/publicRoutes';
 
 /** Where the app lives, so the offer can hand someone back to this listing afterwards. */
 const listingHash = (id: string) => `#/library/${id}`;
+
+/** What an account adds to this listing — each one a control the signed-in page really has. */
+const OFFER_POINTS = [
+  'Add it to your playbooks in one click',
+  'Adapt it to your brand with AI',
+  'Use it inside ChatGPT, Claude, Cursor and more',
+];
 
 export default function PublicListing() {
   const { id } = useParams();
@@ -65,6 +74,14 @@ export default function PublicListing() {
     window.location.reload();
   };
 
+  // SQEM-410 — on Cloud the offer starts the trial here; on a self-hosted instance it still advertises
+  // Cloud, so the button opens the same listing on Cloud instead of this instance's sign-up form.
+  const offerTarget = publicListingOffer({
+    selfHosted: IS_SELF_HOSTED, marketplaceUrl: MARKETPLACE_API_URL,
+    listingId: id ?? '', cloudMarketplaceUrl: CLOUD_PROD_MARKETPLACE,
+  });
+  const ctaClass = 'inline-flex items-center gap-2 px-5 py-3 bg-white hover:bg-brand-50 text-brand-800 rounded-xl font-bold text-sm transition-all shadow-sm';
+
   if (loading) return <ListingLoading />;
   // No exit: `/library` is behind the sign-in wall, so "Back to Marketplace" would walk a
   // signed-out visitor into it. The footer link to sqemes.com is the way out that works.
@@ -78,23 +95,52 @@ export default function PublicListing() {
       // rejection. The offer below carries them instead.
       onDownload={handleDownload}
       downloading={downloading}
-      offer={
-        <div className="mt-6 rounded-2xl border border-brand-100 dark:border-brand-900/40 bg-brand-50/60 dark:bg-brand-900/10 p-5">
-          <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-            Add this to your workspace, adapt it to your brand, and rate it
-          </p>
-          {/* The wording is not free: a fresh Cloud workspace fails `needsSubscriptionGate` and lands
-              on the plan chooser. There is no free tier in Cloud by design — free means the trial or
-              self-hosting, nothing else — the trial is 14 days, and Stripe asks for a card. Saying
-              "free account" here would be a promise the next screen breaks. (Self-host has no billing
-              at all, so this gate never fires there.) */}
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
-            Start a <span className="font-semibold text-slate-600 dark:text-slate-300">free 14-day trial</span> — a card is required, and you can cancel any time.
-            Prefer to keep it free forever? <a href="https://github.com/NeoRebels/sqemes" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-brand-600">Self-host Sqemes</a> — this marketplace is readable from your own instance.
-          </p>
-          <button onClick={startTrial} className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-sm transition-all">
-            Start free trial
-          </button>
+      offer={offerTarget.kind === 'none' ? undefined :
+        // SQEM-405 — the owner asked for a tile that reads as an offer rather than a note. It borrows
+        // the plan card on the Dashboard (dark brand gradient, white type), so it is a pattern the app
+        // already has, not a new one. It stays dark in both themes on purpose: it is the one surface
+        // on this page that asks for something.
+        <div className="mt-8 relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-900 via-brand-800 to-brand-700 dark:ring-1 dark:ring-brand-700/60 p-6 sm:p-7 text-white shadow-lg">
+          <div aria-hidden className="pointer-events-none absolute -top-20 -right-16 w-56 h-56 rounded-full bg-brand-500/30 blur-3xl" />
+          <div className="relative">
+            <span className="inline-flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-brand-200">
+              <Sparkles className="w-3.5 h-3.5" /> Sqemes Cloud
+            </span>
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight mt-1.5">Make this playbook yours</h2>
+            {/* Each point is something the signed-in page actually does: "Add to playbooks", "Adapt to
+                brand", and the extension (ChatGPT, Claude) plus MCP (Cursor). Nothing here may promise
+                what the next screen does not deliver. */}
+            <ul className="mt-4 space-y-2.5">
+              {OFFER_POINTS.map(point => (
+                <li key={point} className="flex items-start gap-2.5 text-sm text-brand-50">
+                  <span className="mt-0.5 shrink-0 w-4 h-4 rounded-full bg-white/15 flex items-center justify-center">
+                    <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                  </span>
+                  {point}
+                </li>
+              ))}
+            </ul>
+            {/* The wording is not free: a fresh Cloud workspace fails `needsSubscriptionGate` and lands
+                on the plan chooser. There is no free tier in Cloud by design — free means the trial or
+                self-hosting, nothing else — the trial is 14 days, and Stripe asks for a card. Saying
+                "free account" here would be a promise the next screen breaks. (Self-host has no billing
+                at all, so this gate never fires there.) */}
+            <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2">
+              {offerTarget.kind === 'cloud' ? (
+                <a href={offerTarget.href} className={ctaClass}>
+                  Start free 14-day trial <ArrowRight className="w-4 h-4" />
+                </a>
+              ) : (
+                <button onClick={startTrial} className={ctaClass}>
+                  Start free 14-day trial <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+              <span className="text-xs text-brand-200">A card is required · cancel any time</span>
+            </div>
+            <p className="mt-5 pt-4 border-t border-white/10 text-xs text-brand-200 leading-relaxed">
+              Prefer to keep it free forever? <a href="https://github.com/NeoRebels/sqemes" target="_blank" rel="noopener noreferrer" className="font-semibold text-white underline underline-offset-2 decoration-white/40 hover:decoration-white">Self-host Sqemes</a> — this marketplace is readable from your own instance.
+            </p>
+          </div>
         </div>
       }
     >

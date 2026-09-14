@@ -450,7 +450,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.11.15       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.11.16       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### ⛔ 3a. Before v1.11.9: count your workspace-wide MCP keys
@@ -643,7 +643,7 @@ If you would rather it did not, block `/#/library/` at your reverse proxy — bu
 reaches the server, so the block has to happen in the browser or not at all. Removing the route in a
 fork is the reliable way.
 
-*Last updated: 2026-09-13 (SQEM-403: version pin v1.11.15 · SQEM-399) — the api sidecar starts again: its image now bundles the TypeScript handlers at build time. v1.11.4 to v1.11.13 shipped it dead — extension config, MCP OAuth and the marketplace proxy answered 502 while the app itself ran; `docker compose up -d --build` on v1.11.14 rebuilds it. Before that (SQEM-394) — templates are called **playbooks** in the app; the routes moved to
+*Last updated: 2026-09-14 (SQEM-409: version pin v1.11.16 — the launch button says "Use skill"; a marketplace listing opened on your instance by someone without an account now offers Sqemes Cloud through a link to the same listing on app.sqemes.com instead of your instance's sign-up form, and no offer at all if the instance reads its own marketplace). Before that (SQEM-403: version pin v1.11.15 · SQEM-399) — the api sidecar starts again: its image now bundles the TypeScript handlers at build time. v1.11.4 to v1.11.13 shipped it dead — extension config, MCP OAuth and the marketplace proxy answered 502 while the app itself ran; `docker compose up -d --build` on v1.11.14 rebuilds it. Before that (SQEM-394) — templates are called **playbooks** in the app; the routes moved to
 `/playbooks` and every old link redirects. Nothing changes for an operator. Earlier the same day
 (SQEM-390) — the assistant template kind is gone: on upgrade the migration
 turns every assistant into a skill with the same text, and a role is a persona. Earlier: 2026-08-19

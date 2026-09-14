@@ -282,7 +282,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
             {selected?.kind === 'skill' && (
               <div className="rounded-xl border border-emerald-100 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-900/10 px-4 py-3">
                 <p className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold mb-0.5">Skill</p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-400">Applying it adds this knowledge to the chat as context for every message — nothing is inserted into the input.</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">Using it adds this knowledge to this chat as context for every message — nothing is inserted into the input.</p>
               </div>
             )}
             {templateVars.map(v => (
@@ -363,7 +363,10 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
             >
               {isResolving
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing…</>
-                : selected?.kind === 'skill' ? 'Apply skill' : 'Insert into chat'
+                // SQEM-406 — "Use", not "Apply": a UX tester read "Apply skill" as "activate / share
+                // live". The Chat header lists what is in effect under "Using:", so the button says
+                // the same word. "Applied" stays the code's term (SQEM-371); a person reads "use".
+                : selected?.kind === 'skill' ? 'Use skill' : 'Insert into chat'
               }
             </button>
           </div>

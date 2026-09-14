@@ -29,8 +29,24 @@ describe('marketplaceUrlFor', () => {
       .toBe('https://x.test/mp');
   });
 
-  it('an empty override disables the marketplace and is not overruled by a fallback', () => {
+  it('an empty override disables the marketplace on self-host and is not overruled by a fallback', () => {
     expect(marketplaceUrlFor({ selfHosted: true, override: '' })).toBe('');
+    expect(marketplaceUrlFor({ selfHosted: true, supabaseUrl: STAGING, override: '  ' })).toBe('');
+  });
+
+  // SQEM-405 — production shipped `override: ""` (an empty Vercel variable) and every signed-out
+  // visitor of a shared listing got "This playbook isn't available". Cloud cannot disable its own
+  // marketplace, so an empty value there must fall through to the project the build talks to.
+  it('an empty override on Cloud is ignored — the build reads its own project', () => {
+    expect(marketplaceUrlFor({ selfHosted: false, supabaseUrl: 'https://api.sqemes.com/', override: '' }))
+      .toBe(CLOUD_PROD_MARKETPLACE);
+    expect(marketplaceUrlFor({ selfHosted: false, supabaseUrl: STAGING, override: ' ' }))
+      .toBe(`${STAGING}/functions/v1/marketplace-public`);
+  });
+
+  it('a non-empty override on Cloud still wins', () => {
+    expect(marketplaceUrlFor({ selfHosted: false, supabaseUrl: STAGING, override: 'https://x.test/mp/' }))
+      .toBe('https://x.test/mp');
   });
 
   it('tolerates the trailing whitespace and slashes that env vars collect', () => {

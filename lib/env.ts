@@ -20,7 +20,15 @@ export const IS_SELF_HOSTED = import.meta.env.VITE_SELF_HOSTED === 'true';
 //
 // So: derive it from the Supabase project this build talks to. Self-host keeps Cloud prod, because
 // there the marketplace genuinely is somebody else's. Override per instance with
-// VITE_MARKETPLACE_API_URL, or set it empty to disable the marketplace.
+// VITE_MARKETPLACE_API_URL, or — on self-host only — set it empty to disable the marketplace.
+//
+// ⛔ **An empty override means "disabled" on self-host and NOTHING on Cloud (SQEM-405).** Production
+// shipped with `VITE_MARKETPLACE_API_URL` defined but empty in Vercel, so this function returned `''`,
+// the public listing page POSTed to `fetch('')` — the page itself — and every signed-out visitor saw
+// "This playbook isn't available". Signed-in users read through Supabase and never noticed, which is
+// why it went unseen. Cloud cannot switch its own marketplace off anyway (`MARKETPLACE_ENABLED` is
+// `true` whenever `!IS_SELF_HOSTED`), so on Cloud an empty value is treated as unset. `.env.example`
+// carries the empty line on purpose for self-hosters; copying it into a Cloud environment is the trap.
 export const CLOUD_PROD_MARKETPLACE = 'https://api.sqemes.com/functions/v1/marketplace-public';
 
 /** Exported and pure so the rule can be pinned by a test — it is what just went wrong. */
@@ -28,7 +36,7 @@ export function marketplaceUrlFor(
   { selfHosted, supabaseUrl, override }: { selfHosted: boolean; supabaseUrl?: string; override?: string },
 ): string {
   const trim = (v: string) => v.trim().replace(/\/+$/, '');
-  if (override !== undefined) return trim(override);
+  if (override !== undefined && (selfHosted || trim(override) !== '')) return trim(override);
   if (selfHosted) return CLOUD_PROD_MARKETPLACE;
   const own = trim(supabaseUrl ?? '');
   // No Supabase URL means the build is broken anyway (`lib/supabase.ts` throws); falling back to

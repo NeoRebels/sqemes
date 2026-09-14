@@ -452,7 +452,7 @@ const Chat = () => {
       .then(persona => {
         if (cancelled || !persona) return;
         applyPersona(persona);
-        showToast(`Persona “${persona.title}” applied to this chat`, 'success');
+        showToast(`Using persona “${persona.title}” in this chat`, 'success');
       })
       .catch(() => { /* a persona that cannot be read is simply not applied */ });
     return () => { cancelled = true; };
@@ -1302,7 +1302,7 @@ const Chat = () => {
               onChange={persona => {
                 if (!persona) { removePersona(); return; }
                 applyPersona(persona);
-                showToast(`Persona “${persona.title}” applied to this chat`, 'success');
+                showToast(`Using persona “${persona.title}” in this chat`, 'success');
               }}
               emptyLabel="No persona"
               emptyActionLabel={can(currentUser, workspace, 'prompts:edit') ? 'Create a persona' : undefined}
@@ -1644,7 +1644,7 @@ const Chat = () => {
             return next;
           });
           if (images.length) addContextImages(images);
-          showToast('Skill applied to this chat', 'success');
+          showToast(`Using “${template.title}” in this chat`, 'success');
         }}
       />
 
