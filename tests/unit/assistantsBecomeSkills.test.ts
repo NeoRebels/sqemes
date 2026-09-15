@@ -100,7 +100,11 @@ describe('SQEM-390 — nowhere in the product is "assistant" still a kind', () =
   it('the legacy readers really are readers — each turns the old kind into a skill or refuses it', () => {
     expect(read('lib/templateBundle.ts')).toMatch(/legacyAssistant \|\| b\.kind === 'skill' \? 'skill' : 'prompt'/);
     expect(read('lib/templateBundle.ts')).toMatch(/legacyAssistant \? \(b\.systemInstruction \|\| b\.content \|\| ''\)/);
-    expect(read('supabase/functions/marketplace-submit/index.ts')).toMatch(/kind: 'skill', content: raw\.systemInstruction \|\| raw\.content/);
+    // `marketplace-submit` is Cloud-only and pruned from the public export (SQEM-182) — there is nothing to
+    // read there, and a missing file must not fail the public repo's tests (SQEM-411).
+    if (existsSync(resolve(ROOT, 'supabase/functions/marketplace-submit/index.ts'))) {
+      expect(read('supabase/functions/marketplace-submit/index.ts')).toMatch(/kind: 'skill', content: raw\.systemInstruction \|\| raw\.content/);
+    }
     expect(read('supabase/functions/mcp-server/index.ts')).toMatch(/kind "assistant" no longer exists/);
   });
 
