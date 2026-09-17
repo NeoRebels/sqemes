@@ -124,3 +124,33 @@ body {
 .animate-scale-up {
   animation: scale-up 0.2s ease-out forwards;
 }
+
+/* SQEM-417 — the setup wizard's step change and the staggered lists inside it.
+   Shorter and flatter than `fade-in`: this fires on every step of a five-step flow, and a movement
+   that reads as "alive" once reads as "slow" the fifth time. */
+@keyframes step-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-step-in {
+  animation: step-in 0.22s ease-out both;
+}
+
+/* The stagger is a CSS variable so the delay lives with the item, not in a class per index. */
+.animate-stagger {
+  animation: step-in 0.28s ease-out both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+/* ⛔ Motion is a preference, not a detail: someone who asked the operating system for less of it must
+   still see every screen and every list item. Opacity and transform are reset, never `display`. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-step-in,
+  .animate-stagger,
+  .animate-fade-in,
+  .animate-scale-up {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+}

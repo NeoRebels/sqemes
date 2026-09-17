@@ -1,5 +1,6 @@
 import type { PromptKind, Variable } from '../types';
 import { runAuthoringAI } from './authoringAI';
+import { contentToMarkdown } from './draftContent';
 import {
   starterPromptsInstruction, starterSkillsInstruction, BRAND_VOICE_SKILL_INSTRUCTION,
   SINGLE_TEMPLATE_RULE, SINGLE_TEMPLATE_SHAPE,
@@ -30,6 +31,11 @@ export interface TemplateDraft {
   description: string;
   content: string;
   variables: Variable[];
+  /**
+   * SQEM-413 — which chosen area this draft belongs to; `undefined` for the brand voice, which is
+   * generated for every workspace and belongs to no single area. Saved as the playbook's tag.
+   */
+  area?: string;
 }
 
 function brandSummary(b: BrandInput): string {
@@ -150,33 +156,56 @@ export async function generateBrandVoiceSkill(b: BrandInput, ctx: GenContext): P
   };
 }
 
-export async function generateStarterPrompts(b: BrandInput, ctx: GenContext, count = 5): Promise<TemplateDraft[]> {
-  const raw = await runAuthoringAI({ ...ctx, systemInstruction: starterPromptsInstruction(count), prompt: brandSummary(b) });
+export async function generateStarterPrompts(b: BrandInput, ctx: GenContext, areas: string[]): Promise<TemplateDraft[]> {
+  const raw = await runAuthoringAI({ ...ctx, systemInstruction: starterPromptsInstruction(areas), prompt: brandSummary(b) });
   return parseJsonArray(raw)
     .filter(x => x?.title && x?.content)
-    .slice(0, count)
-    .map(x => ({
+    .slice(0, areas.length)
+    // SQEM-412 — `content` may come back as an object; `String()` on one is "[object Object]", and
+    // that used to be saved. An empty body after conversion drops the draft.
+    .map(x => ({ x, content: contentToMarkdown(x.content) }))
+    .filter(({ content }) => content.length > 0)
+    .map(({ x, content }) => ({
       kind: 'prompt' as const,
       title: String(x.title).slice(0, 120),
       description: String(x.description ?? '').slice(0, 300),
-      content: String(x.content),
+      content,
       // SQEM-390 — the model's labels are questions; the placeholders decide which variables exist.
-      variables: extractVariables(String(x.content), questionLabels(x.variables)),
+      variables: extractVariables(content, questionLabels(x.variables)),
+      area: normalizeArea(x.area, areas),
     }));
 }
 
-export async function generateStarterSkills(b: BrandInput, ctx: GenContext, count = 1): Promise<TemplateDraft[]> {
-  const raw = await runAuthoringAI({ ...ctx, systemInstruction: starterSkillsInstruction(count), prompt: brandSummary(b) });
+export async function generateStarterSkills(b: BrandInput, ctx: GenContext, areas: string[]): Promise<TemplateDraft[]> {
+  const raw = await runAuthoringAI({ ...ctx, systemInstruction: starterSkillsInstruction(areas), prompt: brandSummary(b) });
   return parseJsonArray(raw)
     .filter(x => x?.title && x?.content)
-    .slice(0, count)
-    .map(x => ({
+    .slice(0, areas.length)
+    // SQEM-412 — see the note in generateStarterPrompts: a skill body arrived as an object more than
+    // once, because this instruction describes a shape (Scope / Rules / Examples / Limits).
+    .map(x => ({ x, content: contentToMarkdown(x.content) }))
+    .filter(({ content }) => content.length > 0)
+    .map(({ x, content }) => ({
       kind: 'skill' as const,
       title: String(x.title).slice(0, 120),
       description: String(x.description ?? '').slice(0, 300),
-      content: String(x.content),
+      content,
       variables: [],
+      area: normalizeArea(x.area, areas),
     }));
+}
+
+/**
+ * SQEM-413 — the area a draft claims, corrected against what the person actually chose.
+ *
+ * ⚠️ The model is told to copy a label verbatim and mostly does; when it paraphrases ("Marketing"
+ * for "Marketing & Sales") or invents one, the draft still has to land somewhere a person recognises.
+ * Falling back to the first chosen area keeps the grouping honest — every draft sits under a heading
+ * the person picked — instead of opening a group nobody asked for.
+ */
+function normalizeArea(value: unknown, areas: string[]): string {
+  const raw = String(value ?? "").trim().toLowerCase();
+  return areas.find(a => a.toLowerCase() === raw) ?? areas[0];
 }
 
 /** A section of the starter library that failed, with the reason kept intact. */
@@ -193,8 +222,10 @@ export interface StarterLibraryResult {
 }
 
 /**
- * Generate the full starter library in parallel — **8 templates: 4 prompts, 4 skills** (SQEM-390;
- * Cloud-only onboarding, SQEM-170). The 4 skills = the brand-voice skill + 3 knowledge skills.
+ * Generate the starter library in parallel — **the brand-voice skill plus one prompt and one skill per
+ * area the person chose** (SQEM-413; Cloud-only onboarding, SQEM-170). With the recommended two areas
+ * that is five playbooks; before SQEM-413 it was a fixed 4 + 4 for everyone, and a UX tester asked of
+ * one of them "what is this supposed to do for me?" — the answer was that nothing had asked him.
  *
  * ⚠️ Until SQEM-390 this was 9: the brand-voice assistant, 2 role assistants, 3 prompts, 3 skills.
  * The role generators went with the assistant kind — a role is a persona now, and the wizard does
@@ -212,14 +243,27 @@ export interface StarterLibraryResult {
  *   drafts empty + failures empty     → every call succeeded but `parseJsonArray` found no usable
  *                                       JSON, i.e. the model answered in prose. Retrying can help.
  */
-export async function generateStarterLibrary(b: BrandInput, ctx: GenContext): Promise<StarterLibraryResult> {
+export async function generateStarterLibrary(
+  b: BrandInput,
+  ctx: GenContext,
+  areas: string[],
+  /**
+   * SQEM-417 — called as each section lands, so the wizard can tick it off while the others are still
+   * running. The three calls go out together; without this the UI can only show one spinner for all
+   * three and invent the progress, which is the kind of honesty a first run cannot afford.
+   */
+  onSection?: (label: string, ok: boolean) => void,
+): Promise<StarterLibraryResult> {
   const sections: { label: string; run: () => Promise<TemplateDraft[]> }[] = [
     { label: 'brand voice', run: () => generateBrandVoiceSkill(b, ctx).then(s => [s]) },
-    { label: 'prompts', run: () => generateStarterPrompts(b, ctx, 4) },
-    { label: 'skills', run: () => generateStarterSkills(b, ctx, 3) },
+    { label: 'prompts', run: () => generateStarterPrompts(b, ctx, areas) },
+    { label: 'skills', run: () => generateStarterSkills(b, ctx, areas) },
   ];
 
-  const settled = await Promise.allSettled(sections.map(s => s.run()));
+  const settled = await Promise.allSettled(sections.map(s => s.run().then(
+    result => { onSection?.(s.label, true); return result; },
+    err => { onSection?.(s.label, false); throw err; },
+  )));
 
   const drafts: TemplateDraft[] = [];
   const failures: SectionFailure[] = [];

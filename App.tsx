@@ -47,6 +47,7 @@ const LegacyListRedirect = () => {
 const Library = React.lazy(() => import('./pages/Library'));
 const MarketplaceTemplate = React.lazy(() => import('./pages/MarketplaceTemplate'));
 const PublicListing = React.lazy(() => import('./pages/PublicListing')); // SQEM-258
+import GleapBoot from './components/GleapBoot';
 const Chat = React.lazy(() => import('./pages/Chat'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Files = React.lazy(() => import('./pages/Files'));
@@ -245,6 +246,9 @@ const AppRoutes = () => {
 
   return (
     <Suspense fallback={<LoadingScreen />}>
+      {/* SQEM-261 — inside the authenticated tree on purpose: everything above this line can be
+          reached without an account, and the public listing page renders its own routes entirely. */}
+      <GleapBoot />
       <Routes>
         {/* Full Screen Routes */}
         {/* SQEM-394 — playbooks live under /playbooks; every /prompts/* and /templates path below

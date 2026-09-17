@@ -60,7 +60,7 @@ const RecentChatsWidget = () => {
 
   const items: Item[] = useMemo(() => {
     const sqemes: Item[] = chatSessions.map(s => ({
-      key: `s-${s.id}`, icon: 'sqemes', label: 'Sqemes', title: s.title || 'New chat',
+      key: `s-${s.id}`, icon: 'sqemes', label: 'sqemes', title: s.title || 'New chat',
       pinned: s.pinned, ts: new Date(s.lastActiveAt).getTime(),
       onOpen: () => navigate(`/chat/${s.id}`),
       onTogglePin: () => updateChatSession(s.id, { pinned: !s.pinned }),

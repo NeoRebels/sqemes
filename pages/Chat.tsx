@@ -37,7 +37,6 @@ import { WorkspaceFilePickerModal } from '../components/WorkspaceFilePickerModal
 import type { ChatSession, Persona, Prompt, WorkspaceFile } from '../types';
 import { ModelSelect } from '../components/ModelSelect';
 import { PersonaSelect } from '../components/PersonaSelect';
-import { ProviderIcon } from '../components/ProviderIcon';
 import TemplateLaunchModal, { type ContextImage } from '../components/TemplateLaunchModal';
 import ChatSearchModal from '../components/ChatSearchModal';
 import Avatar from '../components/ui/Avatar';
@@ -314,10 +313,10 @@ const Chat = () => {
   const [dragActive, setDragActive]           = useState(false);
   const [sessionId, setSessionId]             = useState<string | null>(null);
   const [attachMenuOpen, setAttachMenuOpen]   = useState(false);
-  // SQEM-149 — connectors enabled for this chat session (Claude models).
+  // SQEM-149 — the workspace's connectors. ⭐ SQEM-436 removed the per-session SELECTION: a connector
+  // is set up in order to be there, and confirming it again before every conversation was a step that
+  // bought nothing. What is left is the list and a status indicator.
   const [connectors, setConnectors]           = useState<Connector[]>([]);
-  const [enabledConnectorIds, setEnabledConnectorIds] = useState<string[]>([]);
-  const [connectorMenuOpen, setConnectorMenuOpen]     = useState(false);
   const [saveToWorkspace, setSaveToWorkspace] = useState(false);
   const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false);
 
@@ -367,7 +366,6 @@ const Chat = () => {
   const textareaRef         = useRef<HTMLTextAreaElement>(null);
   const fileInputRef        = useRef<HTMLInputElement>(null);
   const attachMenuRef       = useRef<HTMLDivElement>(null);
-  const connectorMenuRef    = useRef<HTMLDivElement>(null);
   const sessionLoadedRef    = useRef<string | null>(null);
   // SQEM-115 — ids of messages truncated by an edit, pruned from the DB on the next send.
   const supersededIdsRef    = useRef<string[]>([]);
@@ -692,16 +690,29 @@ const Chat = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, [attachMenuOpen]);
 
-  // SQEM-149 — load the workspace's connectors + close the connector menu on outside click.
+  // SQEM-149 — load the workspace's connectors.
   useEffect(() => { fetchConnectors(workspace.id).then(setConnectors).catch(() => {}); }, [workspace.id]);
-  useEffect(() => {
-    if (!connectorMenuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (connectorMenuRef.current && !connectorMenuRef.current.contains(e.target as Node)) setConnectorMenuOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [connectorMenuOpen]);
+
+  /**
+   * SQEM-436 — whether the MODEL currently chosen can reach connectors.
+   *
+   * ⚠️ The selected model, not "does a Claude key exist anywhere". The old menu was shown on the
+   * latter, which answered a different question: a workspace with a Claude key could be chatting on
+   * Gemini and still be offered connectors that would never be sent.
+   *
+   * ⛔ Connector ids are withheld when the answer is no, even though `chat-message` resolves them for
+   * Claude and OpenAI only. It is not belt-and-braces: the CLIENT timeout is raised to 300 s when
+   * connectors are in the payload (SQEM-381), so sending them on a Gemini turn would make the user
+   * wait five minutes for something that was never going to happen.
+   */
+  const connectorsSupported = useMemo(() => {
+    const m = AVAILABLE_MODELS.find(x => x.id === selectedModel) ?? enabledModels.find(x => x.id === selectedModel);
+    return m?.provider === 'claude' || m?.provider === 'openai';
+  }, [selectedModel, enabledModels]);
+  const activeConnectorIds = useMemo(
+    () => (connectorsSupported ? connectors.map(c => c.id) : []),
+    [connectorsSupported, connectors],
+  );
 
   // SQEM-185 — useCallback so the memoized MessageItem stays memoized between keystrokes. Depends on
   // `messages` (unchanged while typing), so it's stable on the hot path but current when messages change.
@@ -926,13 +937,13 @@ const Chat = () => {
         setMessages(prev => prev.map(m => (
           m.id === assistantMsgId ? { ...m, content: textSoFar, pending: false } : m
         )));
-      }, clientJobTimeoutMs({ connectors: enabledConnectorIds.length > 0, selfHosted: IS_SELF_HOSTED }));
+      }, clientJobTimeoutMs({ connectors: activeConnectorIds.length > 0, selfHosted: IS_SELF_HOSTED }));
 
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-message`, {
         method: 'POST',
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ ...chatPayloadBase, messages: messagesToSend, jobId, connectorIds: enabledConnectorIds }),
+        body: JSON.stringify({ ...chatPayloadBase, messages: messagesToSend, jobId, connectorIds: activeConnectorIds }),
       });
 
       if (!res.ok) throw await edgeError(res);
@@ -1189,7 +1200,7 @@ const Chat = () => {
                 onExit={() => navigate('/')}
                 escapeEnabled
                 escapeReady={
-                  !templateModalOpen && !searchOpen && !attachMenuOpen && !connectorMenuOpen &&
+                  !templateModalOpen && !searchOpen && !attachMenuOpen &&
                   !workspacePickerOpen && !renamingId && !openMenuId && !deleteConfirmId
                 }
                 className="flex-1"
@@ -1291,6 +1302,15 @@ const Chat = () => {
               emptyActionLabel="Add API key"
               emptyActionIcon={<Key className="w-3.5 h-3.5" />}
               onEmptyAction={() => navigate('/settings', { state: { initialTab: 'api' } })}
+              /**
+               * SQEM-446 — mark the models your connectors actually reach.
+               *
+               * ⚠️ Only when the workspace HAS connectors. Otherwise green would advertise a
+               * capability nobody set up, and it would contradict the composer's icon, which appears
+               * under the same condition. (The other reading — a pure capability hint, always shown —
+               * is one line away if that turns out to be the more useful one.)
+               */
+              connectorProviders={connectors.length > 0 ? ['claude', 'openai'] : undefined}
             />
 
             {/* SQEM-390 (PR C) — the role, chosen where the model is chosen. A persona applied
@@ -1519,50 +1539,36 @@ const Chat = () => {
                     >
                       <FileText className="w-4 h-4" />
                     </button>
-                    {/* SQEM-149 — connectors for this session. Only shown with a Claude or OpenAI key
-                        configured — v1 passthrough runs on Claude (Messages API) + OpenAI (Responses API). */}
-                    {connectors.length > 0 && enabledModels.some(m => m.provider === 'claude' || m.provider === 'openai') && (
-                      <div ref={connectorMenuRef} className="relative shrink-0">
-                        <button
-                          onClick={() => setConnectorMenuOpen(o => !o)}
-                          disabled={enabledModels.length === 0}
-                          title="Connectors"
-                          className={`relative p-3 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed ${enabledConnectorIds.length ? 'text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20'}`}
+                    {/* SQEM-436 — a STATUS, not a menu. The connectors are always sent; this says
+                        whether the chosen model can use them. Shown whenever the workspace has any,
+                        including when no Claude/OpenAI key exists at all — "inactive" is the honest
+                        answer there too, and hiding it would leave the connectors looking broken. */}
+                    {connectors.length > 0 && (
+                      <div className="relative shrink-0 group">
+                        <div
+                          role="status"
+                          aria-label={connectorsSupported
+                            ? 'Your MCP Connectors are active'
+                            : 'Your MCP Connectors are inactive — only works with Claude and ChatGPT'}
+                          className={`p-3 rounded-xl transition-all ${connectorsSupported
+                            ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
+                            : 'text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20'}`}
                         >
                           <Plug className="w-4 h-4" />
-                          {enabledConnectorIds.length > 0 && (
-                            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-brand-600 text-white text-2xs font-bold flex items-center justify-center">{enabledConnectorIds.length}</span>
+                        </div>
+                        <div
+                          role="tooltip"
+                          className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[15rem] px-3 py-2 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-xl z-30 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          {connectorsSupported ? (
+                            <p className="text-2xs font-bold text-emerald-600 dark:text-emerald-400">Your MCP Connectors are active</p>
+                          ) : (
+                            <>
+                              <p className="text-2xs font-bold text-red-500 dark:text-red-400">Your MCP Connectors are inactive</p>
+                              <p className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">only works with Claude and ChatGPT</p>
+                            </>
                           )}
-                        </button>
-                        {connectorMenuOpen && (
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 mb-2 w-64 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-xl z-30 p-1.5 animate-scale-up">
-                            <p className="px-3 pt-1.5 pb-1 text-2xs font-bold text-slate-400 uppercase tracking-wider">Connectors</p>
-                            {connectors.map(c => {
-                              const on = enabledConnectorIds.includes(c.id);
-                              return (
-                                <label key={c.id} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={on}
-                                    onChange={() => setEnabledConnectorIds(prev => on ? prev.filter(id => id !== c.id) : [...prev, c.id])}
-                                    className="w-4 h-4 rounded accent-brand-600 cursor-pointer shrink-0"
-                                  />
-                                  <span className="min-w-0">
-                                    <span className="block text-sm text-slate-700 dark:text-slate-200 truncate">{c.name}</span>
-                                    <span className="block text-2xs text-slate-400 truncate">{c.mcp_url}</span>
-                                  </span>
-                                </label>
-                              );
-                            })}
-                            <div className="px-3 pt-2 pb-1 mt-1 border-t border-slate-100 dark:border-slate-700">
-                              <p className="text-2xs text-slate-400">Works with:</p>
-                              <div className="flex items-center gap-2 mt-1.5">
-                                <ProviderIcon provider="claude" className="w-4 h-4" />
-                                <ProviderIcon provider="openai" className="w-4 h-4" />
-                              </div>
-                            </div>
-                          </div>
-                        )}
+                        </div>
                       </div>
                     )}
                   </div>

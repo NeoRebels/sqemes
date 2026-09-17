@@ -44,3 +44,30 @@ export async function saveApiKey(workspaceId: string, provider: string, key: str
 export async function deleteApiKey(workspaceId: string, provider: string) {
   return invokeFunction('manage-api-keys', { workspaceId, provider, action: 'delete' });
 }
+
+/**
+ * SQEM-425 — has any MCP client actually connected to this workspace?
+ *
+ * Every MCP call authenticates against `sqemes_api_keys` and the server stamps `last_used_at` on the
+ * key it used (`mcp-server/index.ts`), OAuth connections included — they are rows in the same table
+ * (`is_oauth`). So one row with a non-null `last_used_at` is **evidence**, not a guess: a tool has
+ * spoken to this workspace at least once. A key that was issued and never used stays null.
+ *
+ * ⚠️ Deliberately fails to `false`. RLS shows the caller only the keys they may see (their own; an
+ * admin more), and the wizard is not admin-only — so a member can legitimately get nothing back.
+ * Unknown must render as "not confirmed", never as a check mark that was never earned.
+ */
+export async function hasUsedMcpConnection(workspaceId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('sqemes_api_keys')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .not('last_used_at', 'is', null)
+      .limit(1);
+    if (error) return false;
+    return (data?.length ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}

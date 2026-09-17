@@ -239,7 +239,7 @@ export default function Personas() {
     try {
       setImportData(await readBundle(file));
     } catch (err: any) {
-      showToast(err?.message || 'Not a Sqemes bundle', 'error');
+      showToast(err?.message || 'Not a sqemes bundle', 'error');
     }
   };
 

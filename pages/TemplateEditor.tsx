@@ -754,7 +754,7 @@ const TemplateEditor = () => {
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     <span className="font-semibold text-slate-600 dark:text-slate-300">Everyone in this workspace</span>{' '}
                     can see and use this playbook. Restricting one to people or groups is available on{' '}
-                    <a href="https://sqemes.com" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">Sqemes Cloud</a>.
+                    <a href="https://sqemes.com" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">sqemes Cloud</a>.
                   </p>
                 </div>
               </div>

@@ -24,7 +24,7 @@ export function AboutSection() {
 
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="text-sm font-bold text-slate-900 dark:text-slate-100">Sqemes</div>
+          <div className="text-sm font-bold text-slate-900 dark:text-slate-100">sqemes</div>
           <div className="text-xs text-slate-500 dark:text-slate-400">Self-hosted</div>
         </div>
         <div className="text-sm font-mono text-slate-700 dark:text-slate-200">v{CURRENT_VERSION}</div>

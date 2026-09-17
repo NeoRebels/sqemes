@@ -42,7 +42,32 @@ export interface LegalDocument {
 }
 
 /**
- * **`terms` is at `1.2` since 2026-08-30; `privacy` stays at `1.1`.** They version independently, and
+ * **`terms` is at `1.3` and `privacy` at `1.2` since 2026-09-16 (SQEM-427) — ONE bump for three
+ * changes, on purpose.** Gleap became a processor (privacy Part 2 + the subprocessor table), the
+ * Acceptable Use Policy gained a fair-use section for the API and MCP rate limits, and the Terms
+ * gained the paragraph that makes those limits something agreed rather than something imposed.
+ *
+ * ⚠️ **Why the Terms had to move at all, when the suspension right was already there.** The owner
+ * decided against a termination-for-cause clause (2026-09-16): suspension covers what was meant. But
+ * the AUP *forms part of the Terms*, and it gained a **new obligation** — you may not work around the
+ * limits by spreading a workload over extra keys or by retrying in a loop. A new obligation nobody
+ * agreed to is exactly what this mechanism exists to prevent, so the number moves with it.
+ *
+ * ⛔ **Both numbers were verified against the published pages before they were changed here, and one
+ * of them was NOT ready when the texts went live.** The content was updated on 2026-09-16 while the
+ * Terms page still called itself "Version 1.2, effective August 30" — so for a day the number 1.2
+ * meant two different wordings: the August text its existing acceptances point at, and the new one.
+ * That is the failure this comment has warned about since 2026-08-27, and it happens in the gap
+ * between publishing a text and labelling it. **Check the label, not just the paragraph.**
+ *
+ * The check that released this bump (`curl` on each page): *Technical limits* and *the limits in
+ * force are stated in the product documentation* present, *terminate for cause* absent, and the
+ * header reading **Version 1.3**. Privacy carries no version label of its own — it is dated, and
+ * `1.2` means the wording of **16 September 2026**.
+ */
+
+/**
+ * **`terms` was at `1.2` from 2026-08-30; `privacy` was at `1.1`.** They version independently, and
  * this is the first time that mattered: § 16 of the Terms still described Sqemes as open source under
  * AGPL-3.0, three days after the licence moved to the Sustainable Use License (SQEM-281/290). That is
  * a change to what a customer is promised, so it re-gates. The privacy policy did not change, so
@@ -74,8 +99,8 @@ export interface LegalDocument {
  * `tests/unit/legal.test.ts` pins that invariant.
  */
 export const LEGAL_DOCUMENTS: LegalDocument[] = [
-  { id: 'terms',   label: 'Terms and Conditions', url: 'https://sqemes.com/terms',   version: '1.2' },
-  { id: 'privacy', label: 'Privacy Policy',       url: 'https://sqemes.com/privacy', version: '1.1' },
+  { id: 'terms',   label: 'Terms and Conditions', url: 'https://sqemes.com/terms',   version: '1.3' },
+  { id: 'privacy', label: 'Privacy Policy',       url: 'https://sqemes.com/privacy', version: '1.2' },
 ];
 
 /** A row from `legal_acceptances` — only the two columns that decide anything. */

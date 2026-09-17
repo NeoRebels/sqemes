@@ -20,7 +20,35 @@ export type Connector = {
 export type ConnectorTool = { name: string; description?: string };
 export type ProbeResult = { ok: boolean; serverName?: string; tools?: ConnectorTool[]; error?: string };
 
-const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+/**
+ * ⚠️ **The trailing slash is stripped, and that is not tidiness.** The edge functions normalise their
+ * own base the same way (`.trim().replace(/\/+$/, '')` in `connector-oauth-start` and
+ * `_shared/connectorApps.ts`). This side did not — and the two then disagreed: staging's
+ * `VITE_SUPABASE_URL` carries a trailing slash, so `connectorRedirectUri()` handed out
+ * `…supabase.co//functions/v1/connector-oauth-callback` while the server sent the single-slash form.
+ * Somebody registered the double-slash version at Nifty and got *"this connection request is invalid
+ * or expired"* — an error that names neither the URI nor the slash.
+ */
+const SUPABASE_BASE = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
+const FUNCTIONS_URL = `${SUPABASE_BASE}/functions/v1`;
+
+/**
+ * SQEM-439 — the redirect URI a third-party OAuth app has to be registered with.
+ *
+ * ⛔ Some providers (Nifty) do not hand out a client; you register one in THEIR developer area against
+ * a redirect URI, and the client only works for that URI. The person connecting cannot know ours, and
+ * the failure if they guess is a token-endpoint error that names everything except the URI — so the
+ * dialog has to show it.
+ *
+ * ⚠️ It differs per environment (`VITE_SUPABASE_URL`), so a staging app and a production app are two
+ * different registrations. The dialog says so.
+ *
+ * ⛔ It must be **byte-identical** to what `connector-oauth-start` sends — the provider compares
+ * exactly. Two places computing one URL is the shape of this bug; see the note on `SUPABASE_BASE`.
+ */
+export function connectorRedirectUri(): string {
+  return `${FUNCTIONS_URL}/connector-oauth-callback`;
+}
 
 async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   const { data: { session } } = await supabase.auth.getSession();
@@ -53,6 +81,34 @@ export function probeConnector(
   return invoke<ProbeResult>({ action: 'probe', ...input });
 }
 
+/**
+ * SQEM-438 — which of a connector's tools may be used.
+ *
+ * ⛔ An edge function, not a table update: `workspace_connectors` has no UPDATE policy on purpose
+ * (SQEM-149), so the browser cannot write this row at all.
+ *
+ * ⚠️ `null` means "no restriction" and is NOT the same as listing every tool — with no restriction
+ * the provider's future tools are included automatically, with a list the set is frozen.
+ */
+/**
+ * SQEM-444 — what kind of MCP server is this?
+ *
+ * The dialog used to make the person choose between "paste a token" and "no auth", which are two of
+ * four shapes and not the ones most servers use. The server's own answer decides, so this asks it.
+ */
+export type InspectResult =
+  | { ok: true; kind: 'none'; serverName?: string; tools?: ConnectorTool[] }
+  | { ok: true; kind: 'oauth'; issuer: string; registration: boolean; scopes: string[] }
+  | { ok: true; kind: 'token'; reason?: string };
+
+export function inspectConnector(mcpUrl: string): Promise<InspectResult> {
+  return invoke<InspectResult>({ action: 'inspect', mcpUrl });
+}
+
+export function setConnectorTools(connectorId: string, tools: string[] | null): Promise<{ ok: boolean; allowedTools: string[] | null }> {
+  return invoke({ action: 'set-tools', connectorId, tools });
+}
+
 export function createConnector(input: {
   workspaceId: string;
   name: string;
@@ -64,7 +120,7 @@ export function createConnector(input: {
   return invoke({ action: 'create', ...input });
 }
 
-/** SQEM-157/159 — create a token-paste connector (app = 'shopify' | 'github' | 'notion'). `shop` only
+/** SQEM-157/159 — create a token-paste connector (app = 'shopify' | 'github'). `shop` only
  *  applies to Shopify. No OAuth — the pasted token is encrypted server-side. */
 export function createTokenConnector(input: {
   workspaceId: string; app: string; token: string; shared: boolean; shop?: string;
@@ -78,14 +134,24 @@ export async function deleteConnector(id: string): Promise<void> {
 }
 
 /** SQEM-150/153/154 — begin a one-click OAuth connector flow for an app (id from OAUTH_APPS, e.g.
- *  'google-calendar', 'microsoft-outlook'). Returns the provider consent URL to redirect to. */
-export async function startOAuthConnect(workspaceId: string, app: string): Promise<string> {
+ *  'google-calendar', 'microsoft-outlook'). Returns the provider consent URL to redirect to.
+ *
+ *  SQEM-437 — `clientId` is for MCP servers that neither register a client on request nor advertise
+ *  one, and expect a value the PERSON holds (Nifty issues one per user). Omitted for every other app. */
+export async function startOAuthConnect(
+  workspaceId: string,
+  app: string,
+  clientId?: string,
+  clientSecret?: string,
+  /** SQEM-444 — an MCP server that is in no registry: its URL and name travel instead of an app id. */
+  adHoc?: { mcpUrl: string; name: string; scopes?: string[] },
+): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
   const res = await fetch(`${FUNCTIONS_URL}/connector-oauth-start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-    body: JSON.stringify({ workspaceId, app }),
+    body: JSON.stringify({ workspaceId, app, ...(clientId ? { clientId } : {}), ...(clientSecret ? { clientSecret } : {}), ...(adHoc ?? {}) }),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok || !json.url) throw new Error(json.error || `Error ${res.status}`);

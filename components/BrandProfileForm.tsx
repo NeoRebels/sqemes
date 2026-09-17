@@ -130,7 +130,7 @@ export function BrandProfileForm({
           </p>
         )}
         {!canUseAI && !websiteError && (
-          <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">Add a provider key or enable Sqemes AI to analyze a website.</p>
+          <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">Add a provider key or enable sqemes AI to analyze a website.</p>
         )}
       </div>
       )}

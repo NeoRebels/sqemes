@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Info } from 'lucide-react';
+import { ChevronDown, Info, Plug } from 'lucide-react';
 import { ProviderIcon } from './ProviderIcon';
 
 interface ModelSpecs {
@@ -29,6 +29,18 @@ interface Props {
   emptyActionLabel?: string;
   emptyActionIcon?: React.ReactNode;
   onEmptyAction?: () => void;
+  /**
+   * SQEM-446 — providers whose models get a green connector mark in the list.
+   *
+   * ⛔ A property rather than a rule baked in here, because this component serves four callers
+   * (`PersonaSelect`, `EditorTestPanel`, `ui/Modal`, Chat) and only one of them is about connectors.
+   * A green icon in a persona picker would mean nothing, and a mark that means nothing is worse than
+   * no mark.
+   *
+   * ⚠️ Only green, never red. The composer's icon has both states because it describes ONE chosen
+   * model; a list where half the rows glow red reads as a list of faults rather than a choice.
+   */
+  connectorProviders?: string[];
 }
 
 const getCostColor = (v: number) =>
@@ -46,6 +58,7 @@ export function ModelSelect({
   emptyActionLabel,
   emptyActionIcon,
   onEmptyAction,
+  connectorProviders,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -138,6 +151,11 @@ export function ModelSelect({
                 >
                   <ProviderIcon provider={m.provider} className="w-4 h-4 shrink-0" />
                   <span className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{m.name}</span>
+                  {/* SQEM-446 — same mark and same green as the composer's active state, so the two
+                      places read as one statement rather than two unrelated signals. */}
+                  {connectorProviders?.includes(m.provider) && (
+                    <Plug className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Works with your MCP connectors" />
+                  )}
                   {m.specs && (
                     <Info className={`w-3.5 h-3.5 shrink-0 transition-colors ${hoveredId === m.id ? 'text-brand-500' : 'text-slate-300 dark:text-slate-600'}`} />
                   )}

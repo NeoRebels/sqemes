@@ -1,5 +1,5 @@
 
-import { PlanTier, PromptKind } from './types';
+import { PlanTier, PromptKind, UserRole } from './types';
 
 // SQEM-082 — decided monthly AI-credit allowances per tier (1 credit = 1,000 tokens).
 // Used for the Dashboard "AI credits" display when the workspace has no provisioned
@@ -7,6 +7,28 @@ import { PlanTier, PromptKind } from './types';
 // prices, and provision these same numbers as `workspaces.credits_limit` (enforcement).
 // SQEM-057 — free-trial length (days) for all paid tiers. Mirrors the edge function.
 export const TRIAL_DAYS = 14;
+
+/**
+ * SQEM-432 — how a role is WRITTEN wherever a person reads one.
+ *
+ * ⛔ The stored value stays lower-case (`'admin'`) — it is what the database, the types and every RLS
+ * policy compare against. This map is display only; applying it to a `value` attribute would write
+ * "Admin" into `workspace_members.role` and silently break access control. A test pins that.
+ *
+ * ⭐ It exists because the labels were hard-coded **three times** in `pages/Settings.tsx`, and
+ * `lib/gleap.ts` was about to send a fourth wording (the raw lower-case value) to a place where the
+ * owner reads reports. Same reasoning as `includedCredits` in `lib/credits.ts`: two places computing
+ * one thing is how they come to disagree.
+ *
+ * ⚠️ The invite dialog adds its own explanation — "Admin (Full Access)". The label comes from here,
+ * the parenthetical stays where it is; folding it in would delete an explanation somebody wrote on
+ * purpose, and dropping it would make the dialog less clear than it is.
+ */
+export const ROLE_LABELS: Record<UserRole, string> = {
+  admin: 'Admin',
+  editor: 'Editor',
+  member: 'Member',
+};
 
 export const PLAN_AI_CREDITS: Record<PlanTier, number> = {
   Solo: 2000,
@@ -77,7 +99,7 @@ export const KIND_HELP: Record<PromptKind, string> = {
 // extension setup fetches first. Same rule as the `.js` extension on the import in `api/`
 // (SQEM-309): what this file imports is what the serverless function has to resolve at runtime.
 // `tests/unit/extensionConfigLeaf.test.ts` pins it.
-// (`import { PlanTier, PromptKind } from './types'` above is type-only and is erased.)
+// (`import { PlanTier, PromptKind, UserRole } from './types'` above is type-only and is erased.)
 
 export const VAT_NOTE = 'Includes VAT. Business customers with a valid VAT ID are charged net.';
 

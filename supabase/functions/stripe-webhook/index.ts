@@ -139,12 +139,34 @@ Deno.serve(async (req) => {
         const plan = priceId ? PRICE_TO_PLAN[priceId] : undefined;
         const billingCycle = priceId ? (PRICE_TO_CYCLE[priceId] ?? 'monthly') : 'monthly';
 
+        /**
+         * SQEM-434 — the AI-credit month is anchored to Stripe's own cycle.
+         *
+         * ⛔ **`billing_cycle_anchor`, not `current_period_start`.** Credits reset **monthly**; a
+         * subscription can be **yearly**. `current_period_start` moves with the invoice, so on a
+         * yearly plan it would advance once a year and that customer would get their credits back
+         * once a year. The anchor is a fixed reference point that survives renewals, and its
+         * day-of-month is the reset day for monthly and yearly plans alike.
+         *
+         * ⚠️ `invoice.paid` looks like the natural trigger and fails for the same reason — on a
+         * yearly plan it fires once a year.
+         *
+         * It is written on every subscription event, not only the first: a cycle can be moved (a
+         * plan change with proration, a billing-date change), and the reset has to move with it.
+         */
+        const anchor = typeof subscription.billing_cycle_anchor === 'number'
+          ? new Date(subscription.billing_cycle_anchor * 1000).toISOString()
+          : null;
+
         const update: Record<string, any> = {
           subscription_status: status,
           trial_ends_at: trialEnd,
           stripe_subscription_id: subscription.id,
           // Canceled-at-period-end keeps the sub trialing/active until the period ends.
           cancel_at_period_end: !!subscription.cancel_at_period_end,
+          // ⚠️ Only when Stripe sent one — writing null over a stored anchor would silently put the
+          // workspace back on the drifting fallback.
+          ...(anchor ? { billing_cycle_anchor: anchor } : {}),
         };
         // Only (re)assert the plan/cycle when the sub is usable and the price maps cleanly.
         if (['active', 'trialing'].includes(status) && plan) {

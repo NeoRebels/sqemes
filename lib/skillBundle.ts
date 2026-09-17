@@ -68,7 +68,7 @@ export function importErrorMessage(bundleErr: unknown, skillErr: unknown): strin
     return skillErr.message;
   }
   const detail = bundleErr instanceof Error ? bundleErr.message : 'it could not be read';
-  return `Neither a Sqemes bundle nor an Agent Skill: no ${SKILL_ENTRY} anywhere in the archive, and ${detail.charAt(0).toLowerCase()}${detail.slice(1)}.`;
+  return `Neither a sqemes bundle nor an Agent Skill: no ${SKILL_ENTRY} anywhere in the archive, and ${detail.charAt(0).toLowerCase()}${detail.slice(1)}.`;
 }
 
 /** What a skill folder holds, independent of how it is packed. */

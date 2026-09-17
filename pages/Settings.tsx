@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useUI, useWorkspace } from '../store';
 import { can } from '../lib/permissions';
 import { useLocation, useNavigate } from 'react-router';
-import { PLANS, TRIAL_DAYS, VAT_NOTE } from '../constants';
+import { PLANS, ROLE_LABELS, TRIAL_DAYS, VAT_NOTE } from '../constants';
 import { LIBRARY_SYSTEM_PROMPT } from '../lib/libraryPrompt';
 import { hasActiveSubscription, isTrialing } from '../lib/subscription';
 import { IS_SELF_HOSTED } from '../lib/env';
+import { copyToClipboard } from '../lib/clipboard';
 import { fetchCanPublish, setPublisherToken } from '../lib/api/library';
 import { UserRole } from '../types';
 import { BrandProfileForm, brandFormFromProfile, type BrandFormValue } from '../components/BrandProfileForm';
@@ -82,27 +83,6 @@ const isPlaceholderKey = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) return false;
   return MASKED_KEY_RE.test(trimmed) || /enter new key to replace/i.test(trimmed);
-};
-
-const copyToClipboard = async (text: string): Promise<boolean> => {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    try {
-      const el = document.createElement('textarea');
-      el.value = text;
-      el.style.position = 'fixed';
-      el.style.opacity = '0';
-      document.body.appendChild(el);
-      el.select();
-      const ok = document.execCommand('copy');
-      document.body.removeChild(el);
-      return ok;
-    } catch {
-      return false;
-    }
-  }
 };
 
 const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () => void }) => {
@@ -998,7 +978,7 @@ const Settings = () => {
                 <Card className="p-6 md:p-8">
                   <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Marketplace Publisher</h2>
                   <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                    A publisher token lets this instance <span className="font-semibold">submit</span> playbooks to the Sqemes community marketplace (browsing + copying works without one). It&apos;s stored encrypted and never shown again.{' '}
+                    A publisher token lets this instance <span className="font-semibold">submit</span> playbooks to the sqemes community marketplace (browsing + copying works without one). It&apos;s stored encrypted and never shown again.{' '}
                     <a href="https://sqemes.com/publisher" target="_blank" rel="noopener noreferrer" className="text-brand-600 dark:text-brand-400 font-semibold hover:underline">Apply for a publisher key →</a>
                   </p>
                   <div className="mb-2">
@@ -1117,7 +1097,7 @@ const Settings = () => {
                     <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Access control and groups</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 max-w-md mx-auto">
                       Decide per playbook who may see and use it: everyone, only you, or named people
-                      and groups that keep following your team as it changes. Available on Sqemes Cloud.
+                      and groups that keep following your team as it changes. Available on sqemes Cloud.
                     </p>
                     <a
                       href="https://sqemes.com"
@@ -1125,7 +1105,7 @@ const Settings = () => {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none"
                     >
-                      Explore Sqemes Cloud <ArrowUpRight className="w-4 h-4" />
+                      Explore sqemes Cloud <ArrowUpRight className="w-4 h-4" />
                     </a>
                   </div>
                 </Card>
@@ -1299,9 +1279,9 @@ const Settings = () => {
                               onChange={(e) => handleRoleChange(member, e.target.value as UserRole)}
                               disabled={member.id === currentUser.id}
                             >
-                              <option value="admin">Admin</option>
-                              <option value="editor">Editor</option>
-                              <option value="member">Member</option>
+                              {(Object.keys(ROLE_LABELS) as UserRole[]).map(r => (
+                                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                              ))}
                             </select>
                           ) : (
                             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
@@ -2110,9 +2090,10 @@ const Settings = () => {
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as UserRole)}
             >
-              <option value="admin">Admin (Full Access)</option>
-              <option value="editor">Editor (Can Create)</option>
-              <option value="member">Member (Read Only)</option>
+              {/* ⚠️ SQEM-432 — the label comes from ROLE_LABELS, the explanation stays here. */}
+              <option value="admin">{ROLE_LABELS.admin} (Full Access)</option>
+              <option value="editor">{ROLE_LABELS.editor} (Can Create)</option>
+              <option value="member">{ROLE_LABELS.member} (Read Only)</option>
             </select>
           </div>
           <div className="flex gap-3 mt-8">

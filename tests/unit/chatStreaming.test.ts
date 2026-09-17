@@ -28,8 +28,15 @@ describe('SQEM-372 — what must not stream', () => {
     expect(CHAT_FN).toMatch(/const streams = !funded/);
   });
 
-  it('⛔ connector calls do not stream — tool events interleave with text', () => {
-    expect(CHAT_FN).toMatch(/const streams = !funded && !connectors\?\.length/);
+  it('⭐ SQEM-435 — connector calls DO stream; only funded is left out', () => {
+    // This test read `!funded && !connectors?.length` until 2026-09-17, and it was right to: the
+    // interleaved remote tool events really would have leaked into the text. What changed is not the
+    // rule but the readers — all four now match exact event types, so an `mcp_tool_use` block can
+    // neither be printed nor executed. The proof lives next door, with the filters it depends on:
+    // `tests/unit/connectorStreaming.test.ts`. Do not re-add the connector clause here without
+    // taking that file apart first.
+    expect(CHAT_FN).toMatch(/const streams = !funded;/);
+    expect(CHAT_FN).not.toMatch(/const streams = !funded && !connectors/);
   });
 
   it('image models do not stream', () => {

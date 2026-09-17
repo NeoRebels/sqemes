@@ -43,7 +43,7 @@ export default function AuthoringModelCard({
         AI for authoring
       </h2>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-        Used when Sqemes writes for you — enhancing a prompt, generating a description, the setup and
+        Used when sqemes writes for you — enhancing a prompt, generating a description, the setup and
         playbook wizards, and adapting a playbook to your brand. It does not affect Chat, where you pick
         the model each time.
       </p>

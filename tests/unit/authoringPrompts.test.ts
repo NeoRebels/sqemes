@@ -89,8 +89,11 @@ describe('SQEM-390 — describe, per kind', () => {
 
 describe('SQEM-390 — the starter library asks for quality, not just quantity', () => {
   it('⛔ prompts: role · context · task · output format, 2–4 variables, labels as QUESTIONS', () => {
-    const p = starterPromptsInstruction(4);
+    const p = starterPromptsInstruction(['Marketing & Sales', 'Data & Research', 'Business & Ops', 'Creative & Design']);
     expect(p).toMatch(/Generate exactly 4/);
+    // SQEM-413 — the areas are named in the instruction and each item must carry one.
+    expect(p).toContain('Marketing & Sales · Data & Research');
+    expect(p).toMatch(/"area" key/);
     for (const part of ['Role:', 'Context:', 'Task:', 'Output format:']) expect(p).toContain(part);
     expect(p).toMatch(/2–4 \{\{variable_name\}\} placeholders/);
     expect(p).toMatch(/phrased as the QUESTION the person answers/);
@@ -99,8 +102,10 @@ describe('SQEM-390 — the starter library asks for quality, not just quantity',
   });
 
   it('⛔ skills: scope · rules · examples · limits, no placeholders, no invented facts, description = when', () => {
-    const s = starterSkillsInstruction(3);
-    expect(s).toMatch(/Generate exactly 3/);
+    const s = starterSkillsInstruction(['Marketing & Sales', 'Data & Research', 'Business & Ops']);
+    expect(s).toMatch(/EXACTLY ONE skill for each/);
+    expect(s).toContain('Marketing & Sales · Data & Research · Business & Ops');
+    expect(s).toMatch(/"area" key/);
     for (const part of ['Scope:', 'Rules:', 'Examples:', 'Limits:']) expect(s).toContain(part);
     expect(s).toMatch(/No \{\{placeholders\}\}/);
     expect(s).toMatch(/Do not invent facts/);

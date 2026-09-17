@@ -91,7 +91,7 @@ export const sanitizeName = (name: string) => name.replace(/[^\w.-]+/g, '_').sli
 export async function readBundle(zipFile: File): Promise<{ zip: JSZip; manifest: BundleManifest }> {
   const zip = await JSZip.loadAsync(zipFile);
   const entry = zip.file('manifest.json');
-  if (!entry) throw new Error('Not a Sqemes bundle (manifest.json missing).');
+  if (!entry) throw new Error('Not a sqemes bundle (manifest.json missing).');
   let manifest: BundleManifest;
   try { manifest = JSON.parse(await entry.async('string')); } catch { throw new Error('Corrupt bundle (invalid manifest).'); }
   if (manifest.schema !== BUNDLE_SCHEMA) throw new Error(`Unsupported bundle version: ${manifest.schema ?? 'unknown'}.`);

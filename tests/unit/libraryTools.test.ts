@@ -168,22 +168,47 @@ describe('SQEM-373 — the wiring in chat-message', () => {
     }
   });
 
-  it('⛔ Claude still withholds library tools when connectors are enabled', () => {
-    // Its Messages API has one `tools` field and two writers: passing both would silently lose the
-    // connectors rather than fail, and a connector that stops working without an error is the
-    // hardest kind of bug to trace back.
-    expect(CHAT_FN).toMatch(/connectors\?\.length \? null : \(tools \?\? null\)/);
+  it('⛔ SQEM-428 — Claude keeps the library tools WHEN CONNECTORS ARE ON', () => {
+    // This read `connectors?.length ? null : (tools ?? null)` until SQEM-428, so anyone who connected
+    // Gmail or Plaud lost their own playbooks in the same conversation. The stated reason — "one
+    // `tools` field and two writers" — was not true: the connectors go in `mcp_servers`.
+    expect(CHAT_FN).not.toMatch(/connectors\?\.length \? null : \(tools \?\? null\)/);
+    expect(CHAT_FN).toMatch(/let activeTools = tools \?\? null/);
   });
 
-  it('⭐ SQEM-377/378 — the exclusion is PROVIDER-SPECIFIC, not blanket', () => {
-    // It used to be `workspaceId && !connectors?.length` for everyone. On `/v1/responses` connectors
-    // and function tools share one array, so OpenAI can have both.
+  it('⛔ …and `body.tools` is BUILT from both sources, never assigned twice', () => {
+    // A second `body.tools = …` is exactly how the definitions were lost. One array, appended to.
+    const fn = CHAT_FN.slice(CHAT_FN.indexOf('async function callClaude'));
+    const body = fn.slice(0, fn.indexOf('\n}\n'));
+    expect(body).toMatch(/const toolDefs: any\[\] = activeTools \? toClaudeTools\(activeTools\.definitions\) : \[\]/);
+    expect(body).toMatch(/toolDefs\.push\(toolset\)/);
+    expect(body).toMatch(/if \(toolDefs\.length\) body\.tools = toolDefs/);
+    // ⛔ Exactly one writer of `body.tools` on this path.
+    expect(body.match(/body\.tools\s*=/g) ?? []).toHaveLength(1);
+    // The connectors themselves still travel in their own field.
+    expect(body).toMatch(/body\.mcp_servers = connectors\.map/);
+  });
+
+  it('⛔ what makes the mixing safe: the readers filter STRICTLY on tool_use', () => {
+    // Anthropic reports its own connector calls as `mcp_tool_use`. If either filter were loosened to
+    // a `startsWith` or a truthy check, a connector's call would be routed into `activeTools.execute`
+    // — which fails by executing the wrong thing, not by erroring. This is the load-bearing detail of
+    // SQEM-428, so it is pinned in the file that depends on it.
+    const STREAM = code(readFileSync(root('supabase/functions/_shared/toolStream.ts'), 'utf8'));
+    expect(STREAM).toMatch(/content_block\?\.type === 'tool_use'/);
+    expect(STREAM).toMatch(/\.filter\(b => b\?\.type === 'tool_use' && b\?\.name\)/);
+    expect(STREAM).not.toMatch(/startsWith\('tool_use'\)|includes\('tool_use'\)/);
+  });
+
+  it('⭐ SQEM-377/428 — no provider excludes the library any more', () => {
+    // It used to be `workspaceId && !connectors?.length` for everyone, then Claude-only (SQEM-378).
     expect(CHAT_FN).not.toMatch(/workspaceId && !connectors\?\.length/);
-    // ⛔ SQEM-378 put the remaining rule back at THIS level rather than leaving it only inside
-    // `callClaude`: the library prompt is decided here too, and a prompt that promises tools the
-    // provider never received is how a model starts inventing library contents (SQEM-326).
-    expect(CHAT_FN).toMatch(/toolsBlockedByProvider = provider === 'claude' && !!connectors\?\.length/);
-    expect(CHAT_FN).toMatch(/workspaceId && !toolsBlockedByProvider/);
+    expect(CHAT_FN).not.toContain('toolsBlockedByProvider');
+    // ⚠️ SQEM-378's real point survives: the library PROMPT is decided from the same `tools` value
+    // that is sent. A prompt promising tools the provider never received is how a model starts
+    // inventing library contents (SQEM-326).
+    expect(CHAT_FN).toMatch(/const tools: ToolRuntime \| null = workspaceId/);
+    expect(CHAT_FN).toMatch(/const instruction = tools \? withLibraryPrompt\(systemInstruction\) : systemInstruction/);
   });
 
   it('⛔ the loop has a cap, and the cap is VISIBLE', () => {

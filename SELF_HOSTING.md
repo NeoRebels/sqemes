@@ -293,6 +293,14 @@ config above, requests access to your instance's origin(s) through Chrome's perm
 points itself at your instance — no rebuild or side-load. Cloud users keep the default
 (`app.sqemes.com`) and notice nothing.
 
+> **⚠️ Your instance cannot see the extension, and that is by design.** The app detects an installed
+> extension by messaging it from the page, and Chrome only allows that from the origins listed in the
+> extension's `externally_connectable` — `https://app.sqemes.com` alone, because Chrome accepts no
+> catch-all pattern there. So on a self-hosted instance the setup wizard keeps offering the install and
+> the final checklist says the extension cannot be checked from here, **even after you have installed
+> and connected it** (SQEM-420). Nothing is broken: the extension talks to your instance over the
+> config endpoint above; it is only the reverse direction — page asking extension — that stays silent.
+
 > **⚠️ Reverse-proxy requirement.** The discovery endpoint must be reachable **at the same origin the
 > user enters** (your app URL). The bundled **Caddy** overlay already routes `/.well-known/*` (and the
 > other sidecar routes) to the api sidecar, so a Caddy deploy works out of the box. If you run the app
@@ -450,7 +458,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.11.17       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.11.18       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### ⛔ 3a. Before v1.11.9: count your workspace-wide MCP keys
@@ -643,7 +651,7 @@ If you would rather it did not, block `/#/library/` at your reverse proxy — bu
 reaches the server, so the block has to happen in the browser or not at all. Removing the route in a
 fork is the reliable way.
 
-*Last updated: 2026-09-15 (SQEM-411: version pin v1.11.17 — no functional change; the repository's own CI is green again: `npm run typecheck` had failed since v1.11.11 on a stub that took no props, and three tests read files this repository does not contain). Before that (SQEM-409: version pin v1.11.16 — the launch button says "Use skill"; a marketplace listing opened on your instance by someone without an account now offers Sqemes Cloud through a link to the same listing on app.sqemes.com instead of your instance's sign-up form, and no offer at all if the instance reads its own marketplace). Before that (SQEM-403: version pin v1.11.15 · SQEM-399) — the api sidecar starts again: its image now bundles the TypeScript handlers at build time. v1.11.4 to v1.11.13 shipped it dead — extension config, MCP OAuth and the marketplace proxy answered 502 while the app itself ran; `docker compose up -d --build` on v1.11.14 rebuilds it. Before that (SQEM-394) — templates are called **playbooks** in the app; the routes moved to
+*Last updated: 2026-09-17 (SQEM-453: version pin v1.11.18 — **connect any MCP server yourself.** The "Add connector" dialog now asks the server how it wants to be connected and shows only the fields it actually needs, covering all four shapes: dynamic client registration (nothing to configure), a client ID you registered yourself, a pasted bearer token, and servers that need no sign-in at all. Previously you could only attach what we had built a tile for. Per connector you can now choose which of its tools are offered. In Chat, connectors are always active — an icon beside the input says whether the selected model supports them, and the model list marks the ones that do — and connector answers stream instead of arriving in one block. ⚠️ The **tiles** for Plaud, Notion, Noota, Nifty, Shopify and GitHub are still Cloud-only; use the dialog with the server's own URL. That filter is too broad and is being fixed. Also in this cut: the reworked setup wizard. Nothing here requires a new environment variable). Before that (SQEM-411: version pin v1.11.17 — no functional change; the repository's own CI is green again: `npm run typecheck` had failed since v1.11.11 on a stub that took no props, and three tests read files this repository does not contain). Before that (SQEM-409: version pin v1.11.16 — the launch button says "Use skill"; a marketplace listing opened on your instance by someone without an account now offers Sqemes Cloud through a link to the same listing on app.sqemes.com instead of your instance's sign-up form, and no offer at all if the instance reads its own marketplace). Before that (SQEM-403: version pin v1.11.15 · SQEM-399) — the api sidecar starts again: its image now bundles the TypeScript handlers at build time. v1.11.4 to v1.11.13 shipped it dead — extension config, MCP OAuth and the marketplace proxy answered 502 while the app itself ran; `docker compose up -d --build` on v1.11.14 rebuilds it. Before that (SQEM-394) — templates are called **playbooks** in the app; the routes moved to
 `/playbooks` and every old link redirects. Nothing changes for an operator. Earlier the same day
 (SQEM-390) — the assistant template kind is gone: on upgrade the migration
 turns every assistant into a skill with the same text, and a role is a persona. Earlier: 2026-08-19

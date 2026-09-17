@@ -159,7 +159,9 @@ describe('SQEM-390 — the surfaces', () => {
   it('the wizard reviews two kinds', () => {
     const step = code(read('components/WizardCreateStep.tsx'));
     expect(step).not.toMatch(/assistant:/);
-    expect(step).toMatch(/four prompts and four skills/);
+    // SQEM-413 — the promise is no longer a fixed "four prompts and four skills": it is the brand
+    // voice plus one prompt and one skill per chosen area. Two kinds, counted differently.
+    expect(step).toMatch(/one prompt and one skill for each area/);
   });
 });
 

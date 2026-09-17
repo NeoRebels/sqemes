@@ -104,7 +104,7 @@ export default function PublicListing() {
           <div aria-hidden className="pointer-events-none absolute -top-20 -right-16 w-56 h-56 rounded-full bg-brand-500/30 blur-3xl" />
           <div className="relative">
             <span className="inline-flex items-center gap-1.5 text-2xs font-bold uppercase tracking-wider text-brand-200">
-              <Sparkles className="w-3.5 h-3.5" /> Sqemes Cloud
+              <Sparkles className="w-3.5 h-3.5" /> sqemes Cloud
             </span>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight mt-1.5">Make this playbook yours</h2>
             {/* Each point is something the signed-in page actually does: "Add to playbooks", "Adapt to
@@ -138,7 +138,7 @@ export default function PublicListing() {
               <span className="text-xs text-brand-200">A card is required · cancel any time</span>
             </div>
             <p className="mt-5 pt-4 border-t border-white/10 text-xs text-brand-200 leading-relaxed">
-              Prefer to keep it free forever? <a href="https://github.com/NeoRebels/sqemes" target="_blank" rel="noopener noreferrer" className="font-semibold text-white underline underline-offset-2 decoration-white/40 hover:decoration-white">Self-host Sqemes</a> — this marketplace is readable from your own instance.
+              Prefer to keep it free forever? <a href="https://github.com/NeoRebels/sqemes" target="_blank" rel="noopener noreferrer" className="font-semibold text-white underline underline-offset-2 decoration-white/40 hover:decoration-white">Self-host sqemes</a> — this marketplace is readable from your own instance.
             </p>
           </div>
         </div>

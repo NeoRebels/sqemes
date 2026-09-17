@@ -60,9 +60,16 @@ describe('SQEM-401 — two rows on a phone, one row on a desktop', () => {
     expect(body).not.toMatch(/<Paperclip /);
   });
 
-  it('⚠️ both menus anchor to the button\'s centre on a phone and to its left edge from md up', () => {
+  it('⚠️ the attach menu anchors to the button\'s centre on a phone and to its left edge from md up', () => {
+    // ⚠️ This counted TWO menus until SQEM-436. The connectors menu was the second, and it is gone —
+    // connectors are always active now, so the icon is a status and opens nothing. The rule itself is
+    // unchanged and still matters for the one menu that is left: anchored left on a phone, a menu
+    // opens off the edge of the screen.
     const menus = src.match(/absolute bottom-full left-1\/2 -translate-x-1\/2 md:left-0 md:translate-x-0 mb-2 w-64/g) ?? [];
-    expect(menus.length, 'attach + connectors menus').toBe(2);
+    expect(menus.length, 'attach menu').toBe(1);
     expect(src).not.toMatch(/absolute bottom-full left-0 mb-2/);
+    // The connector tooltip is centred too — it has no md: variant because it is never wider than
+    // its anchor's row.
+    expect(src).toMatch(/absolute bottom-full left-1\/2 -translate-x-1\/2 mb-2 w-max/);
   });
 });

@@ -113,7 +113,7 @@ const LegalGateActive = ({
 
         <p className="text-sm text-slate-600 dark:text-slate-300 mb-5">
           {pending.length === live.length
-            ? 'Please read and agree to the documents below to use Sqemes.'
+            ? 'Please read and agree to the documents below to use sqemes.'
             : 'Please read and agree to the updated documents below to continue.'}
         </p>
 

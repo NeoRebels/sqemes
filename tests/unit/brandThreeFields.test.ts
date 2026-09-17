@@ -60,7 +60,7 @@ describe('SQEM-395 — what the model is told', () => {
   it('⛔ the brand summary is three lines — no Tone, no use case', async () => {
     const prompts: string[] = [];
     runAuthoringAI.mockImplementation(async ({ prompt }: { prompt: string }) => { prompts.push(prompt); return '[]'; });
-    await generateStarterLibrary({ brandName: 'Acme', whatItDoes: 'sells widgets', audience: 'buyers' }, { workspaceId: 'ws', modelId: 'm' });
+    await generateStarterLibrary({ brandName: 'Acme', whatItDoes: 'sells widgets', audience: 'buyers' }, { workspaceId: 'ws', modelId: 'm' }, ['Marketing & Sales']);
     expect(prompts.length).toBeGreaterThan(0);
     for (const p of prompts) {
       expect(p).toBe('Brand name: Acme\nWhat it does: sells widgets\nAudience: buyers');
@@ -68,8 +68,8 @@ describe('SQEM-395 — what the model is told', () => {
   });
 
   it('the starter instructions no longer mention a use case; the brand voice infers the tone', () => {
-    expect(starterPromptsInstruction(4)).not.toMatch(/use case/i);
-    expect(starterSkillsInstruction(3)).not.toMatch(/use case/i);
+    expect(starterPromptsInstruction(['Marketing & Sales'])).not.toMatch(/use case/i);
+    expect(starterSkillsInstruction(['Marketing & Sales'])).not.toMatch(/use case/i);
     expect(BRAND_VOICE_SKILL_INSTRUCTION).toMatch(/Infer the tone from how the brand describes itself/);
     expect(BRAND_VOICE_SKILL_INSTRUCTION).not.toMatch(/at the given tone/);
   });

@@ -1,7 +1,7 @@
 {
   "name": "sqemes",
   "private": true,
-  "version": "1.11.17",
+  "version": "1.11.18",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
@@ -29,6 +29,7 @@
     "@sentry/react": "^10.63.0",
     "@supabase/supabase-js": "^2.95.3",
     "@vercel/speed-insights": "^2.0.0",
+    "gleap": "^17.0.3",
     "jszip": "^3.10.1",
     "lucide-react": "^0.554.0",
     "react": "^19.2.8",

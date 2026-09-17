@@ -62,8 +62,8 @@ export default function ListingView({
           ? <FullScreenExit label="Back to Marketplace" onExit={onExit} escapeEnabled />
           : <span />}
         <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
-          <img src={sqemesIcon} alt="Sqemes" className="w-5 h-5" />
-          <span className="text-sm font-bold tracking-tight text-slate-600 dark:text-slate-300">Sqemes</span>
+          <img src={sqemesIcon} alt="sqemes" className="w-5 h-5" />
+          <span className="text-sm font-bold tracking-tight text-slate-600 dark:text-slate-300">sqemes</span>
         </div>
       </div>
 
@@ -124,8 +124,11 @@ export default function ListingView({
               {adapting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} {adaptLabel}
             </button>
           )}
-          {/* A text link, not a third button: it is an alternative to taking the template in, not a
-              competing primary action.
+          {/* An outline button, not a text link (SQEM-415, UX test 2026-09-16): underlined beside two
+              filled buttons it read as fine print — a tester looking for the way to take a playbook
+              *out* of Sqemes did not find it. Outline keeps the hierarchy (it is an alternative to
+              taking the template in, not a competing primary action) while still looking like a
+              control.
               SQEM-302 — shown for every listing now. It used to be skills only, because the download
               was an Agent Skill folder and a prompt's variables cannot be expressed as a SKILL.md.
               The Sqemes bundle expresses both kinds, so the restriction lost the reason it was
@@ -135,7 +138,7 @@ export default function ListingView({
               onClick={onDownload}
               disabled={downloading}
               title={fileNames.length ? `A .sqemes.zip with ${fileNames.length} file${fileNames.length === 1 ? '' : 's'}` : 'A .sqemes.zip — this listing carries no files'}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 underline underline-offset-4 decoration-slate-300 dark:decoration-slate-600 hover:decoration-brand-400 transition-colors disabled:opacity-50 disabled:no-underline"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-brand-400 hover:text-brand-600 dark:hover:border-brand-500 dark:hover:text-brand-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Download Playbook
             </button>
@@ -147,7 +150,9 @@ export default function ListingView({
         {/* What you get — transparency */}
         {fileNames.length ? (
           <div className="mt-8 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-soft p-5">
-            <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-3">What comes with this copy</h2>
+            {/* SQEM-415 — "this copy" was read as a copy of something else; the word everywhere
+                else on this page is playbook. */}
+            <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-3">What comes with this playbook</h2>
             {fileNames.length > 0 && (
               // SQEM-258 — the list is capped and scrolls: a skill import can bring 151 files, and
               // an uncapped chip list pushes the preview and everything below it off the page. The
@@ -184,7 +189,7 @@ export default function ListingView({
         {/* Footer — soft growth loop */}
         <div className="mt-14 pt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-center">
           <a href="https://sqemes.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-500 hover:text-brand-600 transition-colors">
-            <img src={sqemesIcon} alt="" className="w-4 h-4 opacity-70" /> Made with Sqemes <ArrowUpRight className="w-3.5 h-3.5" />
+            <img src={sqemesIcon} alt="" className="w-4 h-4 opacity-70" /> Made with sqemes <ArrowUpRight className="w-3.5 h-3.5" />
           </a>
         </div>
       </div>

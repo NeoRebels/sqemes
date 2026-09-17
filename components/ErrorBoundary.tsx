@@ -51,7 +51,7 @@ class ErrorBoundary extends Component<Props, State> {
               <div className="w-12 h-12 bg-brand-50 dark:bg-brand-900/30 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <RefreshCw className="w-6 h-6 text-brand-600 dark:text-brand-400" />
               </div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">We&apos;ve updated Sqemes</h2>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">We&apos;ve updated sqemes</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
                 Reload to use the latest version.
               </p>

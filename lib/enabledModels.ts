@@ -55,7 +55,7 @@ export function buildEnabledModels(
 
   const hasTextModel = enabled.some(m => !isImageModel(m.id));
   if (fundedAvailable && !hasTextModel) {
-    enabled.push({ id: FUNDED_MODEL_ID, name: 'Sqemes AI', description: 'Uses your monthly AI credits — no API key needed', provider: 'sqemes' });
+    enabled.push({ id: FUNDED_MODEL_ID, name: 'sqemes AI', description: 'Uses your monthly AI credits — no API key needed', provider: 'sqemes' });
   }
   return enabled;
 }

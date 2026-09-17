@@ -144,8 +144,15 @@ Write 1-2 sentences: when to apply this skill, and what it covers — including 
  * The prompts section. ⚠️ The phrases "starter prompt library" and "Generate exactly N" are read by
  * `tests/unit/wizardGeneration.test.ts` to route and to count; keep them.
  */
-export function starterPromptsInstruction(count: number): string {
-  return `You build a starter prompt library for a brand's team. Generate exactly ${count} reusable prompt templates tailored to this brand's work — the tasks this kind of business runs again and again.
+/**
+ * SQEM-413 — one prompt per area the person picked, and each item says which area it is for.
+ * ⚠️ The areas are the marketplace categories, so the label a person chooses here is the same word the
+ * marketplace uses. A model that invents an area is corrected by the caller, not trusted.
+ */
+export function starterPromptsInstruction(areas: string[]): string {
+  return `You build a starter prompt library for a brand's team. Generate exactly ${areas.length} reusable prompt templates tailored to this brand's work — the tasks this kind of business runs again and again.
+
+Write EXACTLY ONE prompt for each of these areas, in this order: ${areas.join(' · ')}. Each object carries an "area" key holding that area's label, copied verbatim from this list.
 
 Each prompt is one task the team runs repeatedly. Its body follows this shape, in Markdown:
 - Role: one line saying who the AI is for this task, for this brand.
@@ -157,16 +164,19 @@ Variables: use 2–4 {{variable_name}} placeholders in snake_case for what the p
 
 Do not invent facts about the brand beyond what you are given.
 
-Return ONLY a JSON array — no prose, no code fences — of objects with keys "title" (short), "description" (one sentence on when to use it), "content" (the prompt body) and "variables" (an array of {"name", "label"} covering every placeholder in content).`;
+Return ONLY a JSON array — no prose, no code fences — of objects with keys "title" (short), "description" (one sentence on when to use it), "content", "variables" (an array of {"name", "label"} covering every placeholder in content) and "area". ⛔ "content" is ONE Markdown STRING holding the whole prompt body, including its headings — never an object, never an array (SQEM-412).`;
 }
 
 /**
  * The knowledge-skills section. ⚠️ "reusable SKILLS" and "Generate exactly N" are read by the tests.
  */
-export function starterSkillsInstruction(count: number): string {
+/** SQEM-413 — one skill per chosen area; see `starterPromptsInstruction`. */
+export function starterSkillsInstruction(areas: string[]): string {
   return `You build reusable SKILLS for a brand — blocks of company knowledge an AI applies whenever they fit. A skill is not a task and not a role: nothing in it is filled in, and it is read in addition to whatever the AI is already doing.
 
-Generate exactly ${count} distinct skills this brand's team would actually reach for — the knowledge this kind of business repeats. Each body in Markdown, following this shape:
+Write EXACTLY ONE skill for each of these areas, in this order: ${areas.join(' · ')}. Each object carries an "area" key holding that area's label, copied verbatim from this list.
+
+Each skill is knowledge this brand's team would actually reach for in that area — what this kind of business repeats. Each body in Markdown, following this shape:
 - Scope: what the knowledge covers and when it applies (one or two sentences).
 - Rules: concrete, checkable statements — "always", "never", "prefer X over Y".
 - Examples: one or two short ones that show a rule in use.
@@ -174,7 +184,7 @@ Generate exactly ${count} distinct skills this brand's team would actually reach
 
 No {{placeholders}} — a skill is applied, not filled in. Do not invent facts about the brand beyond what you are given: write rules the team can adjust, not facts it would have to correct.
 
-Return ONLY a JSON array — no prose, no code fences — of objects with keys "title" (short), "description" (one sentence saying WHEN to apply it — an AI agent reads this to decide whether the skill fits) and "content" (the skill body).`;
+Return ONLY a JSON array — no prose, no code fences — of objects with keys "title" (short), "description" (one sentence saying WHEN to apply it — an AI agent reads this to decide whether the skill fits), "content" and "area". ⛔ "content" is ONE Markdown STRING holding the whole body, including its headings — never an object, never an array (SQEM-412).`;
 }
 
 /** The brand-voice skill: one text call, no JSON. ⚠️ "Write a BRAND VOICE skill" is read by the tests. */

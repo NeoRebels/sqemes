@@ -12,7 +12,7 @@ vi.mock('../../lib/authoringAI', () => ({
   firstTextModelId: () => 'gpt-test',
 }));
 
-const { extractVariables, questionLabels, generateStarterLibrary, generateSingleTemplate } = await import('../../lib/wizardGeneration');
+const { extractVariables, questionLabels, generateStarterLibrary, generateSingleTemplate, generateStarterSkills, generateStarterPrompts } = await import('../../lib/wizardGeneration');
 
 // SQEM-184 — the real {{placeholder}} → Variable[] extraction (kind=prompt auto-variables).
 describe('extractVariables', () => {
@@ -60,6 +60,8 @@ describe('extractVariables', () => {
 describe('generateStarterLibrary', () => {
   const BRAND = { brandName: 'Acme', whatItDoes: 'sells widgets', audience: 'buyers' };
   const CTX = { workspaceId: 'ws-1', modelId: 'gpt-test' };
+  // SQEM-413 — the person picks the areas; one prompt and one skill are asked for per area.
+  const AREAS = ['Marketing & Sales', 'Support & Success'];
 
   /** Route each section by the system instruction it sends, so tests can fail one at a time.
    *  Always async — the real `runAuthoringAI` is, and `generateBrandVoiceSkill` is awaited in a
@@ -72,8 +74,8 @@ describe('generateStarterLibrary', () => {
       throw new Error(`unrouted section: ${systemInstruction.slice(0, 40)}`);
     };
 
-  const ONE_PROMPT = JSON.stringify([{ title: 'Email', description: 'd', content: 'Write to {{name}}', variables: [{ name: 'name', label: 'Who is this for?' }] }]);
-  const ONE_SKILL = JSON.stringify([{ title: 'Tone', description: 'd', content: 'Stay warm.' }]);
+  const ONE_PROMPT = JSON.stringify([{ title: 'Email', description: 'd', content: 'Write to {{name}}', variables: [{ name: 'name', label: 'Who is this for?' }], area: 'Marketing & Sales' }]);
+  const ONE_SKILL = JSON.stringify([{ title: 'Tone', description: 'd', content: 'Stay warm.', area: 'Support & Success' }]);
 
   // Block body, not an expression: `mockReset()` returns the mock, and a function returned from
   // `beforeEach` is treated as a teardown callback — Vitest would then call the mock with no
@@ -83,7 +85,7 @@ describe('generateStarterLibrary', () => {
   it('collects every section and reports no failures when all succeed', async () => {
     runAuthoringAI.mockImplementation(routeBy({ prompts: () => ONE_PROMPT, skills: () => ONE_SKILL }));
 
-    const { drafts, failures } = await generateStarterLibrary(BRAND, CTX);
+    const { drafts, failures } = await generateStarterLibrary(BRAND, CTX, AREAS);
 
     expect(failures).toEqual([]);
     // brand-voice skill + 1 prompt + 1 skill — every draft is one of the two kinds that exist
@@ -93,16 +95,41 @@ describe('generateStarterLibrary', () => {
     expect(drafts.find(d => d.kind === 'prompt')?.variables.map(v => [v.name, v.label])).toEqual([['name', 'Who is this for?']]);
   });
 
-  it('⛔ SQEM-390 — asks for 4 prompts and 3 knowledge skills: 4 + 4 with the brand voice', () => {
-    // The owner's number (2026-09-13). Pinned on the request rather than on the response, because a
-    // mock returning eight drafts would prove nothing about what the product asks for.
+  it('⛔ SQEM-413 — asks for one prompt and one skill PER CHOSEN AREA, and names the areas', () => {
+    // Pinned on the request, not the response: a mock returning drafts would prove nothing about what
+    // the product asks for. Until SQEM-413 this was a fixed 4 + 3 for everyone (SQEM-390's numbers).
     const asked: string[] = [];
     runAuthoringAI.mockImplementation(async ({ systemInstruction }: { systemInstruction: string }) => { asked.push(systemInstruction); return '[]'; });
-    return generateStarterLibrary(BRAND, CTX).then(() => {
-      expect(asked.some(s => s.includes('starter prompt library') && s.includes('exactly 4'))).toBe(true);
-      expect(asked.some(s => s.includes('reusable SKILLS') && s.includes('exactly 3'))).toBe(true);
+    return generateStarterLibrary(BRAND, CTX, AREAS).then(() => {
+      expect(asked.some(s => s.includes('starter prompt library') && s.includes('exactly 2'))).toBe(true);
+      expect(asked.some(s => s.includes('reusable SKILLS') && s.includes('EXACTLY ONE skill for each'))).toBe(true);
+      for (const instruction of asked.filter(s => !s.startsWith('Write a BRAND VOICE skill'))) {
+        expect(instruction).toContain('Marketing & Sales · Support & Success');
+      }
       expect(asked.some(s => s.includes('assistant'))).toBe(false);
     });
+  });
+
+  it('⛔ SQEM-413 — a draft carries the area it belongs to; the brand voice carries none', async () => {
+    runAuthoringAI.mockImplementation(routeBy({ prompts: () => ONE_PROMPT, skills: () => ONE_SKILL }));
+    const { drafts } = await generateStarterLibrary(BRAND, CTX, AREAS);
+    expect(drafts.map(d => d.area)).toEqual([undefined, 'Marketing & Sales', 'Support & Success']);
+  });
+
+  it('⛔ SQEM-413 — an area the model invented lands in the first CHOSEN area, not in a group nobody picked', async () => {
+    runAuthoringAI.mockImplementation(routeBy({
+      skills: () => JSON.stringify([{ title: 'T', description: 'd', content: 'c', area: 'Growth Hacking' }]),
+    }));
+    const { drafts } = await generateStarterLibrary(BRAND, CTX, AREAS);
+    expect(drafts.find(d => d.title === 'T')?.area).toBe('Marketing & Sales');
+  });
+
+  it('⛔ SQEM-413 — a paraphrased area is matched case-insensitively, not by guessing', async () => {
+    runAuthoringAI.mockImplementation(routeBy({
+      skills: () => JSON.stringify([{ title: 'T', description: 'd', content: 'c', area: 'support & success' }]),
+    }));
+    const { drafts } = await generateStarterLibrary(BRAND, CTX, AREAS);
+    expect(drafts.find(d => d.title === 'T')?.area).toBe('Support & Success');
   });
 
   it('keeps the drafts that worked and names the section that did not', async () => {
@@ -111,7 +138,7 @@ describe('generateStarterLibrary', () => {
       skills: () => ONE_SKILL,
     }));
 
-    const { drafts, failures } = await generateStarterLibrary(BRAND, CTX);
+    const { drafts, failures } = await generateStarterLibrary(BRAND, CTX, AREAS);
 
     expect(drafts.map(d => d.kind)).toEqual(['skill', 'skill']);
     expect(failures).toEqual([{ section: 'prompts', message: 'Rate limit reached' }]);
@@ -120,7 +147,7 @@ describe('generateStarterLibrary', () => {
   it('carries the real reason out when every section fails', async () => {
     runAuthoringAI.mockImplementation(async () => { throw new Error('Your OpenAI key was rejected'); });
 
-    const { drafts, failures } = await generateStarterLibrary(BRAND, CTX);
+    const { drafts, failures } = await generateStarterLibrary(BRAND, CTX, AREAS);
 
     expect(drafts).toEqual([]);
     expect(failures).toHaveLength(3);
@@ -137,7 +164,7 @@ describe('generateStarterLibrary', () => {
       skills: () => 'Of course.',
     }));
 
-    const { drafts, failures } = await generateStarterLibrary(BRAND, CTX);
+    const { drafts, failures } = await generateStarterLibrary(BRAND, CTX, AREAS);
 
     // The brand-voice skill still comes back — it needs no JSON, only the text.
     expect(drafts.map(d => d.kind)).toEqual(['skill']);
@@ -174,5 +201,44 @@ describe('document truncation', () => {
     const seen = await promptFor('all of it');
     expect(seen).toContain('all of it');
     expect(seen).not.toContain('Excerpt');
+  });
+});
+
+// SQEM-412 — a model may answer with `content` as an OBJECT (the instructions describe a shape:
+// Scope/Rules/Examples/Limits for a skill, Role/Context/Task for a prompt). `String(value)` turned
+// that into "[object Object]" — shown in the preview and SAVED as the playbook's body.
+describe('SQEM-412 — a draft body that arrives as an object', () => {
+  beforeEach(() => runAuthoringAI.mockReset());
+
+  const ctx = { workspaceId: 'w1', userId: 'u1', modelId: 'gpt-test' };
+
+  it('turns an object body into Markdown instead of "[object Object]"', async () => {
+    runAuthoringAI.mockResolvedValue(JSON.stringify([{
+      title: 'Support tone',
+      description: 'Apply when answering customers.',
+      content: { scope: 'Customer replies.', rules: ['Always greet by name', 'Never promise a date'] },
+    }]));
+    const [draft] = await generateStarterSkills({ brandName: 'B', whatItDoes: 'x', audience: 'y' }, ctx, ['Marketing & Sales']);
+    expect(draft.content).not.toContain('[object Object]');
+    expect(draft.content).toContain('## Scope');
+    expect(draft.content).toContain('Customer replies.');
+    expect(draft.content).toContain('- Always greet by name');
+  });
+
+  it('drops a draft whose body holds nothing usable, rather than saving an empty playbook', async () => {
+    runAuthoringAI.mockResolvedValue(JSON.stringify([{ title: 'Empty', description: 'd', content: {} }]));
+    expect(await generateStarterSkills({ brandName: 'B', whatItDoes: 'x', audience: 'y' }, ctx, ['Marketing & Sales'])).toEqual([]);
+  });
+
+  it('extracts a prompt’s variables from the CONVERTED body, not from the raw object', async () => {
+    runAuthoringAI.mockResolvedValue(JSON.stringify([{
+      title: 'Reply draft',
+      description: 'd',
+      content: { task: 'Write a reply to {{customer}} about {{topic}}.' },
+      variables: [{ name: 'customer', label: 'Customer' }],
+    }]));
+    const [draft] = await generateStarterPrompts({ brandName: 'B', whatItDoes: 'x', audience: 'y' }, ctx, ['Marketing & Sales']);
+    expect(draft.content).toContain('{{customer}}');
+    expect(draft.variables.map(v => v.name)).toEqual(['customer', 'topic']);
   });
 });

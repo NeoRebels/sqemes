@@ -421,9 +421,6 @@ verify_jwt = false
 [functions.mcp-msgraph]
 verify_jwt = false
 
-[functions.mcp-notion]
-verify_jwt = false
-
 [functions.get-marketplace-bundle]
 verify_jwt = false
 

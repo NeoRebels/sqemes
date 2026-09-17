@@ -9,6 +9,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { encryptApiKey } from '../_shared/crypto.ts';
 import { getFreshConnectorToken } from '../_shared/connectorToken.ts';
+import { discoverAuthServer } from '../_shared/mcpOauth.ts';
 import { TOKEN_APPS } from '../_shared/connectorApps.ts';
 
 const MCP_PROTOCOL = '2024-11-05';
@@ -74,7 +75,7 @@ Deno.serve(async (req) => {
       let token: string | null = body.token ?? null;
       if (body.connectorId) {
         const { data: row } = await admin.from('workspace_connectors')
-          .select('id, workspace_id, user_id, mcp_url, provider, auth_token_encrypted, refresh_token_encrypted, token_expires_at')
+          .select('id, workspace_id, user_id, mcp_url, provider, auth_token_encrypted, refresh_token_encrypted, token_expires_at, oauth_client_id, oauth_client_secret_encrypted')
           .eq('id', body.connectorId).single();
         if (!row) return json({ error: 'Connector not found' }, 404);
         const { data: mem } = await admin.from('workspace_members').select('role')
@@ -90,6 +91,90 @@ Deno.serve(async (req) => {
         // A failed probe is a user-facing test result, not a server error.
         return json({ ok: false, error: e instanceof Error ? e.message : String(e) });
       }
+    }
+
+    /**
+     * SQEM-444 — ask the server what it wants, so the dialog does not ask the person.
+     *
+     * Four shapes exist (SQEM-426/429/430/437/439/441), and until now each was reachable only through
+     * a tile we had shipped. The information that decides between them is in the server's own answer:
+     *
+     *   200 on `initialize`            → no authentication at all  (Shopify Storefront)
+     *   401 + registration_endpoint    → dynamic registration      (Plaud, Notion, Noota)
+     *   401, no registration           → a client id must be entered (Nifty)
+     *   anything else                  → fall back to a pasted token
+     *
+     * ⚠️ Discovery is the same `POST initialize` as everywhere else — a GET returns 404 at some
+     * servers and would make an OAuth server look unauthenticated (SQEM-429).
+     *
+     * ⚠️ `scopes` is returned because leaving it out cost SQEM-439 a whole round: a consent screen
+     * with no scope to show rejects the request with an error that names neither.
+     */
+    if (body.action === 'inspect') {
+      const url: string | undefined = body.mcpUrl;
+      if (!url || !/^https:\/\//i.test(url)) return json({ error: 'A https:// mcpUrl is required' }, 400);
+      try {
+        const open = await probeMcp(url, null);
+        return json({ ok: true, kind: 'none', serverName: open.serverName, tools: open.tools });
+      } catch {
+        // Not reachable without a token — which is the normal case, not a failure.
+      }
+      try {
+        const meta = await discoverAuthServer(url);
+        return json({
+          ok: true,
+          kind: 'oauth',
+          issuer: meta.issuer,
+          registration: !!meta.registration_endpoint,
+          scopes: meta.scopes_supported ?? [],
+        });
+      } catch (e) {
+        // No usable OAuth metadata: the server may still take a static bearer token, so say that
+        // rather than declaring it broken.
+        return json({ ok: true, kind: 'token', reason: e instanceof Error ? e.message : String(e) });
+      }
+    }
+
+    /**
+     * SQEM-438 — set which of a connector's tools may be used.
+     *
+     * ⛔ **This needs an edge function because the browser cannot write the row at all.**
+     * `workspace_connectors` has a SELECT and a DELETE policy and deliberately no INSERT/UPDATE one
+     * (SQEM-149), so that tokens are only ever encrypted server-side. A settings dialog that reached
+     * for `supabase.from('workspace_connectors').update(...)` would fail with `permission denied`,
+     * and the fix would not be a policy — it would be this.
+     *
+     * ⚠️ **The permission mirrors the DELETE policy word for word**: your own personal connector, or a
+     * workspace-shared one if you are admin/editor. A second, slightly different rule about the same
+     * row is how two answers to one question come about.
+     *
+     * ⚠️ `tools: null` means **"no restriction"**, which is NOT the same as ticking every box. With no
+     * restriction the provider's own future tools are included automatically; with an explicit list
+     * the set is frozen and a tool added later is silently missing. The dialog says so; this function
+     * only has to keep the two states distinguishable — hence `null`, never `[]`.
+     */
+    if (body.action === 'set-tools') {
+      const { connectorId, tools } = body;
+      if (!connectorId) return json({ error: 'connectorId required' }, 400);
+      if (tools !== null && !Array.isArray(tools)) return json({ error: 'tools must be an array or null' }, 400);
+      const { data: row } = await admin.from('workspace_connectors')
+        .select('id, workspace_id, user_id')
+        .eq('id', connectorId).single();
+      if (!row) return json({ error: 'Connector not found' }, 404);
+      const { data: mem } = await admin.from('workspace_members').select('role')
+        .eq('workspace_id', row.workspace_id).eq('user_id', user.id).single();
+      if (!mem) return json({ error: 'Not a member of this workspace' }, 403);
+      const mayEdit = row.user_id
+        ? row.user_id === user.id
+        : ['admin', 'editor'].includes(mem.role);
+      if (!mayEdit) return json({ error: 'Forbidden' }, 403);
+      // An empty array would mean "no tools at all", which nothing in the product can express and
+      // which reads exactly like "all of them" in the UI. It collapses to null on purpose.
+      const allowed = Array.isArray(tools) && tools.length ? tools.map(String) : null;
+      const { error } = await admin.from('workspace_connectors')
+        .update({ allowed_tools: allowed }).eq('id', connectorId);
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true, allowedTools: allowed });
     }
 
     // --- create: encrypt token server-side + insert ---------------------------------------------

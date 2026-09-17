@@ -321,7 +321,7 @@ async function resolveConnectors(
 ): Promise<ResolvedConnector[] | null> {
   const { data } = await admin
     .from('workspace_connectors')
-    .select('id, mcp_url, user_id, allowed_tools, provider, auth_token_encrypted, refresh_token_encrypted, token_expires_at')
+    .select('id, mcp_url, user_id, allowed_tools, provider, auth_token_encrypted, refresh_token_encrypted, token_expires_at, oauth_client_id, oauth_client_secret_encrypted')
     .eq('workspace_id', workspaceId)
     .in('id', connectorIds);
   const rows = ((data as any[]) || []).filter(r => r.user_id === null || r.user_id === userId);
@@ -395,20 +395,36 @@ async function runAndBroadcast({
   /**
    * SQEM-372 — the streaming decision, made ONCE and in one place rather than inside each provider.
    *
-   * ⛔ Two cases deliberately do NOT stream, and each has its own reason:
+   * ⛔ **One** case deliberately does not stream: **funded**. `FUNDED_MODEL` is metered from
+   * `usage.total_tokens`, a streamed reply reports zero tokens unless the provider honours
+   * `stream_options`, and a silent under-charge is invisible in a way an over-charge never is. Lift
+   * that only after observing usage on staging.
    *
-   *   - **funded** — `FUNDED_MODEL` is metered from `usage.total_tokens`. A streamed reply reports
-   *     zero tokens unless the provider honours `stream_options`, and a silent under-charge is
-   *     invisible in a way an over-charge never is. Lift this after observing usage on staging.
-   *   - **connectors** — the reply interleaves remote tool events with text; folding that into a
-   *     delta stream is its own problem.
+   * ⭐ **SQEM-435 — connectors used to be the second case, and are not any more.** The reason on
+   * record (SQEM-372) was that "the reply interleaves remote tool events with text, and folding that
+   * into a delta stream is its own problem". True when it was written; solved since, by the readers
+   * themselves rather than by anything aimed at this:
+   *
+   *   `claudeDelta`                   — only `content_block_delta` + `delta.type === 'text_delta'`
+   *   `createClaudeToolAccumulator`   — opens only `content_block.type === 'tool_use'` blocks, and
+   *                                     discards an `input_json_delta` with no matching entry
+   *   `responsesDelta`                — only `type === 'response.output_text.delta'`
+   *   `readResponsesToolCalls`        — only `type === 'function_call'`
+   *
+   * An `mcp_tool_use` block therefore cannot reach the text stream and cannot be executed as one of
+   * ours. ⛔ Those four filters are what make this safe — `tests/unit/connectorStreaming.test.ts`
+   * pins all of them, and loosening any one of them breaks this line, not just itself.
+   *
+   * ⚠️ The stream has GAPS with connectors: while the provider runs a remote tool server-side, no
+   * text flows. "Text — pause — text" is the honest expectation, and it is still far better than a
+   * silent wait of up to 300 s (SQEM-381).
    *
    * (Image models never reach this function.)
    *
    * ⭐ `broadcaster` is created per MESSAGE, not per provider call — so the tool loop below can call
    * a provider several times and the client still sees one continuous stream.
    */
-  const streams = !funded && !connectors?.length;
+  const streams = !funded;
   const broadcaster = streams
     ? createDeltaBroadcaster(text => broadcastJobResult(jobId, { delta: text }))
     : null;
@@ -417,25 +433,21 @@ async function runAndBroadcast({
   /**
    * SQEM-373 — the library as tools, built for every text message that has somewhere to look.
    *
-   * ⭐ **SQEM-377 lifted the connector exclusion here, and each provider now decides for itself.**
-   * It used to be `workspaceId && !connectors?.length`, because on chat completions a connector and
-   * our tools fought over one `tools` field. On `/v1/responses` they share the array, so OpenAI can
-   * have both. ⚠️ `callClaude` still nulls them when connectors are present — its Messages API has
-   * the original conflict — and it says so at the point where it matters, rather than being handled
-   * silently up here for every provider.
+   * ⭐ **No provider excludes the library any more.** It used to be `workspaceId && !connectors?.length`,
+   * because on chat completions a connector and our tools fought over one `tools` field. SQEM-377 gave
+   * OpenAI the shared array on `/v1/responses`, and **SQEM-428 established that Claude never had the
+   * conflict either**: its connectors live in `mcp_servers`, and what sits in `tools` alongside our
+   * definitions is only the `mcp_toolset` entries pointing at them. One array, both writers, no loss.
    *
    * ⚠️ The runtime is cheap to create — the reader behind it is a thunk, so a message that never
    * calls a tool pays nothing beyond the tool definitions in the request.
    */
   //
-  // ⛔ **SQEM-378 moved Claude's connector rule up here, and that is not tidying.** `callClaude` still
-  // nulls the tools when connectors are present — its Messages API has one `tools` field and two
-  // writers — but the *prompt* below is decided at this level. If the two disagreed, a Claude
-  // connector chat would be told to search a library whose tools were never sent, and a model told to
-  // search something it cannot reach invents the answer (SQEM-326, unreachable persona routes). One
-  // decision, one place; the provider's own guard stays as a belt-and-braces.
-  const toolsBlockedByProvider = provider === 'claude' && !!connectors?.length;
-  const tools: ToolRuntime | null = (workspaceId && !toolsBlockedByProvider)
+  // ⚠️ **SQEM-378's rule still holds, it just no longer excludes anything:** the *prompt* is decided
+  // here, the tools are sent below, and the two must agree. A model told to search a library whose
+  // tools were never sent invents the answer (SQEM-326, unreachable persona routes). `tools` is the
+  // single source for both — keep it that way.
+  const tools: ToolRuntime | null = workspaceId
     ? createLibraryToolRuntime(
         () => createLibraryReader({ client: createAdminClient(), workspaceId, userId }),
         { maxRounds: funded ? TOOL_ROUNDS_FUNDED : TOOL_ROUNDS_BYOK, budgetMs: TOOL_BUDGET_MS },
@@ -856,7 +868,7 @@ async function callClaude(
   messages: ChatMessage[],
   connectors: ResolvedConnector[] | null = null,
   onDelta?: (increment: string) => void,
-  /** SQEM-373 — present ⇒ the model may call the workspace library. Never set alongside connectors. */
+  /** SQEM-373 — present ⇒ the model may call the workspace library. SQEM-428: valid alongside connectors. */
   tools?: ToolRuntime | null,
 ): Promise<string> {
   const apiMessages = messages.map(msg => {
@@ -878,35 +890,59 @@ async function callClaude(
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' };
 
-  // ⛔ SQEM-373 — connectors and library tools are mutually exclusive on this path, and the caller
-  // already enforces it. Repeated here because both write `body.tools`: a future caller that passes
-  // both would silently lose the connectors rather than fail, and a connector that stops working
-  // without an error is the hardest kind of bug to trace back to its cause.
-  let activeTools = connectors?.length ? null : (tools ?? null);
+  /**
+   * ⭐ **SQEM-428 — the library AND the connectors, in the same conversation.**
+   *
+   * This line used to read `connectors?.length ? null : (tools ?? null)`, on the stated grounds that
+   * the Messages API has "one `tools` field and two writers". It does not: the connectors themselves
+   * go in `body.mcp_servers`, and what they contribute to `body.tools` is one `mcp_toolset` entry
+   * each — an ordinary array element next to our function definitions. The exclusion cost a
+   * workspace its own playbooks the moment anyone connected Gmail or Plaud.
+   *
+   * ⛔ **What makes the two safe to mix — checked, not assumed.** Anthropic runs the connector calls
+   * itself and reports them as `mcp_tool_use` blocks. Both readers here filter strictly on
+   * `type === 'tool_use'` (`_shared/toolStream.ts:123` streaming, `:208` non-streaming), so a
+   * connector's call can never be routed into `activeTools.execute`, where the name would not
+   * resolve. If that filter is ever loosened to a `startsWith` or a truthy check, this mixing breaks
+   * — and it breaks by *executing the wrong thing*, not by failing.
+   *
+   * ⚠️ **The one real loss, named so nobody rediscovers it as a bug.** When our loop runs another
+   * round it rebuilds the assistant turn from `text` + our tool calls (`claudeAssistantTurn`), which
+   * drops the `mcp_tool_use`/`mcp_tool_result` blocks from that turn. Protocol-wise that is fine —
+   * Anthropic already answered them inside the same response, so nothing is left dangling — but the
+   * model does not see its own connector results again in the next round. Preserving them means
+   * passing the raw content blocks through, which the streaming path does not currently produce.
+   */
+  let activeTools = tools ?? null;
   let answer = '';
 
   for (;;) {
     const body: any = { model: modelId, max_tokens: 8192, messages: apiMessages };  // SQEM-125 — no temperature
-    // ⚠️ SQEM-372 — connectors are NOT streamed. With `mcp_servers` the reply interleaves tool events
-    // with text, and mixing that into the delta stream is a separate problem; the caller withholds
-    // `onDelta` in that case rather than this branch guessing.
+    // ⭐ SQEM-435 — connector turns stream too. The caller decides (one place, see `streams`); this
+    // branch has never guessed and still does not. With `mcp_servers` the reply interleaves remote
+    // tool events with text, and the readers drop them: `claudeDelta` takes only `text_delta`, the
+    // accumulator only opens `tool_use` blocks.
     if (onDelta) body.stream = true;
     if (systemInstruction) body.system = systemInstruction;
-    if (activeTools) body.tools = toClaudeTools(activeTools.definitions);
+    // ⛔ SQEM-428 — ONE array, built from both sources. Assigning `body.tools` twice is what used to
+    // drop our definitions on the floor; append, never replace.
+    const toolDefs: any[] = activeTools ? toClaudeTools(activeTools.definitions) : [];
 
     // SQEM-149 — remote MCP connectors: Claude calls the connectors' tools server-side.
     if (connectors?.length) {
       body.mcp_servers = connectors.map(c => ({ type: 'url', url: c.url, name: c.name, ...(c.token ? { authorization_token: c.token } : {}) }));
-      body.tools = connectors.map(c => {
+      for (const c of connectors) {
         const toolset: any = { type: 'mcp_toolset', mcp_server_name: c.name };
         if (c.allowedTools) {
           toolset.default_config = { enabled: false };
           toolset.configs = Object.fromEntries(c.allowedTools.map(t => [t, { enabled: true }]));
         }
-        return toolset;
-      });
+        toolDefs.push(toolset);
+      }
       headers['anthropic-beta'] = 'mcp-client-2025-11-20';
     }
+
+    if (toolDefs.length) body.tools = toolDefs;
 
     const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',

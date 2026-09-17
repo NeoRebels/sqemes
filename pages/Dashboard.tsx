@@ -177,7 +177,7 @@ const Dashboard = () => {
       {(isTrialing(workspace) || (emptyWorkspace && wizardFlag === 'dismissed' && !showWizard)) && (
         <div className="mb-8 flex flex-col md:flex-row md:justify-end gap-4">
           {isTrialing(workspace) && (
-            <div className={`md:w-1/2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 rounded-2xl border ${workspace.cancelAtPeriodEnd ? 'border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20' : 'border-brand-200 dark:border-brand-800/50 bg-brand-50 dark:bg-brand-900/20'}`}>
+            <div className={`md:w-1/2 animate-step-in flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 rounded-2xl border ${workspace.cancelAtPeriodEnd ? 'border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20' : 'border-brand-200 dark:border-brand-800/50 bg-brand-50 dark:bg-brand-900/20'}`}>
               <div className="flex items-center gap-3">
                 <div className={`p-2.5 rounded-xl shrink-0 ${workspace.cancelAtPeriodEnd ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400' : 'bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400'}`}>
                   {workspace.cancelAtPeriodEnd ? <CreditCard className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
@@ -185,26 +185,34 @@ const Dashboard = () => {
                 <div>
                   {workspace.cancelAtPeriodEnd ? (
                     <>
-                      <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Your subscription is cancelled</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      <p className="text-base font-bold text-slate-900 dark:text-slate-100">Your subscription is cancelled</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                         {workspace.name} will be deactivated after {workspace.trialEndsAt ? new Date(workspace.trialEndsAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the trial ends'}.
                       </p>
                     </>
                   ) : (
                     <>
-                      <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                      {/* SQEM-419 — the remaining time was a sentence among sentences. As a chip it is
+                          the one thing this banner exists to say, readable without reading. */}
+                      <div className="flex items-center gap-2 flex-wrap">
                         {(() => {
                           const d = trialDaysLeft(workspace);
-                          if (d == null) return `Your ${workspace.plan} trial is active`;
-                          return `${d === 1 ? '1 day' : `${d} days`} left in your ${workspace.plan} trial`;
+                          return d == null ? null : (
+                            <span className="text-2xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-brand-600 text-white">
+                              {d === 1 ? '1 day left' : `${d} days left`}
+                            </span>
+                          );
                         })()}
-                      </p>
+                        <p className="text-base font-bold text-slate-900 dark:text-slate-100">
+                          Your {workspace.plan} trial is active
+                        </p>
+                      </div>
                       {/* SQEM-205 — the commitment was named here, the way out was not. The product
                           said the card is on file and the trial converts automatically, while the
                           word "cancel" first appeared four plan cards down on the billing page.
                           Naming both in the same breath is the honest version — and the cancellation
                           itself is already self-serve, so there is nothing to soften. */}
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Your card is on file — the trial converts to a paid {workspace.plan} subscription automatically. Cancel any time before then and you won&apos;t be charged.</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Your card is on file — the trial converts to a paid {workspace.plan} subscription automatically. Cancel any time before then and you won&apos;t be charged.</p>
                     </>
                   )}
                 </div>
@@ -232,24 +240,40 @@ const Dashboard = () => {
               so bailing out at step 1 kept the way back while walking to the last step and declining
               only the generation set the flag to 'complete' and removed it for good — the more
               engaged user was the one who got locked out. `emptyWorkspace` already covers the case
-              that matters: once templates exist, the banner is gone regardless of the flag. */}
+              that matters: once templates exist, the banner is gone regardless of the flag.
+
+              SQEM-419 — this is the invitation into the setup wizard, so it looks like the wizard
+              (SQEM-417): the same dark brand band, the icon on a light tile, the button in white.
+              ⚠️ The ring is not decoration — on a dark dashboard a dark band without it dissolves
+              into the background. */}
           {emptyWorkspace && wizardFlag !== null && !showWizard && (
-            <div className="md:w-1/2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 rounded-2xl border border-brand-200 dark:border-brand-800/50 bg-brand-50 dark:bg-brand-900/20">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400 shrink-0">
+            <div className="md:w-1/2 relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-br from-brand-900 via-brand-800 to-brand-700 text-white shadow-lg dark:ring-1 dark:ring-brand-700/60 animate-step-in">
+              <div aria-hidden className="pointer-events-none absolute -top-20 -right-16 w-48 h-48 rounded-full bg-brand-500/30 blur-3xl" />
+              <div className="relative flex items-center gap-3.5">
+                <div className="p-2.5 rounded-xl bg-white/15 text-white shrink-0">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Finish setting up your workspace</p>
+                  <p className="text-base font-bold tracking-tight">Finish setting up your workspace</p>
                   {/* SQEM-201 — no longer mentions MCP: it left the wizard and lives in the
-                      Connections card right below this banner. */}
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Add a provider key, install the extension, and let AI build your first playbooks.</p>
+                      Connections card right below this banner.
+                      ⛔ SQEM-424 — and it no longer starts with the provider key. The sentence still
+                      carried the pre-SQEM-386 order (key → extension → playbooks), which is exactly the
+                      order three UX tests rejected: it opened with the one screen that explains nothing.
+                      A banner that advertises the wizard must advertise the wizard's real order.
+                      ⚠️ Self-host gets its own sentence: there is no playbook-generation step there
+                      (SQEM-170), so promising one would be a lie told on the first screen. */}
+                  <p className="text-sm text-brand-100/90 mt-1 leading-relaxed">
+                    {IS_SELF_HOSTED
+                      ? <>Choose where you want to use your playbooks — and set up only that.</>
+                      : <>Let AI write your first playbooks, choose where you want to use them, and set up only that.</>}
+                  </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowWizard(true)}
                 // SQEM-386 — full width on a phone: a tester called this "too unobtrusive, stretch it across".
-                className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none"
+                className="relative w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-brand-50 text-brand-800 rounded-xl text-sm font-bold transition-all shadow-sm"
               >
                 Finish setup <ArrowRight className="w-4 h-4" />
               </button>
@@ -326,7 +350,7 @@ const Dashboard = () => {
                 <>
                   <Link to="/settings" state={{ initialTab: 'api' }} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0"><Key className="w-4 h-4 text-slate-500 dark:text-slate-400" /></div>
-                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex-1">Provider keys</span>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex-1">AI provider keys</span>
                     {apiKeysConfigured > 0
                       ? <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><Check className="w-3.5 h-3.5" />{apiKeysConfigured} active</span>
                       : <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">None yet</span>}
