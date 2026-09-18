@@ -75,6 +75,34 @@ type TokenAppUI = { id: string; provider: string; name: string; description: str
  */
 const GOOGLE_PENDING_REVIEW = 'Awaiting Google’s review — not connectable yet';
 
+/**
+ * SQEM-452 — which tiles a self-hosted instance cannot use, and why it is only these.
+ *
+ * ⛔ **The gate below used to replace the WHOLE card with a Cloud advert.** It was written (SQEM-150)
+ * when this list held Google and Microsoft and nothing else, and its reason — *"the managed one-click
+ * apps need Cloud OAuth infra"* — was true of every tile it covered. The list then grew to fifteen and
+ * the gate did not: **seven tiles that need nothing from us at all were hidden behind a sales pitch.**
+ * Shopify Storefront is the plainest case — `auth: 'public'`, no credentials of any kind, and it works
+ * against shops nobody here owns.
+ *
+ * Google and Microsoft genuinely differ: their client ids come from OUR environment variables
+ * (`GOOGLE_OAUTH_CLIENT_ID`, `MICROSOFT_OAUTH_CLIENT_ID`), which a self-hoster does not have. Every
+ * other shape is self-sufficient — dynamic registration (Plaud, Notion, Noota), a client id the person
+ * registers themselves (Nifty), a pasted token (GitHub, Shopify), or no sign-in (Shopify Storefront).
+ *
+ * ⚠️ **A new provider defaults to AVAILABLE, and that direction is deliberate.** Get it wrong this way
+ * and the operator meets *"This connector is not configured on this instance (…)"* — the message
+ * `connector-oauth-start` already returns, visible and self-explanatory. Get it wrong the other way
+ * and the tile silently vanishes for every self-hoster, which is precisely the bug being fixed here
+ * and took months to notice. A loud wrong beats a quiet one.
+ *
+ * ⚠️ The ticket proposed deriving this from `clientIdEnv`. That field lives in the edge functions'
+ * `CONNECTOR_APPS`, not in these UI definitions — so the provider is what is actually available here.
+ * `tests/unit/selfHostConnectorTiles.test.ts` pins which tile lands on which side.
+ */
+const CLOUD_ONLY_PROVIDERS = ['google', 'microsoft'];
+const needsCloudOAuth = (app: { provider: string }) => CLOUD_ONLY_PROVIDERS.includes(app.provider);
+
 const OAUTH_APPS: (OAuthApp | TokenAppUI | OAuthIdAppUI | PublicAppUI)[] = [
   { id: 'google-gmail', provider: 'google', name: 'Gmail', description: 'Read & draft your email', auth: 'oauth', Icon: GmailIcon, unavailable: GOOGLE_PENDING_REVIEW },
   { id: 'google-calendar', provider: 'google', name: 'Google Calendar', description: 'Read your events & schedule', auth: 'oauth', Icon: GoogleCalendarIcon, unavailable: GOOGLE_PENDING_REVIEW },
@@ -133,6 +161,14 @@ const OAUTH_APPS: (OAuthApp | TokenAppUI | OAuthIdAppUI | PublicAppUI)[] = [
     help: "Enter the store's own domain — the one customers visit. No login, no token: a Shopify storefront answers publicly. It works for any Shopify store, including ones you do not run.",
   },
 ];
+
+/**
+ * SQEM-452 — derived from the one list, never maintained beside it. A second list is how the gate
+ * this replaces went stale in the first place: `OAUTH_APPS` grew from two entries to fifteen and the
+ * rule about them did not move.
+ */
+const CLOUD_ONLY_APPS = OAUTH_APPS.filter(needsCloudOAuth);
+const VISIBLE_APPS = IS_SELF_HOSTED ? OAUTH_APPS.filter(a => !needsCloudOAuth(a)) : OAUTH_APPS;
 
 export default function ConnectorsCard({
   workspaceId,
@@ -524,24 +560,24 @@ export default function ConnectorsCard({
           Apps
         </h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          {IS_SELF_HOSTED
-            ? 'One-click app connectors are available on sqemes Cloud.'
-            : 'One-click connectors — sign in once, then use them in Chat.'}
+          One-click connectors — sign in once, then use them in Chat.
         </p>
       </div>
-      {IS_SELF_HOSTED ? (
-        /* Self-host: the managed one-click apps need Cloud OAuth infra — show a CTA, not broken tiles. */
-        <div className="rounded-2xl border border-brand-100 dark:border-brand-900/40 bg-gradient-to-br from-brand-50 to-white dark:from-brand-900/20 dark:to-slate-800/50 p-6 text-center">
+      {/* SQEM-452 — the advert covers the tiles it is actually about, and nothing else. It used to
+          replace the whole card; see `needsCloudOAuth`. The names come from the list, so this text
+          cannot go stale the way the hard-coded one did. */}
+      {IS_SELF_HOSTED && (
+        <div className="rounded-2xl border border-brand-100 dark:border-brand-900/40 bg-gradient-to-br from-brand-50 to-white dark:from-brand-900/20 dark:to-slate-800/50 p-6 text-center mb-6">
           <div className="flex items-center justify-center gap-1.5 mb-4">
-            {OAUTH_APPS.map(app => (
+            {CLOUD_ONLY_APPS.map(app => (
               <div key={app.id} className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-sm">
                 <app.Icon className="w-5 h-5" />
               </div>
             ))}
           </div>
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">One-click app connectors</h3>
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">One-click sign-in connectors</h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 max-w-md mx-auto">
-            Connect Gmail, Google Calendar, Docs, Sheets, Drive, and Outlook straight into your chat — no API keys, no setup. Available on sqemes Cloud.
+            {CLOUD_ONLY_APPS.map(a => a.name).join(', ')} need an OAuth app we host, so they are available on sqemes Cloud. Everything below works on this instance.
           </p>
           <a
             href="https://sqemes.com"
@@ -552,9 +588,9 @@ export default function ConnectorsCard({
             Explore sqemes Cloud <ArrowUpRight className="w-4 h-4" />
           </a>
         </div>
-      ) : (
+      )}
       <div className="space-y-3">
-        {OAUTH_APPS.map(app => {
+        {VISIBLE_APPS.map(app => {
           const appConnector = connectors.find(c => c.provider === app.provider && c.name === app.name);
           const connected = !!appConnector;
           // SQEM-274 — an app we cannot authorise yet. The tile stays, so the person can see the
@@ -619,7 +655,6 @@ export default function ConnectorsCard({
           );
         })}
       </div>
-      )}
     </Card>
 
       {/* Add connector modal */}

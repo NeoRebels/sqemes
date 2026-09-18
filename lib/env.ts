@@ -5,6 +5,37 @@
 // builds never set the flag. Mirrors the check in lib/subscription.ts.
 export const IS_SELF_HOSTED = import.meta.env.VITE_SELF_HOSTED === 'true';
 
+/**
+ * SQEM-456 — the one place that turns `VITE_SUPABASE_URL` into an edge-function URL.
+ *
+ * ⛔ **Production's `VITE_SUPABASE_URL` ends in a slash**, and thirteen call sites appended
+ * `/functions/v1/…` straight onto it, so every one of them sent `https://api.sqemes.com//functions/…`.
+ * Supabase routes that away — both forms answer 401, nothing was broken — but two of those sites
+ * *display* the string: the MCP configuration a person copies into Claude Desktop. A config that
+ * looks wrong is a config people stop trusting.
+ *
+ * ⭐ **The rule already existed twice and was unreachable both times**, which is the real finding
+ * here. `lib/api/connectors.ts` normalises since SQEM-439 — with the note *"Two places computing one
+ * URL is the shape of this bug"* written above it — and `marketplaceUrlFor` below has the same
+ * `trim`, locked inside the function. A rule nobody can import is a rule that will be re-broken.
+ *
+ * ⚠️ **Reading `VITE_SUPABASE_URL` elsewhere is fine; appending a path to it is not.**
+ * `lib/supabase.ts` and `lib/environment.ts` legitimately read it for other purposes.
+ * `tests/unit/functionsUrl.test.ts` bans only the concatenation.
+ *
+ * ⚠️ Fixing the Vercel variable instead would have worked today and drifted tomorrow — an
+ * environment value is not a place to keep an invariant.
+ */
+export const SUPABASE_BASE = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
+
+/** `functionsUrl('mcp-server')` → `https://api.sqemes.com/functions/v1/mcp-server`. */
+export function functionsUrl(name: string): string {
+  return `${SUPABASE_BASE}/functions/v1/${name}`;
+}
+
+/** The `/functions/v1` base, for the few callers that build several paths from it. */
+export const FUNCTIONS_BASE = `${SUPABASE_BASE}/functions/v1`;
+
 // SQEM-176/178 — the global community marketplace.
 //
 // ⚠️ **A Cloud deployment reads its OWN marketplace; only self-host reads Cloud production

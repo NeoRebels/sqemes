@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { FUNCTIONS_BASE } from '../env';
 
 export type ApiKeyStatus = Record<string, boolean>;
 
@@ -8,13 +9,12 @@ export interface AiStatus {
   fundedAvailable: boolean;
 }
 
-const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 
 async function invokeFunction(functionName: string, body: Record<string, any>) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
 
-  const res = await fetch(`${FUNCTIONS_URL}/${functionName}`, {
+  const res = await fetch(`${FUNCTIONS_BASE}/${functionName}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

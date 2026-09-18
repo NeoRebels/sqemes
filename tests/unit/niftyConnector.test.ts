@@ -94,7 +94,13 @@ describe('SQEM-437 — Nifty connector', () => {
     // single-slash one. An OAuth provider compares redirect URIs exactly: registering the shown value
     // then failed with "this connection request is invalid or expired", which names neither the URI
     // nor the slash. Both sides strip trailing slashes; neither may stop.
-    expect(API).toMatch(/String\(import\.meta\.env\.VITE_SUPABASE_URL \?\? ''\)\.trim\(\)\.replace\(\/\\\/\+\$\/, ''\)/);
+    // ⚠️ SQEM-456 MOVED this expression out of `lib/api/connectors.ts` into `lib/env.ts`, and the
+    // rule is unchanged — the browser still strips exactly what the server strips. The assertion
+    // follows the rule to its new home instead of pinning the old address: nineteen other call
+    // sites had been appending to the raw variable precisely because the rule sat somewhere nobody
+    // would import from.
+    expect(read('lib/env.ts')).toMatch(/String\(import\.meta\.env\.VITE_SUPABASE_URL \?\? ''\)\.trim\(\)\.replace\(\/\\\/\+\$\/, ''\)/);
+    expect(API).toMatch(/FUNCTIONS_BASE/);
     for (const src of [START, read('supabase/functions/_shared/connectorApps.ts')]) {
       expect(src).toMatch(/\.trim\(\)\.replace\(\/\\\/\+\$\/, ''\)/);
     }

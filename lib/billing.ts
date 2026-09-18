@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { functionsUrl } from './env';
 import type { PlanTier } from '../types';
 
 export type BillingCycle = 'monthly' | 'yearly';
@@ -18,7 +19,7 @@ export async function startCheckout(workspaceId: string, plan: PlanTier, billing
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
 
-  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`, {
+  const res = await fetch(functionsUrl('create-checkout-session'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
     body: JSON.stringify({ workspaceId, plan, billingCycle }),

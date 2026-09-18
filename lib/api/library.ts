@@ -4,7 +4,7 @@ import type { LibraryTemplate, TemplateCategory, Variable, Step, PromptKind, Pro
 // SQEM-186 — templateBundle (which statically imports jszip) and injectionScan are dynamically imported
 // at their marketplace call sites below, so jszip stays out of the eager boot chunk (this module is
 // loaded at app start via the store). They only load when a user actually publishes/copies a bundle.
-import { IS_SELF_HOSTED, MARKETPLACE_API_URL, MARKETPLACE_ENABLED } from '../env';
+import { IS_SELF_HOSTED, MARKETPLACE_API_URL, MARKETPLACE_ENABLED, FUNCTIONS_BASE } from '../env';
 
 // ---- SQEM-176/178 — global marketplace source ------------------------------------------------------
 // The marketplace lives in the Cloud (single source of truth). Cloud uses its local Supabase (below).
@@ -240,7 +240,6 @@ export async function copyTemplateToWorkspace(
 // ---- SQEM-163 — user-contributed marketplace -------------------------------------------------------
 
 const client = supabase as unknown as { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
-const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 
 /** Publish a workspace template to the marketplace as a moderated bundle snapshot (submit-for-review). */
 export async function publishToMarketplace(input: {
@@ -342,7 +341,7 @@ export async function copyListingToWorkspace(listing: LibraryTemplate, workspace
   if (!listing.bundlePath) { await copyTemplateToWorkspace(listing.id, workspaceId, userId); return; }
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
-  const res = await fetch(`${FUNCTIONS_URL}/get-marketplace-bundle`, {
+  const res = await fetch(`${FUNCTIONS_BASE}/get-marketplace-bundle`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
     body: JSON.stringify({ listingId: listing.id }),

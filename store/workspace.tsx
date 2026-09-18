@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback } from 'react';
+import { FUNCTIONS_BASE } from '../lib/env';
 import { User, Workspace, UserRole, Invitation } from '../types';
 import { supabase } from '../lib/supabase';
 import { clearMonitoringUser, logError } from '../lib/monitoring';
@@ -215,8 +216,7 @@ export function useWorkspaceState(
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-      const res = await fetch(`${FUNCTIONS_URL}/delete-account`, {
+      const res = await fetch(`${FUNCTIONS_BASE}/delete-account`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

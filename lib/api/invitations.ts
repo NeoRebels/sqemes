@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { FUNCTIONS_BASE } from '../env';
 import { logError } from '../monitoring';
 import type { Database } from '../database.types';
 import type { Invitation, UserRole } from '../../types';
@@ -81,8 +82,7 @@ export async function createInvitation(
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-      const res = await fetch(`${FUNCTIONS_URL}/send-invite-email`, {
+      const res = await fetch(`${FUNCTIONS_BASE}/send-invite-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -142,8 +142,7 @@ export async function resendInvitation(id: string, inviterName: string): Promise
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-      const res = await fetch(`${FUNCTIONS_URL}/send-invite-email`, {
+      const res = await fetch(`${FUNCTIONS_BASE}/send-invite-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

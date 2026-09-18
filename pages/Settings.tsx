@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { PLANS, ROLE_LABELS, TRIAL_DAYS, VAT_NOTE } from '../constants';
 import { LIBRARY_SYSTEM_PROMPT } from '../lib/libraryPrompt';
 import { hasActiveSubscription, isTrialing } from '../lib/subscription';
-import { IS_SELF_HOSTED } from '../lib/env';
+import { IS_SELF_HOSTED, functionsUrl, FUNCTIONS_BASE } from '../lib/env';
 import { copyToClipboard } from '../lib/clipboard';
 import { fetchCanPublish, setPublisherToken } from '../lib/api/library';
 import { UserRole } from '../types';
@@ -86,7 +86,7 @@ const isPlaceholderKey = (value: string) => {
 };
 
 const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () => void }) => {
-  const mcpUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mcp-server`;
+  const mcpUrl = functionsUrl('mcp-server');
   const snippet = `{\n  "mcpServers": {\n    "sqemes": {\n      "url": "${mcpUrl}",\n      "headers": {\n        "Authorization": "Bearer sqm_live_YOUR_KEY"\n      }\n    }\n  }\n}`;
   const [mcpUrlCopied, setMcpUrlCopied] = useState(false);
   const [snippetCopied, setSnippetCopied] = useState(false);
@@ -692,8 +692,7 @@ const Settings = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
-      const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-      const res = await fetch(`${FUNCTIONS_URL}/create-checkout-session`, {
+      const res = await fetch(`${FUNCTIONS_BASE}/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
         body: JSON.stringify({ workspaceId: workspace.id, plan: tier, billingCycle }),
@@ -712,8 +711,7 @@ const Settings = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
-      const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-      const res = await fetch(`${FUNCTIONS_URL}/create-portal-session`, {
+      const res = await fetch(`${FUNCTIONS_BASE}/create-portal-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
         body: JSON.stringify({ workspaceId: workspace.id }),

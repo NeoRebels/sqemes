@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { functionsUrl } from '../env';
 import type { Database } from '../database.types';
 import type { Workspace, User, BrandProfile, UserRole } from '../../types';
 
@@ -127,7 +128,7 @@ export async function deleteWorkspace(id: string) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
 
-  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-workspace`, {
+  const res = await fetch(functionsUrl('delete-workspace'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
     body: JSON.stringify({ workspaceId: id }),

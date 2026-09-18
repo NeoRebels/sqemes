@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { functionsUrl } from '../lib/env';
 import { useWorkspace, useUI } from '../store';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
@@ -87,7 +88,7 @@ const ChoosePlanScreen = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-portal-session`, {
+      const res = await fetch(functionsUrl('create-portal-session'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ workspaceId: workspace.id }),

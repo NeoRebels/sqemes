@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { functionsUrl } from './env';
 import { waitForJobResult } from './realtimeJob';
 import { AVAILABLE_MODELS } from '../constants';
 import { isImageModel, buildEnabledModels } from './enabledModels';
@@ -137,7 +138,7 @@ export async function runAuthoringAI({
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
 
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/execute-step`;
+  const url = functionsUrl('execute-step');
   const jobId = crypto.randomUUID();
   const resultPromise = waitForJobResult(jobId);
 

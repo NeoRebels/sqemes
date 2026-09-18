@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { IS_SELF_HOSTED } from '../lib/env';
+import { IS_SELF_HOSTED, functionsUrl } from '../lib/env';
 import { copyToClipboard } from '../lib/clipboard';
 import { useWorkspace, useUI } from '../store';
 import { saveApiKey, deleteApiKey, getApiKeyStatus, hasUsedMcpConnection } from '../lib/api/apiKeys';
@@ -164,7 +164,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
    */
   const [mcpConnected, setMcpConnected] = useState(false);
   /** Same URL the Settings card shows — one source for the endpoint a person copies. */
-  const MCP_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mcp-server`;
+  const MCP_URL = functionsUrl('mcp-server');
   const creditsIncluded = includedCredits(workspace);
   const hasByokText = firstTextModelId(workspace.apiKeys) !== null;
   const showCredits = !IS_SELF_HOSTED && !!workspace.fundedAvailable && creditsIncluded > 0;

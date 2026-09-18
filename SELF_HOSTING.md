@@ -347,14 +347,32 @@ below) — without them, submit and the token field fail.
 
 ## Connectors — external MCP tools
 
-Connectors let a workspace attach third-party tools (Notion, Shopify, Outlook, Microsoft Graph) and
-expose them inside Sqemes. They ship with self-host in full: `manage-connectors` plus the OAuth pair
-`connector-oauth-start` / `connector-oauth-callback`, and one edge function per integration
-(`mcp-notion`, `mcp-shopify`, `mcp-outlook`, `mcp-msgraph`).
+Connectors let a workspace attach third-party MCP tools and expose them inside Sqemes. They ship with
+self-host in full: `manage-connectors` plus the OAuth pair `connector-oauth-start` /
+`connector-oauth-callback`, and an edge function for each vendor that has no MCP server of its own
+(`mcp-shopify`, `mcp-outlook`, `mcp-msgraph`).
 
-Each connector is configured **per workspace in the UI**, with its own OAuth app credentials that you
-register with the respective provider — there is no shared Sqemes-side app, so the redirect URI points
-at *your* instance. Tokens are encrypted at rest with `API_KEY_ENCRYPTION_KEY`, the same key that
+**Add connector** takes any hosted MCP endpoint: it asks the server how it wants to be connected and
+shows only the fields that server actually needs — a plain redirect, a client id you registered
+yourself, a pasted token, or nothing at all. You are not limited to what we built a tile for.
+
+### Which one-click tiles work here
+
+| Tile | Works on your instance |
+|---|---|
+| Plaud, Notion, Noota | **yes** — the server issues a client on request; nothing to configure |
+| Nifty | **yes** — you register a client in their App Center against *your* redirect URI |
+| GitHub, Shopify | **yes** — paste a token |
+| Shopify Storefront | **yes** — no sign-in of any kind, for any Shopify store |
+| Gmail, Google Calendar/Drive/Docs/Sheets, Outlook, Microsoft Calendar, OneDrive | **no** — these use an OAuth app we host |
+
+⚠️ **Before v1.11.19 the whole Apps section was replaced by a Cloud advert**, so the seven that do
+work here were invisible. If you are on an older version, reach them through **Add connector** with
+the server's own URL — the result is the same connector.
+
+Each connector is configured **per workspace in the UI**. Where a provider needs OAuth credentials you
+register them yourself, so the redirect URI points at *your* instance; the dialog shows you the exact
+URI to register. Tokens are encrypted at rest with `API_KEY_ENCRYPTION_KEY`, the same key that
 protects provider keys — which is the other reason never to change it after first use.
 
 ### When a connection fails, read the code in brackets
@@ -458,7 +476,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.11.18       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.11.19       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### ⛔ 3a. Before v1.11.9: count your workspace-wide MCP keys
@@ -651,7 +669,7 @@ If you would rather it did not, block `/#/library/` at your reverse proxy — bu
 reaches the server, so the block has to happen in the browser or not at all. Removing the route in a
 fork is the reliable way.
 
-*Last updated: 2026-09-17 (SQEM-453: version pin v1.11.18 — **connect any MCP server yourself.** The "Add connector" dialog now asks the server how it wants to be connected and shows only the fields it actually needs, covering all four shapes: dynamic client registration (nothing to configure), a client ID you registered yourself, a pasted bearer token, and servers that need no sign-in at all. Previously you could only attach what we had built a tile for. Per connector you can now choose which of its tools are offered. In Chat, connectors are always active — an icon beside the input says whether the selected model supports them, and the model list marks the ones that do — and connector answers stream instead of arriving in one block. ⚠️ The **tiles** for Plaud, Notion, Noota, Nifty, Shopify and GitHub are still Cloud-only; use the dialog with the server's own URL. That filter is too broad and is being fixed. Also in this cut: the reworked setup wizard. Nothing here requires a new environment variable). Before that (SQEM-411: version pin v1.11.17 — no functional change; the repository's own CI is green again: `npm run typecheck` had failed since v1.11.11 on a stub that took no props, and three tests read files this repository does not contain). Before that (SQEM-409: version pin v1.11.16 — the launch button says "Use skill"; a marketplace listing opened on your instance by someone without an account now offers Sqemes Cloud through a link to the same listing on app.sqemes.com instead of your instance's sign-up form, and no offer at all if the instance reads its own marketplace). Before that (SQEM-403: version pin v1.11.15 · SQEM-399) — the api sidecar starts again: its image now bundles the TypeScript handlers at build time. v1.11.4 to v1.11.13 shipped it dead — extension config, MCP OAuth and the marketplace proxy answered 502 while the app itself ran; `docker compose up -d --build` on v1.11.14 rebuilds it. Before that (SQEM-394) — templates are called **playbooks** in the app; the routes moved to
+*Last updated: 2026-09-18 (SQEM-452: version pin v1.11.19 — **seven one-click tiles work on your instance and were hidden.** Plaud, Notion, Noota, Nifty, GitHub, Shopify and Shopify Storefront need nothing from us — dynamic registration, a client id you register yourself, a pasted token, or no sign-in at all — but the whole Apps section was replaced by a Cloud advert, written back when that section held only Google and Microsoft. Those eight still need an OAuth app we host and remain Cloud-only; the notice now names them instead of hiding everything. If you were on v1.11.18 you could already reach all seven through **Add connector** with the server's own URL — this makes them one click). Before that (SQEM-453: version pin v1.11.18 — **connect any MCP server yourself.** The "Add connector" dialog now asks the server how it wants to be connected and shows only the fields it actually needs, covering all four shapes: dynamic client registration (nothing to configure), a client ID you registered yourself, a pasted bearer token, and servers that need no sign-in at all. Previously you could only attach what we had built a tile for. Per connector you can now choose which of its tools are offered. In Chat, connectors are always active — an icon beside the input says whether the selected model supports them, and the model list marks the ones that do — and connector answers stream instead of arriving in one block. ⚠️ The **tiles** for Plaud, Notion, Noota, Nifty, Shopify and GitHub are still Cloud-only; use the dialog with the server's own URL. That filter is too broad and is being fixed. Also in this cut: the reworked setup wizard. Nothing here requires a new environment variable). Before that (SQEM-411: version pin v1.11.17 — no functional change; the repository's own CI is green again: `npm run typecheck` had failed since v1.11.11 on a stub that took no props, and three tests read files this repository does not contain). Before that (SQEM-409: version pin v1.11.16 — the launch button says "Use skill"; a marketplace listing opened on your instance by someone without an account now offers Sqemes Cloud through a link to the same listing on app.sqemes.com instead of your instance's sign-up form, and no offer at all if the instance reads its own marketplace). Before that (SQEM-403: version pin v1.11.15 · SQEM-399) — the api sidecar starts again: its image now bundles the TypeScript handlers at build time. v1.11.4 to v1.11.13 shipped it dead — extension config, MCP OAuth and the marketplace proxy answered 502 while the app itself ran; `docker compose up -d --build` on v1.11.14 rebuilds it. Before that (SQEM-394) — templates are called **playbooks** in the app; the routes moved to
 `/playbooks` and every old link redirects. Nothing changes for an operator. Earlier the same day
 (SQEM-390) — the assistant template kind is gone: on upgrade the migration
 turns every assistant into a skill with the same text, and a role is a persona. Earlier: 2026-08-19

@@ -98,6 +98,27 @@ describe('SQEM-261 — how Gleap is allowed to be wired', () => {
     expect(CSP).toMatch(/connect-src[^"]*wss:\/\/ws\.gleap\.io/);
     // frame-src was absent, so the widget iframe fell back to default-src 'self' and was blocked.
     expect(CSP).toMatch(/frame-src 'self' https:\/\/messenger-app\.gleap\.io/);
+
+    // ⛔ SQEM-454 — one host per surface, and the messenger is not the only surface.
+    // The product-tour editor runs on `app.gleap.io` and was blocked outright: Gleap's own dialog
+    // said so ("Your Content-Security-Policy blocks the Gleap editor's toolbar frame"), which is the
+    // lucky case. The three below fail SILENTLY — a tour's video simply does not play, a font simply
+    // falls back — so they are pinned here rather than waited for.
+    expect(CSP).toMatch(/frame-src[^;"]*https:\/\/app\.gleap\.io/);
+    expect(CSP).toMatch(/media-src[^;"]*https:\/\/outboundmedia\.gleap\.io/);
+    expect(CSP).toMatch(/font-src[^;"]*https:\/\/app\.gleap\.io/);
+    expect(CSP).toMatch(/connect-src[^;"]*wss:\/\/sockets\.gleap\.io/);
+
+    // ⚠️ `media-src` has to EXIST. Without it the directive falls back to `default-src 'self'`, which
+    // is exactly how the messenger frame was blocked before SQEM-261 — an absent directive is not a
+    // permissive one.
+    expect(CSP).toMatch(/media-src 'self'/);
+
+    // ⚠️ No wildcards, deliberately (owner's decision, 2026-09-17). Gleap documents
+    // `https://*.gleap.io` for every directive; spelled-out hosts keep the policy narrow, at the
+    // price of coming back here when Gleap adds a subdomain. This assertion is what makes that a
+    // decision rather than a drift.
+    expect(CSP).not.toMatch(/\*\.gleap\.io/);
     // ⛔ The SDK is bundled via npm precisely so this can stay closed (SQEM-111).
     // ⚠️ Read the ONE directive: `[^"]*` runs past the semicolon into style-src, which legitimately
     // carries 'unsafe-inline' — and then this assertion fails on a policy that is perfectly fine.

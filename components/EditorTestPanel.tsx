@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { functionsUrl } from '../lib/env';
 import { useWorkspace, useData } from '../store';
 import { supabase } from '../lib/supabase';
 import { waitForJobResult } from '../lib/realtimeJob';
@@ -183,7 +184,7 @@ export default function EditorTestPanel({ template, resetKey, onReset }: Props) 
 
     try {
       const resultPromise = waitForJobResult(jobId, controller.signal);
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-message`, {
+      const res = await fetch(functionsUrl('chat-message'), {
         method: 'POST',
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },

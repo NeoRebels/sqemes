@@ -1,4 +1,5 @@
 import type { PromptKind, Variable } from '../types';
+import { functionsUrl } from './env';
 import { runAuthoringAI } from './authoringAI';
 import { contentToMarkdown } from './draftContent';
 import {
@@ -116,7 +117,7 @@ export async function analyzeWebsite(url: string, ctx: GenContext): Promise<Part
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
 
-  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-website`, {
+  const res = await fetch(functionsUrl('analyze-website'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
     body: JSON.stringify({ url, workspaceId: ctx.workspaceId }),

@@ -7,6 +7,47 @@
     <link rel="icon" type="image/png" href="/logo-favicon-V2.png" />
 
     <!--
+      SQEM-455 — what a shared link looks like. Without these, a link pasted into WhatsApp showed the
+      favicon, the word "sqemes" (the <title>) and the bare domain, because that is all a crawler
+      could find.
+
+      ⛔ **These are the ONLY preview a shared sqemes link can have, and that is a routing fact, not a
+      tagging one.** The app is a HashRouter, so a marketplace link reads
+      `app.sqemes.com/#/library/<id>` — everything after `#` is client-side by definition and never
+      reaches the server. A crawler fetches `/` and cannot know which listing was meant. No function
+      and no rewrite changes that while the id sits behind the hash; it would need a real path plus
+      server-rendered tags, which is its own decision (HashRouter is documented three times as
+      deliberate). So: one description for the product, not per page.
+
+      ⚠️ **No `og:url`, and any image path stays RELATIVE — on purpose.** This file is exported to the
+      self-host repo. An absolute `https://app.sqemes.com/...` would make every shared link from
+      somebody else's instance advertise OUR domain and OUR image. A relative path resolves against
+      the page's own origin (WhatsApp and Facebook both do this), so an operator's instance shows
+      theirs, or none.
+
+      ⚠️ **The artwork already carries the claim and the wordmark**, so the title deliberately does
+      NOT repeat it — it opens with the problem instead, and the image supplies the category. The
+      master lives at `pm/sqemes-share-og.jpg` in the source repository; what ships is the same image
+      re-encoded at quality 85 (398 KB → 189 KB, visually identical). ⚠️ That is not housekeeping:
+      WhatsApp quietly drops a preview image it considers too large, and the failure looks exactly
+      like having no image at all.
+
+      ⚠️ Previews are cached per URL for days. After a deploy an already-shared link keeps looking
+      old — that is not a failure. Test with a fresh URL or Facebook's sharing debugger.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="sqemes" />
+    <meta property="og:title" content="Stop keeping AI know-how in people's heads" />
+    <meta property="og:description" content="sqemes stores your team's playbooks — prompts and skills — and uses them everywhere you already work with AI." />
+    <meta property="og:image" content="/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Two colleagues working at a laptop, beside the line: your company's playbooks, in every AI your team uses." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Stop keeping AI know-how in people's heads" />
+    <meta name="twitter:description" content="sqemes stores your team's playbooks — prompts and skills — and uses them everywhere you already work with AI." />
+
+    <!--
       SQEM-361 — installable from the home screen, deliberately WITHOUT a service worker.
 
       ⛔ Chrome's install prompt still wants a service worker with a fetch handler, and we are not

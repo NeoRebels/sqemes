@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from '
 import { useUI, useWorkspace, useData, useChatSessions, usePrompts } from '../store';
 import { can } from '../lib/permissions';
 import { checkContentViolation } from '../lib/contentGuard';
-import { IS_SELF_HOSTED } from '../lib/env';
+import { IS_SELF_HOSTED, functionsUrl, FUNCTIONS_BASE } from '../lib/env';
 import { supabase } from '../lib/supabase';
 import { waitForJobResult } from '../lib/realtimeJob';
 import { clientJobTimeoutMs } from '../supabase/functions/_shared/chatTimeouts.ts';
@@ -759,11 +759,10 @@ const Chat = () => {
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
-      const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
       const jobId = crypto.randomUUID();
       const resultPromise = waitForJobResult(jobId);
       const funded = isFundedModel(textModel.id);
-      const res = await fetch(`${FUNCTIONS_URL}/execute-step`, {
+      const res = await fetch(`${FUNCTIONS_BASE}/execute-step`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
         body: JSON.stringify({
@@ -806,7 +805,7 @@ const Chat = () => {
 
       const jobId = crypto.randomUUID();
       const resultPromise = waitForJobResult(jobId);
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/execute-step`, {
+      const res = await fetch(functionsUrl('execute-step'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
         body: JSON.stringify({
@@ -939,7 +938,7 @@ const Chat = () => {
         )));
       }, clientJobTimeoutMs({ connectors: activeConnectorIds.length > 0, selfHosted: IS_SELF_HOSTED }));
 
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-message`, {
+      const res = await fetch(functionsUrl('chat-message'), {
         method: 'POST',
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },

@@ -1,6 +1,7 @@
 // SQEM-149 — connectors API. List/delete are RLS-direct on workspace_connectors; create + probe go
 // through the manage-connectors edge function (token is encrypted server-side and never returned).
 import { supabase } from '../supabase';
+import { FUNCTIONS_BASE } from '../env';
 
 // workspace_connectors is not in the generated database.types yet (added by migration 20260727120000);
 // a thin cast keeps this typed at the call sites without regenerating.
@@ -28,9 +29,13 @@ export type ProbeResult = { ok: boolean; serverName?: string; tools?: ConnectorT
  * `…supabase.co//functions/v1/connector-oauth-callback` while the server sent the single-slash form.
  * Somebody registered the double-slash version at Nifty and got *"this connection request is invalid
  * or expired"* — an error that names neither the URI nor the slash.
+ *
+ * ⭐ **SQEM-456 moved the rule where it can be reached.** This module held the only correct copy, and
+ * nineteen other call sites went on appending to the raw variable — because importing a URL rule from
+ * an API module is not something anybody thinks to do. The normalisation now lives in `lib/env.ts`
+ * and this file uses it like everyone else. The note above stays: it is the evidence.
  */
-const SUPABASE_BASE = String(import.meta.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
-const FUNCTIONS_URL = `${SUPABASE_BASE}/functions/v1`;
+const FUNCTIONS_URL = FUNCTIONS_BASE;
 
 /**
  * SQEM-439 — the redirect URI a third-party OAuth app has to be registered with.
@@ -44,7 +49,8 @@ const FUNCTIONS_URL = `${SUPABASE_BASE}/functions/v1`;
  * different registrations. The dialog says so.
  *
  * ⛔ It must be **byte-identical** to what `connector-oauth-start` sends — the provider compares
- * exactly. Two places computing one URL is the shape of this bug; see the note on `SUPABASE_BASE`.
+ * exactly. Two places computing one URL is the shape of this bug; the normalisation both sides share
+ * now lives in `lib/env.ts` (`SUPABASE_BASE`), see the note on `FUNCTIONS_URL` above.
  */
 export function connectorRedirectUri(): string {
   return `${FUNCTIONS_URL}/connector-oauth-callback`;

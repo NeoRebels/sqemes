@@ -17,7 +17,7 @@ import { CHROME_STORE_URL } from '../lib/links';
 import { useExtensionInstalled } from '../hooks/useExtensionInstalled';
 import { firstTextModelId } from '../lib/authoringAI';
 import { isTrialing, trialDaysLeft } from '../lib/subscription';
-import { IS_SELF_HOSTED } from '../lib/env';
+import { IS_SELF_HOSTED, functionsUrl } from '../lib/env';
 
 const Dashboard = () => {
   const { workspace, currentUser } = useWorkspace();
@@ -67,7 +67,7 @@ const Dashboard = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-portal-session`, {
+      const res = await fetch(functionsUrl('create-portal-session'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ workspaceId: workspace.id }),
