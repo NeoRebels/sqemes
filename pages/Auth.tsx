@@ -68,9 +68,33 @@ const Auth = ({ inviteEmail, initialMode }: { inviteEmail?: string; initialMode?
           setMessage(null);
           return; // signed in already — the auth listener takes it from here
         }
-        setCanResend(true);
-        setMessage('Almost there — open the confirmation link we just emailed you, then sign in.');
+
+        // SQEM-458 — …and `session === null` has TWO causes, which is what SQEM-277 could not see.
+        //
+        // Signing up with an address that already has an account returns no error and no session
+        // either: Supabase obfuscates the case deliberately, so the form cannot be used to test
+        // which addresses are registered. Measured against staging on 2026-09-21 — the two
+        // responses are identical but for one field:
+        //
+        //   existing address → identities: []            new address → identities: [{ provider: 'email' }]
+        //
+        // ⛔ Everything else is fabricated to match: a random `id`, `created_at` = now, and a
+        // `confirmation_sent_at` for a mail that was never sent. So the old copy told the one
+        // person who already had an account to go and open a link that does not exist, and offered
+        // to send it again.
+        //
+        // ⚠️ We do not read `identities` to tell them apart (considered and rejected, owner,
+        // 2026-09-21): it is not a guaranteed part of their API, it would fail silently rather than
+        // break, and using it re-opens exactly the account-enumeration their obfuscation closes.
+        // The wording below is true under both causes instead, and names a next step under both.
+        setMessage('Check your inbox — if this address is new, a confirmation link is on its way. If you already have an account, sign in below.');
         setMode('login');
+
+        // ⚠️ Deliberately no `setCanResend(true)` here — and that RESTORES what SQEM-277 intended
+        // ("shown only once we know a confirmation is genuinely outstanding, never on spec"). It is
+        // not lost: `setMode('login')` puts them on the sign-in form, and a sign-in attempt on an
+        // unconfirmed account answers "Email not confirmed", which offers the resend above — at the
+        // one moment we actually know there is something to resend.
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');

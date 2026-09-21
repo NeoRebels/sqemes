@@ -228,6 +228,12 @@ const AppRoutes = () => {
   const { workspace } = useWorkspace();
   const { pathname } = useLocation();
 
+  // SQEM-459 — this looks like a duplicate of the branch in `App()` and is not; do not delete it.
+  // `isResetRoute` there is read from `window.location.hash` at render time, not from state. Paste a
+  // reset link into the address bar of an already-open, signed-in tab and only the hash changes:
+  // `HashRouter` re-renders, `App()` does not, and this is the branch that serves the route. Same
+  // twin shape as the public listing — the branch above covers the cold start and the signed-out
+  // case, this one covers the running app. Removing it would send that visit to `<Route path="*">`.
   if (pathname === '/reset-password') {
     return (
       <Suspense fallback={<LoadingScreen />}>
@@ -466,6 +472,38 @@ function App() {
       <EnvironmentShell>
         <Suspense fallback={<LoadingScreen />}>
           <Auth inviteEmail={inviteEmail} initialMode={fromPublicPage ? 'register' : undefined} />
+        </Suspense>
+      </EnvironmentShell>
+    );
+  }
+
+  // SQEM-459 — the reset route is rendered here, before anything reads `session`.
+  //
+  // `pages/ResetPassword.tsx` establishes its own session: the recovery token arrives as
+  // `token_hash` in the fragment and is redeemed by `verifyOtp` (SQEM-091 — so an email scanner's
+  // GET cannot burn the link before the person clicks it). This route is therefore reached with no
+  // session by design, and the guards above exempt it for exactly that reason.
+  //
+  // ⛔ Until SQEM-264 the fall-through was `<AuthenticatedApp />`, which reads no session, so the
+  // exemption was harmless. Wrapping it in `<LegalGate userId={session.user.id}>` turned the one
+  // path that legitimately has no session into the one that threw — and since the first render
+  // always has `session === null`, EVERY reset link opened a white screen from 2026-08-21 until
+  // this line. The root has no error boundary above `AuthenticatedApp`, so nothing caught it.
+  //
+  // ⚠️ Deliberately not `!session && isResetRoute`. The moment `verifyOtp` establishes the recovery
+  // session, that condition would hand the route to the tree below mid-flow: the form remounts, and
+  // someone who has not accepted the current terms meets the legal gate instead of the password
+  // field. `ResetPassword` signs out and returns to sign-in when it is done (SQEM-140), so the gate
+  // still runs — on the next, clean session, which is where it belongs.
+  if (isResetRoute) {
+    return (
+      <EnvironmentShell>
+        <Suspense fallback={<LoadingScreen />}>
+          <HashRouter>
+            <Routes>
+              <Route path="/reset-password" element={<ResetPassword />} />
+            </Routes>
+          </HashRouter>
         </Suspense>
       </EnvironmentShell>
     );
