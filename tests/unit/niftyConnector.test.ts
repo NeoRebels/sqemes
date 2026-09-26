@@ -115,7 +115,9 @@ describe('SQEM-437 — Nifty connector', () => {
 
   it('⚠️ the optional Client Secret is masked, and the Client ID is not', () => {
     // One is a secret, the other is not — Microsoft publishes its own client id in a 401 header.
-    expect(CARD).toMatch(/type=\{tokenApp\.auth === 'token' \? 'password' : 'text'\}/);
+    // ⚠️ SQEM-469 widened this: a `needsSecret` tile (Shopify) asks for a CLIENT ID in this field,
+    // and a client id is not a secret. The masking rule is unchanged for everyone else.
+    expect(CARD).toMatch(/type=\{tokenApp\.auth === 'token' && !tokenApp\.needsSecret \? 'password' : 'text'\}/);
     expect(CARD).toMatch(/value=\{tokenSecret\}[\s\S]{0,120}type="password"/);
   });
 
@@ -136,7 +138,9 @@ describe('SQEM-437 — Nifty connector', () => {
     // `auth === 'oauth-id' ? 'text' : 'password'` and went red when SQEM-441 added a fourth kind and
     // flipped the condition to key on 'token'. Behaviour unchanged, test wrong — the third time in
     // this chain that a wording pin cost a red run. What must hold is: only a TOKEN is masked.
-    expect(CARD).toMatch(/type=\{tokenApp\.auth === 'token' \? 'password' : 'text'\}/);
+    // ⚠️ SQEM-469 widened this: a `needsSecret` tile (Shopify) asks for a CLIENT ID in this field,
+    // and a client id is not a secret. The masking rule is unchanged for everyone else.
+    expect(CARD).toMatch(/type=\{tokenApp\.auth === 'token' && !tokenApp\.needsSecret \? 'password' : 'text'\}/);
   });
 
   it('⛔ no "share with the workspace" option — the callback always writes user_id', () => {

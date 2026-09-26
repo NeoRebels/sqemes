@@ -186,7 +186,11 @@ describe('SQEM-373 — the wiring in chat-message', () => {
     // ⛔ Exactly one writer of `body.tools` on this path.
     expect(body.match(/body\.tools\s*=/g) ?? []).toHaveLength(1);
     // The connectors themselves still travel in their own field.
-    expect(body).toMatch(/body\.mcp_servers = connectors\.map/);
+    // ⚠️ SQEM-466 renamed the source to `activeConnectors`: the list shrinks when the provider
+    // refuses one, and the body must be built from what is left, not from the original. Asserting
+    // the new name on purpose — a looser `\w+\.map` would let a future change rebuild the body from
+    // the unfiltered list and this test would still pass.
+    expect(body).toMatch(/body\.mcp_servers = activeConnectors\.map/);
   });
 
   it('⛔ what makes the mixing safe: the readers filter STRICTLY on tool_use', () => {

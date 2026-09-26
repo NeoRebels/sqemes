@@ -28,9 +28,13 @@ export const CONNECTOR_APPS: Record<string, ConnectorApp> = {
 // it is an `MCP_OAUTH_APPS` entry now and needs no pasted token at all. Our `mcp-notion` shim existed
 // only because that server was DCR-only and could not take a static token; SQEM-426 removed that
 // obstacle, and the shim with it.
-export type TokenApp = { provider: string; name: string; mcpUrl: string; needsShop?: boolean };
+// ⛔ SQEM-469 — `needsSecret` marks the apps where the pasted value is a CLIENT ID and a secret
+// follows, not a ready-made token. Shopify became one on 2026-01-01 when legacy custom apps were
+// removed: an app now yields id + secret, and the access token is minted from them and expires
+// after 24 hours.
+export type TokenApp = { provider: string; name: string; mcpUrl: string; needsShop?: boolean; needsSecret?: boolean };
 export const TOKEN_APPS: Record<string, TokenApp> = {
-  shopify: { provider: 'shopify', name: 'Shopify', mcpUrl: `${PUBLIC_API_URL}/functions/v1/mcp-shopify`, needsShop: true },
+  shopify: { provider: 'shopify', name: 'Shopify', mcpUrl: `${PUBLIC_API_URL}/functions/v1/mcp-shopify`, needsShop: true, needsSecret: true },
   github:  { provider: 'github',  name: 'GitHub',  mcpUrl: 'https://api.githubcopilot.com/mcp/' },
 };
 

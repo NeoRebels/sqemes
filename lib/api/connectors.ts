@@ -129,7 +129,9 @@ export function createConnector(input: {
 /** SQEM-157/159 — create a token-paste connector (app = 'shopify' | 'github'). `shop` only
  *  applies to Shopify. No OAuth — the pasted token is encrypted server-side. */
 export function createTokenConnector(input: {
-  workspaceId: string; app: string; token: string; shared: boolean; shop?: string;
+  // SQEM-469 — `secret` accompanies a client id on credentials apps (Shopify); the server does
+  // the exchange and stores both, so the token can be minted again when it expires.
+  workspaceId: string; app: string; token: string; shared: boolean; shop?: string; secret?: string;
 }): Promise<{ ok: boolean; connector: Connector }> {
   return invoke({ action: 'create-token', ...input });
 }

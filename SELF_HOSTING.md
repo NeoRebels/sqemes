@@ -362,7 +362,8 @@ yourself, a pasted token, or nothing at all. You are not limited to what we buil
 |---|---|
 | Plaud, Notion, Noota | **yes** — the server issues a client on request; nothing to configure |
 | Nifty | **yes** — you register a client in their App Center against *your* redirect URI |
-| GitHub, Shopify | **yes** — paste a token |
+| GitHub | **yes** — paste a token |
+| Shopify | **yes** — paste a Client ID and Client secret. ⚠️ Since Shopify removed legacy custom apps on 2026-01-01 there is no durable token to paste: create the app in the Shopify **Dev Dashboard**, set the scopes `read_products`, `read_orders`, `read_customers` on its version, **publish** it, **then install** it on your store — in that order. Sqemes mints the access token from your credentials and renews it; it expires every 24 hours |
 | Shopify Storefront | **yes** — no sign-in of any kind, for any Shopify store |
 | Gmail, Google Calendar/Drive/Docs/Sheets, Outlook, Microsoft Calendar, OneDrive | **no** — these use an OAuth app we host |
 
@@ -476,7 +477,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.11.20       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.11.21       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### ⛔ 3a. Before v1.11.9: count your workspace-wide MCP keys

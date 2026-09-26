@@ -5,6 +5,7 @@ import { getFreshConnectorToken } from '../_shared/connectorToken.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
 import { fetchWithTimeout } from '../_shared/fetchWithTimeout.ts';
 import { broadcastJobResult } from '../_shared/broadcast.ts';
+import { refusedConnectorLabels, connectorRefusedNotice } from '../_shared/connectorRefusal.ts';
 import { withTimeContext } from '../_shared/timeContext.ts';
 import { withLibraryPrompt } from '../_shared/libraryPrompt.ts';
 import { providerTimeoutMs } from '../_shared/chatTimeouts.ts';
@@ -309,7 +310,10 @@ Deno.serve(async (req) => {
 // ── Connectors (SQEM-149) ────────────────────────────────────────────────────
 
 // A connector resolved for a chat turn (token decrypted). Formatted per-provider at the call site.
-type ResolvedConnector = { url: string; name: string; token: string | null; allowedTools: string[] | null };
+// SQEM-466 — `name` is the label we send to the provider (`c_<id>`); `displayName` is what the
+// person called it. The provider echoes the former back when it refuses, so we need both to say
+// which connector dropped out in words anybody can act on.
+type ResolvedConnector = { url: string; name: string; displayName: string; token: string | null; allowedTools: string[] | null };
 
 // Resolve enabled connectors for a turn. Only connectors the caller may see (workspace-shared, or
 // their own per-user) are included; the bearer token is decrypted here.
@@ -321,7 +325,7 @@ async function resolveConnectors(
 ): Promise<ResolvedConnector[] | null> {
   const { data } = await admin
     .from('workspace_connectors')
-    .select('id, mcp_url, user_id, allowed_tools, provider, auth_token_encrypted, refresh_token_encrypted, token_expires_at, oauth_client_id, oauth_client_secret_encrypted')
+    .select('id, name, mcp_url, user_id, allowed_tools, provider, auth_token_encrypted, refresh_token_encrypted, token_expires_at, oauth_client_id, oauth_client_secret_encrypted')
     .eq('workspace_id', workspaceId)
     .in('id', connectorIds);
   const rows = ((data as any[]) || []).filter(r => r.user_id === null || r.user_id === userId);
@@ -332,6 +336,7 @@ async function resolveConnectors(
     out.push({
       url: r.mcp_url,
       name: 'c_' + String(r.id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 28), // unique, valid server label
+      displayName: r.name || 'a connector', // SQEM-466 — what the person sees if it has to be dropped
       token: await getFreshConnectorToken(admin, r), // decrypts; refreshes an expired Google token in place
       allowedTools: Array.isArray(r.allowed_tools) && r.allowed_tools.length ? (r.allowed_tools as string[]) : null,
     });
@@ -914,6 +919,14 @@ async function callClaude(
    * passing the raw content blocks through, which the streaming path does not currently produce.
    */
   let activeTools = tools ?? null;
+  /**
+   * SQEM-466 — the connector list shrinks when the provider turns one away.
+   *
+   * ⛔ Termination is structural, not a counter: every retry removes at least one entry, so the loop
+   * can run at most once per connector and then carries none at all. No round cap to tune wrong.
+   */
+  let activeConnectors = connectors;
+  const droppedConnectors: string[] = [];
   let answer = '';
 
   for (;;) {
@@ -929,9 +942,9 @@ async function callClaude(
     const toolDefs: any[] = activeTools ? toClaudeTools(activeTools.definitions) : [];
 
     // SQEM-149 — remote MCP connectors: Claude calls the connectors' tools server-side.
-    if (connectors?.length) {
-      body.mcp_servers = connectors.map(c => ({ type: 'url', url: c.url, name: c.name, ...(c.token ? { authorization_token: c.token } : {}) }));
-      for (const c of connectors) {
+    if (activeConnectors?.length) {
+      body.mcp_servers = activeConnectors.map(c => ({ type: 'url', url: c.url, name: c.name, ...(c.token ? { authorization_token: c.token } : {}) }));
+      for (const c of activeConnectors) {
         const toolset: any = { type: 'mcp_toolset', mcp_server_name: c.name };
         if (c.allowedTools) {
           toolset.default_config = { enabled: false };
@@ -948,10 +961,35 @@ async function callClaude(
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-    }, providerTimeoutMs({ connectors: !!connectors?.length, selfHosted: SELF_HOSTED })); // SQEM-381
+    }, providerTimeoutMs({ connectors: !!activeConnectors?.length, selfHosted: SELF_HOSTED })); // SQEM-381
 
     if (!response.ok) {
       const errText = await response.text();
+
+      /**
+       * SQEM-466 — a connector the remote server turns away must not take the message with it.
+       *
+       * ⛔ Anthropic fails the WHOLE request over one refused MCP server, and since connectors are
+       * always active in chat (SQEM-436) a plain text question died because of a Plaud connection
+       * somebody never finished setting up. Eleven days, for a paying customer.
+       *
+       * ⚠️ This runs BEFORE the `toolsWereRefused` branch on purpose. That one is
+       * `status === 400 && /tool/i.test(body)` — broad, and safe only because its remedy is
+       * harmless. Ours is specific and its remedy is not: dropping a connector changes what the
+       * model can see. The narrow match goes first so the broad one cannot mis-handle this case.
+       */
+      const refused = activeConnectors?.length ? refusedConnectorLabels(response.status, errText) : [];
+      if (refused.length) {
+        const keep = activeConnectors!.filter(c => !refused.includes(c.name));
+        // Retry only if something was actually removed — otherwise the provider named a label we do
+        // not carry, and an identical retry would loop.
+        if (keep.length < activeConnectors!.length) {
+          for (const c of activeConnectors!) if (refused.includes(c.name)) droppedConnectors.push(c.displayName);
+          console.warn('[chat-connectors] provider refused connectors, retrying without:', droppedConnectors.join(', '));
+          activeConnectors = keep.length ? keep : null;
+          continue;
+        }
+      }
       // SQEM-375 — the model cannot do function tools. Retry once without them rather than
       // failing the whole message; `activeTools` is null from here, so this cannot loop.
       if (activeTools && toolsWereRefused(response.status, errText)) {
@@ -977,7 +1015,11 @@ async function callClaude(
     }
     answer += text;
 
-    if (!activeTools || !toolCalls.length) return answer || 'No content generated.';
+    if (!activeTools || !toolCalls.length) {
+      // ⛔ The drop must be VISIBLE — the same argument as `toolCapNotice`. Somebody who asks about
+      // their Shopify orders and gets an answer without Shopify will believe the answer.
+      return (answer || 'No content generated.') + connectorRefusedNotice(droppedConnectors);
+    }
 
     apiMessages.push(claudeAssistantTurn(text, toolCalls) as any);
     const results: { id: string; output: string }[] = [];

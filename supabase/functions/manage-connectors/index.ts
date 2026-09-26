@@ -11,8 +11,18 @@ import { encryptApiKey } from '../_shared/crypto.ts';
 import { getFreshConnectorToken } from '../_shared/connectorToken.ts';
 import { discoverAuthServer } from '../_shared/mcpOauth.ts';
 import { TOKEN_APPS } from '../_shared/connectorApps.ts';
+import { fetchShopifyToken, shopFromMcpUrl } from '../_shared/shopifyToken.ts';
+import { fetchWithTimeout } from '../_shared/fetchWithTimeout.ts';
 
 const MCP_PROTOCOL = '2024-11-05';
+/**
+ * SQEM-467 — a probe must not be able to hang the request that is waiting for it.
+ *
+ * ⚠️ Ten seconds is a handshake budget, not a work budget: `initialize` + `tools/list` are two small
+ * round trips. It is deliberately far below the platform's own limit so a dead host fails as a
+ * readable sentence rather than as a timed-out function.
+ */
+const PROBE_TIMEOUT_MS = 10_000;
 const SHOP_RE = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/;
 
 // Minimal MCP client probe over Streamable HTTP. Handles JSON *and* SSE responses + Mcp-Session-Id.
@@ -33,11 +43,22 @@ async function probeMcp(url: string, token: string | null): Promise<{ serverName
     return null;
   };
   const rpc = async (method: string, params: unknown, session: string | null, id?: number) => {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: hdrs(session),
-      body: JSON.stringify(id === undefined ? { jsonrpc: '2.0', method, params } : { jsonrpc: '2.0', id, method, params }),
-    });
+    // SQEM-467 — ⚠️ `fetchWithTimeout`'s own abort message says "LLM provider did not respond",
+    // which is wrong for an MCP server. It is translated here rather than at the call sites, so the
+    // existing `probe` action cannot start showing provider wording for a connector.
+    let res: Response;
+    try {
+      res = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: hdrs(session),
+        body: JSON.stringify(id === undefined ? { jsonrpc: '2.0', method, params } : { jsonrpc: '2.0', id, method, params }),
+      }, PROBE_TIMEOUT_MS);
+    } catch (e) {
+      if ((e as { status?: number })?.status === 504) {
+        throw new Error(`${method}: no answer within ${PROBE_TIMEOUT_MS / 1000} seconds`);
+      }
+      throw e;
+    }
     const newSession = res.headers.get('mcp-session-id') || session;
     if (!res.ok && id !== undefined) throw new Error(`${method} → HTTP ${res.status}`);
     const body = id === undefined ? null : await readRpc(res);
@@ -52,6 +73,35 @@ async function probeMcp(url: string, token: string | null): Promise<{ serverName
   if (list.body?.error) throw new Error(`tools/list: ${list.body.error.message || 'error'}`);
   const tools = (list.body?.result?.tools || []).map((t: { name: string; description?: string }) => ({ name: t.name, description: t.description }));
   return { serverName: init.body?.result?.serverInfo?.name, tools };
+}
+
+/**
+ * SQEM-467 — ask the server before we claim a connection.
+ *
+ * ⛔ **Until this existed, "Connected" meant "we stored a non-empty string."** Two customer cases
+ * came out of that on the same day: a Shopify tile holding an `shpss_` client secret (not an access
+ * token at all), and two Plaud rows with no token whatsoever, left behind by an OAuth flow that was
+ * begun and never finished. Both showed as connected. The second kind is worse than cosmetic —
+ * Anthropic fails the ENTIRE request when one listed MCP server refuses the token, so one dead
+ * connector killed every Claude message its owner sent (SQEM-466).
+ *
+ * ⭐ **Why a probe and not a rule about tokens.** A connector without a token is not necessarily
+ * broken: `Shopify Storefront` is public by design and legitimately carries none. Its row is
+ * indistinguishable from the dead Plaud one — same shape, same empty column. Only the server knows
+ * the difference, so we ask it. A stored `auth_kind` would be a second truth that can drift from the
+ * first; this one cannot, because it is measured at the moment it matters.
+ *
+ * Returns the server's own words on failure, `null` on success.
+ */
+async function whyUnreachable(url: string, token: string | null): Promise<string | null> {
+  try {
+    await probeMcp(url, token);
+    return null;
+  } catch (e) {
+    // ⚠️ The server's sentence is the useful half — never replace it with "connection failed".
+    // `lib/aiErrors.ts` in the source repository spells out what that costs (SQEM-273).
+    return e instanceof Error ? e.message : String(e);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -197,6 +247,10 @@ Deno.serve(async (req) => {
         auth_token_encrypted: token ? await encryptApiKey(token) : null,
         allowed_tools: Array.isArray(allowedTools) && allowedTools.length ? allowedTools : null,
       };
+      // SQEM-467 — this is the path every broken row on production came through. Probe first.
+      const why = await whyUnreachable(mcpUrl, token ?? null);
+      if (why) return json({ error: `The server did not accept this connection: ${why}` }, 400);
+
       const { data: created, error } = await admin.from('workspace_connectors')
         .insert(row).select('id, name, mcp_url, user_id, allowed_tools, created_at').single();
       if (error) return json({ error: error.message }, 500);
@@ -211,7 +265,8 @@ Deno.serve(async (req) => {
       const app = TOKEN_APPS[appId as string];
       if (!app) return json({ error: 'Unsupported app' }, 400);
       if (!workspaceId) return json({ error: 'workspaceId required' }, 400);
-      if (!token?.trim()) return json({ error: 'An access token is required' }, 400);
+      if (!token?.trim()) return json({ error: app.needsSecret ? 'A client ID is required' : 'An access token is required' }, 400);
+      if (app.needsSecret && !String(body.secret ?? '').trim()) return json({ error: 'A client secret is required' }, 400);
 
       let mcpUrl = app.mcpUrl;
       if (app.needsShop) {
@@ -233,6 +288,34 @@ Deno.serve(async (req) => {
         .eq('workspace_id', workspaceId).eq('provider', app.provider).eq('name', app.name);
       del = userId === null ? del.is('user_id', null) : del.eq('user_id', userId);
       await del;
+      /**
+       * SQEM-469 — for a credentials app the pasted value is a client ID, and the token is minted.
+       *
+       * ⭐ Doing it here rather than lazily means the person learns at setup time what Shopify
+       * thinks of their app — not tomorrow, and not as a 401 inside a chat message. The exchange
+       * rejects an empty `scope`, which is the state a customer reached twice on 2026-09-25: the
+       * app installed, the token valid, and every data call answering 403.
+       */
+      const storedTokenClientId = String(token).trim();
+      let storedToken = storedTokenClientId;
+      let tokenExpiresAt: string | null = null;
+      if (app.needsSecret) {
+        const shop = shopFromMcpUrl(mcpUrl);
+        if (!shop) return json({ error: 'Enter your shop as {store}.myshopify.com' }, 400);
+        try {
+          const grant = await fetchShopifyToken(shop, storedToken, String(body.secret).trim());
+          storedToken = grant.accessToken;
+          tokenExpiresAt = grant.expiresAt;
+        } catch (e) {
+          return json({ error: e instanceof Error ? e.message : String(e) }, 400);
+        }
+      }
+
+      // SQEM-467 — the tile path. A pasted string that looks like a token is not a token: a customer
+      // pasted his app's `shpss_` client secret here and the tile reported "Connected".
+      const whyToken = await whyUnreachable(mcpUrl, storedToken);
+      if (whyToken) return json({ error: `The server did not accept this token: ${whyToken}` }, 400);
+
       const { data: created, error } = await admin.from('workspace_connectors').insert({
         workspace_id: workspaceId,
         created_by: user.id,
@@ -240,7 +323,14 @@ Deno.serve(async (req) => {
         name: app.name,
         provider: app.provider,
         mcp_url: mcpUrl,
-        auth_token_encrypted: await encryptApiKey(String(token).trim()),
+        auth_token_encrypted: await encryptApiKey(storedToken),
+        // SQEM-469 — the credentials stay so the token can be minted again; without them the
+        // connector would die 24 hours later with no way back.
+        ...(app.needsSecret ? {
+          oauth_client_id: storedTokenClientId,
+          oauth_client_secret_encrypted: await encryptApiKey(String(body.secret).trim()),
+          token_expires_at: tokenExpiresAt,
+        } : {}),
       }).select('id, name, mcp_url, user_id, allowed_tools, created_at').single();
       if (error) return json({ error: error.message }, 500);
       return json({ ok: true, connector: created });

@@ -155,15 +155,22 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
               up directly above; on its own it achieves nothing. Somewhere else in the product it
               would be a text people copy and then wonder why nothing changed. */}
           <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">System prompt (optional)</p>
+            {/* ⛔ SQEM-468 — this said "(optional)" until 2026-09-26, and the measurement says the
+                opposite. Six typical requests, custom instructions switched off: only two reached
+                the library through the server alone. The same text pasted into the client's standing
+                instructions is what covers the other four, so on this screen it is the step that
+                decides whether any of this works — not a nicety. */}
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">System prompt — paste this too</p>
             {/* SQEM-378 — the same text the MCP server hands out and the same one the Sqemes chat
                 works under. Saying so matters: it is the difference between "a snippet we offer" and
                 "the rule this product already follows", and the second is what makes someone paste
                 it. One source, so this claim cannot quietly stop being true. */}
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
               This is the same instruction the Sqemes chat already works under, and the one the server
-              hands to connected clients. Add it where your AI tool keeps its standing instructions and
-              it applies in clients that ignore the server&rsquo;s own — and to everyone at once.
+              hands to connected clients. ⚠️ Clients largely ignore what the server hands them &mdash;
+              measured, not assumed: without this text in your own standing instructions, most requests
+              never reach your playbooks. Add it where your AI tool keeps them, and it applies to
+              everyone at once.
             </p>
             <div className="relative bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl p-4">
               <pre className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap max-h-44 overflow-y-auto pr-8">{LIBRARY_SYSTEM_PROMPT}</pre>

@@ -18,7 +18,11 @@ describe('SQEM-441 — Shopify Storefront', () => {
     // Two different capabilities: storefront sees the catalogue, admin sees orders and customers.
     expect(CARD).toMatch(/id: 'shopify-storefront', provider: 'shopify-storefront'/);
     expect(CARD).toMatch(/id: 'shopify', provider: 'shopify'/);
-    expect(CARD).toMatch(/tokenLabel: 'Admin API access token'/);
+    // ⚠️ SQEM-469 — the admin tile stopped asking for a token on 2026-01-01, when Shopify removed
+    // legacy custom apps: it now takes a Client ID and mints the token itself. What this assertion
+    // actually guards is that the two Shopify tiles stay DISTINCT, so the label is checked, not the
+    // word "token".
+    expect(CARD).toMatch(/tokenLabel: 'Client ID'/);
   });
 
   it('⭐ it asks for a domain and nothing else', () => {
@@ -48,7 +52,9 @@ describe('SQEM-441 — Shopify Storefront', () => {
   });
 
   it('the domain field is plain text — it is public information', () => {
-    expect(CARD).toMatch(/type=\{tokenApp\.auth === 'token' \? 'password' : 'text'\}/);
+    // ⚠️ SQEM-469 widened this: a `needsSecret` tile (Shopify) asks for a CLIENT ID in this field,
+    // and a client id is not a secret. The masking rule is unchanged for everyone else.
+    expect(CARD).toMatch(/type=\{tokenApp\.auth === 'token' && !tokenApp\.needsSecret \? 'password' : 'text'\}/);
   });
 
   it('no new edge action was needed', () => {

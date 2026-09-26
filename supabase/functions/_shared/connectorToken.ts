@@ -4,6 +4,7 @@
 import { encryptApiKey, decryptApiKey } from './crypto.ts';
 import { MCP_OAUTH_APPS, mcpClientIdSource } from './connectorApps.ts';
 import { discoverAuthServer, getOrRegisterClient } from './mcpOauth.ts';
+import { fetchShopifyToken, shopFromMcpUrl } from './shopifyToken.ts';
 
 const PUBLIC_API_URL = (Deno.env.get('PUBLIC_API_URL') ?? Deno.env.get('SUPABASE_URL') ?? '').trim().replace(/\/+$/, '');
 const REDIRECT_URI = `${PUBLIC_API_URL}/functions/v1/connector-oauth-callback`;
@@ -59,6 +60,32 @@ export async function getFreshConnectorToken(
    * ⚠️ Deliberately BEFORE the env-configured path and returning from inside: Google and Microsoft must
    * keep behaving exactly as they did. Nothing below this block changed.
    */
+  /**
+   * SQEM-469 — Shopify mints a new token from the credentials; there is nothing to "refresh".
+   *
+   * ⛔ Both branches below require `refresh_token_encrypted`, and the client credentials grant
+   * issues none — so without this, a Shopify connector created after 2026-01-01 would fall through
+   * to its stored token and die 24 hours after setup, with a provider 401 as the only symptom.
+   * That is the silent death from SQEM-347, and here it would be guaranteed rather than possible.
+   *
+   * ⚠️ Deliberately gated on the credentials being present, not on the provider alone: a connector
+   * from before 2026 holds a legacy `shpat_` that never expires and carries no client id. Those
+   * must keep working untouched, and they do — this branch simply does not apply to them.
+   */
+  if (expiresSoon && row.provider === 'shopify' && row.oauth_client_id && row.oauth_client_secret_encrypted) {
+    const shop = shopFromMcpUrl(row.mcp_url);
+    if (shop) {
+      try {
+        const grant = await fetchShopifyToken(shop, row.oauth_client_id, await decryptApiKey(row.oauth_client_secret_encrypted));
+        await admin.from('workspace_connectors').update({
+          auth_token_encrypted: await encryptApiKey(grant.accessToken),
+          token_expires_at: grant.expiresAt,
+        }).eq('id', row.id);
+        return grant.accessToken;
+      } catch { /* fall through to the stored token; the MCP call surfaces the real error */ }
+    }
+  }
+
   if (expiresSoon && row.refresh_token_encrypted && row.provider && MCP_OAUTH_PROVIDERS.has(row.provider)) {
     const fresh = await refreshMcpOauth(admin, row);
     if (fresh) return fresh;

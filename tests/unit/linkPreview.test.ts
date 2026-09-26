@@ -46,8 +46,8 @@ function jpeg(file: string): { width: number; height: number } {
 const OG_IMAGE_FILE = 'public/og-image.jpg';
 /**
  * ⚠️ WhatsApp silently drops a preview image it considers too large, and the result looks exactly
- * like having no image at all. The master (`pm/sqemes-share-og.jpg` in the source repository) is
- * 398 KB; what ships is the same picture at quality 85. Keep a margin under 300 KB.
+ * like having no image at all. What ships is a quality-85 re-encode of a 398 KB master that is no
+ * longer kept in this repository. Keep a margin under 300 KB.
  */
 const MAX_BYTES = 300_000;
 

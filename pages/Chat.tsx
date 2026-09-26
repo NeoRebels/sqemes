@@ -1446,9 +1446,18 @@ const Chat = () => {
             </div>
           ) : error && (
             <div className="px-4 py-2 shrink-0">
-              <div className="max-w-3xl mx-auto p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span className="truncate">{error}</span>
+              {/* SQEM-465 — this message wraps, and that is the whole point of the ticket.
+                  It used to be `truncate`, so a provider's reason ended after one line with an
+                  ellipsis. A customer's screenshot of `Claude API error (400): {"type":"error",…
+                  "message":"mcp_servers: M…` is what exposed it: the half we needed was the half
+                  that was cut. `lib/aiErrors.ts` argues at length that the provider's own sentence
+                  must survive — this is the same rule, enforced in CSS rather than in code.
+                  ⚠️ `items-start` because the text is now multi-line and the icon belongs beside
+                  the first line, not floating in the middle. `break-words` because a provider
+                  error is often JSON with no spaces to break at. */}
+              <div className="max-w-3xl mx-auto p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span className="flex-1 break-words">{error}</span>
               </div>
             </div>
           )}

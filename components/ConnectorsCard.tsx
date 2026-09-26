@@ -53,7 +53,8 @@ type OAuthApp = { id: string; provider: string; name: string; description: strin
 type PublicAppUI = { id: string; provider: string; name: string; description: string; auth: 'public'; Icon: ComponentType<{ className?: string }>; hostLabel: string; placeholder: string; help: string; path: string; unavailable?: string };
 
 type OAuthIdAppUI = { id: string; provider: string; name: string; description: string; auth: 'oauth-id'; Icon: ComponentType<{ className?: string }>; tokenLabel: string; placeholder: string; help: string; unavailable?: string; needsRedirectUri?: boolean; secretLabel?: string; secretOptional?: boolean };
-type TokenAppUI = { id: string; provider: string; name: string; description: string; auth: 'token'; Icon: ComponentType<{ className?: string }>; tokenLabel: string; placeholder: string; help: string; needsShop?: boolean; unavailable?: string };
+// SQEM-469 — `needsSecret` tiles ask for a client id + secret and mint the token themselves.
+type TokenAppUI = { id: string; provider: string; name: string; description: string; auth: 'token'; Icon: ComponentType<{ className?: string }>; tokenLabel: string; placeholder: string; help: string; needsShop?: boolean; needsSecret?: boolean; secretLabel?: string; secretOptional?: boolean; unavailable?: string };
 
 /**
  * SQEM-274 — why the five Google tiles cannot be connected yet.
@@ -147,8 +148,14 @@ const OAUTH_APPS: (OAuthApp | TokenAppUI | OAuthIdAppUI | PublicAppUI)[] = [
 
   {
     id: 'shopify', provider: 'shopify', name: 'Shopify', description: 'Read products, orders & customers', auth: 'token', Icon: ShopifyIcon, needsShop: true,
-    tokenLabel: 'Admin API access token', placeholder: 'shpat_…',
-    help: 'In your store, create a custom app (Settings → Apps → Develop apps), grant read_products, read_orders, read_customers, install it, and paste its Admin API access token.',
+    // ⛔ SQEM-469 — Shopify removed legacy custom apps on 2026-01-01. A new app hands out a client
+    // id and secret, never a durable token, and the token minted from them dies after 24 hours.
+    // The old help text sent people to "Settings → Apps → Develop apps", a path that no longer
+    // exists — it cost a customer call to find that out.
+    needsSecret: true,
+    tokenLabel: 'Client ID', placeholder: 'e.g. 91819eb1611d92e6717dc3add883540c',
+    secretLabel: 'Client secret',
+    help: 'In the Shopify Dev Dashboard, create an app. On its version set the access scopes read_products, read_orders and read_customers, publish the version, THEN install the app on your store — in that order, or the token will be valid but allowed to read nothing. Copy the Client ID and Client secret from the app\'s settings.',
   },
   /**
    * SQEM-441 — the storefront side of a shop: catalogue, policies, cart. A different capability from
@@ -350,6 +357,7 @@ export default function ConnectorsCard({
 
   const connectToken = async () => {
     if (!tokenApp || !tokenValue.trim() || (tokenApp.auth === 'token' && tokenApp.needsShop && !tokenShop.trim())) return;
+    if (tokenApp.auth === 'token' && tokenApp.needsSecret && !tokenSecret.trim()) return;
     /**
      * SQEM-437 — the same dialog, two endings. A token app stores the value as the credential; an
      * `oauth-id` app hands it to the consent flow, which is a REDIRECT — so nothing is saved here and
@@ -397,7 +405,7 @@ export default function ConnectorsCard({
     }
     setTokenSaving(true);
     try {
-      await createTokenConnector({ workspaceId, app: tokenApp.id, token: tokenValue.trim(), shared: tokenShared && canShare, ...(tokenApp.needsShop ? { shop: tokenShop.trim() } : {}) });
+      await createTokenConnector({ workspaceId, app: tokenApp.id, token: tokenValue.trim(), shared: tokenShared && canShare, ...(tokenApp.needsShop ? { shop: tokenShop.trim() } : {}), ...(tokenApp.needsSecret ? { secret: tokenSecret.trim() } : {}) });
       showToast(`${tokenApp.name} connected`, 'success');
       setTokenApp(null);
       await load();
@@ -820,16 +828,16 @@ export default function ConnectorsCard({
                 masked for the opposite reason. */}
             {/* ⚠️ SQEM-441 — a shop domain is public information, so it is plain text like the client
                 id above and unlike a token. */}
-            <input value={tokenValue} onChange={e => setTokenValue(e.target.value)} type={tokenApp.auth === 'token' ? 'password' : 'text'} placeholder={tokenApp.placeholder}
+            <input value={tokenValue} onChange={e => setTokenValue(e.target.value)} type={tokenApp.auth === 'token' && !tokenApp.needsSecret ? 'password' : 'text'} placeholder={tokenApp.placeholder}
               className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400" />
 
-            {tokenApp.auth === 'oauth-id' && tokenApp.secretLabel && (
+            {((tokenApp.auth === 'oauth-id') || (tokenApp.auth === 'token' && tokenApp.needsSecret)) && tokenApp.secretLabel && (
               <>
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                   {tokenApp.secretLabel}{tokenApp.secretOptional && <span className="ml-1 normal-case tracking-normal font-medium text-slate-400">— optional</span>}
                 </label>
                 {/* ⚠️ Masked, unlike the Client ID above: this one IS a secret. */}
-                <input value={tokenSecret} onChange={e => setTokenSecret(e.target.value)} type="password" placeholder="leave empty if Nifty did not issue one"
+                <input value={tokenSecret} onChange={e => setTokenSecret(e.target.value)} type="password" placeholder={tokenApp.auth === 'token' ? 'shpss_…' : 'leave empty if Nifty did not issue one'}
                   className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400" />
               </>
             )}
