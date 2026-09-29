@@ -2,7 +2,7 @@ import JSZip from 'npm:jszip@3.10.1';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import {
   createLibraryReader, hiddenFromCaller, toSlug, renderContextBlocks,
-  LibraryNotFound, LibraryBadRequest,
+  LibraryNotFound, LibraryBadRequest, isPathInWorkspace,
 } from '../_shared/libraryQueries.ts';
 import { LIBRARY_SYSTEM_PROMPT } from '../_shared/libraryPrompt.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
@@ -2048,7 +2048,10 @@ Deno.serve(async (req) => {
 
       // 6. Delete the storage object, then the file row. Nothing references the
       //    file anymore, so no dangling uuid[] entries are left behind.
-      await adminClient.storage.from('workspace-files').remove([file.storage_path]);
+      // SQEM-492 — only ever remove an object inside this workspace's folder.
+      if (isPathInWorkspace(file.storage_path, workspaceId)) {
+        await adminClient.storage.from('workspace-files').remove([file.storage_path]);
+      }
       const { error: delErr } = await adminClient
         .from('workspace_files')
         .delete()

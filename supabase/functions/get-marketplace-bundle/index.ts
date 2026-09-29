@@ -40,6 +40,13 @@ Deno.serve(async (req) => {
     }
     if (!allowed) return json({ error: 'Forbidden' }, 403);
 
+    // SQEM-492 — only sign a bundle that sits where its row says it comes from: the submitting
+    // workspace's folder (Cloud) or the publisher submissions folder (self-host, row without workspace).
+    const expectedPrefix = row.workspace_id ? `${row.workspace_id}/` : 'submissions/';
+    if (!row.bundle_path.startsWith(expectedPrefix) || row.bundle_path.includes('..')) {
+      return json({ error: 'Not found' }, 404);
+    }
+
     const { data: signed, error: signErr } = await admin.storage.from('library-files').createSignedUrl(row.bundle_path, 300);
     if (signErr || !signed) return json({ error: 'Could not sign bundle URL' }, 500);
     return json({ url: signed.signedUrl });

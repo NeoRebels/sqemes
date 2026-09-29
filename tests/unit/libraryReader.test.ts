@@ -91,15 +91,15 @@ function build(overrides: { templates?: any[]; personas?: any[]; routes?: any[];
       ],
       persona_templates: overrides.routes ?? [],
       workspace_files: overrides.files ?? [
-        { id: 'f-open', workspace_id: WORKSPACE, name: 'open.md', mime_type: 'text/markdown', size_bytes: 10, storage_path: 'p/open.md', created_by: 'someone' },
-        { id: 'f-shut', workspace_id: WORKSPACE, name: 'shut.md', mime_type: 'text/markdown', size_bytes: 20, storage_path: 'p/shut.md', created_by: 'someone' },
+        { id: 'f-open', workspace_id: WORKSPACE, name: 'open.md', mime_type: 'text/markdown', size_bytes: 10, storage_path: 'ws-1/open.md', created_by: 'someone' },
+        { id: 'f-shut', workspace_id: WORKSPACE, name: 'shut.md', mime_type: 'text/markdown', size_bytes: 20, storage_path: 'ws-1/shut.md', created_by: 'someone' },
       ],
     },
     {
       mcp_accessible_template_ids: (overrides.accessibleTemplates ?? ['t-open']).map(id => ({ id })),
       mcp_accessible_persona_ids:  (overrides.accessiblePersonas  ?? ['p-open']).map(id => ({ id })),
     },
-    overrides.blobs ?? { 'p/open.md': '# Heading\n\ncontent', 'p/shut.md': 'secret bytes' },
+    overrides.blobs ?? { 'ws-1/open.md': '# Heading\n\ncontent', 'ws-1/shut.md': 'secret bytes' },
   );
   return createLibraryReader({ client, workspaceId: WORKSPACE, userId: USER });
 }
@@ -191,11 +191,21 @@ describe('createLibraryReader — files (SQEM-291)', () => {
     // Mirrors `can_access_file()`: the uploader clause. Without it, attaching your own file to a
     // template someone later restricted would lock you out of your own upload.
     const lib = await build({
-      files: [{ id: 'f-mine', workspace_id: WORKSPACE, name: 'mine.txt', mime_type: 'text/plain', size_bytes: 4, storage_path: 'p/mine.txt', created_by: USER }],
-      blobs: { 'p/mine.txt': 'mine' },
+      files: [{ id: 'f-mine', workspace_id: WORKSPACE, name: 'mine.txt', mime_type: 'text/plain', size_bytes: 4, storage_path: 'ws-1/mine.txt', created_by: USER }],
+      blobs: { 'ws-1/mine.txt': 'mine' },
     });
     expect(lib.canAccessFile('f-mine')).toBe(true);
     expect((await lib.readContextFile('f-mine')).text).toBe('mine');
+  });
+
+  it('⛔ SQEM-492 — a file whose storage path is outside the workspace is never downloaded', async () => {
+    // The row is the caller's own and accessible; only its path points elsewhere. The constraint
+    // `workspace_files_path_in_workspace` keeps such rows out of the table — this is the second line.
+    const lib = await build({
+      files: [{ id: 'f-mine', workspace_id: WORKSPACE, name: 'mine.txt', mime_type: 'text/plain', size_bytes: 4, storage_path: 'ws-2/other.txt', created_by: USER }],
+      blobs: { 'ws-2/other.txt': 'not yours' },
+    });
+    await expect(lib.readContextFile('f-mine')).rejects.toThrow(LibraryNotFound);
   });
 
   it('accepts a bare id as well as a uri', async () => {

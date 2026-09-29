@@ -788,13 +788,31 @@ const Settings = () => {
     }
 
     // Save buffered profile changes
-    const updates: Partial<{ name: string; email: string; avatar: string }> = {};
+    const updates: Partial<{ name: string; avatar: string }> = {};
     if (profileName !== currentUser.name) updates.name = profileName;
-    if (profileEmail !== currentUser.email) updates.email = profileEmail;
     if (profileAvatar !== currentUser.avatar) updates.avatar = profileAvatar;
 
     if (Object.keys(updates).length > 0) {
       await updateUser(updates);
+    }
+
+    // SQEM-491 — an email change is a change of the LOGIN address, confirmed by GoTrue with both
+    // the old and the new address (secure email change is on). Until then nothing changes: the
+    // profile email mirrors auth.users via a trigger, so the field goes back to the current address.
+    // It used to write `profiles.email` directly — unconfirmed, and without touching the login.
+    const newEmail = profileEmail.trim();
+    const emailChangeRequested = !!newEmail && newEmail.toLowerCase() !== currentUser.email.toLowerCase();
+    if (emailChangeRequested) {
+      const { error } = await supabase.auth.updateUser(
+        { email: newEmail },
+        { emailRedirectTo: window.location.origin },
+      );
+      setProfileEmail(currentUser.email);
+      if (error) {
+        showToast(error.message || 'Could not start the email change', 'error');
+      } else {
+        showToast(`Confirm the change in both inboxes — ${currentUser.email} and ${newEmail}. Your sign-in email changes once both are confirmed.`, 'info');
+      }
     }
 
     if (passwords.new) {
@@ -803,7 +821,8 @@ const Settings = () => {
     }
 
     setProfileDirty(false);
-    showToast("Profile updated successfully", "success");
+    // The email toast above says more than "updated" — and "updated" would be untrue for the email.
+    if (!emailChangeRequested) showToast("Profile updated successfully", "success");
   };
 
   const handleLogout = () => {
@@ -1866,9 +1885,11 @@ const Settings = () => {
                         <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Email Address</label>
                         <input
                           className="w-full p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                          type="email"
                           value={profileEmail}
                           onChange={e => { setProfileEmail(e.target.value); setProfileDirty(true); }}
                         />
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">This is your sign-in email. A change is confirmed from both the old and the new address.</p>
                      </div>
 
                      <div>

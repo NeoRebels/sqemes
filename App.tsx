@@ -224,9 +224,19 @@ const NoWorkspaceScreen = () => {
 };
 
 const AppRoutes = () => {
-  const { noWorkspace, isLoading } = useUI();
+  const { noWorkspace, isLoading, showToast } = useUI();
   const { workspace } = useWorkspace();
   const { pathname } = useLocation();
+
+  // SQEM-491 — a GoTrue `#message=` (first email-change confirmation) was stashed by `App()`.
+  React.useEffect(() => {
+    try {
+      const msg = sessionStorage.getItem('sqm_auth_message');
+      if (!msg) return;
+      sessionStorage.removeItem('sqm_auth_message');
+      showToast(msg, 'info');
+    } catch { /* storage unavailable — nothing to show */ }
+  }, [showToast]);
 
   // SQEM-459 — this looks like a duplicate of the branch in `App()` and is not; do not delete it.
   // `isResetRoute` there is read from `window.location.hash` at render time, not from state. Paste a
@@ -426,6 +436,21 @@ function App() {
   // #error=access_denied&error_code=otp_expired&...
   // HashRouter would treat this as an unknown path → 404. Strip the hash and
   // let the app render normally (logged-in users go home, logged-out see Auth).
+  // SQEM-491 — the same for `#message=`: with secure email change, the FIRST of the two confirmation
+  // links lands here with "Confirmation link accepted. Please proceed to confirm link sent to the
+  // other email". Keep the sentence for a toast (AppRoutes shows it) instead of a 404.
+  if (window.location.hash.startsWith('#message=')) {
+    try {
+      const msg = new URLSearchParams(window.location.hash.slice(1)).get('message');
+      if (msg) sessionStorage.setItem('sqm_auth_message', msg);
+    } catch { /* storage unavailable — the redirect alone still avoids the 404 */ }
+    window.location.replace(window.location.origin + window.location.pathname + '#/');
+    return (
+      <EnvironmentShell>
+        <LoadingScreen />
+      </EnvironmentShell>
+    );
+  }
   if (window.location.hash.startsWith('#error=')) {
     window.location.replace(window.location.origin + window.location.pathname + '#/');
     return (

@@ -64,7 +64,8 @@ describe('SQEM-390 — nowhere in the product is "assistant" still a kind', () =
   const KIND_USE = /(?:kind\s*[:=]==?\s*|value:\s*|\[\s*'prompt'[^\]]*|\{\s*'prompt'[^}]*)'assistant'/;
   const LEGACY_READERS: Record<string, RegExp> = {
     'lib/templateBundle.ts': /const legacyAssistant = b\.kind === 'assistant';/,
-    'supabase/functions/marketplace-submit/index.ts': /raw\.kind === 'assistant'/,
+    // SQEM-493 — the submission reader moved here from marketplace-submit; both submit functions use it.
+    'supabase/functions/_shared/submissionManifest.ts': /raw\.kind === 'assistant'/,
     'supabase/functions/mcp-server/index.ts': /if \(kind === 'assistant'\)\s*\n\s*return rpcError/,
   };
 
@@ -100,11 +101,9 @@ describe('SQEM-390 — nowhere in the product is "assistant" still a kind', () =
   it('the legacy readers really are readers — each turns the old kind into a skill or refuses it', () => {
     expect(read('lib/templateBundle.ts')).toMatch(/legacyAssistant \|\| b\.kind === 'skill' \? 'skill' : 'prompt'/);
     expect(read('lib/templateBundle.ts')).toMatch(/legacyAssistant \? \(b\.systemInstruction \|\| b\.content \|\| ''\)/);
-    // `marketplace-submit` is Cloud-only and pruned from the public export (SQEM-182) — there is nothing to
-    // read there, and a missing file must not fail the public repo's tests (SQEM-411).
-    if (existsSync(resolve(ROOT, 'supabase/functions/marketplace-submit/index.ts'))) {
-      expect(read('supabase/functions/marketplace-submit/index.ts')).toMatch(/kind: 'skill', content: raw\.systemInstruction \|\| raw\.content/);
-    }
+    // SQEM-493 — the submission reader lives in `_shared/submissionManifest.ts` (ships to the export,
+    // unlike the pruned `marketplace-submit`, so no existsSync guard is needed any more).
+    expect(read('supabase/functions/_shared/submissionManifest.ts')).toMatch(/kind: 'skill', content: raw\.systemInstruction \|\| raw\.content/);
     expect(read('supabase/functions/mcp-server/index.ts')).toMatch(/kind "assistant" no longer exists/);
   });
 

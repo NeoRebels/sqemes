@@ -241,63 +241,38 @@ export async function copyTemplateToWorkspace(
 
 const client = supabase as unknown as { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-/** Publish a workspace template to the marketplace as a moderated bundle snapshot (submit-for-review). */
+/**
+ * Publish a workspace template to the marketplace as a moderated bundle snapshot (submit-for-review).
+ *
+ * SQEM-493 — the browser builds and uploads the bundle to its own workspace folder, then hands it to
+ * `marketplace-submit-cloud`, which reads it, runs the injection scan and the content hash on the
+ * server, deduplicates, and inserts the pending listing. The client can no longer insert a listing:
+ * it used to compute the scan here and write it, so the review queue showed what the browser said.
+ */
 export async function publishToMarketplace(input: {
   workspaceId: string; template: Prompt; allFiles: WorkspaceFile[]; userId: string; category?: TemplateCategory;
 }): Promise<LibraryTemplate> {
-  const { workspaceId, template, allFiles, userId, category } = input;
-
-  // SQEM-169 — content hash + duplicate pre-check (a friendly message; the DB partial-unique index is
-  // the backstop). Blocked only while an earlier listing is still pending/published.
-  const contentHash = await sha256Hex(`${template.title} ${template.description} ${template.content}`);
-  const { data: dupes } = await client.from('library_templates')
-    .select('id')
-    .eq('workspace_id', workspaceId)
-    .in('status', ['pending', 'published'])
-    .or(`source_prompt_id.eq.${template.id},content_hash.eq.${contentHash}`);
-  if (dupes && dupes.length) throw new Error('This playbook is already in the Marketplace (published or pending review).');
+  const { workspaceId, template, allFiles, category } = input;
 
   const { buildBundle } = await import('../templateBundle');
-  const { blob, manifest } = await buildBundle([template], allFiles);
-
-  // SQEM-169 — heuristic injection scan (advisory; shown to admins in the review queue).
-  const { scanForInjection } = await import('../injectionScan');
-  const scan = scanForInjection(template.content, template.description);
+  const { blob } = await buildBundle([template], allFiles);
 
   const path = `${workspaceId}/${crypto.randomUUID()}/bundle.sqemes.zip`;
   const { error: upErr } = await supabase.storage.from('library-files').upload(path, blob, { contentType: 'application/zip' });
   if (upErr) throw upErr;
 
-  const preview = {
-    fileNames: (manifest.files || []).map(f => f.name),
-    fileCount: (manifest.files || []).length,
-  };
-  const { data, error } = await client.from('library_templates').insert({
-    workspace_id: workspaceId,
-    kind: template.kind,
-    title: template.title,
-    description: template.description,
-    category: category ?? 'General',
-    tags: template.tag ? [template.tag] : [],
-    variables: JSON.parse(JSON.stringify(template.variables || [])),
-    content: template.content,
-    created_by: userId,
-    published: false,   // submit-for-review — an admin approves
-    status: 'pending',
-    bundle_path: path,
-    preview,
-    source_prompt_id: template.id,
-    content_hash: contentHash,
-    scan_risk: scan.risk,
-    scan_reasons: scan.reasons,
-  }).select(`id, kind, title, description, category, tags, steps, variables, usage_count, published, created_by, created_at, updated_at, ${UGC_COLS}`).single();
-  if (error) {
-    await supabase.storage.from('library-files').remove([path]);
-    // A race that hit the partial-unique dedup index → the same friendly message.
-    if ((error as { code?: string }).code === '23505') throw new Error('This playbook is already in the Marketplace (published or pending review).');
-    throw error;
-  }
-  return rowToLibraryTemplate(data as unknown as LibraryTemplateRow);
+  // Cleanup of a failed submission is the function's job: the client has no DELETE on the
+  // `library-files` bucket (the old client-side `remove` after a failed insert never did anything).
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+  const res = await fetch(`${FUNCTIONS_BASE}/marketplace-submit-cloud`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ workspaceId, bundlePath: path, sourcePromptId: template.id, category: category ?? 'General' }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.listing) throw new Error(json.error || `Error ${res.status}`);
+  return rowToLibraryTemplate(json.listing as LibraryTemplateRow);
 }
 
 /** Self-host copy of a no-bundle (curated) listing: build a local prompt from the in-memory listing

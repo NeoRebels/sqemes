@@ -19,6 +19,10 @@
  * object and then wrapped it in the very last line.
  */
 
+/** SQEM-492 — a storage path belongs to a workspace only if it sits in that workspace's folder. */
+export const isPathInWorkspace = (path: string | null | undefined, workspaceId: string): boolean =>
+  typeof path === 'string' && !!workspaceId && path.startsWith(`${workspaceId}/`) && !path.includes('..');
+
 // ── Errors ──────────────────────────────────────────────────────────────────
 //
 // Two of them, because the two callers map them to different things and a single opaque Error would
@@ -342,7 +346,9 @@ export async function createLibraryReader(
     const resolved: ResolvedFile[] = [];
     for (const f of (files || [])) {
       let text: string | null = null;
-      if (isTextContentMime(f.mime_type)) {
+      // SQEM-492 — a path outside this workspace's folder is never downloaded (defence in depth
+      // behind the workspace_files_path_in_workspace constraint).
+      if (isTextContentMime(f.mime_type) && isPathInWorkspace(f.storage_path, workspaceId)) {
         const { data: blob } = await client.storage.from('workspace-files').download(f.storage_path);
         if (blob) text = await blob.text();
       }
@@ -659,7 +665,7 @@ export async function createLibraryReader(
         .eq('id', fileId)
         .single();
 
-      if (!file) throw new LibraryNotFound(`Resource not found: ${ref}`);
+      if (!file || !isPathInWorkspace(file.storage_path, workspaceId)) throw new LibraryNotFound(`Resource not found: ${ref}`);
 
       const { data: blob, error: storageErr } = await client.storage
         .from('workspace-files')

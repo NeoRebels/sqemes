@@ -244,9 +244,11 @@ export function useWorkspaceState(
 
   const updateUser = useCallback(async (updates: Partial<User>) => {
     try {
+      // SQEM-491 — no `email` here: `profiles.email` mirrors the login address (a trigger on
+      // auth.users writes it) and is not client-writable. Settings changes the LOGIN address via
+      // `supabase.auth.updateUser({ email })`, which GoTrue confirms with both addresses.
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
-      if (updates.email !== undefined) dbUpdates.email = updates.email;
       if (updates.avatar !== undefined) dbUpdates.avatar = updates.avatar;
 
       if (Object.keys(dbUpdates).length > 0) {
