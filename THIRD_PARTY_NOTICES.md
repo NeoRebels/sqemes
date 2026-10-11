@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Generated 2026-09-29 from the production dependency tree. **Do not edit by hand** — it is rebuilt
+Generated 2026-10-11 from the production dependency tree. **Do not edit by hand** — it is rebuilt
 by `scripts/build-public-export.sh` on every release, which is what keeps it from going stale.
 
 Sqemes itself is licensed under the Sustainable Use License from v1.11.0 (AGPL-3.0 for v1.10.0 to
@@ -175,7 +175,7 @@ consult the upstream repository named by the image for its terms.
 | safe-buffer | 5.1.2 | MIT |
 | scheduler | 0.27.0 | MIT |
 | setimmediate | 1.0.5 | MIT |
-| source-map-js | 1.2.1 | BSD-3-Clause |
+| source-map-js | 1.2.2 | BSD-3-Clause |
 | space-separated-tokens | 2.0.2 | MIT |
 | string_decoder | 1.1.1 | MIT |
 | stringify-entities | 4.0.4 | MIT |
@@ -1705,7 +1705,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 53. source-map-js@1.2.1
+### 53. source-map-js@1.2.2
 
 ```
 Copyright (c) 2009-2011, Mozilla Foundation and contributors

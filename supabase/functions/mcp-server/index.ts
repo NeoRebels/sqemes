@@ -318,9 +318,62 @@ function buildArguments(variables: any[]): any[] {
     }));
 }
 
+// The `initialize` answer. A function so the early return above the gates (SQEM-481) and nothing
+// else builds it.
+function initializeResult() {
+  return {
+    protocolVersion: MCP_VERSION,
+    capabilities: { prompts: {}, resources: {}, tools: {} },
+    // SQEM-132 — session-level guidance. Claude clients surface a server's `instructions`
+    // in the system context at session start, before any per-request tool matching. This
+    // is the strongest lever for getting a connected client to proactively consider the
+    // user's templates on relevant requests, instead of only when they name Sqemes.
+    //
+    // ⛔ SQEM-378 — this used to be a hand-written text right here, a second wording of the block
+    // Settings shows people to paste into their own client. Two texts, one job, neither aware of
+    // the other — and only this one had learned about personas (SQEM-324). One source now.
+    instructions: LIBRARY_SYSTEM_PROMPT,
+    // SQEM-089 — brand the connector. `icons` (MCP SEP-973) is additive metadata a
+    // client MAY render in its connector list; PNG over HTTPS is the safest, most
+    // widely-supported form, served credential-free from our own domain. `sizes` is
+    // omitted deliberately — its format varies across spec revisions (string vs array)
+    // and `'any'` is for scalable SVG, so a strict client could reject a raster icon
+    // declared with it; omitting = "usable at any size".
+    serverInfo: {
+      name: 'sqemes',
+      title: 'Sqemes',
+      version: '2.0.0',
+      websiteUrl: 'https://app.sqemes.com',
+      icons: [
+        { src: 'https://app.sqemes.com/logo-favicon-V2.png', mimeType: 'image/png' },
+      ],
+    },
+  };
+}
+
 // ---- Main handler ----
 
+/**
+ * SQEM-481 — `Server-Timing` on every answer: where the time of a call went, measured inside the
+ * function. `scripts/mcp-latency.mjs` reads it from outside, so a slow call can be attributed to auth,
+ * the gates, the access sets or the handler without guessing. Durations only, no data.
+ */
 Deno.serve(async (req) => {
+  const t0 = performance.now();
+  const marks: string[] = [];
+  let last = t0;
+  const mark = (name: string) => {
+    const now = performance.now();
+    marks.push(`${name};dur=${(now - last).toFixed(0)}`);
+    last = now;
+  };
+  const res = await handle(req, mark);
+  marks.push(`total;dur=${(performance.now() - t0).toFixed(0)}`);
+  try { res.headers.set('Server-Timing', marks.join(', ')); } catch { /* immutable headers — skip */ }
+  return res;
+});
+
+async function handle(req: Request, mark: (name: string) => void): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { status: 200, headers: CORS });
   }
@@ -342,11 +395,16 @@ Deno.serve(async (req) => {
   const adminClient = createAdminClient();
   const keyHash = await hashKey(rawKey);
 
-  const { data: keyRow, error: keyErr } = await adminClient
-    .from('sqemes_api_keys')
-    .select('id, workspace_id, name, scopes, expires_at, is_oauth, user_id, created_at, last_used_at')
-    .eq('key_hash', keyHash)
-    .single();
+  // SQEM-481 — the body is read while the key is looked up; neither needs the other. The key still
+  // decides first: an unauthenticated caller gets the challenge, never a parse error.
+  const [{ data: keyRow, error: keyErr }, parsed] = await Promise.all([
+    adminClient
+      .from('sqemes_api_keys')
+      .select('id, workspace_id, name, scopes, expires_at, is_oauth, user_id, created_at, last_used_at')
+      .eq('key_hash', keyHash)
+      .single(),
+    req.json().then((v: unknown) => ({ ok: true as const, v }), () => ({ ok: false as const, v: null })),
+  ]);
 
   if (keyErr || !keyRow) {
     return authChallenge();
@@ -402,22 +460,78 @@ Deno.serve(async (req) => {
   const scopes: string[] = Array.isArray(keyRow.scopes) && keyRow.scopes.length > 0
     ? keyRow.scopes
     : (keyRow.is_oauth ? [] : FULL_SCOPES);
-  await adminClient.from('sqemes_api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyId);
+  /**
+   * SQEM-481 — `last_used_at` is written at most once a minute, and not in the caller's path.
+   *
+   * It used to be an awaited write on every call: one round trip that the answer waited for, to move
+   * a timestamp by seconds. Its two readers are the 90-day idle limit above (SQEM-348) and the "last
+   * used" column in Settings; a minute of resolution is far inside what either can tell apart.
+   * `EdgeRuntime.waitUntil` keeps the write alive after the response — an un-awaited promise alone
+   * can be torn down with it. Where the runtime lacks it (local tests), the write is awaited as before.
+   */
+  const lastUsedRaw = (keyRow as { last_used_at?: string | null }).last_used_at ?? null;
+  if (!lastUsedRaw || Date.now() - new Date(lastUsedRaw).getTime() > 60_000) {
+    const touch = Promise.resolve(
+      adminClient.from('sqemes_api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyId),
+    ).catch((e: Error) => console.error('[mcp] last_used_at write failed:', e?.message));
+    const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+    if (rt?.waitUntil) rt.waitUntil(touch); else await touch;
+  }
+  mark('auth');
 
   // 2. Parse JSON-RPC request
-  let rpc: { jsonrpc: string; id?: unknown; method: string; params?: any };
-  try {
-    rpc = await req.json();
-  } catch {
+  if (!parsed.ok) {
     return rpcError(null, -32700, 'Parse error');
   }
+  const rpc = parsed.v as { jsonrpc: string; id?: unknown; method: string; params?: any };
 
   const { id, method, params } = rpc;
 
+  /**
+   * SQEM-481 — the handshake answers before any per-request work. `initialize` and `ping` carry no
+   * workspace data and were already exempt from the paywall and the call count; they no longer pay
+   * for the access sets and the role lookup either (~5 round trips that nothing below them read).
+   * `notifications/initialized` is the same class — a notification with an empty answer — and joins
+   * them: counting it as a "read" (as it was) inflated the very number SQEM-351 collects.
+   */
+  if (method === 'ping') {
+    return rpcResult(id, {});
+  }
+  if (method === 'initialize') {
+    return rpcResult(id, initializeResult());
+  }
+  if (method === 'notifications/initialized') {
+    return new Response(null, { status: 204, headers: CORS });
+  }
+
+  // SQEM-142 — per-user template access. OAuth connections carry the authorizing user; restrict
+  // templates to what that user may access.
+  const mcpUserId: string = keyUserId;
+
+  /**
+   * SQEM-481 — the access sets and the role are started now and awaited after the gates.
+   *
+   * They are reads with no side effect, so starting them before the paywall costs nothing but wasted
+   * work on a refused call, and it takes them out of the sequential chain (paywall → count → budget →
+   * access → role), which was ~9 round trips one after another before a handler started. The gates
+   * themselves keep their order — the count must stay after the paywall and before the budget, for
+   * the reasons written at each of them.
+   * ⚠️ The `.catch` on the copies marks a rejection as handled when a gate returns early; awaiting the
+   * originals below still throws, exactly as the inline awaits did.
+   */
+  const libP = createLibraryReader({ client: adminClient, workspaceId, userId: mcpUserId });
+  const memberP = Promise.resolve(adminClient
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', mcpUserId)
+    .maybeSingle());
+  libP.catch(() => {});
+  memberP.catch(() => {});
+
   // SQEM-083 — server-side paywall: a lapsed workspace may handshake (initialize/ping)
   // but can't use any data method until it has an active subscription.
-  if (method !== 'initialize' && method !== 'ping'
-      && !(await isWorkspaceSubscriptionActive(adminClient, workspaceId))) {
+  if (!(await isWorkspaceSubscriptionActive(adminClient, workspaceId))) {
     return rpcError(id, -32003, 'This Sqemes workspace has no active subscription. Resubscribe at app.sqemes.com to use MCP.');
   }
 
@@ -439,7 +553,7 @@ Deno.serve(async (req) => {
    * The capability comes from `TOOL_CAPABILITY`, never re-derived — re-deriving that mapping in a
    * second place is what SQEM-332 and SQEM-349 each cost.
    */
-  if (method !== 'initialize' && method !== 'ping') {
+  {
     const counted = method === 'tools/call'
       ? TOOL_CAPABILITY[(params as { name?: string } | undefined)?.name ?? '']
       : 'read';
@@ -456,14 +570,19 @@ Deno.serve(async (req) => {
        *
        * ⚠️ `initialize` and `ping` are skipped: protocol overhead on the client's own schedule, which
        * would swamp the signal. Best-effort — a failed count must never cost the caller their answer.
-       * Awaited rather than fired-and-forgotten, because an un-awaited promise can be torn down with
-       * the response. The capability comes from `TOOL_CAPABILITY`, never re-derived.
+       * The capability comes from `TOOL_CAPABILITY`, never re-derived.
+       *
+       * ⭐ SQEM-500 — **started here, no longer waited for.** Under load (staging, 100 concurrent) every
+       * request in this chain queued for PostgREST's share of the connections; the count was one of
+       * three in a row, and the answer does not depend on it. It is still *started* before the budget
+       * check, so a refused call is still counted. `EdgeRuntime.waitUntil` keeps it alive after the
+       * response; without the runtime (local tests) it is awaited as before. The budget has its own
+       * counter (`mcp_rate_counters`), so it does not see fewer calls because of this.
        */
-      try {
-        await adminClient.rpc('record_mcp_call', { p_key_id: keyId, p_capability: counted });
-      } catch (e) {
-        console.error('[mcp-metrics] failed to record call:', (e as Error).message);
-      }
+      const count = Promise.resolve(adminClient.rpc('record_mcp_call', { p_key_id: keyId, p_capability: counted }))
+        .catch((e: Error) => console.error('[mcp-metrics] failed to record call:', e?.message));
+      const rtCount = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+      if (rtCount?.waitUntil) rtCount.waitUntil(count); else await count;
 
       /**
        * SQEM-352 — the budget, checked after the call is counted and before the work is done.
@@ -508,9 +627,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  // SQEM-142 — per-user template access. OAuth connections carry the authorizing user; restrict
-  // templates to what that user may access.
-  const mcpUserId: string = keyUserId;
+  mark('gates');
 
   /**
    * ⛔ **The `else` branch that used to stand here is gone (SQEM-346).**
@@ -536,7 +653,8 @@ Deno.serve(async (req) => {
    * Nothing about the behaviour here changed: the reader runs the same two RPCs with the same
    * `mcpUserId`, and every handler below still answers exactly what it answered before.
    */
-  const lib = await createLibraryReader({ client: adminClient, workspaceId, userId: mcpUserId });
+  const [lib, { data: memberRow }] = await Promise.all([libP, memberP]);
+  mark('access');
   const canAccessTemplate = lib.canAccessTemplate;
   const canAccessPersona  = lib.canAccessPersona;
 
@@ -550,12 +668,7 @@ Deno.serve(async (req) => {
   // deleted when its owner leaves, so this should not occur — but a role read that returns nothing
   // must fail closed regardless, because the alternative is that leaving the workspace silently
   // upgrades somebody.
-  const { data: memberRow } = await adminClient
-    .from('workspace_members')
-    .select('role')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', mcpUserId)
-    .maybeSingle();
+  // (Started above, next to the access sets — SQEM-481.)
   const mcpUserRole: string | null = (memberRow as { role?: string } | null)?.role ?? null;
 
   /**
@@ -616,44 +729,7 @@ Deno.serve(async (req) => {
 
   // 3. Route methods
 
-  if (method === 'ping') {
-    return rpcResult(id, {});
-  }
-
-  if (method === 'initialize') {
-    return rpcResult(id, {
-      protocolVersion: MCP_VERSION,
-      capabilities: { prompts: {}, resources: {}, tools: {} },
-      // SQEM-132 — session-level guidance. Claude clients surface a server's `instructions`
-      // in the system context at session start, before any per-request tool matching. This
-      // is the strongest lever for getting a connected client to proactively consider the
-      // user's templates on relevant requests, instead of only when they name Sqemes.
-      //
-      // ⛔ SQEM-378 — this used to be a hand-written text right here, a second wording of the block
-      // Settings shows people to paste into their own client. Two texts, one job, neither aware of
-      // the other — and only this one had learned about personas (SQEM-324). One source now.
-      instructions: LIBRARY_SYSTEM_PROMPT,
-      // SQEM-089 — brand the connector. `icons` (MCP SEP-973) is additive metadata a
-      // client MAY render in its connector list; PNG over HTTPS is the safest, most
-      // widely-supported form, served credential-free from our own domain. `sizes` is
-      // omitted deliberately — its format varies across spec revisions (string vs array)
-      // and `'any'` is for scalable SVG, so a strict client could reject a raster icon
-      // declared with it; omitting = "usable at any size".
-      serverInfo: {
-        name: 'sqemes',
-        title: 'Sqemes',
-        version: '2.0.0',
-        websiteUrl: 'https://app.sqemes.com',
-        icons: [
-          { src: 'https://app.sqemes.com/logo-favicon-V2.png', mimeType: 'image/png' },
-        ],
-      },
-    });
-  }
-
-  if (method === 'notifications/initialized') {
-    return new Response(null, { status: 204, headers: CORS });
-  }
+  // ping, initialize and notifications/initialized are answered before the gates (SQEM-481).
 
   // ---- prompts/list ----
 
@@ -2073,4 +2149,4 @@ Deno.serve(async (req) => {
   }
 
   return rpcError(id, -32601, `Method not found: ${method}`);
-});
+}

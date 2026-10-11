@@ -17,6 +17,8 @@ playwright-report/
 !AGENTS.md
 !supabase/migrations/*.sql
 !supabase/seed.sql
+# SQEM-504 — the tenant-isolation suite's probe helper and two-tenant seed (local database only)
+!tests/isolation/*.sql
 # Vendored Supabase self-host DB init scripts (SQEM-116)
 !selfhost/volumes/db/*.sql
 

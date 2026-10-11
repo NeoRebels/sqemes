@@ -99,7 +99,7 @@ export function buildPreview(text: string, mimeType: string): { preview: string;
   return { preview: slice, truncated: text.length > slice.length };
 }
 
-/** One context file, resolved from storage. `text` is null for binaries. */
+/** One context file, resolved from storage. `text` is null for binaries and in `list` mode. */
 export interface ResolvedFile {
   id: string;
   name: string;
@@ -107,6 +107,66 @@ export interface ResolvedFile {
   uri: string;
   byteSize: number;
   text: string | null;
+  /** `list` mode only, text files only (SQEM-481 — read from the row, computed once). */
+  preview?: string;
+  previewTruncated?: boolean;
+}
+
+// SQEM-481 — how many storage downloads one request runs at a time, and how often a failed one is
+// retried.
+//
+// ⛔ **Measured on production after Promotion (45): with eight in flight, 2 of 4 inline loads of a
+// 154-file skill lost 58–61 files** — individual downloads failed sporadically, and the failure was
+// silent: the file came back as a reference instead of its text, and nothing was logged. The cause
+// was found with the log line below: `429 Too many connections issued to the database`. Every storage
+// download makes the Storage API run its own query, and parallel downloads exhaust ITS connection
+// pool — which is shared by the whole project, so the 429 also reaches other users' storage requests
+// while a large inline load runs. Four in flight with retries still lost up to 3 of 151 files and ran
+// 20–39 s under load (staging, 10 consecutive loads). Two in flight (SQEM-481). The retries stay as
+// the second line, and whatever still fails is logged with the storage's answer.
+// ⛔ Do not raise this without re-running that measurement — the cost lands on everyone, not on MCP.
+const DOWNLOAD_CONCURRENCY = 2;
+const DOWNLOAD_RETRY_DELAYS_MS = [150, 450];
+
+/** The embedded `workspace_file_texts(content)` of a row — PostgREST returns it as an object or a one-element array. */
+function storedTextOf(row: any): string | null {
+  const e = row?.workspace_file_texts;
+  const c = Array.isArray(e) ? e[0]?.content : e?.content;
+  return typeof c === 'string' ? c : null;
+}
+
+/**
+ * Download one storage object as text, retrying a failed attempt. `null` only after every attempt
+ * failed — the caller then falls back to a reference, which is still readable via the uri.
+ */
+async function downloadText(
+  client: any, path: string, onError?: (message: string) => void,
+): Promise<string | null> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const { data: blob, error } = await client.storage.from('workspace-files').download(path);
+      if (blob && !error) return await blob.text();
+      onError?.(String((error as any)?.statusCode ?? (error as any)?.status ?? '') + ' ' + String(error?.message ?? 'no data'));
+    } catch (e) {
+      onError?.(`threw: ${(e as Error)?.message}`);
+    }
+    if (attempt >= DOWNLOAD_RETRY_DELAYS_MS.length) return null;
+    await new Promise(r => setTimeout(r, DOWNLOAD_RETRY_DELAYS_MS[attempt]));
+  }
+}
+
+/** `Promise.all` over `items`, at most `limit` in flight, results in input order. */
+export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
 }
 
 // Renders resolved context files as prompt text: text inline, binaries as a URI reference.
@@ -264,7 +324,7 @@ export interface LibraryReader {
 
   /** Accepts a bare file id or a `sqemes://files/<id>` uri. */
   readContextFile(ref: string): Promise<FileContent>;
-  resolveContextFiles(fileIds: string[] | null | undefined): Promise<ResolvedFile[]>;
+  resolveContextFiles(fileIds: string[] | null | undefined, opts?: { mode?: 'inline' | 'list' }): Promise<ResolvedFile[]>;
 }
 
 export interface LibraryReaderOptions {
@@ -278,26 +338,35 @@ export interface LibraryReaderOptions {
 /**
  * Resolves the caller's access once, then answers library reads against it.
  *
- * ⚠️ The three access sets cost three round trips and are built eagerly, because every one of them
- * is needed by at least one handler and a lazy build would have made the first call of a session
+ * ⚠️ The three access sets cost one database call (SQEM-500) and are built eagerly, because every
+ * one of them is needed by at least one handler and a lazy build would have made the first call of a session
  * pay a different price than the rest — which is exactly the kind of variance that gets mistaken for
  * a slow query later. `mcp-server` already built all three per request before this module existed.
  */
 export async function createLibraryReader(
   { client, workspaceId, userId }: LibraryReaderOptions,
 ): Promise<LibraryReader> {
-  // SQEM-142/210 — per-user template access, evaluated by the database so the rule lives once.
-  const { data: accRows } = await client.rpc('mcp_accessible_template_ids', {
-    p_workspace_id: workspaceId, p_user_id: userId,
-  });
-  const accessibleTemplates = new Set(((accRows as { id: string }[] | null) || []).map(r => r.id));
-  const canAccessTemplate = (templateId: string): boolean => accessibleTemplates.has(templateId);
+  // SQEM-500 — the three access sets in ONE database call. SQEM-481 ran four lookups concurrently;
+  // under load that still meant four requests queueing for PostgREST's share of the connections, and
+  // the queue was where the time went (staging, 100 concurrent: ~7× per query, Postgres idle). The
+  // rules did not move: `library_access_sets()` delegates to `mcp_accessible_template_ids` and
+  // `mcp_accessible_persona_ids`, and its file clause is the SQEM-291 rule below.
+  //
+  // ⚠️ A failed call yields EMPTY sets — the reader then sees nothing, which is the closed direction.
+  const { data: sets } = await client.rpc('library_access_sets', { p_workspace_id: workspaceId, p_user_id: userId });
+  const accessSets = (sets ?? {}) as { templates?: { id: string; title: string }[]; personas?: string[]; files?: string[] };
 
-  // SQEM-324 — the same question for personas, answered the same way and for the same reasons.
-  const { data: pAccRows } = await client.rpc('mcp_accessible_persona_ids', {
-    p_workspace_id: workspaceId, p_user_id: userId,
-  });
-  const accessiblePersonas = new Set(((pAccRows as { id: string }[] | null) || []).map(r => r.id));
+  const accessibleTemplates = new Set((accessSets.templates ?? []).map(t => t.id));
+  const canAccessTemplate = (templateId: string): boolean => accessibleTemplates.has(templateId);
+  // name → id over the templates this caller may open; `get_template(name:)` resolves here instead of
+  // reading every title in the workspace again.
+  const templateIdBySlug = new Map<string, string>();
+  for (const t of accessSets.templates ?? []) {
+    const slug = toSlug(t.title);
+    if (!templateIdBySlug.has(slug)) templateIdBySlug.set(slug, t.id);
+  }
+
+  const accessiblePersonas = new Set(accessSets.personas ?? []);
   const canAccessPersona = (personaId: string): boolean => accessiblePersonas.has(personaId);
 
   // SQEM-291 — which files this caller may read **by id**, which is not answered by the line above.
@@ -310,56 +379,127 @@ export async function createLibraryReader(
   // Enumeration is the sharper half: nobody asked for that list, and a file name alone can be the
   // disclosure ("Q3-layoffs.xlsx").
   //
-  // Built as a set once, not a check per file: a listing would otherwise make one round trip per
-  // row. The uploader clause mirrors `can_access_file()`.
-  const accessibleFileIds: Set<string> = await (async () => {
-    const { data: rows } = await client
-      .from('prompts')
-      .select('id, context_file_ids')
-      .eq('workspace_id', workspaceId);
-    type Row = { id: string; context_file_ids: string[] | null };
-    const all = (rows as Row[] | null) || [];
-    const ids = new Set<string>();
-    for (const r of all) {
-      if (!canAccessTemplate(r.id)) continue;
-      for (const fid of r.context_file_ids || []) ids.add(fid);
-    }
-    const { data: own } = await client
-      .from('workspace_files')
-      .select('id')
-      .eq('workspace_id', workspaceId)
-      .eq('created_by', userId);
-    for (const f of (own as { id: string }[] | null) || []) ids.add(f.id);
-    return ids;
-  })();
+  // Computed in `library_access_sets()` since SQEM-500: files attached to a template the caller may
+  // open, plus files they uploaded (the uploader clause mirrors `can_access_file()`).
+  const accessibleFileIds = new Set<string>(accessSets.files ?? []);
 
   // Resolves context files from storage (source of truth — no longer extracted_text).
   // Text files carry their content; binaries carry only a resource URI to fetch.
-  const resolveContextFiles = async (fileIds: string[] | null | undefined): Promise<ResolvedFile[]> => {
+  //
+  // SQEM-481 — `mode: 'list'` downloads nothing it does not have to. The preview is stored on the
+  // row (`workspace_files.preview`) the first time it is computed, so a listing reads one query
+  // instead of one download per file. Measured before: `design_diagrams` (154 files) took 12 s at
+  // p50 in list mode — slower than most clients wait — although it returned only 174 KB.
+  //
+  // ⚠️ The stored preview is valid because a file's bytes never change after upload: the app has no
+  // replace path, `storage_path` is not client-writable (SQEM-492) and the bucket has no UPDATE
+  // policy. An editor who deletes the storage object and re-uploads different bytes under the same
+  // path would leave the preview stale; it is a hint for "is this worth reading?", never content
+  // and never an access decision, so that is accepted rather than paid for with a check per file.
+  // ⚠️ A file whose download fails keeps `preview` null and is retried on the next listing.
+  const resolveContextFiles = async (
+    fileIds: string[] | null | undefined,
+    { mode = 'inline' }: { mode?: 'inline' | 'list' } = {},
+  ): Promise<ResolvedFile[]> => {
     if (!fileIds?.length) return [];
+    // SQEM-500 — `inline` reads the stored text in the same query (an embedded join on
+    // `workspace_file_texts`); `list` does not, because it needs only the preview and the text would
+    // be megabytes of payload for nothing.
     const { data: files } = await client
       .from('workspace_files')
-      .select('id, name, mime_type, size_bytes, storage_path')
+      .select(mode === 'list'
+        ? 'id, name, mime_type, size_bytes, storage_path, preview, preview_truncated'
+        : 'id, name, mime_type, size_bytes, storage_path, workspace_file_texts(content)')
       .eq('workspace_id', workspaceId)
       .in('id', fileIds);
 
-    const resolved: ResolvedFile[] = [];
-    for (const f of (files || [])) {
-      let text: string | null = null;
-      // SQEM-492 — a path outside this workspace's folder is never downloaded (defence in depth
-      // behind the workspace_files_path_in_workspace constraint).
-      if (isTextContentMime(f.mime_type) && isPathInWorkspace(f.storage_path, workspaceId)) {
-        const { data: blob } = await client.storage.from('workspace-files').download(f.storage_path);
-        if (blob) text = await blob.text();
+    const rows = (files || []) as any[];
+    const toFill: { id: string; preview: string; truncated: boolean }[] = [];
+    const toStore: { file_id: string; workspace_id: string; content: string }[] = [];
+
+    // `list` with a preview still missing: its text may be stored already (an earlier inline read).
+    const storedText = new Map<string, string>();
+    for (const f of rows) {
+      const t = storedTextOf(f);
+      if (t != null) storedText.set(f.id, t);
+    }
+    if (mode === 'list') {
+      const missing = rows.filter(f => isTextContentMime(f.mime_type) && typeof f.preview !== 'string').map(f => f.id);
+      if (missing.length) {
+        const { data: texts } = await client.from('workspace_file_texts').select('file_id, content').in('file_id', missing);
+        for (const t of (texts || []) as { file_id: string; content: string }[]) storedText.set(t.file_id, t.content);
       }
-      resolved.push({
+    }
+
+    // Concurrent, bounded: the old loop awaited each download in turn, so 154 files cost 154 round
+    // trips end to end. See DOWNLOAD_CONCURRENCY for why it is four and not more.
+    let failed = 0;
+    // The distinct storage errors seen in this request, for the log line — the cause of the SQEM-481
+    // regression was invisible precisely because nothing said what the storage answered.
+    const errorKinds = new Map<string, number>();
+    const noteError = (m: string) => errorKinds.set(m.trim().slice(0, 120), (errorKinds.get(m.trim().slice(0, 120)) ?? 0) + 1);
+    const resolved = await mapLimit(rows, DOWNLOAD_CONCURRENCY, async (f: any): Promise<ResolvedFile> => {
+      const base = {
         id: f.id,
         name: f.name,
         mimeType: f.mime_type,
         uri: `sqemes://files/${f.id}`,
         byteSize: f.size_bytes ?? 0,
-        text,
-      });
+        text: null as string | null,
+      };
+      if (!isTextContentMime(f.mime_type)) return base;
+
+      if (mode === 'list' && typeof f.preview === 'string') {
+        return { ...base, preview: f.preview, previewTruncated: !!f.preview_truncated };
+      }
+      // SQEM-492 — a path outside this workspace's folder is never downloaded (defence in depth
+      // behind the workspace_files_path_in_workspace constraint).
+      let text = storedText.get(f.id) ?? null;
+      if (text == null) {
+        if (!isPathInWorkspace(f.storage_path, workspaceId)) return base;
+        text = await downloadText(client, f.storage_path, noteError);
+        if (text == null) { failed++; return base; }
+        toStore.push({ file_id: f.id, workspace_id: workspaceId, content: text });
+      }
+      if (mode === 'inline') return { ...base, text };
+
+      const { preview, truncated } = buildPreview(text, f.mime_type);
+      toFill.push({ id: f.id, preview, truncated });
+      return { ...base, preview, previewTruncated: truncated };
+    });
+
+    if (failed || errorKinds.size) {
+      const kinds = [...errorKinds].map(([m, c]) => `${c}× "${m}"`).join('; ');
+      console.error(`[library] ${failed} of ${rows.length} context file downloads failed after retries — returned by reference (mode ${mode}). Attempts failed: ${kinds}`);
+    }
+
+    // SQEM-500 — store what had to be downloaded, so the next read of these files needs no storage
+    // at all. One batched request; a conflict means a concurrent read stored it first.
+    if (toStore.length) {
+      try {
+        await client.from('workspace_file_texts').upsert(toStore, { onConflict: 'file_id', ignoreDuplicates: true });
+      } catch (e) {
+        console.error('[library] text write-back failed:', (e as Error)?.message);
+      }
+    }
+
+    // Write the computed previews back. Awaited, because an un-awaited promise can be torn down with
+    // the response; they run concurrently and only ever on the first listing of a file.
+    // `.is('preview', null)` keeps a concurrent first listing from writing twice for nothing.
+    if (toFill.length) {
+      await Promise.all(toFill.map(async ({ id, preview, truncated }) => {
+        try {
+          await client
+            .from('workspace_files')
+            .update({ preview, preview_truncated: truncated })
+            .eq('workspace_id', workspaceId)
+            .eq('id', id)
+            .is('preview', null);
+        } catch (e) {
+          // Best effort: a failed write costs the next listing a download, never this answer.
+          console.error('[library] preview write-back failed:', (e as Error)?.message);
+        }
+      }));
     }
     return resolved;
   };
@@ -538,17 +678,23 @@ export async function createLibraryReader(
     async getTemplate({ id: templateId, name: templateName, includeFiles = 'inline' }) {
       if (!templateId && !templateName) throw new LibraryBadRequest('Provide either id or name');
 
-      const { data: templates } = await client
+      // SQEM-481 — fetch ONE row with its content, not every row. This used to select the content
+      // of every template in the workspace to pick one out in memory — several hundred bodies per
+      // call. A name is matched on the slug, which is computed — since SQEM-500 against the titles
+      // the access sets already carry, so it costs no query at all.
+      const resolvedId: string | undefined = templateId ?? templateIdBySlug.get(templateName!);
+      // SQEM-142 — checked before the content is fetched, so a closed template's body is never read.
+      if (!resolvedId || !canAccessTemplate(resolvedId)) throw new LibraryNotFound('Template not found');
+
+      const { data: tpl } = await client
         .from('prompts')
         .select('id, title, description, kind, content, variables, context_file_ids')
         .eq('workspace_id', workspaceId)
-        .or('published.eq.true,kind.eq.skill'); // SQEM-110/210 — vestigial guard
+        .eq('id', resolvedId)
+        .or('published.eq.true,kind.eq.skill') // SQEM-110/210 — vestigial guard
+        .maybeSingle();
 
-      const tpl = templateId
-        ? (templates || []).find((t: any) => t.id === templateId)
-        : (templates || []).find((t: any) => toSlug(t.title) === templateName);
-
-      if (!tpl || !canAccessTemplate(tpl.id)) throw new LibraryNotFound('Template not found'); // SQEM-142
+      if (!tpl) throw new LibraryNotFound('Template not found');
 
       // SQEM-230 — how context files come back. `inline` stays the module default so every existing
       // MCP caller gets byte-identical output; an unknown value is rejected rather than silently
@@ -560,7 +706,7 @@ export async function createLibraryReader(
 
       // Text context files are inlined; binaries (PDF/images) are referenced by resource URI.
       let content = tpl.content || '';
-      const resolved = await resolveContextFiles(tpl.context_file_ids);
+      const resolved = await resolveContextFiles(tpl.context_file_ids, { mode: includeFiles as 'inline' | 'list' });
       for (const block of renderContextBlocks(resolved, includeFiles)) {
         content += `\n\n${block}`;
       }
@@ -579,10 +725,9 @@ export async function createLibraryReader(
         const base = { name: f.name, uri: f.uri, mimeType: f.mimeType };
         if (includeFiles === 'inline') return base;
         const listed: any = { ...base, byteSize: f.byteSize };
-        if (f.text != null) {
-          const { preview, truncated } = buildPreview(f.text, f.mimeType);
-          listed.preview = preview;
-          listed.previewTruncated = truncated;
+        if (f.preview != null) {
+          listed.preview = f.preview;
+          listed.previewTruncated = f.previewTruncated ?? false;
         }
         return listed;
       });
@@ -660,12 +805,16 @@ export async function createLibraryReader(
 
       const { data: file } = await client
         .from('workspace_files')
-        .select('id, name, mime_type, storage_path')
+        .select('id, name, mime_type, storage_path, workspace_file_texts(content)')
         .eq('workspace_id', workspaceId)
         .eq('id', fileId)
         .single();
 
       if (!file || !isPathInWorkspace(file.storage_path, workspaceId)) throw new LibraryNotFound(`Resource not found: ${ref}`);
+
+      // SQEM-500 — a text file read before is answered from the database, without storage.
+      const stored = isTextContentMime(file.mime_type) ? storedTextOf(file) : null;
+      if (stored != null) return { uri, name: file.name, mimeType: file.mime_type, text: stored, base64: null };
 
       const { data: blob, error: storageErr } = await client.storage
         .from('workspace-files')
@@ -674,7 +823,14 @@ export async function createLibraryReader(
       if (storageErr || !blob) throw new LibraryNotFound('File content not available');
 
       if (isTextContentMime(file.mime_type)) {
-        return { uri, name: file.name, mimeType: file.mime_type, text: await blob.text(), base64: null };
+        const text = await blob.text();
+        try {
+          await client.from('workspace_file_texts')
+            .upsert([{ file_id: file.id, workspace_id: workspaceId, content: text }], { onConflict: 'file_id', ignoreDuplicates: true });
+        } catch (e) {
+          console.error('[library] text write-back failed:', (e as Error)?.message);
+        }
+        return { uri, name: file.name, mimeType: file.mime_type, text, base64: null };
       }
       return {
         uri, name: file.name, mimeType: file.mime_type,

@@ -298,9 +298,22 @@ describe('MCP write authorisation (SQEM-336)', () => {
     // PAYWALL gate a few lines above tests the same two methods, and the loose match found that one
     // instead. Caught by mutation, not by reading. **A test that can match the wrong occurrence of a
     // condition is not testing the condition.**
-    expect(src, 'the counting guard must skip the handshake').toMatch(
-      /if \(method !== 'initialize' && method !== 'ping'\) \{\s*const counted/,
-    );
+    //
+    // SQEM-481 — the handshake no longer reaches the counting block at all: it returns before the
+    // gates, so the guard became a position. Asserted as one: every handshake return must come
+    // BEFORE the first `record_mcp_call`, and each return is anchored to its own method so that
+    // dropping one of them (and letting it fall through to the count) fails here.
+    const firstCount = src.indexOf("rpc('record_mcp_call'");
+    expect(firstCount, 'record_mcp_call must exist').toBeGreaterThan(0);
+    for (const [m, ret] of [
+      ['ping', /if \(method === 'ping'\) \{\s*return rpcResult\(id, \{\}\);/],
+      ['initialize', /if \(method === 'initialize'\) \{\s*return rpcResult\(id, initializeResult\(\)\);/],
+      ['notifications/initialized', /if \(method === 'notifications\/initialized'\) \{\s*return new Response\(null, \{ status: 204/],
+    ] as const) {
+      const at = src.search(ret);
+      expect(at, `${m} must return early`).toBeGreaterThan(0);
+      expect(at, `${m} must return before the call is counted`).toBeLessThan(firstCount);
+    }
     // ⚠️ The capability is read from TOOL_CAPABILITY, never re-derived — a second copy of that
     // mapping is what SQEM-332 and SQEM-349 each cost.
     expect(src).toMatch(/TOOL_CAPABILITY\[[\s\S]{0,80}?\][\s\S]{0,200}?record_mcp_call/);

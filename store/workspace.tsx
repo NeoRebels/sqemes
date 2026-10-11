@@ -87,7 +87,9 @@ export function useWorkspaceState(
     try {
       await workspacesApi.setWorkspaceManaged(id, managed);
       setWorkspace(prev => {
-        const updated = { ...prev, isManaged: managed };
+        // SQEM-488 — the RPC sets credits_limit too (0 = unmetered); mirror that for managed. Leaving
+        // managed restores the plan allowance server-side; the next load shows it.
+        const updated = { ...prev, isManaged: managed, ...(managed ? { creditsLimit: 0 } : {}) };
         setAvailableWorkspaces(list => list.map(w => w.id === id ? updated : w));
         return updated;
       });

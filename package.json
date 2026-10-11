@@ -1,7 +1,7 @@
 {
   "name": "sqemes",
   "private": true,
-  "version": "1.11.22",
+  "version": "1.11.23",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
@@ -22,6 +22,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,json,css}\"",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:isolation": "vitest run --config vitest.isolation.config.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
@@ -66,9 +67,10 @@
   },
   "overrides": {
     "js-yaml": "^4.3.2",
-    "brace-expansion": "^5.0.9",
+    "brace-expansion": "^5.0.11",
     "minimatch": "^10.0.3",
-    "undici": "^7.29.0",
-    "browserslist": "^4.28.8"
+    "undici": "^7.29.1",
+    "browserslist": "^4.28.8",
+    "source-map-js": "^1.2.2"
   }
 }

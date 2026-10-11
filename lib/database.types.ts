@@ -517,6 +517,8 @@ export type Database = {
           name: string;
           mime_type: string;
           size_bytes: number;
+          preview: string | null;  // SQEM-481 — server-owned
+          preview_truncated: boolean | null;
           storage_path: string;
           tags: string[];
           created_by: string | null;
@@ -528,6 +530,8 @@ export type Database = {
           name: string;
           mime_type: string;
           size_bytes: number;
+          preview?: string | null;  // SQEM-481 — server-owned
+          preview_truncated?: boolean | null;
           storage_path: string;
           tags?: string[];
           created_by?: string | null;
@@ -539,11 +543,21 @@ export type Database = {
           name?: string;
           mime_type?: string;
           size_bytes?: number;
+          preview?: string | null;  // SQEM-481 — server-owned
+          preview_truncated?: boolean | null;
           storage_path?: string;
           tags?: string[];
           created_by?: string | null;
           created_at?: string;
         };
+        Relationships: [];
+      };
+      // SQEM-500 — server-only stored text of a text context file. No client access (RLS on, no
+      // policies); declared so the schema here stays complete, not because the app reads it.
+      workspace_file_texts: {
+        Row: { file_id: string; workspace_id: string; content: string; created_at: string };
+        Insert: { file_id: string; workspace_id: string; content: string; created_at?: string };
+        Update: { file_id?: string; workspace_id?: string; content?: string; created_at?: string };
         Relationships: [];
       };
       // SQEM-292 — access groups. Hand-written rather than regenerated: the generator needs a live

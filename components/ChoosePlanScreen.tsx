@@ -8,7 +8,7 @@ import { PLANS, TRIAL_DAYS, VAT_NOTE } from '../constants';
 import { can } from '../lib/permissions';
 import { isPaymentFailing } from '../lib/subscription';
 import type { PlanTier } from '../types';
-import { Check, Loader2, LogOut, Building2, CreditCard, ExternalLink, Download } from 'lucide-react';
+import { Check, Loader2, LogOut, Building2, CreditCard, ExternalLink, Download, Shield } from 'lucide-react';
 import { buildAccountExport, accountExportFilename } from '../lib/accountExport';
 import { downloadBlob } from '../lib/bundleFormat';
 
@@ -17,7 +17,7 @@ import { downloadBlob } from '../lib/bundleFormat';
 // Admins act; members are told to ask an admin. A workspace switcher + sign-out keep
 // users with several workspaces from being stranded.
 const ChoosePlanScreen = () => {
-  const { workspace, currentUser, availableWorkspaces, switchWorkspace } = useWorkspace();
+  const { workspace, currentUser, availableWorkspaces, switchWorkspace, isSqemesAdmin, setWorkspaceManaged } = useWorkspace();
   const { showToast } = useUI();
   const { signOut } = useAuth();
 
@@ -26,6 +26,7 @@ const ChoosePlanScreen = () => {
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
+  const [managedBusy, setManagedBusy] = useState(false);
 
   // SQEM-267 — see the block above the button for why this lives on the gated screen at all.
   // It calls the **existing** account export from SQEM-205, unchanged: that function already
@@ -301,6 +302,29 @@ const ChoosePlanScreen = () => {
               : <><Download className="w-4 h-4" /> Download everything</>}
           </button>
         </div>
+        )}
+
+        {/* SQEM-488 — the Settings toggle is unreachable behind this gate, so a Sqemes admin gets the
+            same switch here. `set_workspace_managed` checks `is_sqemes_admin()` server-side (and since
+            SQEM-489 nobody can grant themselves that flag); managed also sets credits_limit = 0, so the
+            workspace is unmetered, not just ungated. Once `isManaged` flips, App drops this screen. */}
+        {isSqemesAdmin && !workspace.isManaged && (
+          <div className="max-w-md mx-auto mt-8 flex items-center justify-between gap-4 p-4 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800/50 rounded-xl">
+            <div className="flex items-center gap-3">
+              <Shield className="w-5 h-5 text-brand-600 dark:text-brand-400 shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-brand-900 dark:text-brand-300">Sqemes admin</p>
+                <p className="text-xs text-brand-600 dark:text-brand-400 mt-0.5">Make <span className="font-semibold">{workspace.name}</span> a managed workspace — no plan, no paywall, AI not metered.</p>
+              </div>
+            </div>
+            <button
+              onClick={async () => { setManagedBusy(true); try { await setWorkspaceManaged(workspace.id, true); } finally { setManagedBusy(false); } }}
+              disabled={managedBusy}
+              className="shrink-0 inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {managedBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Make managed
+            </button>
+          </div>
         )}
 
         {/* Workspace switcher — for users who belong to other workspaces */}

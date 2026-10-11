@@ -48,9 +48,15 @@ describe('SQEM-492 — workspace_files', () => {
 
   it('edge functions never download or remove a path outside the workspace', () => {
     const lq = code(read('supabase/functions/_shared/libraryQueries.ts'));
-    const downloads = lq.match(/\.download\([a-z]+\.storage_path\)/g) ?? [];
-    expect(downloads.length).toBe(2);
-    expect((lq.match(/isPathInWorkspace\(/g) ?? []).length).toBe(2); // one guard per download
+    // Two ways to reach storage with a row's path: `.download(<row>.storage_path)` directly
+    // (readContextFile) and `downloadText(client, <row>.storage_path, …)` (resolveContextFiles, which
+    // retries since SQEM-481). The helper's own `.download(path)` is the only other `.download(` and
+    // takes whatever its callers pass — so the guard count must still match the call sites.
+    const direct  = lq.match(/\.download\([a-z]+\.storage_path\)/g) ?? [];
+    const helper  = lq.match(/downloadText\(client, [a-z]+\.storage_path/g) ?? [];
+    expect(direct.length + helper.length).toBe(2);
+    expect((lq.match(/\.download\(/g) ?? []).length).toBe(direct.length + 1); // + the helper's own
+    expect((lq.match(/isPathInWorkspace\(/g) ?? []).length).toBe(2); // one guard per call site
     const mcp = code(read('supabase/functions/mcp-server/index.ts'));
     expect(mcp).toMatch(/if \(isPathInWorkspace\(file\.storage_path, workspaceId\)\) \{\s*await adminClient\.storage\.from\('workspace-files'\)\.remove/);
   });

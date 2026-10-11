@@ -25,47 +25,97 @@ type Rows = Record<string, any[]>;
  * passes the same vestigial `published.eq.true,kind.eq.skill` guard (SQEM-110/210) and applying it
  * would only re-test PostgREST.
  */
-function fakeClient(tables: Rows, rpcs: Record<string, any[]>, blobs: Record<string, string> = {}) {
+function fakeClient(tables: Rows, rpcs: Record<string, any[]>, blobs: Record<string, string> = {}, failFirst: Record<string, number> = {}) {
   const seen: string[] = [];
   return {
     seen,
     rpc: async (name: string, args: any) => {
       seen.push(`rpc:${name}`);
+      // SQEM-500 — `library_access_sets()` mirrored from its SQL: templates from the template rule
+      // (with titles), personas from the persona rule, and files = those attached to an accessible
+      // template plus those the caller uploaded. ⚠️ The real SQL is exercised on staging; this fake
+      // only lets the JS-side filtering be tested against the same shape.
+      if (name === 'library_access_sets') {
+        const accT = new Set((rpcs.mcp_accessible_template_ids ?? []).map((r: any) => r.id));
+        const t = (tables.prompts ?? []).filter(p => p.workspace_id === args.p_workspace_id && accT.has(p.id));
+        const files = new Set<string>();
+        for (const p of t) for (const f of p.context_file_ids ?? []) files.add(f);
+        for (const f of tables.workspace_files ?? []) if (f.workspace_id === args.p_workspace_id && f.created_by === args.p_user_id) files.add(f.id);
+        return { data: {
+          templates: t.map(p => ({ id: p.id, title: p.title })),
+          personas: (rpcs.mcp_accessible_persona_ids ?? []).map((r: any) => r.id),
+          files: [...files],
+        }, error: null };
+      }
       return { data: rpcs[name] ?? [], error: null, args };
     },
     from(table: string) {
       const filters: [string, any][] = [];
       let one = false;
+      let patch: Record<string, unknown> | null = null;
+      let columns = '*';
       const rows = () => {
         let out = tables[table] ?? [];
         for (const [col, val] of filters) {
           out = Array.isArray(val)
             ? out.filter(r => val.includes(r[col]))
-            : out.filter(r => r[col] === val);
+            : val === null
+              ? out.filter(r => r[col] == null)
+              : out.filter(r => r[col] === val);
         }
         return out;
       };
       const b: any = {
-        select: () => b,
+        select: (cols?: string) => { columns = cols ?? '*'; return b; },
         order:  () => b,
         or:     () => b,
         eq: (c: string, v: any) => { filters.push([c, v]); return b; },
         in: (c: string, v: any) => { filters.push([c, v]); return b; },
+        is: (c: string, v: any) => { filters.push([c, v]); return b; },
+        update: (p: Record<string, unknown>) => { patch = p; return b; },
+        // SQEM-500 — `workspace_file_texts` write-back; ignoreDuplicates keeps the first row.
+        upsert: async (rowsIn: any[]) => {
+          seen.push(`upsert:${table}:${rowsIn.map(r => r.file_id ?? r.id).join(',')}`);
+          const t = (tables[table] ??= []);
+          for (const r of rowsIn) if (!t.some(x => x.file_id === r.file_id)) t.push({ ...r });
+          return { data: null, error: null };
+        },
         single:      () => { one = true; return b; },
         maybeSingle: () => { one = true; return b; },
         then: (resolve: any) => {
-          seen.push(`from:${table}`);
           const r = rows();
-          return resolve({ data: one ? (r[0] ?? null) : r, error: null });
+          if (patch) {
+            seen.push(`update:${table}:${r.map(x => x.id).join(',')}`);
+            for (const x of r) Object.assign(x, patch);
+            return resolve({ data: null, error: null });
+          }
+          seen.push(`from:${table}`);
+          seen.push(`select:${table}:${columns}`);
+          // PostgREST embedding of the one-to-one `workspace_file_texts(content)` (SQEM-500).
+          const out = table === 'workspace_files' && columns.includes('workspace_file_texts(')
+            ? r.map(x => {
+                const t = (tables.workspace_file_texts ?? []).find(y => y.file_id === x.id);
+                return { ...x, workspace_file_texts: t ? { content: t.content } : null };
+              })
+            : r;
+          return resolve({ data: one ? (out[0] ?? null) : out, error: null });
         },
       };
       return b;
     },
     storage: {
       from: () => ({
-        download: async (path: string) => blobs[path] !== undefined
-          ? { data: { text: async () => blobs[path], arrayBuffer: async () => new ArrayBuffer(0) }, error: null }
-          : { data: null, error: { message: 'not found' } },
+        download: async (path: string) => {
+          seen.push(`download:${path}`);
+          // SQEM-481 — `failFirst[path]` transient failures before the download succeeds.
+          if ((failFirst[path] ?? 0) > 0) {
+            failFirst[path]--;
+            return { data: null, error: { message: 'transient' } };
+          }
+          return blobs[path] !== undefined
+            ? { data: { text: async () => blobs[path], arrayBuffer: async () => new ArrayBuffer(0) }, error: null }
+            : { data: null, error: { message: 'not found' } };
+        },
       }),
     },
   };
@@ -78,7 +128,7 @@ function fakeClient(tables: Rows, rpcs: Record<string, any[]>, blobs: Record<str
 const WORKSPACE = 'ws-1';
 const USER = 'user-1';
 
-function build(overrides: { templates?: any[]; personas?: any[]; routes?: any[]; files?: any[]; accessibleTemplates?: string[]; accessiblePersonas?: string[]; ownFiles?: any[]; blobs?: Record<string, string> } = {}) {
+function build(overrides: { templates?: any[]; personas?: any[]; routes?: any[]; files?: any[]; accessibleTemplates?: string[]; accessiblePersonas?: string[]; ownFiles?: any[]; blobs?: Record<string, string>; failFirst?: Record<string, number> } = {}) {
   const templates = overrides.templates ?? [
     { id: 't-open', workspace_id: WORKSPACE, title: 'Open Brief', description: 'a brief', kind: 'prompt', content: 'body', variables: [], context_file_ids: ['f-open'] },
     { id: 't-shut', workspace_id: WORKSPACE, title: 'Shut Brief', description: 'a brief', kind: 'prompt', content: 'secret', variables: [], context_file_ids: ['f-shut'] },
@@ -100,8 +150,17 @@ function build(overrides: { templates?: any[]; personas?: any[]; routes?: any[];
       mcp_accessible_persona_ids:  (overrides.accessiblePersonas  ?? ['p-open']).map(id => ({ id })),
     },
     overrides.blobs ?? { 'ws-1/open.md': '# Heading\n\ncontent', 'ws-1/shut.md': 'secret bytes' },
+    overrides.failFirst ?? {},
   );
+  (overrides as any)._capture?.(client);
   return createLibraryReader({ client, workspaceId: WORKSPACE, userId: USER });
+}
+
+/** Like `build`, but also hands back the fake client, for assertions on what was queried. */
+async function buildWithClient(overrides: Parameters<typeof build>[0] = {}) {
+  let captured: any;
+  const lib = await build({ ...overrides, _capture: (c: any) => { captured = c; } } as any);
+  return { lib, client: captured };
 }
 
 describe('createLibraryReader — templates', () => {
@@ -155,6 +214,128 @@ describe('createLibraryReader — templates', () => {
     const inline = await lib.getTemplate({ id: 't-open', includeFiles: 'inline' });
     expect(inline.content).toContain('# Heading');
     expect(inline.contextFiles[0]).not.toHaveProperty('preview');
+  });
+
+  it('⭐ SQEM-481 — list mode reads a STORED preview and downloads nothing', async () => {
+    // The whole point of the column: a skill with 154 files costs one query, not 154 downloads.
+    const { lib, client } = await buildWithClient({
+      files: [{ id: 'f-open', workspace_id: WORKSPACE, name: 'open.md', mime_type: 'text/markdown', size_bytes: 10,
+                storage_path: 'ws-1/open.md', created_by: 'someone', preview: '# Stored', preview_truncated: true }],
+    });
+    const listed = await lib.getTemplate({ id: 't-open', includeFiles: 'list' });
+    expect(listed.contextFiles[0]).toMatchObject({ preview: '# Stored', previewTruncated: true });
+    expect(client.seen.filter((x: string) => x.startsWith('download:'))).toEqual([]);
+    expect(client.seen.filter((x: string) => x.startsWith('update:'))).toEqual([]);
+  });
+
+  it('⭐ SQEM-481 — a missing preview is computed once and written back', async () => {
+    const { lib, client } = await buildWithClient();
+    await lib.getTemplate({ id: 't-open', includeFiles: 'list' });
+    expect(client.seen).toContain('download:ws-1/open.md');
+    expect(client.seen).toContain('update:workspace_files:f-open');
+
+    // Second listing: served from the row.
+    client.seen.length = 0;
+    const again = await lib.getTemplate({ id: 't-open', includeFiles: 'list' });
+    expect(again.contextFiles[0]).toMatchObject({ preview: '# Heading', previewTruncated: false });
+    expect(client.seen.filter((x: string) => x.startsWith('download:'))).toEqual([]);
+  });
+
+  it('⛔ SQEM-481 — a binary never gets a preview and is never downloaded in list mode', async () => {
+    const { lib, client } = await buildWithClient({
+      files: [{ id: 'f-open', workspace_id: WORKSPACE, name: 'a.pdf', mime_type: 'application/pdf', size_bytes: 99,
+                storage_path: 'ws-1/a.pdf', created_by: 'someone' }],
+    });
+    const listed = await lib.getTemplate({ id: 't-open', includeFiles: 'list' });
+    expect(listed.contextFiles[0]).not.toHaveProperty('preview');
+    expect(client.seen.filter((x: string) => x.startsWith('download:') || x.startsWith('update:'))).toEqual([]);
+  });
+
+  it('⛔ SQEM-481 — a closed template\'s body is never even fetched', async () => {
+    // getTemplate now resolves the id first and fetches one row with content only after the access
+    // check. The old shape fetched every body in the workspace and filtered in memory.
+    const { lib, client } = await buildWithClient();
+    client.seen.length = 0;
+    await expect(lib.getTemplate({ name: 'shut_brief' })).rejects.toThrow(LibraryNotFound);
+    expect(client.seen.filter((x: string) => x.startsWith('select:prompts:') && x.includes('content'))).toEqual([]);
+  });
+
+  it('⛔ SQEM-481 — a download that fails once is retried, and the file still comes back inline', async () => {
+    // Measured on production after Promotion (45): concurrent downloads failed sporadically and the
+    // file silently degraded to a reference. One transient failure must not cost the caller the text.
+    const { lib, client } = await buildWithClient({ failFirst: { 'ws-1/open.md': 1 } });
+    const inline = await lib.getTemplate({ id: 't-open', includeFiles: 'inline' });
+    expect(inline.content).toContain('[Context: open.md]\n# Heading');
+    expect(client.seen.filter((x: string) => x === 'download:ws-1/open.md')).toHaveLength(2);
+  });
+
+  it('⛔ SQEM-481 — a download that keeps failing falls back to a reference AND is logged', async () => {
+    const errors: string[] = [];
+    const orig = console.error;
+    console.error = (...a: unknown[]) => { errors.push(a.join(' ')); };
+    try {
+      const { lib, client } = await buildWithClient({ failFirst: { 'ws-1/open.md': 99 } });
+      const inline = await lib.getTemplate({ id: 't-open', includeFiles: 'inline' });
+      expect(inline.content).toContain('read via sqemes://files/f-open');
+      expect(client.seen.filter((x: string) => x === 'download:ws-1/open.md')).toHaveLength(3);
+      expect(errors.some(e => /1 of 1 context file downloads failed/.test(e))).toBe(true);
+    } finally {
+      console.error = orig;
+    }
+  });
+
+  it('⭐ SQEM-500 — the reader builds its access sets in ONE database call', async () => {
+    // Under load every request queued for PostgREST; four lookups per call became one.
+    const { client } = await buildWithClient();
+    expect(client.seen).toEqual(['rpc:library_access_sets']);
+  });
+
+  it('⭐ SQEM-500 — get_template by name costs no extra titles query', async () => {
+    const { lib, client } = await buildWithClient();
+    client.seen.length = 0;
+    expect((await lib.getTemplate({ name: 'open_brief' })).id).toBe('t-open');
+    expect(client.seen.filter((x: string) => x.startsWith('select:prompts:'))).toHaveLength(1);
+  });
+
+  it('⭐ SQEM-500 — inline stores a downloaded text once, then reads it without storage', async () => {
+    const { lib, client } = await buildWithClient();
+    client.seen.length = 0;
+    await lib.getTemplate({ id: 't-open', includeFiles: 'inline' }); // downloads + stores
+    expect(client.seen).toContain('download:ws-1/open.md');
+    expect(client.seen).toContain('upsert:workspace_file_texts:f-open');
+    client.seen.length = 0;
+    const again = await lib.getTemplate({ id: 't-open', includeFiles: 'inline' });
+    expect(again.content).toContain('[Context: open.md]\n# Heading');
+    expect(client.seen.filter((x: string) => x.startsWith('download:'))).toEqual([]);
+  });
+
+  it('SQEM-500 — list mode with a missing preview uses a stored text instead of downloading', async () => {
+    const { lib, client } = await buildWithClient();
+    await lib.getTemplate({ id: 't-open', includeFiles: 'inline' }); // stores the text, no preview yet
+    client.seen.length = 0;
+    const listed = await lib.getTemplate({ id: 't-open', includeFiles: 'list' });
+    expect(listed.contextFiles[0]).toMatchObject({ preview: '# Heading' });
+    expect(client.seen.filter((x: string) => x.startsWith('download:'))).toEqual([]);
+    expect(client.seen).toContain('update:workspace_files:f-open'); // the preview is still written back
+  });
+
+  it('SQEM-500 — read_context_file answers a text file from the store after the first read', async () => {
+    const { lib, client } = await buildWithClient();
+    expect((await lib.readContextFile('sqemes://files/f-open')).text).toBe('# Heading\n\ncontent');
+    expect(client.seen).toContain('upsert:workspace_file_texts:f-open');
+    client.seen.length = 0;
+    expect((await lib.readContextFile('f-open')).text).toBe('# Heading\n\ncontent');
+    expect(client.seen.filter((x: string) => x.startsWith('download:'))).toEqual([]);
+  });
+
+  it('SQEM-481 — inline mode still carries the full text and ignores a stored preview', async () => {
+    const lib = await build({
+      files: [{ id: 'f-open', workspace_id: WORKSPACE, name: 'open.md', mime_type: 'text/markdown', size_bytes: 10,
+                storage_path: 'ws-1/open.md', created_by: 'someone', preview: '# Stored', preview_truncated: false }],
+    });
+    const inline = await lib.getTemplate({ id: 't-open', includeFiles: 'inline' });
+    expect(inline.content).toContain('[Context: open.md]\n# Heading\n\ncontent');
+    expect(inline.content).not.toContain('# Stored');
   });
 
   it('SQEM-232 — a listing reports each template\'s OWN files, not the workspace total', async () => {
