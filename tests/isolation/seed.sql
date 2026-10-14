@@ -70,6 +70,11 @@ insert into public.workspace_files (id, workspace_id, name, mime_type, size_byte
           'aaaaaaaa-0000-4000-8000-0000000000aa/aaaaaaaa-0000-4000-8000-00000000a301/a.md', 'aaaaaaaa-0000-4000-8000-0000000000a1');
 update public.prompts set context_file_ids = array['aaaaaaaa-0000-4000-8000-00000000a301'::uuid]
   where id = 'aaaaaaaa-0000-4000-8000-00000000a001';
+-- SQEM-509 — an ownerless file no template lists (what the MCP server wrote before the fix, once its
+-- template was deleted). Visible to A's admin only, so it can be cleaned up.
+insert into public.workspace_files (id, workspace_id, name, mime_type, size_bytes, storage_path, created_by)
+  values ('aaaaaaaa-0000-4000-8000-00000000a302', 'aaaaaaaa-0000-4000-8000-0000000000aa', 'orphan.md', 'text/markdown', 6,
+          'aaaaaaaa-0000-4000-8000-0000000000aa/aaaaaaaa-0000-4000-8000-00000000a302/orphan.md', null);
 insert into public.workspace_file_texts (file_id, workspace_id, content)
   values ('aaaaaaaa-0000-4000-8000-00000000a301', 'aaaaaaaa-0000-4000-8000-0000000000aa', 'secret');
 insert into storage.objects (bucket_id, name, owner, metadata)

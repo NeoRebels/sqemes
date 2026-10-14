@@ -6,6 +6,8 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { IS_SELF_HOSTED } from '../lib/env';
+import TurnstileWidget from '../components/TurnstileWidget';
+import { TURNSTILE_SITE_KEY, captchaEnabled } from '../lib/captcha';
 
 // SQEM-258 — `initialMode` lets a caller open the register form directly. Someone who pressed
 // "Start free trial" on a public listing has said what they want; showing them a sign-in form asks
@@ -23,6 +25,12 @@ const Auth = ({ inviteEmail, initialMode }: { inviteEmail?: string; initialMode?
   // SQEM-277 — shown only once we know a confirmation is genuinely outstanding, never on spec.
   const [canResend, setCanResend] = useState(false);
   const [resending, setResending] = useState(false);
+  // SQEM-501 — the login captcha. Without a site key it is off and none of this has an effect. A token
+  // is single-use, so every attempt (whatever its outcome) bumps `captchaReset` for a fresh one.
+  const captchaOn = captchaEnabled(TURNSTILE_SITE_KEY);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
+  const token = captchaToken ?? undefined;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +41,7 @@ const Auth = ({ inviteEmail, initialMode }: { inviteEmail?: string; initialMode?
 
     try {
       if (mode === 'login') {
-        const { error } = await signIn(email, password);
+        const { error } = await signIn(email, password, token);
         if (error) {
           // SQEM-277 — "Email not confirmed" is the one sign-in failure with a next step, so it
           // gets one. Everything else falls through to the raw provider message unchanged.
@@ -44,14 +52,14 @@ const Auth = ({ inviteEmail, initialMode }: { inviteEmail?: string; initialMode?
           throw error;
         }
       } else if (mode === 'forgot') {
-        const { error } = await resetPassword(email);
+        const { error } = await resetPassword(email, token);
         if (error) throw error;
         setMessage('Check your email for a password reset link.');
       } else {
         if (!name.trim()) {
           throw new Error('Name is required');
         }
-        const { data, error } = await signUp(email, password, name);
+        const { data, error } = await signUp(email, password, name, token);
         if (error) throw error;
 
         // SQEM-277 — ask the response instead of assuming the answer.
@@ -100,6 +108,7 @@ const Auth = ({ inviteEmail, initialMode }: { inviteEmail?: string; initialMode?
       setError(err.message || 'An error occurred');
     } finally {
       setLoading(false);
+      if (captchaOn) setCaptchaReset(n => n + 1);
     }
   };
 
@@ -111,8 +120,9 @@ const Auth = ({ inviteEmail, initialMode }: { inviteEmail?: string; initialMode?
     setError(null);
     setMessage(null);
     setResending(true);
-    const { error } = await resendConfirmation(email);
+    const { error } = await resendConfirmation(email, token);
     setResending(false);
+    if (captchaOn) setCaptchaReset(n => n + 1);
     if (error) {
       setError(error.message);
       return;
@@ -277,16 +287,21 @@ const Auth = ({ inviteEmail, initialMode }: { inviteEmail?: string; initialMode?
                 <button
                   type="button"
                   onClick={handleResend}
-                  disabled={resending || !email}
+                  disabled={resending || !email || (captchaOn && !captchaToken)}
                   className="w-full text-center text-sm text-brand-600 dark:text-brand-400 hover:underline disabled:opacity-50 disabled:no-underline"
                 >
                   {resending ? 'Sending…' : "Didn't get the email? Send it again"}
                 </button>
               )}
 
+              {captchaOn && (
+                <TurnstileWidget siteKey={TURNSTILE_SITE_KEY} onToken={setCaptchaToken} resetKey={captchaReset} />
+              )}
+
               <Button
                 type="submit"
                 loading={loading}
+                disabled={captchaOn && !captchaToken}
                 className="w-full py-3 shadow-lg shadow-brand-200 dark:shadow-none"
               >
                 {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : mode === 'forgot' ? 'Send Reset Email' : 'Create Account'}

@@ -1,7 +1,7 @@
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { decryptApiKey } from '../_shared/crypto.ts';
-import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { checkChatBudget, budgetMessage } from '../_shared/rateLimit.ts';
 import { fetchWithTimeout } from '../_shared/fetchWithTimeout.ts';
 import { broadcastJobResult } from '../_shared/broadcast.ts';
 import { ensureCreditPeriod, hasCredits, debitCredits } from '../_shared/credits.ts';
@@ -88,9 +88,10 @@ Deno.serve(async (req) => {
     }
 
     // 4. Rate limit check
-    const allowed = await checkRateLimit(workspaceId);
-    if (!allowed) {
-      return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please wait before making more requests.' }), {
+    // SQEM-501 — per person, with a per-workspace ceiling (was: 60/min for the whole workspace).
+    const budget = await checkChatBudget(workspaceId, user.id);
+    if (!budget.ok) {
+      return new Response(JSON.stringify({ error: budgetMessage(budget), code: 'rate_limited', scope: budget.scope }), {
         status: 429,
         headers: { ...cors, 'Content-Type': 'application/json', 'Retry-After': '60' },
       });

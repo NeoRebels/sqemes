@@ -2,7 +2,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { decryptApiKey } from '../_shared/crypto.ts';
 import { getFreshConnectorToken } from '../_shared/connectorToken.ts';
-import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { checkChatBudget, budgetMessage } from '../_shared/rateLimit.ts';
 import { fetchWithTimeout } from '../_shared/fetchWithTimeout.ts';
 import { broadcastJobResult } from '../_shared/broadcast.ts';
 import { refusedConnectorLabels, connectorRefusedNotice } from '../_shared/connectorRefusal.ts';
@@ -29,6 +29,7 @@ import {
 } from '../_shared/toolStream.ts';
 import { ensureCreditPeriod, hasCredits, debitCredits } from '../_shared/credits.ts';
 import { FUNDED_MODEL } from '../_shared/funded.ts';
+import { isLoadtestRequest, runLoadtestMock, LOADTEST_HEADER } from '../_shared/loadtestMock.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
 
 // SQEM-082 — keyless chat + editor test-run route through the Sqemes-funded model
@@ -114,9 +115,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const allowed = await checkRateLimit(workspaceId);
-    if (!allowed) {
-      return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please wait before making more requests.' }), {
+    // SQEM-501 — per person, with a per-workspace ceiling (was: 60/min for the whole workspace).
+    const budget = await checkChatBudget(workspaceId, user.id);
+    if (!budget.ok) {
+      return new Response(JSON.stringify({ error: budgetMessage(budget), code: 'rate_limited', scope: budget.scope }), {
         status: 429,
         headers: { ...cors, 'Content-Type': 'application/json', 'Retry-After': '60' },
       });
@@ -150,6 +152,12 @@ Deno.serve(async (req) => {
       apiKey = fundedKey;
       effectiveModelId = FUNDED_MODEL;
       fundedCreditLimit = state.limit;
+    } else if (isLoadtestRequest(modelId, req.headers.get(LOADTEST_HEADER), Deno.env.get('CHAT_LOADTEST_SECRET'))) {
+      // SQEM-500 — simulated provider for load tests on staging; see _shared/loadtestMock.ts for why it
+      // is unreachable wherever CHAT_LOADTEST_SECRET is not set (production, self-host).
+      provider = 'loadtest';
+      apiKey = '';
+      effectiveModelId = modelId;
     } else {
       // BYOK: derive the provider from the model id, then fetch + decrypt the workspace key.
       const byokLower = modelId.toLowerCase();
@@ -495,6 +503,8 @@ async function runAndBroadcast({
       ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.x.ai/v1/chat/completions', instruction, messages, 'grok', onDelta, tools));
     } else if (provider === 'openrouter') {
       ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://openrouter.ai/api/v1/chat/completions', instruction, messages, 'openrouter', onDelta, tools));
+    } else if (provider === 'loadtest') {
+      result = await runLoadtestMock(onDelta, tools);
     } else {
       result = `[${provider}] Model ${modelId} is not yet supported.`;
     }

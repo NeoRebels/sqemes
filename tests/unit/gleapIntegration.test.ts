@@ -122,7 +122,9 @@ describe('SQEM-261 — how Gleap is allowed to be wired', () => {
     // ⛔ The SDK is bundled via npm precisely so this can stay closed (SQEM-111).
     // ⚠️ Read the ONE directive: `[^"]*` runs past the semicolon into style-src, which legitimately
     // carries 'unsafe-inline' — and then this assertion fails on a policy that is perfectly fine.
+    // ⚠️ SQEM-501 opened it by exactly ONE host: Cloudflare Turnstile (the login captcha) cannot be
+    // bundled — Cloudflare serves the script only from its own origin. Nothing else, and no wildcard.
     const scriptSrc = CSP.match(/script-src[^;"]*/)![0];
-    expect(scriptSrc).toBe("script-src 'self'");
+    expect(scriptSrc).toBe("script-src 'self' https://challenges.cloudflare.com");
   });
 });

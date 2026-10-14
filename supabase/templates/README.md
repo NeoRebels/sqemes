@@ -1,9 +1,15 @@
 # Supabase Auth email templates (SQEM-097)
 
-Branded HTML for the Supabase **Authentication → Emails** templates. These are **dashboard
-config, not deployed by code** — no migration or deploy carries them, so paste each into the
-matching template in the Supabase dashboard, once per project. A fresh or duplicated project
-silently falls back to Supabase's defaults, and nothing announces it.
+Branded HTML for the Supabase **Authentication → Emails** templates. They are **auth config, not a
+migration** — no migration carries them.
+
+- **Staging:** `deploy-staging.yml` sets all five from these files on every deploy, reads them back
+  and fails on a difference (SQEM-508). ⚠️ Edit the file, not the staging dashboard — a dashboard
+  edit is overwritten by the next deploy.
+- **Production:** still a manual paste into the dashboard, once per change.
+
+A fresh or duplicated project silently falls back to Supabase's defaults, and nothing announces
+it — staging had done exactly that (found 2026-10-13; every reset hung on the loading screen).
 
 Design matches the in-code template (`supabase/functions/_shared/emailTemplate.ts`) used for
 the Resend invite email — same logo, card, button, footer.

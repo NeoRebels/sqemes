@@ -39,13 +39,16 @@ export function useAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string, name: string) => {
+  // SQEM-501 — every entry point Supabase protects with its captcha takes an optional token. Without a
+  // site key (self-host, local) it is undefined and the call is exactly what it was before.
+  const signUp = useCallback(async (email: string, password: string, name: string, captchaToken?: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { name },
         emailRedirectTo: window.location.origin,
+        ...(captchaToken ? { captchaToken } : {}),
       },
     });
     return { data, error };
@@ -60,19 +63,20 @@ export function useAuth() {
   // Supabase answers identically whether or not the address has a pending signup — that is
   // deliberate on their side (it stops the form being used to test which addresses are
   // registered), and the caller must not try to be more informative than the API is.
-  const resendConfirmation = useCallback(async (email: string) => {
+  const resendConfirmation = useCallback(async (email: string, captchaToken?: string) => {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: window.location.origin, ...(captchaToken ? { captchaToken } : {}) },
     });
     return { error };
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string, captchaToken?: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
+      ...(captchaToken ? { options: { captchaToken } } : {}),
     });
     return { data, error };
   }, []);
@@ -106,13 +110,14 @@ export function useAuth() {
     return { error };
   }, []);
 
-  const resetPassword = useCallback(async (email: string) => {
+  const resetPassword = useCallback(async (email: string, captchaToken?: string) => {
     // SQEM-091 — redirect to the BARE origin (no `/#/reset-password`). GoTrue puts the
     // recovery token in the fragment; the bare origin lands it at `#access_token=…&type=recovery`
     // where supabase-js parses it cleanly and establishes the recovery session. The
     // PASSWORD_RECOVERY handler above then routes to the reset page.
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin,
+      ...(captchaToken ? { captchaToken } : {}),
     });
     return { data, error };
   }, []);

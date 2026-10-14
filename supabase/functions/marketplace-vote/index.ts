@@ -7,7 +7,7 @@
 // voterKey must be 64-hex, per-voterKey + per-IP rate limit. Toggle handled server-side (re-casting the
 // same value clears the vote), mirroring the Cloud voteListing behaviour.
 import { createAdminClient } from '../_shared/supabase-admin.ts';
-import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { checkRateLimit, uuidFromSeed } from '../_shared/rateLimit.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -99,8 +99,3 @@ Deno.serve(async (req) => {
 
 // Deterministic UUID from a seed string (SHA-256 → RFC-4122-shaped) so the rate-limit table (keyed by a
 // uuid workspace_id) can namespace voter_key / IP counters without a real workspace.
-async function uuidFromSeed(seed: string): Promise<string> {
-  const buf = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed)));
-  const h = Array.from(buf.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join('');
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
-}

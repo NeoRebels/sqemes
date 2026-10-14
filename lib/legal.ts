@@ -42,6 +42,25 @@ export interface LegalDocument {
 }
 
 /**
+ * **`privacy` is at `1.3` since 2026-10-13 (SQEM-501); `terms` stays at `1.3`.** Cloudflare became a
+ * processor: the sign-in check (Turnstile) on the sign-in, registration, password-reset and resend
+ * forms — section 4 ("Protecting sign-in"), the CSP exception in section 8, the summary in section 9
+ * and a row in the subprocessor table, which now names TWO providers outside the EU. A new processor
+ * is a change of substance, the same reason Gleap moved this number in SQEM-427. The same publication
+ * also corrected three stale facts (assistants → playbooks and personas, Mistral as an own-key provider,
+ * the current connector list). The Terms did not change, so they do not re-gate.
+ *
+ * ⚠️ **Released only after the page was checked, and the first check FAILED.** The page went live with
+ * section 12 and the corrections, but without the section 4 paragraph, the section 8 sentence and the
+ * section 9 summary — so it named Cloudflare as a processor without saying what it does or on which
+ * legal basis. Agreeing to that text would have recorded consent to an incomplete policy. Bumped after
+ * a second `curl` showed all six parts and the date **October 13 2026**.
+ *
+ * ⛔ The policy promises 30 days' notice before a new processor. Whether that notice applies is checked
+ * per change; once any customer has a data processing agreement, a new processor waits the 30 days.
+ */
+
+/**
  * **`terms` is at `1.3` and `privacy` at `1.2` since 2026-09-16 (SQEM-427) — ONE bump for three
  * changes, on purpose.** Gleap became a processor (privacy Part 2 + the subprocessor table), the
  * Acceptable Use Policy gained a fair-use section for the API and MCP rate limits, and the Terms
@@ -100,7 +119,7 @@ export interface LegalDocument {
  */
 export const LEGAL_DOCUMENTS: LegalDocument[] = [
   { id: 'terms',   label: 'Terms and Conditions', url: 'https://sqemes.com/terms',   version: '1.3' },
-  { id: 'privacy', label: 'Privacy Policy',       url: 'https://sqemes.com/privacy', version: '1.2' },
+  { id: 'privacy', label: 'Privacy Policy',       url: 'https://sqemes.com/privacy', version: '1.3' },
 ];
 
 /** A row from `legal_acceptances` — only the two columns that decide anything. */

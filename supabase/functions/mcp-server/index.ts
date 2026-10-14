@@ -1,5 +1,6 @@
 import JSZip from 'npm:jszip@3.10.1';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
+import { shouldForward, forwardToHome, SERVED_REGION_HEADER } from '../_shared/regionForward.ts';
 import {
   createLibraryReader, hiddenFromCaller, toSlug, renderContextBlocks,
   LibraryNotFound, LibraryBadRequest, isPathInWorkspace,
@@ -358,7 +359,20 @@ function initializeResult() {
  * function. `scripts/mcp-latency.mjs` reads it from outside, so a slow call can be attributed to auth,
  * the gates, the access sets or the handler without guessing. Durations only, no data.
  */
-Deno.serve(async (req) => {
+Deno.serve(async (incoming) => {
+  // SQEM-510 — a call that landed outside Frankfurt (Claude calls from the US) is re-sent to the home
+  // region, where the database is; see _shared/regionForward.ts. Only authenticated POSTs do database
+  // work — the handshake answers and the auth challenge are cheaper served where they arrive.
+  let req = incoming;
+  const region = Deno.env.get('SB_REGION');
+  const authed = req.method === 'POST' && /^Bearer\s+sqm_live_/i.test(req.headers.get('Authorization') ?? '');
+  if (shouldForward(req, region, authed)) {
+    const body = await req.arrayBuffer();
+    const publicBase = (Deno.env.get('PUBLIC_API_URL') ?? Deno.env.get('SUPABASE_URL') ?? '').trim();
+    const forwarded = await forwardToHome(req, body, publicBase);
+    if (forwarded) return forwarded;
+    req = new Request(req.url, { method: req.method, headers: req.headers, body }); // forward failed — serve here
+  }
   const t0 = performance.now();
   const marks: string[] = [];
   let last = t0;
@@ -369,7 +383,10 @@ Deno.serve(async (req) => {
   };
   const res = await handle(req, mark);
   marks.push(`total;dur=${(performance.now() - t0).toFixed(0)}`);
-  try { res.headers.set('Server-Timing', marks.join(', ')); } catch { /* immutable headers — skip */ }
+  try {
+    res.headers.set('Server-Timing', marks.join(', '));
+    if (region) res.headers.set(SERVED_REGION_HEADER, region); // where the work actually ran
+  } catch { /* immutable headers — skip */ }
   return res;
 });
 
@@ -1808,6 +1825,7 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
           size_bytes: u.sizeBytes,
           storage_path: u.storagePath,
           tags: [],
+          created_by: mcpUserId, // SQEM-509 — see upload_file
         })),
       );
       if (rowsErr) {
@@ -1895,6 +1913,9 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
           size_bytes:        sizeBytes,
           storage_path:      storagePath,
           tags:              [],
+          // SQEM-509 — the service role skips guard_client_owned_columns(), which sets this for the
+          // app. Without it a file no template lists any more is visible to nobody (can_access_file).
+          created_by:        mcpUserId,
         })
         .select('id, name, mime_type')
         .single();
@@ -1997,6 +2018,7 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
           size_bytes:   sizeBytes,
           storage_path: storagePath,
           tags:         [],
+          created_by:   mcpUserId, // SQEM-509 — see upload_file
         })
         .select('id, name, mime_type')
         .single();

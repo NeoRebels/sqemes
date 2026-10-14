@@ -97,6 +97,27 @@ describe('SQEM-504 — controls (the probe can see what it should)', () => {
   });
 });
 
+describe('SQEM-509 — an ownerless file no template lists is visible to the workspace admin only', () => {
+  const ORPHAN = 'aaaaaaaa-0000-4000-8000-00000000a302';
+  const sees = (uid: string) => probe('authenticated', uid, `select count(*) from public.workspace_files where id = '${ORPHAN}'`, true);
+  it('A\'s admin sees it (so it can be found and deleted); A\'s member and B do not', () => {
+    expect(sees(USERS.a1)).toBe('rows=1');
+    expect(sees(USERS.a2)).toBe('rows=0');
+    expect(sees(USERS.b1)).toBe('rows=0');
+    expect(sees(USERS.b2)).toBe('rows=0');
+  });
+  it('the library reader (MCP + Chat) applies the same rule', () => {
+    const files = (ws: string, uid: string) => one(`select public.library_access_sets('${ws}', '${uid}') -> 'files' ? '${ORPHAN}'`);
+    expect(files(A, USERS.a1)).toBe('t');
+    expect(files(A, USERS.a2)).toBe('f');
+    expect(files(A, USERS.b1)).toBe('f');
+  });
+  it('a file a template lists stays governed by the template, not by the admin branch', () => {
+    // a301 is listed by "A open" and has a creator — A's member sees it through the template.
+    expect(probe('authenticated', USERS.a2, `select count(*) from public.workspace_files where id = 'aaaaaaaa-0000-4000-8000-00000000a301'`, true)).toBe('rows=1');
+  });
+});
+
 describe('SQEM-504 — no other tenant can read, change, delete or plant A\'s rows', () => {
   for (const [table, own] of Object.entries(OWNERSHIP)) {
     it(table, () => {

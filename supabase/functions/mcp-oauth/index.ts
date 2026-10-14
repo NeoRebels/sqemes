@@ -1,4 +1,5 @@
 import { createAdminClient } from '../_shared/supabase-admin.ts';
+import { shouldForward, forwardToHome, withoutRegionParam, SERVED_REGION_HEADER } from '../_shared/regionForward.ts';
 
 const SUPABASE_URL      = Deno.env.get('SUPABASE_URL')      ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -78,10 +79,30 @@ function isAllowedRedirectUri(uri: unknown): boolean {
 
 // ---- Main handler ----
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { status: 200, headers: CORS });
+Deno.serve(async (incoming) => {
+  if (incoming.method === 'OPTIONS') return new Response('ok', { status: 200, headers: CORS });
 
-  const url  = new URL(req.url);
+  // SQEM-510 — /register and /token come from the client's servers (Anthropic: the US); run them next
+  // to the database. The two metadata documents are static and stay where they arrive.
+  let req = incoming;
+  const region = Deno.env.get('SB_REGION');
+  const incomingPath = getSubPath(new URL(req.url));
+  const isMetadata = incomingPath === '/' || incomingPath.startsWith('/.well-known/');
+  if (shouldForward(req, region, !isMetadata)) {
+    const body = req.method === 'GET' || req.method === 'HEAD' ? null : await req.arrayBuffer();
+    const forwarded = await forwardToHome(req, body, PUBLIC_API_URL);
+    if (forwarded) return forwarded;
+    req = new Request(req.url, { method: req.method, headers: req.headers, body }); // forward failed — serve here
+  }
+  const res = await handleOauth(req);
+  if (region) { try { res.headers.set(SERVED_REGION_HEADER, region); } catch { /* immutable */ } }
+  return res;
+});
+
+async function handleOauth(req: Request): Promise<Response> {
+  // The routing parameter of a forwarded call must not reach a handler: /authorize copies every query
+  // parameter onto the consent page's URL.
+  const url  = withoutRegionParam(new URL(req.url));
   const path = getSubPath(url);
 
   // ---- RFC 9728: OAuth Protected Resource Metadata ----
@@ -471,4 +492,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ error: 'not_found' }, 404);
-});
+}

@@ -19,6 +19,8 @@ playwright-report/
 !supabase/seed.sql
 # SQEM-504 — the tenant-isolation suite's probe helper and two-tenant seed (local database only)
 !tests/isolation/*.sql
+# SQEM-500 — load-test state: shared test password, raw MCP keys, sessions. Never commit.
+.loadtest/
 # Vendored Supabase self-host DB init scripts (SQEM-116)
 !selfhost/volumes/db/*.sql
 
@@ -28,3 +30,4 @@ coverage/
 # Deno writes these when type-checking an edge function (SQEM-231).
 # node_modules/.deno is covered by the node_modules rule above; deno.lock is not.
 deno.lock
+.ops-monitor/

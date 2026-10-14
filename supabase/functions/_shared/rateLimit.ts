@@ -1,4 +1,7 @@
 import { createAdminClient } from './supabase-admin.ts';
+import { uuidFromSeed, personSeed, workspaceSeed, budgetVerdict, CHAT_RPM_PER_USER, CHAT_RPM_PER_WORKSPACE, type BudgetVerdict } from './chatBudget.ts';
+
+export { uuidFromSeed, budgetMessage } from './chatBudget.ts';
 
 const RATE_LIMIT_RPM = parseInt(Deno.env.get('RATE_LIMIT_RPM') || '60', 10);
 
@@ -66,4 +69,18 @@ export async function checkRateLimit(subjectId: string, limit: number = RATE_LIM
   }
 
   return data === true;
+}
+
+/**
+ * SQEM-501 — the chat/AI budget: per person in the workspace, plus a per-workspace ceiling. Both
+ * counters are checked together (one round trip of wall time). Both fail open like `checkRateLimit`:
+ * a limiter that locks people out when IT is unhealthy is worse than what it protects against.
+ */
+export async function checkChatBudget(workspaceId: string, userId: string): Promise<BudgetVerdict> {
+  const [personKey, wsKey] = await Promise.all([uuidFromSeed(personSeed(workspaceId, userId)), uuidFromSeed(workspaceSeed(workspaceId))]);
+  const [personOk, workspaceOk] = await Promise.all([
+    checkRateLimit(personKey, CHAT_RPM_PER_USER),
+    checkRateLimit(wsKey, CHAT_RPM_PER_WORKSPACE),
+  ]);
+  return budgetVerdict(personOk, workspaceOk);
 }
