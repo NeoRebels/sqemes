@@ -4,7 +4,7 @@ import type { LibraryTemplate, TemplateCategory, Variable, Step, PromptKind, Pro
 // SQEM-186 — templateBundle (which statically imports jszip) and injectionScan are dynamically imported
 // at their marketplace call sites below, so jszip stays out of the eager boot chunk (this module is
 // loaded at app start via the store). They only load when a user actually publishes/copies a bundle.
-import { IS_SELF_HOSTED, MARKETPLACE_API_URL, MARKETPLACE_ENABLED, FUNCTIONS_BASE } from '../env';
+import { IS_SELF_HOSTED, MARKETPLACE_API_URL, MARKETPLACE_ENABLED, functionCallUrl } from '../env';
 
 // ---- SQEM-176/178 — global marketplace source ------------------------------------------------------
 // The marketplace lives in the Cloud (single source of truth). Cloud uses its local Supabase (below).
@@ -242,6 +242,18 @@ export async function copyTemplateToWorkspace(
 const client = supabase as unknown as { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 /**
+ * SQEM-514 — the same check the submit functions run (`bundleFileRejection`), done before anything is
+ * uploaded so the person sees which file is the problem straight away. The server repeats it on the
+ * bytes it receives; this one is a courtesy, not the guard.
+ */
+async function assertMarketplaceFiles(blob: Blob): Promise<void> {
+  const { default: JSZip } = await import('jszip');
+  const { bundleFileRejection } = await import('../../supabase/functions/_shared/submissionManifest.ts');
+  const reason = await bundleFileRejection(await JSZip.loadAsync(blob));
+  if (reason) throw new Error(reason);
+}
+
+/**
  * Publish a workspace template to the marketplace as a moderated bundle snapshot (submit-for-review).
  *
  * SQEM-493 — the browser builds and uploads the bundle to its own workspace folder, then hands it to
@@ -256,6 +268,7 @@ export async function publishToMarketplace(input: {
 
   const { buildBundle } = await import('../templateBundle');
   const { blob } = await buildBundle([template], allFiles);
+  await assertMarketplaceFiles(blob);
 
   const path = `${workspaceId}/${crypto.randomUUID()}/bundle.sqemes.zip`;
   const { error: upErr } = await supabase.storage.from('library-files').upload(path, blob, { contentType: 'application/zip' });
@@ -265,7 +278,7 @@ export async function publishToMarketplace(input: {
   // `library-files` bucket (the old client-side `remove` after a failed insert never did anything).
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
-  const res = await fetch(`${FUNCTIONS_BASE}/marketplace-submit-cloud`, {
+  const res = await fetch(functionCallUrl('marketplace-submit-cloud'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
     body: JSON.stringify({ workspaceId, bundlePath: path, sourcePromptId: template.id, category: category ?? 'General' }),
@@ -316,7 +329,7 @@ export async function copyListingToWorkspace(listing: LibraryTemplate, workspace
   if (!listing.bundlePath) { await copyTemplateToWorkspace(listing.id, workspaceId, userId); return; }
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
-  const res = await fetch(`${FUNCTIONS_BASE}/get-marketplace-bundle`, {
+  const res = await fetch(functionCallUrl('get-marketplace-bundle'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
     body: JSON.stringify({ listingId: listing.id }),
@@ -420,6 +433,7 @@ export async function fetchCanPublish(): Promise<boolean> {
 export async function submitToMarketplaceViaProxy(template: Prompt, allFiles: WorkspaceFile[], category: TemplateCategory): Promise<void> {
   const { buildBundle } = await import('../templateBundle');
   const { blob } = await buildBundle([template], allFiles);
+  await assertMarketplaceFiles(blob);
   const bundle = await blobToBase64(blob);
   const res = await fetch('/api/marketplace-submit', {
     method: 'POST',

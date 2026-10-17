@@ -1,3 +1,4 @@
+import { isTextContentMime } from '../supabase/functions/_shared/skillFile.ts';
 import { isImageType } from './uploadTypes';
 import { getWorkspaceFileSignedUrl } from './api/files';
 import type { Prompt } from '../types';
@@ -63,7 +64,9 @@ export async function resolveFileBlocks(
   files: ResolvableFile[],
   fileIds: string[],
 ): Promise<string[]> {
-  const textFiles = files.filter(f => fileIds.includes(f.id) && !isAttachmentType(f.mimeType));
+  // SQEM-514 — only files that ARE text. A skill may now carry fonts or office files
+  // (application/octet-stream); read with res.text() they became garbage in the prompt.
+  const textFiles = files.filter(f => fileIds.includes(f.id) && isTextContentMime(f.mimeType));
   const blocks: string[] = [];
   await Promise.all(textFiles.map(async f => {
     try {

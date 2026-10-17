@@ -169,8 +169,14 @@ describe('SQEM-504 — storage', () => {
         if (!ins.startsWith('err=42501')) failures.push(`${label} UPLOAD into A: ${ins}`);
       }
     }
-    // Control: A's admin may delete A's own object (rolled back), so the probe is not blind.
-    expect(probe('authenticated', USERS.a1, `delete from storage.objects where ctid = any(${arr})`, false, 'storage.allow_delete_query=true')).toBe(`rows=${ctids.length}`);
+    // Control, so the probe is not blind. Where clients still hold the read policy (self-host), A's
+    // admin deletes A's own object (rolled back). ⚠️ On Cloud SQEM-515 step B removed that policy, and a
+    // DELETE needs SELECT to see its rows — the admin's delete then matches nothing, exactly like
+    // Storage's remove(). There the control is the service role, which bypasses RLS.
+    const clientsRead = one(`select count(*) from pg_policy where polrelid = 'storage.objects'::regclass and polname = 'workspace_files_storage_select'`) === '1';
+    expect(clientsRead
+      ? probe('authenticated', USERS.a1, `delete from storage.objects where ctid = any(${arr})`, false, 'storage.allow_delete_query=true')
+      : probe('service_role', null, `delete from storage.objects where ctid = any(${arr})`, false, 'storage.allow_delete_query=true')).toBe(`rows=${ctids.length}`);
     expect(failures).toEqual([]);
   });
 });

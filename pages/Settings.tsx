@@ -5,7 +5,8 @@ import { useLocation, useNavigate } from 'react-router';
 import { PLANS, ROLE_LABELS, TRIAL_DAYS, VAT_NOTE } from '../constants';
 import { LIBRARY_SYSTEM_PROMPT } from '../lib/libraryPrompt';
 import { hasActiveSubscription, isTrialing } from '../lib/subscription';
-import { IS_SELF_HOSTED, functionsUrl, FUNCTIONS_BASE } from '../lib/env';
+import { IS_SELF_HOSTED, functionsUrl, functionCallUrl } from '../lib/env';
+import { getWorkspaceStorageUsage } from '../lib/api/files';
 import { copyToClipboard } from '../lib/clipboard';
 import { fetchCanPublish, setPublisherToken } from '../lib/api/library';
 import { UserRole } from '../types';
@@ -541,6 +542,16 @@ const Settings = () => {
   };
 
   const memberCount = workspace.members.length;
+
+  // SQEM-515 — storage used / allowed (Cloud; the server reads it, admins see it on the Team tab).
+  const [storageUsage, setStorageUsage] = useState<{ used: number; limit: number | null } | null>(null);
+  useEffect(() => {
+    if (IS_SELF_HOSTED || activeTab !== 'team' || !can(currentUser, workspace, 'settings:general')) return;
+    let cancelled = false;
+    getWorkspaceStorageUsage(workspace.id).then(u => { if (!cancelled) setStorageUsage(u); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [activeTab, workspace.id, currentUser, workspace]);
+  const fmtBytes = (n: number) => n >= 1073741824 ? `${(n / 1073741824).toFixed(n % 1073741824 ? 1 : 0)} GB` : `${Math.round(n / 1048576)} MB`;
   // SQEM-119 — self-host has no subscription model: unlimited seats + all features (like managed).
   const isLimitReached = !workspace.isManaged && !IS_SELF_HOSTED && memberCount >= memberLimit;
   const hasMcpAccess = workspace.isManaged || IS_SELF_HOSTED || currentPlan.mcpAccess;
@@ -699,7 +710,7 @@ const Settings = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
-      const res = await fetch(`${FUNCTIONS_BASE}/create-checkout-session`, {
+      const res = await fetch(functionCallUrl('create-checkout-session'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
         body: JSON.stringify({ workspaceId: workspace.id, plan: tier, billingCycle }),
@@ -718,7 +729,7 @@ const Settings = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
-      const res = await fetch(`${FUNCTIONS_BASE}/create-portal-session`, {
+      const res = await fetch(functionCallUrl('create-portal-session'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
         body: JSON.stringify({ workspaceId: workspace.id }),
@@ -1256,6 +1267,11 @@ const Settings = () => {
                   <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                     {memberCount} active member{memberCount === 1 ? '' : 's'}{(workspace.isManaged || IS_SELF_HOSTED) ? ' · Unlimited seats' : ` of ${memberLimit} seats`}
                   </p>
+                  {storageUsage && (
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5" data-testid="storage-usage">
+                      Storage: {fmtBytes(storageUsage.used)}{storageUsage.limit == null ? ' · unlimited' : ` of ${fmtBytes(storageUsage.limit)}`}
+                    </p>
+                  )}
                 </div>
                 {can(currentUser, workspace, 'team:manage') && (isLimitReached ? (
                    <button

@@ -1,3 +1,4 @@
+import { dropUnsendableInMessages } from '../_shared/messageParts.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { decryptApiKey } from '../_shared/crypto.ts';
@@ -31,6 +32,7 @@ import { ensureCreditPeriod, hasCredits, debitCredits } from '../_shared/credits
 import { FUNDED_MODEL } from '../_shared/funded.ts';
 import { isLoadtestRequest, runLoadtestMock, LOADTEST_HEADER } from '../_shared/loadtestMock.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
+import { countUsage } from '../_shared/usageCounts.ts';
 
 // SQEM-082 — keyless chat + editor test-run route through the Sqemes-funded model
 // (direct Mistral, EU/GDPR), metered against the workspace's monthly AI credits.
@@ -78,7 +80,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { workspaceId, modelId, systemInstruction, messages, jobId, funded, connectorIds, timeZone } = await req.json();
+    const body = await req.json();
+    const { workspaceId, modelId, systemInstruction, jobId, funded, connectorIds, timeZone } = body;
+    // SQEM-514 — a file part no provider can take never reaches a provider branch (_shared/messageParts.ts).
+    const messages = Array.isArray(body.messages) ? dropUnsendableInMessages(body.messages) : body.messages;
 
     // SQEM-370 — the model is told what day it is, composed HERE and not by the client: built at the
     // instant of the request, it cannot go stale in a session left open overnight. The client only
@@ -463,7 +468,11 @@ async function runAndBroadcast({
   const tools: ToolRuntime | null = workspaceId
     ? createLibraryToolRuntime(
         () => createLibraryReader({ client: createAdminClient(), workspaceId, userId }),
-        { maxRounds: funded ? TOOL_ROUNDS_FUNDED : TOOL_ROUNDS_BYOK, budgetMs: TOOL_BUDGET_MS },
+        {
+          maxRounds: funded ? TOOL_ROUNDS_FUNDED : TOOL_ROUNDS_BYOK, budgetMs: TOOL_BUDGET_MS,
+          // SQEM-517 — counted per workspace and day, never per person; fire-and-forget.
+          onTemplateLoaded: (templateId) => countUsage(createAdminClient(), workspaceId, 'chat', 'playbook_loaded', templateId),
+        },
       )
     : null;
 

@@ -1,14 +1,23 @@
 /**
- * SQEM-510 — run the MCP functions next to the database, whoever calls them.
+ * SQEM-510 — run the MCP functions next to the database, whoever calls them. SQEM-513 — and the
+ * database is in IRELAND (`eu-west-1`), not Frankfurt.
  *
  * Supabase executes an Edge Function in the region CLOSEST TO THE CALLER, and there is no per-function
  * setting to change that — only a per-request `x-region` header or `?forceFunctionRegion=` parameter
  * (the header is ignored behind our custom domain, measured; the parameter works). Claude calls the
  * MCP server from the US, so those calls ran in `us-east-1` and each of their database round trips crossed
- * the Atlantic to Frankfurt — several times slower than the same call from Europe (measured 2026-10-14).
+ * the Atlantic — several times slower than the same call from Europe (measured 2026-10-14).
  * The fix is a hop, not a rewrite:
  * a function that finds itself outside the database's region re-sends the request, unchanged, to its own
- * URL pinned to `eu-central-1`, and streams the answer back. One transatlantic round trip instead of many.
+ * URL pinned to `HOME_REGION`, and streams the answer back. One transatlantic round trip instead of many.
+ *
+ * ⛔ **SQEM-513 — `HOME_REGION` is the region of the DATABASE, read from the project, never assumed.**
+ * SQEM-510 pinned `eu-central-1` because the database was believed to be in Frankfurt; the Management
+ * API says `eu-west-1` (`GET /v1/projects/{ref}` → `region`). In Frankfurt every query still crossed
+ * to Ireland and back, and the same MCP calls took about twice as long there as in `eu-west-1`.
+ * Frankfurt is also where European callers
+ * land on their own, so they are forwarded now too. `lib/env.ts` (`FUNCTION_REGION`) holds the same
+ * value for the app's own calls; tests/unit/regionForward.test.ts keeps the two equal.
  *
  * ⛔ Guards, each pinned by tests/unit/regionForward.test.ts:
  *   - no `SB_REGION` (self-host, local) ⇒ never forward — a single server has no other region;
@@ -16,7 +25,7 @@
  *     sets it themselves only switches the hop off for their own request, so it needs no secret;
  *   - the forward fails ⇒ the caller's request is served HERE (slow, not broken).
  */
-export const HOME_REGION = 'eu-central-1';
+export const HOME_REGION = 'eu-west-1';
 
 // Read through globalThis, like chatBudget.ts: this module is also imported by the Node unit tests,
 // where the app's TypeScript config knows no `Deno`.
@@ -26,12 +35,27 @@ export const FORWARDED_HEADER = 'x-sqemes-region-forwarded';
 export const SERVED_REGION_HEADER = 'x-sqemes-served-region';
 export const REGION_PARAM = 'forceFunctionRegion';
 
+/**
+ * SQEM-513 — a call that lands anywhere in Europe is served where it lands.
+ *
+ * The hop is not free: re-sending through the public host opens a fresh connection per call. From
+ * Frankfurt the database round trips to Ireland cost less than that hop (measured: forwarding from
+ * Germany was slower than serving in Frankfurt). From the US the trips
+ * cross the Atlantic and the hop wins. So: forward from outside Europe only. Supabase's European
+ * regions all carry the `eu-` prefix (eu-central-1/2, eu-west-1/2/3, eu-north-1, eu-south-1).
+ * The app is not affected — it pins `eu-west-1` per request (`functionCallUrl()` in lib/env.ts).
+ */
+export function isNearHome(region: string): boolean {
+  return region.startsWith('eu-');
+}
+
 export function shouldForward(
   req: { method: string; headers: Headers },
   region: string | undefined,
   needsDatabase: boolean,
 ): boolean {
   if (!region || region === HOME_REGION) return false;
+  if (isNearHome(region)) return false;
   if (req.method === 'OPTIONS') return false;
   if (req.headers.get(FORWARDED_HEADER)) return false;
   return needsDatabase;

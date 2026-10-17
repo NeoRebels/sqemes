@@ -56,7 +56,11 @@ describe('SQEM-492 — workspace_files', () => {
     const helper  = lq.match(/downloadText\(client, [a-z]+\.storage_path/g) ?? [];
     expect(direct.length + helper.length).toBe(2);
     expect((lq.match(/\.download\(/g) ?? []).length).toBe(direct.length + 1); // + the helper's own
-    expect((lq.match(/isPathInWorkspace\(/g) ?? []).length).toBe(2); // one guard per call site
+    // One guard per download call site, plus — SQEM-514 — one in each reader that hands a path to the
+    // MCP server for SIGNING a link (contextFileMeta, skillFolder): a link is a download by other means.
+    expect((lq.match(/isPathInWorkspace\(/g) ?? []).length).toBe(4);
+    expect(fnBody(lq, 'async contextFileMeta')).toMatch(/isPathInWorkspace\(file\.storage_path, workspaceId\)/);
+    expect(fnBody(lq, 'async skillFolder')).toMatch(/isPathInWorkspace\(r\.storage_path, workspaceId\)/);
     const mcp = code(read('supabase/functions/mcp-server/index.ts'));
     expect(mcp).toMatch(/if \(isPathInWorkspace\(file\.storage_path, workspaceId\)\) \{\s*await adminClient\.storage\.from\('workspace-files'\)\.remove/);
   });

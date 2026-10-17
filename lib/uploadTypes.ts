@@ -1,3 +1,5 @@
+import { TEXT_EXT_TO_MIME, OCTET_STREAM, extensionOf } from '../supabase/functions/_shared/skillFile.ts';
+
 export const SUPPORTED_MIME_TYPES = new Set([
   'image/png', 'image/jpeg', 'image/webp', 'image/gif',
   'application/pdf',
@@ -6,23 +8,8 @@ export const SUPPORTED_MIME_TYPES = new Set([
 
 // Text/code extensions → a specific mime, used for the file-type label. The bytes are
 // stored as text/plain to pass the storage bucket allowlist; this mapping is label-only.
-export const TEXT_EXT_TO_MIME: Record<string, string> = {
-  txt: 'text/plain', text: 'text/plain', log: 'text/plain',
-  csv: 'text/csv',
-  md: 'text/markdown', markdown: 'text/markdown', mdx: 'text/markdown',
-  rst: 'text/x-rst',
-  html: 'text/html', htm: 'text/html',
-  css: 'text/css', scss: 'text/x-scss', sass: 'text/x-sass',
-  xml: 'text/xml', yaml: 'text/yaml', yml: 'text/yaml',
-  json: 'application/json', toml: 'application/toml', sql: 'application/sql',
-  js: 'text/javascript', mjs: 'text/javascript', cjs: 'text/javascript',
-  ts: 'text/typescript', jsx: 'text/jsx', tsx: 'text/tsx',
-  py: 'text/x-python', rb: 'text/x-ruby', go: 'text/x-go', rs: 'text/x-rust',
-  java: 'text/x-java', php: 'text/x-php', swift: 'text/x-swift',
-  kt: 'text/x-kotlin', kts: 'text/x-kotlin', cs: 'text/x-csharp',
-  c: 'text/x-c', h: 'text/x-c', cpp: 'text/x-c++', cc: 'text/x-c++', hpp: 'text/x-c++',
-  sh: 'text/x-sh', bash: 'text/x-sh',
-};
+// SQEM-514 — one table for browser and edge (was a near-copy of TEXT_MIME in mcp-server).
+export { TEXT_EXT_TO_MIME };
 
 // Chat composer (ephemeral inline attachments) — the narrow directly-storable set.
 export const ACCEPT_STRING = [
@@ -51,7 +38,15 @@ export function inferTextMime(filename: string): string | null {
   return TEXT_EXT_TO_MIME[ext] ?? null;
 }
 
-export function fileTypeLabel(mimeType: string): string {
+/**
+ * Short type label. SQEM-514: a skill file stored as `text/plain` or `application/octet-stream` is
+ * labelled by its extension when a name is given — an .svg is text/plain and still reads "SVG".
+ */
+export function fileTypeLabel(mimeType: string, name?: string): string {
+  if (name && (mimeType === 'text/plain' || mimeType === OCTET_STREAM)) {
+    const ext = extensionOf(name);
+    if (ext && ext.length <= 6) return ext.toUpperCase();
+  }
   switch (mimeType) {
     // Documents
     case 'application/pdf':     return 'PDF';

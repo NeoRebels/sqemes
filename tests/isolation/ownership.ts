@@ -45,6 +45,7 @@ export const OWNERSHIP: Record<string, Ownership> = {
   rate_limit_counters: ws(),
   sqemes_api_keys: ws(),
   template_access: ws(),
+  usage_daily: ws(),   // SQEM-517 — counts per workspace, no client access at all
   workspace_api_keys: ws(),
   workspace_connectors: ws(),
   workspace_file_texts: ws(),

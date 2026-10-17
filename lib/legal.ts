@@ -42,7 +42,17 @@ export interface LegalDocument {
 }
 
 /**
- * **`privacy` is at `1.3` since 2026-10-13 (SQEM-501); `terms` stays at `1.3`.** Cloudflare became a
+ * **`privacy` is at `1.4` since 2026-10-16 (SQEM-517); `terms` stays at `1.3`.** A new processing:
+ * the usage statistics for playbooks — counts per workspace, day, channel and playbook, never who, no
+ * content; the extension reports an insertion; a pseudonymised per-minute counter against inflation,
+ * gone within minutes; Art. 6(1)(f); 25 months. Checked on the live page before the bump (all six
+ * parts present, dated October 16 2026). A new processing of
+ * personal data is a change of substance (for a Solo workspace the numbers relate to one person), so it
+ * re-gates.
+ */
+
+/**
+ * **`privacy` was at `1.3` from 2026-10-13 (SQEM-501); `terms` stays at `1.3`.** Cloudflare became a
  * processor: the sign-in check (Turnstile) on the sign-in, registration, password-reset and resend
  * forms — section 4 ("Protecting sign-in"), the CSP exception in section 8, the summary in section 9
  * and a row in the subprocessor table, which now names TWO providers outside the EU. A new processor
@@ -119,7 +129,7 @@ export interface LegalDocument {
  */
 export const LEGAL_DOCUMENTS: LegalDocument[] = [
   { id: 'terms',   label: 'Terms and Conditions', url: 'https://sqemes.com/terms',   version: '1.3' },
-  { id: 'privacy', label: 'Privacy Policy',       url: 'https://sqemes.com/privacy', version: '1.3' },
+  { id: 'privacy', label: 'Privacy Policy',       url: 'https://sqemes.com/privacy', version: '1.4' },
 ];
 
 /** A row from `legal_acceptances` — only the two columns that decide anything. */

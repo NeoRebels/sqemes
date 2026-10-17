@@ -400,6 +400,18 @@ verify_jwt = false
 [functions.mcp-oauth]
 verify_jwt = false
 
+# SQEM-515 — signs workspace-file download links on Cloud and counts them (auth checked in the function).
+[functions.sign-file-url]
+verify_jwt = false
+
+# SQEM-515 step B — deleting a workspace file on Cloud (row with the caller's token, object by the server).
+[functions.delete-workspace-file]
+verify_jwt = false
+
+# SQEM-517 — the extension reports a playbook insertion; counted per workspace and day, never per person.
+[functions.record-usage]
+verify_jwt = false
+
 [functions.cleanup-abandoned-workspaces]
 verify_jwt = false
 

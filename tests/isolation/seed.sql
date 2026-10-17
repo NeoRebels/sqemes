@@ -70,6 +70,9 @@ insert into public.workspace_files (id, workspace_id, name, mime_type, size_byte
           'aaaaaaaa-0000-4000-8000-0000000000aa/aaaaaaaa-0000-4000-8000-00000000a301/a.md', 'aaaaaaaa-0000-4000-8000-0000000000a1');
 update public.prompts set context_file_ids = array['aaaaaaaa-0000-4000-8000-00000000a301'::uuid]
   where id = 'aaaaaaaa-0000-4000-8000-00000000a001';
+-- SQEM-517 — a usage count of A's, so the per-table probe has a row to try to read and change.
+insert into public.usage_daily (workspace_id, day, channel, action, template_id, count)
+  values ('aaaaaaaa-0000-4000-8000-0000000000aa', current_date, 'mcp', 'playbook_loaded', 'aaaaaaaa-0000-4000-8000-00000000a001', 3);
 -- SQEM-509 — an ownerless file no template lists (what the MCP server wrote before the fix, once its
 -- template was deleted). Visible to A's admin only, so it can be cleaned up.
 insert into public.workspace_files (id, workspace_id, name, mime_type, size_bytes, storage_path, created_by)

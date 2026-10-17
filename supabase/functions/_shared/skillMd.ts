@@ -82,3 +82,25 @@ function deriveTitle(body: string, fallback: string): string {
   const h = body.match(/^\s*#\s+(.+?)\s*$/m);
   return h ? h[1] : fallback;
 }
+
+// SQEM-514 — the other direction, for MCP `download_skill`: a template back into a SKILL.md, the way
+// the web app's Agent Skill export wrote it. Twin of `buildSkillMd` / `yamlQuote` in lib/skillBundle.ts,
+// held identical by tests/unit/skillImport.test.ts (the ninth and tenth function of the pair).
+const yamlQuote = (v: string) => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, ' ')}"`;
+
+export function buildSkillMd(b: Pick<SkillBundle, 'title' | 'description' | 'content'>): string {
+  // SQEM-249 — anything the author put here that is not ours rides along, in its own words. This
+  // used to prepend unconditionally, so a body that still carried its author's header exported with
+  // two stacked blocks and their `license:` stopped being a licence.
+  const { foreign, body } = splitFrontmatter(b.content);
+  const lines = [
+    '---',
+    `name: ${toSlug(b.title)}`,
+    `title: ${yamlQuote(b.title)}`,
+    `description: ${yamlQuote(b.description || '')}`,
+    ...foreign,
+    '---',
+    '',
+  ];
+  return lines.join('\n') + body;
+}

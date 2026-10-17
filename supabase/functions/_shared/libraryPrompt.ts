@@ -74,6 +74,8 @@ Playbooks come in two kinds and are used differently:
 - A prompt is a task with {{variables}}. Fill them from the request; ask only for what you genuinely cannot infer.
 - A skill is a reusable block of company knowledge — rules, facts, a way of doing something. Apply it in addition to whatever else you are doing, for as long as the task is within its scope; do not summarise it back.
 
+A playbook can carry files. get_template lists them first — name, size and a short preview; read only the ones the task needs with read_context_file.
+
 Sqemes may also define personas — the roles. A persona is who to be: a working role that bundles several playbooks behind conditions saying which one to load when. If someone names a persona, load it with get_persona; if a task clearly belongs to a role rather than to a single template, look first with list_personas. Adopt the persona, then load a route only once its condition applies — loading every route at once is what a persona exists to avoid.
 
 Do not paste a playbook's contents into your reply unless you are asked for it. Use it, then answer.

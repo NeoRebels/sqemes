@@ -1,3 +1,4 @@
+import { dropUnsendableParts } from '../_shared/messageParts.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { decryptApiKey } from '../_shared/crypto.ts';
@@ -54,7 +55,10 @@ Deno.serve(async (req) => {
     }
 
     // 2. Parse request body
-    const { workspaceId, modelId, systemInstruction, promptContent, jobId, promptId, funded } = await req.json();
+    const body = await req.json();
+    const { workspaceId, modelId, systemInstruction, jobId, promptId, funded } = body;
+    // SQEM-514 — a file part no provider can take never reaches a provider branch (_shared/messageParts.ts).
+    const promptContent = dropUnsendableParts(body.promptContent);
 
     // Funded (Sqemes-credit) calls don't carry a modelId — they use FUNDED_MODEL.
     if (!workspaceId || !promptContent || (!funded && !modelId)) {

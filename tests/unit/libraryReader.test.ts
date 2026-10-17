@@ -487,3 +487,98 @@ describe('the pure helpers, moved with their behaviour intact', () => {
     expect(hiddenFromCaller(undefined)).toBe(false);
   });
 });
+
+describe('SQEM-499 — progressive disclosure: read by path, assets are resources', () => {
+  const skillFiles = [
+    { id: 'f-ref', workspace_id: WORKSPACE, name: 'my-skill/references/animation.md', mime_type: 'text/markdown', size_bytes: 9, storage_path: 'ws-1/ref.md', created_by: 'someone' },
+    { id: 'f-asset', workspace_id: WORKSPACE, name: 'my-skill/assets/template.html', mime_type: 'text/html', size_bytes: 99, storage_path: 'ws-1/asset.html', created_by: 'someone' },
+    { id: 'f-n1', workspace_id: WORKSPACE, name: 'a/notes.md', mime_type: 'text/markdown', size_bytes: 1, storage_path: 'ws-1/n1.md', created_by: 'someone' },
+    { id: 'f-n2', workspace_id: WORKSPACE, name: 'b/notes.md', mime_type: 'text/markdown', size_bytes: 1, storage_path: 'ws-1/n2.md', created_by: 'someone' },
+    { id: 'f-other', workspace_id: WORKSPACE, name: 'my-skill/references/secret.md', mime_type: 'text/markdown', size_bytes: 1, storage_path: 'ws-1/secret.md', created_by: 'someone' },
+  ];
+  const templates = [
+    { id: 't-skill', workspace_id: WORKSPACE, title: 'My Skill', description: '', kind: 'skill', content: 'SKILL', variables: [], context_file_ids: ['f-ref', 'f-asset', 'f-n1', 'f-n2'] },
+    { id: 't-hidden', workspace_id: WORKSPACE, title: 'Hidden Skill', description: '', kind: 'skill', content: 'x', variables: [], context_file_ids: ['f-other'] },
+  ];
+  const blobs = { 'ws-1/ref.md': '# Animation', 'ws-1/asset.html': '<html>big</html>', 'ws-1/n1.md': 'one', 'ws-1/n2.md': 'two', 'ws-1/secret.md': 'secret' };
+  const make = () => buildWithClient({ templates, files: skillFiles, blobs, accessibleTemplates: ['t-skill'] });
+
+  it('reads a file by the path SKILL.md uses, with the skill folder stored in front', async () => {
+    const { lib } = await make();
+    const f = await lib.readContextFileByPath({ name: 'my_skill', path: 'references/animation.md' });
+    expect(f.text).toBe('# Animation');
+  });
+
+  it('⛔ a path is resolved among THIS playbook\'s files only — another playbook\'s file is not found', async () => {
+    const { lib } = await make();
+    await expect(lib.readContextFileByPath({ name: 'my_skill', path: 'references/secret.md' })).rejects.toThrow(LibraryNotFound);
+  });
+
+  it('⛔ a playbook the caller cannot see answers not found, whatever the path', async () => {
+    const { lib } = await make();
+    await expect(lib.readContextFileByPath({ name: 'hidden_skill', path: 'references/secret.md' })).rejects.toThrow(LibraryNotFound);
+  });
+
+  it('an ambiguous path names the candidates instead of guessing', async () => {
+    const { lib } = await make();
+    await expect(lib.readContextFileByPath({ name: 'my_skill', path: 'notes.md' })).rejects.toThrow(/a\/notes\.md, b\/notes\.md/);
+    await expect(lib.readContextFileByPath({ name: 'my_skill', path: 'notes.md' })).rejects.toThrow(LibraryBadRequest);
+  });
+
+  it('a missing path lists what the playbook does have — context files before assets', async () => {
+    const { lib } = await make();
+    await expect(lib.readContextFileByPath({ name: 'my_skill', path: 'nope.md' })).rejects.toThrow(/Its files: a\/notes\.md, b\/notes\.md, my-skill\/references\/animation\.md, my-skill\/assets\/template\.html/);
+  });
+
+  it('asking for SKILL.md points at get_template — it is the playbook itself, not a file', async () => {
+    const { lib } = await make();
+    await expect(lib.readContextFileByPath({ name: 'my_skill', path: 'SKILL.md' })).rejects.toThrow(/own content — it comes back from get_template/);
+  });
+
+  it('⛔ assets/ files are never inlined, previewed or downloaded by get_template — but readable on demand', async () => {
+    const { lib, client } = await make();
+    const inline = await lib.getTemplate({ id: 't-skill', includeFiles: 'inline' });
+    expect(inline.content).not.toContain('<html>big</html>');
+    expect(inline.content).toContain('[Context file: my-skill/assets/template.html');
+    const list = await lib.getTemplate({ id: 't-skill', includeFiles: 'list' });
+    const asset = list.contextFiles.find((f: any) => f.name === 'my-skill/assets/template.html') as any;
+    expect(asset).toBeDefined();
+    expect(asset.preview).toBeUndefined();
+    expect(asset.byteSize).toBe(99);
+    expect(client.seen.filter((x: string) => x === 'download:ws-1/asset.html')).toEqual([]);
+    const read = await lib.readContextFileByPath({ id: 't-skill', path: 'assets/template.html' });
+    expect(read.text).toBe('<html>big</html>');
+  });
+
+  it('⭐ the default follows the KIND: a skill comes back as an outline, a prompt with its files in full', async () => {
+    const tpls = [
+      { id: 't-sk', workspace_id: WORKSPACE, title: 'A Skill', description: '', kind: 'skill', content: 'S', variables: [], context_file_ids: ['f-ref'] },
+      { id: 't-pr', workspace_id: WORKSPACE, title: 'A Prompt', description: '', kind: 'prompt', content: 'P', variables: [], context_file_ids: ['f-ref'] },
+    ];
+    const { lib } = await buildWithClient({ templates: tpls, files: skillFiles, blobs, accessibleTemplates: ['t-sk', 't-pr'] });
+    const skill = await lib.getTemplate({ id: 't-sk', includeFiles: 'auto' });
+    expect(skill.content).not.toContain('# Animation');
+    expect((skill.contextFiles[0] as any).byteSize).toBe(9);
+    const prompt = await lib.getTemplate({ id: 't-pr', includeFiles: 'auto' });
+    expect(prompt.content).toContain('[Context: my-skill/references/animation.md]\n# Animation');
+    // An explicit choice still wins over the kind.
+    const forced = await lib.getTemplate({ id: 't-pr', includeFiles: 'list' });
+    expect(forced.content).not.toContain('# Animation');
+  });
+
+  it('⛔ an outline carries ONE note saying how to get the text — also for a client whose cached tool list predates read_context_file', async () => {
+    const files = [
+      { name: 'references/x.md', mimeType: 'text/markdown', uri: 'sqemes://files/1', text: null },
+      { name: 'references/y.md', mimeType: 'text/markdown', uri: 'sqemes://files/2', text: null },
+    ];
+    const out = renderContextBlocks(files, 'list');
+    expect(out).toHaveLength(3);
+    expect(out[0]).toContain('read_context_file');
+    expect(out[0]).toContain('include_files: "inline"');
+    expect(out.slice(1).every(l => !l.includes('read_context_file'))).toBe(true);
+    // No note when nothing textual is left out (binaries only), and never in inline mode.
+    expect(renderContextBlocks([{ name: 'a.pdf', mimeType: 'application/pdf', uri: 'u', text: null }], 'list')).toEqual(['[Context file: a.pdf (application/pdf) — read via u]']);
+    expect(renderContextBlocks([{ name: 'a.md', mimeType: 'text/markdown', uri: 'u', text: 'x' }], 'inline')).toEqual(['[Context: a.md]\nx']);
+  });
+});
+

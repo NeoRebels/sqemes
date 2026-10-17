@@ -7,8 +7,13 @@ import {
 } from '../_shared/libraryQueries.ts';
 import { LIBRARY_SYSTEM_PROMPT } from '../_shared/libraryPrompt.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
+import { countUsage } from '../_shared/usageCounts.ts';
 import { safeStorageFileName } from '../_shared/storageKey.ts';
-import { readSkillMd, toSlug as skillSlug, withoutOwnFrontmatter } from '../_shared/skillMd.ts';
+import { classifySkillFile, extensionOf, sniffBinaryMime, TEXT_EXT_TO_MIME, STORAGE_TEXT_MIME, OCTET_STREAM, SKILL_STORAGE_MIMES } from '../_shared/skillFile.ts';
+import { readSkillMd, toSlug as skillSlug, withoutOwnFrontmatter, buildSkillMd } from '../_shared/skillMd.ts';
+import { relativeSkillPaths } from '../_shared/skillPaths.ts';
+import { isTextContentMime, deliveryOf } from '../_shared/skillFile.ts';
+import { onPublicHost, dailyLimitMessage, MAX_PATHS_PER_CALL } from '../_shared/fileLinks.ts';
 import {
   findSkillRoot,
   isArchiveJunk,
@@ -99,10 +104,49 @@ const FULL_SCOPES: Capability[] = ['read', 'create', 'update', 'delete'];
 const MCP_READ_RPM  = parseInt(Deno.env.get('MCP_READ_RPM')  || '600', 10);
 const MCP_WRITE_RPM = parseInt(Deno.env.get('MCP_WRITE_RPM') || '120', 10);
 
+// ---- Download links (SQEM-514) ----
+//
+// A file an agent should USE rather than read — `scripts/`, `assets/`, every binary — comes back as a
+// signed link, so it can be saved and run where the agent works (Claude Code, Codex, a sandbox).
+// 15 minutes: long enough for a turn, short enough that a leaked link is close to worthless; one file
+// per link. Served as a download (`download` → Content-Disposition: attachment), on the public host.
+// ⚠️ Storage sends NO nosniff (measured 2026-10-17); the attachment header and the stored types
+// (never HTML/SVG — an .svg is text/plain) are what keep a file from being rendered. On Cloud every link counts against the workspace's daily download
+// ceiling exactly like `sign-file-url` (SQEM-515); self-host does not count.
+const LINK_EXPIRY_SECONDS = 900;
+const SELF_HOSTED = Deno.env.get('SELF_HOSTED') === 'true';
+
+class DownloadLimitReached extends Error {}
+
+async function issueDownloadLinks(
+  adminClient: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  paths: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const publicBase = Deno.env.get('PUBLIC_API_URL') ?? null;
+  for (let i = 0; i < paths.length; i += MAX_PATHS_PER_CALL) {
+    const page = paths.slice(i, i + MAX_PATHS_PER_CALL);
+    if (!SELF_HOSTED) {
+      const { data: rec, error } = await adminClient.rpc('record_file_download', { p_ws: workspaceId, p_paths: page });
+      // Fail open, as in sign-file-url: a broken counter must not lock anybody out of their files.
+      if (error) console.error('[mcp] download counting failed, signing anyway:', error.message);
+      else if (rec && rec.allowed === false) throw new DownloadLimitReached(dailyLimitMessage(Number(rec.used_today), Number(rec.day_limit)));
+    }
+    const { data: signed, error: signErr } = await adminClient.storage
+      .from('workspace-files').createSignedUrls(page, LINK_EXPIRY_SECONDS, { download: true });
+    if (signErr) throw new Error(`Could not create download links: ${signErr.message}`);
+    for (const s of signed ?? []) if (s.path && s.signedUrl && !s.error) out.set(s.path, onPublicHost(s.signedUrl, publicBase));
+  }
+  return out;
+}
+
 const TOOL_CAPABILITY: Record<string, Capability> = {
   list_templates:    'read',
   search_templates:  'read',
   get_template:      'read',
+  read_context_file: 'read', // SQEM-499
+  download_skill:    'read', // SQEM-514 — links, not bytes; same right as reading the files
   list_files:        'read',
   create_template:   'create',
   import_skill_from_url: 'create',
@@ -139,71 +183,13 @@ const TOOL_CAPABILITY: Record<string, Capability> = {
 // the module calls `Deno.serve` at load and cannot be pulled into a test.
 const READ_METHODS = new Set(['prompts/list', 'prompts/get', 'resources/list', 'resources/read']);
 
-// ---- Text file MIME types allowed for upload_file ----
-
-const TEXT_MIME: Record<string, string> = {
-  txt:  'text/plain',
-  md:   'text/markdown',
-  mdx:  'text/markdown',
-  rst:  'text/x-rst',
-  json: 'application/json',
-  yaml: 'text/yaml',
-  yml:  'text/yaml',
-  toml: 'application/toml',
-  csv:  'text/csv',
-  xml:  'text/xml',
-  html: 'text/html',
-  css:  'text/css',
-  scss: 'text/x-scss',
-  sass: 'text/x-sass',
-  sql:  'application/sql',
-  js:   'text/javascript',
-  mjs:  'text/javascript',
-  cjs:  'text/javascript',
-  ts:   'text/typescript',
-  jsx:  'text/jsx',
-  tsx:  'text/tsx',
-  py:   'text/x-python',
-  rb:   'text/x-ruby',
-  go:   'text/x-go',
-  rs:   'text/x-rust',
-  java: 'text/x-java',
-  php:  'text/x-php',
-  swift:'text/x-swift',
-  kt:   'text/x-kotlin',
-  c:    'text/x-c',
-  cpp:  'text/x-c++',
-  cs:   'text/x-csharp',
-  sh:   'text/x-sh',
-  bash: 'text/x-sh',
-};
-
-// ---- Binary types accepted via create_upload_url (must match the storage bucket allowlist) ----
-
-const BINARY_MIME = new Set([
-  'application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/gif',
-]);
-
-// ---- Skill folders fetched by URL (SQEM-248) ----
+// ---- What a file IS (SQEM-514) ----
 //
-// A skill folder may hold pictures beside its text — a diagram skill ships example renders. Mapped
-// by extension because a zip entry carries no MIME type; the values must stay inside BINARY_MIME,
-// which is the storage bucket's own allowlist.
-// What text goes into the bucket as. The bucket's allowlist
-// (`20260617000000_workspace_files.sql`) holds three text types; `TEXT_MIME` holds thirty-odd, and
-// the difference is not a bug in either — the row carries the truthful mime, storage only needs to
-// accept the bytes. `upload_file` has always done this; naming it makes the rule checkable
-// (`tests/unit/skillImport.test.ts`) instead of a habit two call sites happen to share.
-const STORAGE_TEXT_MIME = 'text/plain';
-
-const BINARY_EXT_MIME: Record<string, string> = {
-  pdf: 'application/pdf',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  webp: 'image/webp',
-  gif: 'image/gif',
-};
+// One rule for every path in and out, shared with the browser: `_shared/skillFile.ts`. Text is decided
+// by the bytes (valid UTF-8, no NUL), not by an extension list — until SQEM-514 there were five such
+// lists, and the one here (`TEXT_MIME`) silently dropped every .drawio, .ttf, .xsd and .docx in a
+// skill. Storage only ever receives the types in `SKILL_STORAGE_MIMES` (the bucket allowlist,
+// pinned by `tests/unit/skillImport.test.ts`); the row carries the type every reader decides by.
 
 // Caps for the fetched archive. The download cap is the cheap one — it refuses before anything is
 // unpacked; the uncompressed cap is the zip-bomb guard, and the file cap keeps one call from filling
@@ -360,8 +346,8 @@ function initializeResult() {
  * the gates, the access sets or the handler without guessing. Durations only, no data.
  */
 Deno.serve(async (incoming) => {
-  // SQEM-510 — a call that landed outside Frankfurt (Claude calls from the US) is re-sent to the home
-  // region, where the database is; see _shared/regionForward.ts. Only authenticated POSTs do database
+  // SQEM-510/513 — a call that landed outside the database's region (Claude calls from the US, European
+  // callers in Frankfurt) is re-sent to the home region, eu-west-1; see _shared/regionForward.ts. Only authenticated POSTs do database
   // work — the handshake answers and the auth challenge are cheaper served where they arrive.
   let req = incoming;
   const region = Deno.env.get('SB_REGION');
@@ -1026,7 +1012,7 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
       },
       {
         name: 'get_template',
-        description: 'Load a template\'s full content, variables, and metadata so you can actually use it — e.g. a template found via search_templates or list_templates — by id or name slug. Works for both kinds (prompt or skill). Binary files (PDF, images) are always listed in "contextFiles" with a resource "uri" — fetch their bytes with resources/read. Text context files are inlined by default, or listed the same way if you pass include_files: "list". Use this to inspect a template before updating it, or to consume a skill\'s full knowledge.',
+        description: 'Load a template\'s full content, variables, and metadata so you can actually use it — e.g. a template found via search_templates or list_templates — by id or name slug. Works for both kinds (prompt or skill). A skill\'s context files come back as an outline by default: each entry in "contextFiles" has its name (a path inside the skill, e.g. references/x.md), uri, mimeType, byteSize and, for text, a preview (markdown gets its heading outline). Read only the files the task needs with read_context_file. Files under assets/ or scripts/ are resources, listed without a preview. A prompt comes back with its text files in full, because they are part of the task. include_files overrides either default. Use this to inspect a template before updating it, or to consume a skill\'s knowledge.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1034,10 +1020,34 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
             name: { type: 'string', description: 'Slug name of the template (from list_templates or search_templates)' },
             include_files: {
               type: 'string',
-              enum: ['inline', 'list'],
-              description: 'How to return TEXT context files. "inline" (default) puts their full content into the template content — right for small files and when you need everything anyway. "list" returns them like binaries instead: an entry in "contextFiles" with name, uri, mimeType, byteSize and a preview (markdown gets its heading outline, other text the opening characters), and no file content in the body. Choose "list" when a template carries large text context, or when several files are attached and only one is likely relevant to the task — then read just that one with resources/read on its uri.',
+              enum: ['list', 'inline'],
+              description: 'How to return TEXT context files. Default: "list" for a skill, "inline" for a prompt. "list" returns an outline: name, uri, mimeType, byteSize and a preview per file, with no file content in the body — then read what you need with read_context_file. "inline" puts the full text of every text file into the template content; use it only when you need all of them anyway.',
             },
           },
+        },
+      },
+      {
+        name: 'read_context_file',
+        description: 'Read one context file of a template — after get_template has shown which files exist and what is in them. A file to read (text outside assets/ and scripts/) comes back as text; a file to use (scripts/, assets/, any binary) comes back as a download link valid 15 minutes — pass as: "text" or as: "file" for the other. Address it either by its "uri" from get_template\'s contextFiles, or by "template" (name slug or id) plus "path" — the path inside the skill exactly as SKILL.md writes it (e.g. references/animation.md). Read only the files the task actually needs.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            uri:      { type: 'string', description: 'The file uri from a template\'s contextFiles entry (sqemes://files/<id>).' },
+            template: { type: 'string', description: 'The template\'s name slug (or id), when addressing the file by path.' },
+            path:     { type: 'string', description: 'The file\'s path inside the skill, e.g. references/animation.md. Use together with template.' },
+            as:       { type: 'string', enum: ['text', 'file'], description: 'Optional. "text" returns the content even for scripts/ and assets/; "file" returns a download link even for a text file.' },
+          },
+        },
+      },
+      {
+        name: 'download_skill',
+        description: 'Get a whole skill as the folder it is — to INSTALL it in an agent that runs skills (Claude Code, Codex, a sandbox). Returns SKILL.md as text plus every other file with its path, size and a download link (valid 15 minutes, no auth needed). Create the skill folder, write SKILL.md, then fetch each link to its path. To USE a skill in this conversation, call get_template instead.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            template: { type: 'string', description: 'The skill\'s name slug or id.' },
+          },
+          required: ['template'],
         },
       },
       {
@@ -1106,7 +1116,7 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
       },
       {
         name: 'import_skill_from_url',
-        description: 'Import a whole Anthropic Agent Skill from a public GitHub URL in ONE call. The server downloads the archive, unpacks it, stores every file under its relative path and creates the skill template — the file contents never pass through you.\n\nUSE THIS for any skill that lives in a repository. Uploading a real skill file-by-file via upload_file does not work: a skill folder is routinely megabytes, so you run out of room and it arrives half-complete without anything saying so.\n\nAccepted: https://github.com/owner/repo · https://github.com/owner/repo/tree/<ref>/<folder> · any .zip on a GitHub host. If the archive holds several skills, the call names them and you pass "path" to pick one.\n\nReturns what actually landed: file count, total bytes, and every file that was skipped with the reason. Nothing else in Sqemes reports a partial import, so read it.',
+        description: 'Import a whole Anthropic Agent Skill from a public GitHub URL in ONE call. The server downloads the archive, unpacks it, stores every file under its relative path and creates the skill template — the file contents never pass through you.\n\nUSE THIS for any skill that lives in a repository. Uploading a real skill file-by-file via upload_file does not work: a skill folder is routinely megabytes, so you run out of room and it arrives half-complete without anything saying so.\n\nAccepted: https://github.com/owner/repo · https://github.com/owner/repo/tree/<ref>/<folder> · any .zip on a GitHub host. If the archive holds several skills, the call names them and you pass "path" to pick one.\n\nEvery file in the folder is kept, whatever its type — scripts, schemas, fonts, templates.\n\nReturns what actually landed: file count, total bytes, and every file that was skipped with the reason. Nothing else in Sqemes reports a partial import, so read it.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1118,7 +1128,7 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
       },
       {
         name: 'upload_file',
-        description: 'Upload a text file into the workspace so it can be attached to templates via file_ids.\n\nSupported types: .txt .md .mdx .rst .json .yaml .yml .toml .csv .xml .html .css .scss .sass .sql .js .ts .jsx .tsx .mjs .py .rb .go .rs .java .php .swift .kt .c .cpp .cs .sh .bash\n\nFOLDERS: "name" may be a RELATIVE PATH and it is stored exactly as given — that is how a file keeps its place in a folder. Uploading an Agent Skill or any other folder, send each file under its path relative to the folder root (references/type-bar.md, scripts/extract.py), never the bare filename. Sqemes groups files by that prefix into a folder tree, and a skill whose SKILL.md says "see references/x.md" only works when x.md is actually called references/x.md.\n\nFor PDFs and images use create_upload_url + finalize_upload (binary, uploaded out of band). Office documents (.docx/.xlsx/.pptx) are not supported — convert to PDF.\n\nThe returned id can be used directly in file_ids on create_template or update_template without a follow-up list_files call.',
+        description: 'Upload a text file into the workspace so it can be attached to templates via file_ids. Any text file, whatever its extension.\n\nFOLDERS: "name" may be a RELATIVE PATH and it is stored exactly as given — that is how a file keeps its place in a folder. Uploading an Agent Skill or any other folder, send each file under its path relative to the folder root (references/type-bar.md, scripts/extract.py), never the bare filename. Sqemes groups files by that prefix into a folder tree, and a skill whose SKILL.md says "see references/x.md" only works when x.md is actually called references/x.md.\n\nFor anything that is not text — images, PDFs, fonts, Office files, archives — use create_upload_url + finalize_upload (uploaded out of band).\n\nThe returned id can be used directly in file_ids on create_template or update_template without a follow-up list_files call.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1130,12 +1140,12 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
       },
       {
         name: 'create_upload_url',
-        description: 'Begin uploading a binary file (PDF or image) that is too large to pass inline. Returns a short-lived signed URL; PUT the raw bytes to it (out of band, with Content-Type set to mimeType), then call finalize_upload with the returned fileId to register the file.\n\nSupported types: application/pdf, image/png, image/jpeg, image/webp, image/gif. For text/code use upload_file; Office documents (.docx/.xlsx/.pptx) are unsupported — convert to PDF.',
+        description: 'Begin uploading a binary file — any type: image, PDF, font, Office file, archive. Returns a short-lived signed URL and the contentType to send; PUT the raw bytes to it (out of band, with exactly that Content-Type), then call finalize_upload with the returned fileId. The type is then read from the bytes. For text use upload_file.',
         inputSchema: {
           type: 'object',
           properties: {
             name:     { type: 'string', description: 'Filename with extension (e.g. report.pdf, diagram.png)' },
-            mimeType: { type: 'string', description: 'One of: application/pdf, image/png, image/jpeg, image/webp, image/gif' },
+            mimeType: { type: 'string', description: 'The file\'s type as you know it (e.g. application/pdf, image/png, font/ttf). Only used to pick the Content-Type for the PUT.' },
           },
           required: ['name', 'mimeType'],
         },
@@ -1510,12 +1520,88 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
     }
 
     if (toolName === 'get_template') {
-      // ⚠️ `include_files` defaults to `inline` HERE and to `list` in Chat. The default belongs to
-      // the surface, not to the query: every MCP client written against SQEM-230 expects inline, and
-      // changing that would alter the payload of callers that never asked for anything.
+      // SQEM-499 — `list` by default on MCP too (it was `inline` since SQEM-230). The Agent Skills
+      // standard loads a skill's files on demand; inlining every file cost a typical skill ~35,000
+      // tokens per call and a 154-file one 16–40 s. It became possible only now that MCP has a TOOL
+      // to read a file (read_context_file below): `resources/read` is not something a model can call
+      // in most clients, so `list` without it would have cut the model off from the files.
+      // `inline` stays available on request; going back is this one default.
       return libraryResult(id, () => lib.getTemplate({
-        id: args.id, name: args.name, includeFiles: args.include_files ?? 'inline',
+        id: args.id, name: args.name, includeFiles: args.include_files ?? 'auto', // skill → list, prompt → inline
+      }).then(t => {
+        // SQEM-517 — counted per workspace and day, never per person; after the answer, never in its way.
+        countUsage(adminClient, workspaceId, 'mcp', 'playbook_loaded', t.id);
+        return t;
       }));
+    }
+
+    if (toolName === 'read_context_file') {
+      // SQEM-499 — one file, on demand: by the uri from get_template, or by its path inside the
+      // playbook (`references/x.md`), the way SKILL.md refers to it. Same reader as `resources/read`.
+      // SQEM-514 — delivered by PURPOSE: a file to read (text outside assets/ and scripts/) as text, a
+      // file to use (scripts/, assets/, every binary) as a download link; `as` asks for the other.
+      try {
+        const fileId = args.uri
+          ? String(args.uri)
+          : await lib.contextFileIdByPath({
+              ...(/^[0-9a-f-]{36}$/i.test(String(args.template ?? '')) ? { id: String(args.template) } : { name: args.template }),
+              path: String(args.path ?? ''),
+            });
+        const meta = await lib.contextFileMeta(fileId);
+        const isText = isTextContentMime(meta.mimeType);
+        const delivery = deliveryOf(meta.name, meta.mimeType, args.as);
+        if (delivery === 'refuse') {
+          return rpcError(id, -32602, `"${meta.name}" is a binary file (${meta.mimeType}) — it has no text. Ask with as: "file" for a download link.`);
+        }
+        if (delivery === 'text') {
+          const file = await lib.readContextFile(meta.id);
+          return rpcResult(id, { content: [{ type: 'text', text: file.text ?? '' }] });
+        }
+        const url = (await issueDownloadLinks(adminClient, workspaceId, [meta.storagePath])).get(meta.storagePath);
+        if (!url) return rpcError(id, -32603, 'Could not create a download link for this file');
+        const content: unknown[] = [{ type: 'text', text: JSON.stringify({
+          name: meta.name,
+          mimeType: meta.mimeType,
+          sizeBytes: meta.sizeBytes,
+          url,
+          expiresInSeconds: LINK_EXPIRY_SECONDS,
+          howTo: 'GET the url (no auth header) and save the bytes under the file\'s path. One file per link, valid 15 minutes.'
+            + (isText ? ' Ask again with as: "text" to read it instead.' : ''),
+        }, null, 2) }];
+        // An image is also shown, so a model that cannot fetch still sees it (≤ 5 MB).
+        if (meta.mimeType.startsWith('image/') && meta.sizeBytes <= 5 * 1024 * 1024) {
+          const file = await lib.readContextFile(meta.id);
+          if (file.base64) content.push({ type: 'image', data: file.base64, mimeType: meta.mimeType });
+        }
+        return rpcResult(id, { content });
+      } catch (err) {
+        if (err instanceof DownloadLimitReached) return rpcError(id, -32603, err.message);
+        return libraryError(id, err);
+      }
+    }
+
+    if (toolName === 'download_skill') {
+      // SQEM-514 — a skill as the folder it is, for agents that install skills (Claude Code, Codex):
+      // SKILL.md as text, every other file as path + size + link. Nothing passes through the model but
+      // the SKILL.md and the list — the same reason import_skill_from_url fetches archives itself.
+      try {
+        const sk = await lib.skillFolder({
+          ...(/^[0-9a-f-]{36}$/i.test(String(args.template ?? '')) ? { id: String(args.template) } : { name: args.template }),
+        });
+        const slug = skillSlug(sk.title);
+        const paths = relativeSkillPaths(sk.files.map(f => f.name), slug);
+        const links = sk.files.length ? await issueDownloadLinks(adminClient, workspaceId, sk.files.map(f => f.storagePath)) : new Map();
+        return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
+          skill: slug,
+          install: `Create the folder "${slug}/" in your skills directory (Claude Code: ~/.claude/skills/${slug}/), write SKILL.md there, then GET each url and save it under its path. Links are valid 15 minutes.`,
+          skillMd: buildSkillMd({ title: sk.title, description: sk.description, content: sk.content }),
+          files: sk.files.map((f, i) => ({ path: paths[i], sizeBytes: f.sizeBytes, mimeType: f.mimeType, url: links.get(f.storagePath) ?? null })),
+          expiresInSeconds: LINK_EXPIRY_SECONDS,
+        }, null, 2) }] });
+      } catch (err) {
+        if (err instanceof DownloadLimitReached) return rpcError(id, -32603, err.message);
+        return libraryError(id, err);
+      }
     }
 
     if (toolName === 'list_files') {
@@ -1748,27 +1834,18 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
           `${SKILL_ENTRY} has no "description" in its frontmatter. A skill needs one — AI agents use it to discover the skill. Add it and re-run, or import the folder through the Sqemes app and write one there.`);
       }
 
-      // Everything beside SKILL.md, by relative path. Unsupported types are recorded, not fatal: a
-      // skill that ships one .drawio should still arrive, and the report says what did not.
+      // Everything beside SKILL.md, by relative path. SQEM-514: every file, whatever its type — a skill
+      // is a folder, and the type is decided from the bytes at upload. `skipped` stays in the result
+      // for the paths that are still left out (nothing today), so clients keep reading the same shape.
       const skipped: { name: string; reason: string }[] = [];
       // Indexed access rather than `JSZip.JSZipObject`: the namespace type resolves differently
       // under `npm:` specifiers, and nothing in CI type-checks this file to catch it.
-      const members: { name: string; mimeType: string; storageMime: string; entry: (typeof zip.files)[string] }[] = [];
+      const members: { name: string; entry: (typeof zip.files)[string] }[] = [];
       for (const p of entryPaths) {
         if (!p.startsWith(root)) continue;
         const rel = p.slice(root.length);
         if (!rel || rel === SKILL_ENTRY || isArchiveJunk(rel)) continue;
-        const ext = rel.split('.').pop()?.toLowerCase() ?? '';
-        const textMime = TEXT_MIME[ext];
-        const mimeType = textMime ?? BINARY_EXT_MIME[ext];
-        if (!mimeType) { skipped.push({ name: rel, reason: `unsupported file type .${ext}` }); continue; }
-        // ⚠️ The bucket's own allowlist is far shorter than TEXT_MIME (see
-        // `20260617000000_workspace_files.sql`: text/plain, text/csv, text/markdown and four binary
-        // types). `upload_file` has always uploaded text as **text/plain** and kept the real type in
-        // the row; this path skipped that and handed `text/html` to storage, which refused it — the
-        // first real archive failed on `assets/example-bar-dark.html`. The row still carries the
-        // truthful mime, which is what every reader uses.
-        members.push({ name: rel, mimeType, storageMime: textMime ? STORAGE_TEXT_MIME : mimeType, entry: zip.files[p] });
+        members.push({ name: rel, entry: zip.files[p] });
       }
 
       if (members.length > SKILL_MAX_FILES) {
@@ -1805,11 +1882,14 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
           // The path stays in `name` — that is the folder tree (SQEM-244). Only the storage key is
           // flattened (SQEM-111/237), and the two must not be confused for each other.
           const storagePath = `${workspaceId}/${fileId}/${safeStorageFileName(workspaceName)}`;
+          // SQEM-514 — the type comes from the bytes: text → text/plain in storage, its specific type
+          // on the row; a proven image/PDF as itself; everything else application/octet-stream.
+          const t = classifySkillFile(member.name, bytes);
           const { error } = await adminClient.storage
             .from('workspace-files')
-            .upload(storagePath, bytes, { contentType: member.storageMime });
+            .upload(storagePath, bytes, { contentType: t.storageMime });
           if (error) throw new Error(`${member.name}: ${error.message}`);
-          uploaded.push({ fileId, storagePath, name: workspaceName, mimeType: member.mimeType, sizeBytes: bytes.byteLength });
+          uploaded.push({ fileId, storagePath, name: workspaceName, mimeType: t.rowMime, sizeBytes: bytes.byteLength });
         });
       } catch (err) {
         await cleanUp();
@@ -1881,16 +1961,9 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
       if (!fileName?.trim()) return rpcError(id, -32602, 'name is required');
       if (content == null)   return rpcError(id, -32602, 'content is required');
 
-      const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
-      const mimeType = TEXT_MIME[ext];
-      if (!mimeType) {
-        return rpcError(id, -32602,
-          `Unsupported file type ".${ext}" — upload_file accepts text/code only. ` +
-          `PDFs and images can be uploaded via the Sqemes UI. ` +
-          `Office documents (.docx/.xlsx/.pptx) aren't supported anywhere — convert to PDF first. ` +
-          `Supported text types: ${Object.keys(TEXT_MIME).map(e => '.' + e).join(', ')}`
-        );
-      }
+      // SQEM-514 — `content` is text by definition, so any name is accepted; the row type comes from
+      // the extension when it names a text type and is text/plain otherwise (an .svg, a .drawio).
+      const mimeType = TEXT_EXT_TO_MIME[extensionOf(fileName)] ?? STORAGE_TEXT_MIME;
 
       const fileId      = crypto.randomUUID();
       const safeFileName = safeStorageFileName(fileName); // SQEM-111/237 — no path separators / .. in the storage key
@@ -1936,11 +2009,10 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
       const { name: fileName, mimeType } = args;
       if (!fileName?.trim()) return rpcError(id, -32602, 'name is required');
       if (!mimeType)         return rpcError(id, -32602, 'mimeType is required');
-      if (!BINARY_MIME.has(mimeType)) {
-        return rpcError(id, -32602,
-          `Unsupported binary type "${mimeType}". Supported: ${[...BINARY_MIME].join(', ')}. ` +
-          `For text/code use upload_file; Office documents aren't supported — convert to PDF.`);
-      }
+      // SQEM-514 — any file. Storage accepts only the types in SKILL_STORAGE_MIMES, so anything that is
+      // not an image or a PDF is PUT as application/octet-stream; finalize_upload then decides from the
+      // bytes what it really is.
+      const putType = SKILL_STORAGE_MIMES.includes(mimeType) && mimeType !== STORAGE_TEXT_MIME ? mimeType : OCTET_STREAM;
 
       const fileId      = crypto.randomUUID();
       const safeFileName = safeStorageFileName(fileName); // SQEM-111/237 — no path separators / .. in the storage key
@@ -1958,9 +2030,9 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
         uploadUrl:        signed.signedUrl,
         token:            signed.token,
         path:             storagePath,
-        mimeType,
+        contentType:      putType,
         expiresInSeconds: 7200,
-        instructions:     'PUT the raw file bytes to uploadUrl with Content-Type set to mimeType, then call finalize_upload with this fileId.',
+        instructions:     `PUT the raw file bytes to uploadUrl with Content-Type: ${putType}, then call finalize_upload with this fileId.`,
       }, null, 2) }] });
     }
 
@@ -2003,9 +2075,19 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
       const storedMime  = obj.metadata?.mimetype ?? 'application/octet-stream';
       const sizeBytes   = obj.metadata?.size ?? 0;
 
-      if (!BINARY_MIME.has(storedMime)) {
+      // SQEM-514 — what the file IS is read from its bytes (≤ 15 MB, the bucket limit). A declared
+      // image or PDF must be one: storage would otherwise serve it under a type it is not.
+      if (!SKILL_STORAGE_MIMES.includes(storedMime)) {
         await adminClient.storage.from('workspace-files').remove([storagePath]);
-        return rpcError(id, -32602, `Uploaded file type "${storedMime}" is not an accepted binary type.`);
+        return rpcError(id, -32602, `Uploaded with Content-Type "${storedMime}" — use the contentType create_upload_url returned.`);
+      }
+      const { data: blob, error: dlErr } = await adminClient.storage.from('workspace-files').download(storagePath);
+      if (dlErr || !blob) return rpcError(id, -32603, `Could not read the upload: ${dlErr?.message ?? 'unknown error'}`);
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const kind = classifySkillFile(obj.name, bytes);
+      if (storedMime !== OCTET_STREAM && storedMime !== STORAGE_TEXT_MIME && sniffBinaryMime(bytes) !== storedMime) {
+        await adminClient.storage.from('workspace-files').remove([storagePath]);
+        return rpcError(id, -32602, `The bytes are not ${storedMime}. Upload it again with Content-Type: ${OCTET_STREAM}.`);
       }
 
       const { data: inserted, error: insertErr } = await adminClient
@@ -2014,7 +2096,7 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
           id:           fileId,
           workspace_id: workspaceId,
           name:         obj.name,
-          mime_type:    storedMime,
+          mime_type:    kind.rowMime,
           size_bytes:   sizeBytes,
           storage_path: storagePath,
           tags:         [],

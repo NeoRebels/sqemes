@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { SKILL_STORAGE_MIMES } from '../../supabase/functions/_shared/skillFile';
 import { resolve } from 'node:path';
 import {
   ALLOWED_ARCHIVE_HOSTS,
@@ -171,6 +172,9 @@ describe('the two frontmatter readers agree', () => {
     // write path depend on it agreeing; a drift would drop a foreign `license:` on one side only.
     ['splitFrontmatter', /export function splitFrontmatter\(md: string\): \{ own: Record<string, string>; foreign: string\[\]; body: string \} \{([\s\S]*?)\n\}/],
     ['withoutOwnFrontmatter', /export function withoutOwnFrontmatter\(content: string\): string \{([\s\S]*?)\n\}/],
+    // SQEM-514 — MCP `download_skill` writes the SKILL.md the web app's Agent Skill export wrote.
+    ['buildSkillMd', /export function buildSkillMd\(b: Pick<SkillBundle, 'title' \| 'description' \| 'content'>\): string \{([\s\S]*?)\n\}/],
+    ['yamlQuote', /const yamlQuote = \(v: string\) => (`[^\n]*`);/],
   ];
 
   for (const [name, pattern] of shapes) {
@@ -186,33 +190,38 @@ describe('the two frontmatter readers agree', () => {
 
 describe('what the importer sends to storage is what the bucket accepts', () => {
   // SQEM-248 — this exact mismatch failed the first real import: the skill's 107 `.html` files were
-  // handed to storage as `text/html`, which the bucket refuses. `TEXT_MIME` (thirty-odd types) is
-  // what the *row* records; the bucket allowlist is short, and text goes in as `text/plain`.
-  // Reading both files keeps the two from drifting again, since neither can see the other.
+  // handed to storage as `text/html`, which the bucket refuses. SQEM-514 — every content type the
+  // importers can upload is now ONE list (`SKILL_STORAGE_MIMES` in _shared/skillFile.ts), and the
+  // bucket's allowlist is the LATEST migration that sets it. Reading both keeps them from drifting.
   const read = (p: string) => readFileSync(resolve(__dirname, '../..', p), 'utf8');
 
   const bucketAllowlist = (): string[] => {
-    const sql = read('supabase/migrations/20260617000000_workspace_files.sql');
-    const m = sql.match(/array\[([^\]]*)\]/);
+    const sql = read('supabase/migrations/20261017090000_sqem514_bucket_any_file.sql');
+    const m = sql.match(/allowed_mime_types = array\[([^\]]*)\]/);
     if (!m) throw new Error('bucket allowlist not found — did the migration change?');
-    return m[1].split(',').map(s => s.trim().replace(/^'|'$/g, ''));
-  };
-
-  const sentToStorage = (): string[] => {
-    const src = read('supabase/functions/mcp-server/index.ts');
-    const text = src.match(/const STORAGE_TEXT_MIME = '([^']+)';/);
-    const binary = src.match(/const BINARY_EXT_MIME: Record<string, string> = \{([\s\S]*?)\n\};/);
-    if (!text || !binary) throw new Error('constants not found — did they get renamed?');
-    return [text[1], ...[...binary[1].matchAll(/'([^']+)'/g)].map(m => m[1])];
+    return m[1].split(',').map(s => s.trim().replace(/^'|'$/g, '')).filter(Boolean);
   };
 
   it('every content type the import can upload is in the bucket allowlist', () => {
     const allowed = bucketAllowlist();
-    for (const mime of sentToStorage()) expect(allowed).toContain(mime);
+    for (const mime of SKILL_STORAGE_MIMES) expect(allowed).toContain(mime);
   });
 
   it('and the allowlist was actually parsed, so an empty match cannot pass', () => {
     expect(bucketAllowlist().length).toBeGreaterThan(3);
-    expect(sentToStorage().length).toBeGreaterThan(3);
+    expect(SKILL_STORAGE_MIMES.length).toBeGreaterThan(3);
+  });
+
+  it('no later migration sets the workspace-files allowlist again behind this test', () => {
+    const later = readdirSync(resolve(__dirname, '../../supabase/migrations'))
+      .filter(f => f > '20261017090000_sqem514_bucket_any_file.sql')
+      .filter(f => /workspace-files/.test(read(`supabase/migrations/${f}`)) && /allowed_mime_types/.test(read(`supabase/migrations/${f}`)));
+    expect(later).toEqual([]);
+  });
+
+  it('the MCP importers upload with the type the shared rule decides, not their own', () => {
+    const src = read('supabase/functions/mcp-server/index.ts');
+    expect(src).not.toMatch(/const TEXT_MIME\b|const BINARY_MIME\b|const BINARY_EXT_MIME\b/);
+    expect(src).toMatch(/\.upload\(storagePath, bytes, \{ contentType: t\.storageMime \}\)/);
   });
 });

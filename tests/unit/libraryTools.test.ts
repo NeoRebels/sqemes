@@ -69,14 +69,13 @@ describe('the tool schemas — what all three providers accept', () => {
 });
 
 describe('the executor', () => {
-  it('⭐ get_template defaults to include_files: "list" — the lazy-loading requirement', async () => {
-    // ⛔ The default flips between surfaces on purpose: `libraryQueries` keeps `inline` so every MCP
-    // caller written against SQEM-230 gets byte-identical output. In Chat the whole point is that
-    // context arrives as an outline and the full text only on a second call.
+  it('⭐ get_template defaults to include_files: "auto" — skill as an outline, prompt in full (SQEM-499)', async () => {
+    // `auto` is resolved by kind in libraryQueries.getTemplate — the same default as MCP. An explicit
+    // choice still wins.
     const { reader, seen } = fakeReader();
     const rt = createLibraryToolRuntime(async () => reader);
     await rt.execute('get_template', { name: 'brief' });
-    expect(seen[0][1].includeFiles).toBe('list');
+    expect(seen[0][1].includeFiles).toBe('auto');
 
     await rt.execute('get_template', { name: 'brief', include_files: 'inline' });
     expect(seen[1][1].includeFiles).toBe('inline');
@@ -312,9 +311,12 @@ describe('SQEM-373 — mcp-server shares the handlers rather than keeping its ow
     expect(MCP_FN).not.toMatch(/function contextFileStats|function resolveContextFiles|function composePersona|function buildPreview/);
   });
 
-  it('⚠️ get_template keeps its `inline` default on MCP', () => {
-    // Every client written against SQEM-230 expects inline; changing it would alter the payload of
-    // callers that never asked for anything.
-    expect(MCP_FN).toMatch(/includeFiles: args\.include_files \?\? 'inline'/);
+  it('SQEM-499 — get_template defaults by KIND on MCP (skill → list, prompt → inline), and only because read_context_file exists there', () => {
+    // It was `inline` from SQEM-230 on, to keep every caller's payload. SQEM-499 changed it deliberately
+    // (Agent Skills progressive disclosure: ~35,000 tokens per typical skill call). The flip is safe
+    // only with a TOOL to read a file — `resources/read` is not callable by the model in most clients.
+    expect(MCP_FN).toMatch(/includeFiles: args\.include_files \?\? 'auto'/);
+    expect(MCP_FN).toMatch(/name: 'read_context_file',/);
+    expect(MCP_FN).toMatch(/toolName === 'read_context_file'/);
   });
 });

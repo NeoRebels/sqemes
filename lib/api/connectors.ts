@@ -1,7 +1,7 @@
 // SQEM-149 — connectors API. List/delete are RLS-direct on workspace_connectors; create + probe go
 // through the manage-connectors edge function (token is encrypted server-side and never returned).
 import { supabase } from '../supabase';
-import { FUNCTIONS_BASE } from '../env';
+import { FUNCTIONS_BASE, functionCallUrl } from '../env';
 
 // workspace_connectors is not in the generated database.types yet (added by migration 20260727120000);
 // a thin cast keeps this typed at the call sites without regenerating.
@@ -59,7 +59,7 @@ export function connectorRedirectUri(): string {
 async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
-  const res = await fetch(`${FUNCTIONS_URL}/manage-connectors`, {
+  const res = await fetch(functionCallUrl('manage-connectors'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
     body: JSON.stringify(body),
@@ -156,7 +156,7 @@ export async function startOAuthConnect(
 ): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
-  const res = await fetch(`${FUNCTIONS_URL}/connector-oauth-start`, {
+  const res = await fetch(functionCallUrl('connector-oauth-start'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
     body: JSON.stringify({ workspaceId, app, ...(clientId ? { clientId } : {}), ...(clientSecret ? { clientSecret } : {}), ...(adHoc ?? {}) }),

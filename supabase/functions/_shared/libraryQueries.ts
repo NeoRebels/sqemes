@@ -19,6 +19,9 @@
  * object and then wrapped it in the very last line.
  */
 
+import { isTextContentMime } from './skillFile.ts';
+import { isResourcePath, matchSkillPath } from './skillPaths.ts';
+
 /** SQEM-492 — a storage path belongs to a workspace only if it sits in that workspace's folder. */
 export const isPathInWorkspace = (path: string | null | undefined, workspaceId: string): boolean =>
   typeof path === 'string' && !!workspaceId && path.startsWith(`${workspaceId}/`) && !path.includes('..');
@@ -50,13 +53,9 @@ export function toSlug(title: string): string {
 }
 
 // Mimes whose stored bytes are textual content (inlined directly). Everything else
-// (PDF, images) is binary — referenced by resource URI for the client to fetch.
-export function isTextContentMime(mime: string): boolean {
-  return mime.startsWith('text/')
-    || mime === 'application/json'
-    || mime === 'application/toml'
-    || mime === 'application/sql';
-}
+// (PDF, images, since SQEM-514 application/octet-stream) is binary. Lives in skillFile.ts now, next
+// to the rule that guarantees every text row passes it; re-exported so existing imports stay.
+export { isTextContentMime };
 
 // Chunk-safe base64 — spreading a large Uint8Array into String.fromCharCode overflows the stack.
 export function toBase64(buffer: ArrayBuffer): string {
@@ -174,15 +173,27 @@ export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) =>
 // SQEM-230 — `mode: 'list'` renders text files the same way binaries have always been rendered, by
 // reference. The body then names what context exists without carrying it, which is the whole point:
 // the caller decides per file whether to spend the tokens.
+export const OUTLINE_NOTE =
+  '[The files below are listed, not included. Read one with read_context_file — by its uri, or by this playbook and its path. ' +
+  'If that tool is not available, call get_template again with include_files: "inline".]';
+
 export function renderContextBlocks(
   resolved: Array<{ name: string; mimeType: string; uri: string; text: string | null }>,
   mode: 'inline' | 'list' = 'inline',
 ): string[] {
-  return resolved.map(f =>
+  const lines = resolved.map(f =>
     f.text != null && mode === 'inline'
       ? `[Context: ${f.name}]\n${f.text}`
       : `[Context file: ${f.name} (${f.mimeType}) — read via ${f.uri}]`,
   );
+  // SQEM-499 — ONE note in front of an outline says how to get the text (once, not per line: on a
+  // 151-file skill a per-line hint cost +28 KB). A client whose tool list is cached from before
+  // read_context_file existed sees the outline but not the tool, and cannot call `resources/read` as a
+  // model; the get_template fallback is in every client's schema.
+  if (mode === 'list' && resolved.some(f => f.text == null && isTextContentMime(f.mimeType))) {
+    lines.unshift(OUTLINE_NOTE);
+  }
+  return lines;
 }
 
 // SQEM-324 — a persona, rendered.
@@ -295,6 +306,25 @@ export interface PersonaSummary {
 
 export interface PersonaRow { id: string; title: string; description: string; content: string }
 
+/** SQEM-514 — a context file without its bytes: what a link is issued for. */
+export interface FileMeta {
+  id: string;
+  uri: string;
+  name: string;
+  mimeType: string;
+  storagePath: string;
+  sizeBytes: number;
+}
+
+export interface SkillFolder {
+  id: string;
+  title: string;
+  description: string;
+  content: string;
+  /** The skill's files the caller may read, in the template's order. */
+  files: FileMeta[];
+}
+
 export interface FileContent {
   uri: string;
   name: string;
@@ -324,6 +354,17 @@ export interface LibraryReader {
 
   /** Accepts a bare file id or a `sqemes://files/<id>` uri. */
   readContextFile(ref: string): Promise<FileContent>;
+  /**
+   * SQEM-499 — a file of ONE playbook by its path inside the skill (`references/x.md`), the way a
+   * SKILL.md refers to it. Resolved among that playbook's files only; same access rules as the uri.
+   */
+  readContextFileByPath(args: { id?: string; name?: string; path: string }): Promise<FileContent>;
+  /** SQEM-514 — the file id a path resolves to, with the same rules as readContextFileByPath. */
+  contextFileIdByPath(args: { id?: string; name?: string; path: string }): Promise<string>;
+  /** SQEM-514 — a file's row without downloading it; same access rule and "not found" as readContextFile. */
+  contextFileMeta(ref: string): Promise<FileMeta>;
+  /** SQEM-514 — a skill with every file the caller may read, for `download_skill`. */
+  skillFolder(args: { id?: string; name?: string }): Promise<SkillFolder>;
   resolveContextFiles(fileIds: string[] | null | undefined, opts?: { mode?: 'inline' | 'list' }): Promise<ResolvedFile[]>;
 }
 
@@ -448,6 +489,9 @@ export async function createLibraryReader(
         text: null as string | null,
       };
       if (!isTextContentMime(f.mime_type)) return base;
+      // SQEM-499 — `assets/` and `scripts/` are resources, not context (Agent Skills standard): never
+      // inlined, never previewed, never downloaded here. read_context_file reads one on demand.
+      if (isResourcePath(f.name)) return base;
 
       if (mode === 'list' && typeof f.preview === 'string') {
         return { ...base, preview: f.preview, previewTruncated: !!f.preview_truncated };
@@ -600,7 +644,7 @@ export async function createLibraryReader(
     return { text: composePersona(persona, routes), routeCount: routes.length };
   };
 
-  return {
+  const reader: LibraryReader = {
     canAccessTemplate,
     canAccessPersona,
     canAccessFile: (id: string) => accessibleFileIds.has(id),
@@ -700,6 +744,11 @@ export async function createLibraryReader(
       // MCP caller gets byte-identical output; an unknown value is rejected rather than silently
       // treated as the default, because a typo'd mode would look like it worked while doing the
       // opposite.
+      // SQEM-499 — `auto` is what the surfaces pass when the caller said nothing: a SKILL comes back as
+      // an outline (Agent Skills: resources on demand), a PROMPT with its files in full. A prompt's file
+      // is part of the task — a briefing, a template — and a prompt body rarely names its files, so an
+      // outline would give the model nothing telling it to read them.
+      if (includeFiles === 'auto') includeFiles = tpl.kind === 'skill' ? 'list' : 'inline';
       if (includeFiles !== 'inline' && includeFiles !== 'list') {
         throw new LibraryBadRequest(`include_files must be "inline" or "list" (got "${includeFiles}")`);
       }
@@ -794,6 +843,98 @@ export async function createLibraryReader(
       return renderPersona(persona as PersonaRow);
     },
 
+    async readContextFileByPath(args) {
+      // The same reader as the uri path, so access, storage and the stored-text cache stay one code path.
+      return reader.readContextFile(await reader.contextFileIdByPath(args));
+    },
+
+    async contextFileMeta(ref: string) {
+      const fileId = String(ref || '').replace(/^sqemes:\/\/files\//, '');
+      // SQEM-291 — the same order and the same answer as readContextFile: access first, "not found".
+      if (!fileId || !accessibleFileIds.has(fileId)) throw new LibraryNotFound(`Resource not found: ${ref}`);
+      const { data: file } = await client
+        .from('workspace_files')
+        .select('id, name, mime_type, storage_path, size_bytes')
+        .eq('workspace_id', workspaceId)
+        .eq('id', fileId)
+        .single();
+      if (!file || !isPathInWorkspace(file.storage_path, workspaceId)) throw new LibraryNotFound(`Resource not found: ${ref}`);
+      return {
+        id: file.id, uri: `sqemes://files/${file.id}`, name: file.name, mimeType: file.mime_type,
+        storagePath: file.storage_path, sizeBytes: Number(file.size_bytes ?? 0),
+      };
+    },
+
+    async skillFolder({ id: templateId, name: templateName }) {
+      if (!templateId && !templateName) throw new LibraryBadRequest('Provide either id or name');
+      const resolvedId: string | undefined = templateId ?? templateIdBySlug.get(templateName!);
+      if (!resolvedId || !canAccessTemplate(resolvedId)) throw new LibraryNotFound('Template not found');
+      const { data: tpl } = await client
+        .from('prompts')
+        .select('id, title, description, kind, content, context_file_ids')
+        .eq('workspace_id', workspaceId)
+        .eq('id', resolvedId)
+        .maybeSingle();
+      if (!tpl) throw new LibraryNotFound('Template not found');
+      if (tpl.kind !== 'skill') throw new LibraryBadRequest('download_skill is for skills; a prompt comes back from get_template');
+      const ids: string[] = ((tpl.context_file_ids as string[] | null) ?? []).filter(fid => accessibleFileIds.has(fid));
+      let files: FileMeta[] = [];
+      if (ids.length) {
+        const { data: rows } = await client
+          .from('workspace_files')
+          .select('id, name, mime_type, storage_path, size_bytes')
+          .eq('workspace_id', workspaceId)
+          .in('id', ids);
+        const byId = new Map(((rows ?? []) as Array<{ id: string; name: string; mime_type: string; storage_path: string; size_bytes: number | null }>)
+          .filter(r => isPathInWorkspace(r.storage_path, workspaceId))
+          .map(r => [r.id, r]));
+        files = ids.map(fid => byId.get(fid)).filter(Boolean).map(r => ({
+          id: r!.id, uri: `sqemes://files/${r!.id}`, name: r!.name, mimeType: r!.mime_type,
+          storagePath: r!.storage_path, sizeBytes: Number(r!.size_bytes ?? 0),
+        }));
+      }
+      return { id: tpl.id, title: tpl.title, description: tpl.description ?? '', content: tpl.content ?? '', files };
+    },
+
+    async contextFileIdByPath({ id: templateId, name: templateName, path }) {
+      if (!templateId && !templateName) throw new LibraryBadRequest('Provide the playbook (id or name) the file belongs to');
+      if (!String(path ?? '').trim()) throw new LibraryBadRequest('Provide the path of the file inside the playbook');
+      const resolvedId: string | undefined = templateId ?? templateIdBySlug.get(templateName!);
+      if (!resolvedId || !canAccessTemplate(resolvedId)) throw new LibraryNotFound('Template not found');
+
+      const { data: tpl } = await client
+        .from('prompts')
+        .select('context_file_ids')
+        .eq('workspace_id', workspaceId)
+        .eq('id', resolvedId)
+        .maybeSingle();
+      const ids: string[] = (tpl?.context_file_ids as string[] | null) ?? [];
+      if (!ids.length) throw new LibraryNotFound(`This playbook has no file "${path}"`);
+
+      const { data: rows } = await client
+        .from('workspace_files')
+        .select('id, name')
+        .eq('workspace_id', workspaceId)
+        .in('id', ids);
+      const files = ((rows ?? []) as Array<{ id: string; name: string }>).filter(f => accessibleFileIds.has(f.id));
+      const match = matchSkillPath(files, path);
+      if (match.kind === 'ambiguous') {
+        throw new LibraryBadRequest(`"${path}" matches several files in this playbook — use one of: ${match.candidates.join(', ')}`);
+      }
+      if (match.kind === 'none') {
+        // A SKILL.md is the playbook's own content (get_template), not one of its files.
+        if (/(^|\/)SKILL\.md$/i.test(String(path).trim())) {
+          throw new LibraryNotFound('SKILL.md is this playbook\'s own content — it comes back from get_template, not as a file');
+        }
+        // Context files first, resources (assets/, scripts/) after — a model reads the head of a list.
+        const names = files.map(f => f.name).sort((a, b) =>
+          Number(isResourcePath(a)) - Number(isResourcePath(b)) || a.localeCompare(b));
+        const shown = names.slice(0, 40).join(', ') + (names.length > 40 ? `, … (${names.length - 40} more)` : '');
+        throw new LibraryNotFound(`This playbook has no file "${path}". Its files: ${shown || 'none'}`);
+      }
+      return match.id;
+    },
+
     async readContextFile(ref: string) {
       const fileId = String(ref || '').replace(/^sqemes:\/\/files\//, '');
       const uri = `sqemes://files/${fileId}`;
@@ -838,4 +979,5 @@ export async function createLibraryReader(
       };
     },
   };
+  return reader;
 }

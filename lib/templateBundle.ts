@@ -12,7 +12,7 @@ export { BUNDLE_SCHEMA, readBundle, downloadBlob };
 export type { BundleFile, BundleTemplate, BundleManifest, BundlePersona };
 import { createPrompt } from './api/prompts';
 import { createPersona } from './api/personas';
-import { getWorkspaceFileSignedUrl, uploadWorkspaceFile } from './api/files';
+import { getWorkspaceFileSignedUrl, uploadSkillFile, deleteWorkspaceFile } from './api/files';
 
 
 // ---- Export ----------------------------------------------------------------------------------------
@@ -135,13 +135,21 @@ export async function importBundle(
   const fileMap = new Map<string, string>();   // BundleFile.ref → new workspace_files id
   const createdFiles: WorkspaceFile[] = [];
 
-  for (const bf of manifest.files || []) {
-    const entry = zip.file(bf.path);
-    if (!entry) continue; // manifest referenced a file not in the zip → skip
-    const blob = await entry.async('blob');
-    const created = await uploadWorkspaceFile(workspaceId, new File([blob], bf.name, { type: bf.mimeType || 'application/octet-stream' }), []);
-    fileMap.set(bf.ref, created.id);
-    createdFiles.push(created);
+  // SQEM-514 — any file a skill carries; its type comes from the bytes, the manifest's `mimeType` is
+  // only what the exporting side believed. If one file fails, the files this import already created
+  // are removed again — no template references them yet.
+  try {
+    for (const bf of manifest.files || []) {
+      const entry = zip.file(bf.path);
+      if (!entry) continue; // manifest referenced a file not in the zip → skip
+      const blob = await entry.async('blob');
+      const created = await uploadSkillFile(workspaceId, new File([blob], bf.name), []);
+      fileMap.set(bf.ref, created.id);
+      createdFiles.push(created);
+    }
+  } catch (e) {
+    await Promise.allSettled(createdFiles.map(f => deleteWorkspaceFile(f.id, f.storagePath)));
+    throw e;
   }
 
   const mapFiles = (refs?: string[]) => (refs || []).map(r => fileMap.get(r)).filter(Boolean) as string[];

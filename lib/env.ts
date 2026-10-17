@@ -33,6 +33,29 @@ export function functionsUrl(name: string): string {
   return `${SUPABASE_BASE}/functions/v1/${name}`;
 }
 
+/**
+ * SQEM-513 — the region the app's OWN calls to an edge function should run in: the database's.
+ *
+ * Supabase runs a function in the region closest to the caller, so a browser in Germany lands in
+ * `eu-central-1` while the database is in `eu-west-1` — and every query crossed Frankfurt ↔ Ireland
+ * (measured: roughly twice the latency of the same call served next to the database).
+ * `?forceFunctionRegion=` is honoured behind `api.sqemes.com` (measured 2026-10-14; the `x-region`
+ * header is not). Cloud only: a self-hosted server has one region, and `null` leaves its URLs alone.
+ * Must equal `HOME_REGION` in supabase/functions/_shared/regionForward.ts (pinned by a test).
+ */
+export const FUNCTION_REGION: string | null = IS_SELF_HOSTED ? null : 'eu-west-1';
+
+/**
+ * SQEM-513 — the URL to CALL an edge function with (`fetch`). ⛔ Never for a URL that is shown or
+ * handed to someone else: the MCP URL customers paste into Claude or ChatGPT, an OAuth `redirect_uri`
+ * (`connectorCallbackUrl`). Those stay `functionsUrl()` — a query string there breaks OAuth metadata
+ * (SQEM-449/510) and the redirect allowlists of the providers.
+ */
+export function functionCallUrl(name: string): string {
+  const url = functionsUrl(name);
+  return FUNCTION_REGION ? `${url}?forceFunctionRegion=${FUNCTION_REGION}` : url;
+}
+
 /** The `/functions/v1` base, for the few callers that build several paths from it. */
 export const FUNCTIONS_BASE = `${SUPABASE_BASE}/functions/v1`;
 

@@ -249,7 +249,7 @@ const FileRow = ({
 
         {/* Meta line */}
         <div className="flex items-center gap-x-2 gap-y-1 mt-1 flex-wrap text-xs text-slate-400">
-          <span className="font-medium uppercase tracking-wide">{fileTypeLabel(file.mimeType)}</span>
+          <span className="font-medium uppercase tracking-wide">{fileTypeLabel(file.mimeType, file.name)}</span>
           <span className="text-slate-300 dark:text-slate-600">·</span>
           <span>{formatBytes(file.sizeBytes)}</span>
           <span className="text-slate-300 dark:text-slate-600">·</span>

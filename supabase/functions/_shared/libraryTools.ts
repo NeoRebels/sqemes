@@ -65,8 +65,9 @@ export const LIBRARY_TOOLS: ToolDefinition[] = [
     name: 'get_template',
     description:
       'Load a template in full — its content, system instruction, variables and context files — by name slug or id. ' +
-      'Context files come back as an outline by default: name, size and a preview (markdown gets its heading outline) instead of the full text. ' +
-      'Read the one you actually need with read_context_file on its uri. Pass include_files: "inline" only when you know you want every attached file in full.',
+      'A skill\'s context files come back as an outline by default: name, size and a preview (markdown gets its heading outline) instead of the full text; a prompt comes back with its files in full. ' +
+      'Read the one you actually need with read_context_file — by its uri, or by the playbook plus the file\'s path inside the skill (references/x.md). ' +
+      'Files under assets/ or scripts/ are resources, listed without a preview. Pass include_files: "inline" only when you know you want every attached file in full.',
     parameters: {
       type: 'object',
       properties: {
@@ -75,7 +76,7 @@ export const LIBRARY_TOOLS: ToolDefinition[] = [
         include_files: {
           type: 'string',
           enum: ['list', 'inline'],
-          description: '"list" (default) returns context files as an outline with previews; "inline" puts their full text into the content.',
+          description: 'Default: "list" for a skill, "inline" for a prompt. "list" returns context files as an outline with previews; "inline" puts their full text into the content.',
         },
       },
     },
@@ -83,14 +84,16 @@ export const LIBRARY_TOOLS: ToolDefinition[] = [
   {
     name: 'read_context_file',
     description:
-      'Read one context file in full, by the uri from a get_template outline (sqemes://files/<id>). ' +
+      'Read one context file in full — by the uri from a get_template outline (sqemes://files/<id>), or by template plus path: ' +
+      'the path inside the skill exactly as its SKILL.md writes it (references/animation.md). ' +
       'Use this after get_template has shown you which files exist and what is in them — read only the ones the task actually needs.',
     parameters: {
       type: 'object',
       properties: {
         uri: { type: 'string', description: 'The file uri from a template\'s contextFiles entry.' },
+        template: { type: 'string', description: 'The template\'s name slug or id, when addressing the file by path.' },
+        path: { type: 'string', description: 'The file\'s path inside the skill, e.g. references/animation.md. Use together with template.' },
       },
-      required: ['uri'],
     },
   },
   {
@@ -264,8 +267,12 @@ export function toolsWereRefused(status: number, body: string): boolean {
 
 export function createLibraryToolRuntime(
   getReader: () => Promise<LibraryReader>,
-  { maxRounds = 6, budgetMs = 90_000, now = () => Date.now() }:
-    { maxRounds?: number; budgetMs?: number; now?: () => number } = {},
+  { maxRounds = 6, budgetMs = 90_000, now = () => Date.now(), onTemplateLoaded }:
+    {
+      maxRounds?: number; budgetMs?: number; now?: () => number;
+      /** SQEM-517 — told after a playbook was loaded, so the caller can count it. Never awaited. */
+      onTemplateLoaded?: (templateId: string) => void;
+    } = {},
 ): ToolRuntime {
   const stats: ToolStats = { rounds: 0, calls: 0, byTool: {}, cappedAt: null, cappedBy: null, toolsRefused: false };
 
@@ -292,17 +299,27 @@ export function createLibraryToolRuntime(
             })));
 
           case 'get_template':
-            // ⭐ **The default flips here, and only here.** `libraryQueries` keeps `inline` so every
-            // existing MCP caller gets byte-identical output (SQEM-230). In Chat the whole point is
-            // that context arrives as an outline first, so an omitted `include_files` means "list".
-            return bound(JSON.stringify(await lib.getTemplate({
+            // ⭐ The default follows the KIND, as on MCP since SQEM-499: a skill arrives as an outline, a
+            // prompt with its files (they are part of the task, and no prompt body names its files).
+          {
+            const t = await lib.getTemplate({
               id: typeof args.id === 'string' ? args.id : undefined,
               name: typeof args.name === 'string' ? args.name : undefined,
-              includeFiles: typeof args.include_files === 'string' ? args.include_files : 'list',
-            })));
+              includeFiles: typeof args.include_files === 'string' ? args.include_files : 'auto', // SQEM-499: skill → list, prompt → inline (as on MCP)
+            });
+            try { onTemplateLoaded?.(t.id); } catch { /* a counter never costs the answer */ }
+            return bound(JSON.stringify(t));
+          }
 
           case 'read_context_file': {
-            const file = await lib.readContextFile(String(args.uri ?? ''));
+            // SQEM-499 — by uri, or by template + path inside the skill (one implementation for MCP and Chat).
+            const tpl = typeof args.template === 'string' ? args.template : '';
+            const file = typeof args.uri === 'string' && args.uri
+              ? await lib.readContextFile(args.uri)
+              : await lib.readContextFileByPath({
+                  ...(/^[0-9a-f-]{36}$/i.test(tpl) ? { id: tpl } : { name: tpl }),
+                  path: String(args.path ?? ''),
+                });
             if (file.text == null) {
               // A PDF or an image. Chat has no way to hand raw bytes back through a tool result, and
               // saying so beats returning base64 the model cannot use but still pays for.

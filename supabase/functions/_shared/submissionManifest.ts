@@ -1,10 +1,11 @@
 // SQEM-493 — the one reader of a marketplace submission's manifest, shared by `marketplace-submit`
-// (self-host publishers) and `marketplace-submit-cloud` (Cloud workspaces). Import-free on purpose,
+// (self-host publishers) and `marketplace-submit-cloud` (Cloud workspaces). Imports nothing but the pure `skillFile.ts`,
 // so the unit tests can load it; the callers unzip, this decides what the listing says.
 //
 // ⛔ The listing's text, hash and scan come from the BUNDLE, never from the request body: the bundle
 // is what "Add to workspace" imports, so it is the thing that has to be scanned and deduplicated.
 
+import { marketplaceRejection } from './skillFile.ts';
 export const BUNDLE_SCHEMA = 'sqemes-bundle/v1';
 export const MAX_BUNDLE_BYTES = 5 * 1024 * 1024; // 5 MB compressed
 export const MAX_ENTRIES = 300;
@@ -68,4 +69,21 @@ export function isCloudBundlePath(path: unknown, workspaceId: string): path is s
   return typeof path === 'string'
     && !path.includes('..')
     && new RegExp(`^${workspaceId.replace(/[^0-9a-f-]/gi, '')}/[0-9a-f-]{36}/bundle\\.sqemes\\.zip$`, 'i').test(path);
+}
+
+// SQEM-514 — until the marketplace security ticket lands, a listing may carry text, images and PDFs
+// only; a workspace may hold any file since SQEM-514, a public listing not yet. Decided from the BYTES
+// of every file in the bundle — the manifest's `mimeType` is written by the submitting client and can
+// say anything. Returns null when every file passes, otherwise the reason for the first that does not.
+type ZipLike = { files: Record<string, { dir: boolean; name: string; async(t: 'uint8array'): Promise<Uint8Array> }> };
+
+export async function bundleFileRejection(zip: ZipLike): Promise<string | null> {
+  for (const entry of Object.values(zip.files)) {
+    if (entry.dir || entry.name === 'manifest.json') continue;
+    // Bundle paths are `files/<ref>__<name>` (lib/templateBundle.ts); name the file as the user knows it.
+    const shown = entry.name.replace(/^files\//, '').replace(/^[^_]*__/, '');
+    const reason = marketplaceRejection(shown, await entry.async('uint8array'));
+    if (reason) return reason;
+  }
+  return null;
 }

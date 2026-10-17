@@ -6,7 +6,8 @@ import {
 } from '../../supabase/functions/_shared/regionForward';
 
 /**
- * SQEM-510 — the MCP functions re-send a call that landed outside Frankfurt to the home region.
+ * SQEM-510 — the MCP functions re-send a call that landed outside the home region to it. SQEM-513 — the
+ * home region is the DATABASE's, `eu-west-1`; SQEM-510 had assumed Frankfurt.
  * Claude calls from the US; there every database round trip crossed the Atlantic.
  * These pin the guards: no loop, nothing on self-host, nothing static, and a failed hop is not an outage.
  */
@@ -26,6 +27,16 @@ describe('shouldForward', () => {
   });
   it('never when already in the home region', () => {
     expect(shouldForward(req('POST'), HOME_REGION, true)).toBe(false);
+  });
+  it('SQEM-513 — never from another European region: the hop (~300 ms) costs more than the trips to Ireland', () => {
+    for (const r of ['eu-central-1', 'eu-central-2', 'eu-west-2', 'eu-west-3', 'eu-north-1', 'eu-south-1']) {
+      expect(shouldForward(req('POST'), r, true), r).toBe(false);
+    }
+  });
+  it('SQEM-513 — still forwards from outside Europe (the US, Asia)', () => {
+    for (const r of ['us-east-1', 'us-west-1', 'ap-southeast-1', 'sa-east-1', 'ca-central-1']) {
+      expect(shouldForward(req('POST'), r, true), r).toBe(true);
+    }
   });
   it('⛔ never twice — the loop guard', () => {
     expect(shouldForward(req('POST', { [FORWARDED_HEADER]: 'us-east-1' }), 'us-east-1', true)).toBe(false);

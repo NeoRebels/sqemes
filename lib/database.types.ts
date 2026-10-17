@@ -81,6 +81,8 @@ export type Database = {
           name: string;
           plan: 'Solo' | 'Team' | 'Business';
           is_managed: boolean;
+          /** SQEM-515 — Cloud only (the migration is pruned from the self-host export). */
+          storage_limit_bytes?: number | null;
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
           billing_cycle: string | null;
@@ -104,6 +106,7 @@ export type Database = {
           name: string;
           plan?: 'Solo' | 'Team' | 'Business';
           is_managed?: boolean;
+          storage_limit_bytes?: number | null;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           billing_cycle?: string | null;
@@ -127,6 +130,7 @@ export type Database = {
           name?: string;
           plan?: 'Solo' | 'Team' | 'Business';
           is_managed?: boolean;
+          storage_limit_bytes?: number | null;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           billing_cycle?: string | null;
