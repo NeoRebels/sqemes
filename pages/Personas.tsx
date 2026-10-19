@@ -30,6 +30,7 @@ import BulkActionBar from '../components/ui/BulkActionBar';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import PersonaWizardModal from '../components/PersonaWizardModal';
 import { IS_SELF_HOSTED } from '../lib/env';
+import { errorMessage } from '../lib/errorMessage';
 
 const toSlug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'persona';
 
@@ -258,7 +259,7 @@ export default function Personas() {
         'success',
       );
     } catch (err: any) {
-      showToast(err?.message || 'Import failed', 'error');
+      showToast(errorMessage(err, 'Import failed'), 'error');
     } finally {
       setImporting(false);
     }

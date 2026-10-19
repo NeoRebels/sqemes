@@ -10,8 +10,9 @@ import { BUNDLE_SCHEMA, sanitizeName, readBundle, downloadBlob } from './bundleF
 import type { BundleFile, BundleTemplate, BundleManifest, BundlePersona } from './bundleFormat';
 export { BUNDLE_SCHEMA, readBundle, downloadBlob };
 export type { BundleFile, BundleTemplate, BundleManifest, BundlePersona };
-import { createPrompt } from './api/prompts';
-import { createPersona } from './api/personas';
+import { createPrompt, deletePrompt } from './api/prompts';
+import { createPersona, deletePersona, setPersonaRoutes } from './api/personas';
+import { errorMessage } from './errorMessage';
 import { getWorkspaceFileSignedUrl, uploadSkillFile, deleteWorkspaceFile } from './api/files';
 
 
@@ -187,45 +188,80 @@ export async function importBundle(
 
   const mapFiles = (refs?: string[]) => (refs || []).map(r => fileMap.get(r)).filter(Boolean) as string[];
 
-  let templates = 0;
-  // SQEM-330 — the created id per bundle ref, so a persona's routes can be re-pointed.
-  const templateIdByRef = new Map<string, string>();
-  for (const bt of manifest.templates || []) {
-    const created = await createPrompt(buildPrompt(bt, workspaceId, userId, mapFiles(bt.contextFileRefs), opts.sourceTemplateId), workspaceId);
-    if (created?.id && bt.ref) templateIdByRef.set(bt.ref, created.id);
-    templates++;
+  // SQEM-529 — what this run created, by id, so a failure further on can take it back. Until then
+  // only the files were removed: an import that created its prompt and then failed on the persona
+  // (SQEM-525) left the prompt behind — a retry would have doubled it. Ids, never names:
+  // a playbook of the same name that was already in the workspace is not this run's to delete.
+  const createdTemplateIds: string[] = [];
+  const createdPersonaIds: string[] = [];
+  try {
+    let templates = 0;
+    // SQEM-330 — the created id per bundle ref, so a persona's routes can be re-pointed.
+    const templateIdByRef = new Map<string, string>();
+    for (const bt of manifest.templates || []) {
+      const created = await createPrompt(buildPrompt(bt, workspaceId, userId, mapFiles(bt.contextFileRefs), opts.sourceTemplateId), workspaceId);
+      if (created?.id) createdTemplateIds.push(created.id);
+      if (created?.id && bt.ref) templateIdByRef.set(bt.ref, created.id);
+      templates++;
+    }
+
+    // SQEM-330 — personas last, because their routes address templates that must exist first.
+    //
+    // ⚠️ A route whose template failed to import is **dropped, not kept pointing at nothing.** The
+    // persona arrives smaller and honest rather than complete and broken — the same rule the MCP
+    // renderer follows when a caller cannot reach a route.
+    //
+    // ⛔ Access rules are not imported. They name people of the source workspace, and those ids mean
+    // nothing here; the persona starts open and whoever imported it decides.
+    let personas = 0;
+    for (const bp of manifest.personas || []) {
+      const routes = (bp.routes || [])
+        .map((r, i) => {
+          const templateId = templateIdByRef.get(r.templateRef);
+          return templateId ? { templateId, condition: r.condition || '', sortOrder: i } : null;
+        })
+        .filter(Boolean) as { templateId: string; condition: string; sortOrder: number }[];
+
+      // SQEM-529 — the routes are set separately rather than through `createPersona`, which inserts the
+      // row and then the routes: a route failure there throws after the row exists, and its id would
+      // never reach this function to be taken back.
+      const created = await createPersona(
+        workspaceId,
+        {
+          title: bp.title || 'Imported persona',
+          description: bp.description || '',
+          content: bp.content || '',
+          tags: Array.isArray(bp.tags) ? bp.tags : [],
+        },
+        userId,
+      );
+      createdPersonaIds.push(created.id);
+      if (routes.length) await setPersonaRoutes(created.id, routes);
+      personas++;
+    }
+
+    return { templates, personas, files: createdFiles };
+  } catch (e) {
+    throw await undoImport(e, createdPersonaIds, createdTemplateIds, createdFiles);
   }
+}
 
-  // SQEM-330 — personas last, because their routes address templates that must exist first.
-  //
-  // ⚠️ A route whose template failed to import is **dropped, not kept pointing at nothing.** The
-  // persona arrives smaller and honest rather than complete and broken — the same rule the MCP
-  // renderer follows when a caller cannot reach a route.
-  //
-  // ⛔ Access rules are not imported. They name people of the source workspace, and those ids mean
-  // nothing here; the persona starts open and whoever imported it decides.
-  let personas = 0;
-  for (const bp of manifest.personas || []) {
-    const routes = (bp.routes || [])
-      .map((r, i) => {
-        const templateId = templateIdByRef.get(r.templateRef);
-        return templateId ? { templateId, condition: r.condition || '', sortOrder: i } : null;
-      })
-      .filter(Boolean) as { templateId: string; condition: string; sortOrder: number }[];
-
-    await createPersona(
-      workspaceId,
-      {
-        title: bp.title || 'Imported persona',
-        description: bp.description || '',
-        content: bp.content || '',
-        tags: Array.isArray(bp.tags) ? bp.tags : [],
-        routes,
-      },
-      userId,
-    );
-    personas++;
-  }
-
-  return { templates, personas, files: createdFiles };
+/**
+ * SQEM-529 — remove what a failed import created, newest first: personas (their routes go with them,
+ * `on delete cascade`), then playbooks, then files — so nothing is deleted while something still
+ * points at it. Returns the error to throw: the original one when everything was removed, otherwise
+ * one that keeps the original text and says what is still in the workspace.
+ */
+async function undoImport(
+  cause: unknown, personaIds: string[], templateIds: string[], files: WorkspaceFile[],
+): Promise<unknown> {
+  const failed = (results: PromiseSettledResult<unknown>[]) => results.filter(r => r.status === 'rejected').length;
+  const personas = failed(await Promise.allSettled(personaIds.map(id => deletePersona(id))));
+  const templates = failed(await Promise.allSettled(templateIds.map(id => deletePrompt(id))));
+  const fileCount = failed(await Promise.allSettled(files.map(f => deleteWorkspaceFile(f.id, f.storagePath))));
+  const left = ([[personas, 'persona'], [templates, 'playbook'], [fileCount, 'file']] as [number, string][])
+    .filter(([n]) => n > 0)
+    .map(([n, word]) => `${n} ${word}${n === 1 ? '' : 's'}`);
+  if (!left.length) return cause;
+  return new Error(`${errorMessage(cause, 'Import failed.')} Some imported items could not be removed: ${left.join(', ')}.`);
 }

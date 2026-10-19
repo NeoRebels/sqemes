@@ -1,6 +1,7 @@
 import JSZip from 'npm:jszip@3.10.1';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { shouldForward, forwardToHome, SERVED_REGION_HEADER } from '../_shared/regionForward.ts';
+import { MCP_MAX_BODY_BYTES, declaredLength, readJsonCapped, tooLargeMessage } from '../_shared/requestBody.ts';
 import {
   createLibraryReader, hiddenFromCaller, toSlug, renderContextBlocks,
   LibraryNotFound, LibraryBadRequest, isPathInWorkspace,
@@ -349,7 +350,10 @@ Deno.serve(async (incoming) => {
   let req = incoming;
   const region = Deno.env.get('SB_REGION');
   const authed = req.method === 'POST' && /^Bearer\s+sqm_live_/i.test(req.headers.get('Authorization') ?? '');
-  if (shouldForward(req, region, authed)) {
+  // SQEM-530 — a body declared over the ceiling is not carried across the ocean only to be refused;
+  // it is refused here, by `handle`, without being read.
+  const oversized = (declaredLength(req.headers) ?? 0) > MCP_MAX_BODY_BYTES;
+  if (!oversized && shouldForward(req, region, authed)) {
     const body = await req.arrayBuffer();
     const publicBase = (Deno.env.get('PUBLIC_API_URL') ?? Deno.env.get('SUPABASE_URL') ?? '').trim();
     const forwarded = await forwardToHome(req, body, publicBase);
@@ -364,8 +368,10 @@ Deno.serve(async (incoming) => {
     marks.push(`${name};dur=${(now - last).toFixed(0)}`);
     last = now;
   };
-  const res = await handle(req, mark);
+  const call: CallNote = {};
+  const res = await handle(req, mark, call);
   marks.push(`total;dur=${(performance.now() - t0).toFixed(0)}`);
+  if (call.tool) logCall('end', call.tool, { status: res.status, ms: Math.round(performance.now() - t0) });
   try {
     res.headers.set('Server-Timing', marks.join(', '));
     if (region) res.headers.set(SERVED_REGION_HEADER, region); // where the work actually ran
@@ -373,7 +379,23 @@ Deno.serve(async (incoming) => {
   return res;
 });
 
-async function handle(req: Request, mark: (name: string) => void): Promise<Response> {
+/**
+ * SQEM-530 — one line when a tool call starts and one when it ends: the tool, the body size, the
+ * status, the duration and the worker's heap. A call that dies with 546 ("Memory limit exceeded",
+ * 256 MB per worker) left no trace of which tool it was — nothing named it. A
+ * worker killed mid-call never writes the end line, so the START line carries the size: the last
+ * start without an end is the call that took the worker down.
+ * ⛔ Names and numbers only — never `args`, a file name or any content (tests/unit/mcpCallLog.test.ts).
+ */
+type CallNote = { tool?: string };
+function logCall(phase: 'start' | 'end' | 'refused', tool: string, extra: Record<string, number | null>) {
+  // `rss` reads 0 on Supabase's hosted runtime; the isolate's heap is what fills up.
+  let heapMb: number | null = null;
+  try { heapMb = Math.round(Deno.memoryUsage().heapUsed / 1048576); } catch { /* not available */ }
+  console.log(`[mcp-call] ${JSON.stringify({ phase, tool, ...extra, heapMb })}`);
+}
+
+async function handle(req: Request, mark: (name: string) => void, call: CallNote): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { status: 200, headers: CORS });
   }
@@ -403,7 +425,7 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
       .select('id, workspace_id, name, scopes, expires_at, is_oauth, user_id, created_at, last_used_at')
       .eq('key_hash', keyHash)
       .single(),
-    req.json().then((v: unknown) => ({ ok: true as const, v }), () => ({ ok: false as const, v: null })),
+    readJsonCapped(req), // SQEM-530 — at most MCP_MAX_BODY_BYTES; see _shared/requestBody.ts
   ]);
 
   if (keyErr || !keyRow) {
@@ -481,6 +503,10 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
 
   // 2. Parse JSON-RPC request
   if (!parsed.ok) {
+    if (parsed.tooLarge) {
+      logCall('refused', '(too large)', { bytes: parsed.bytes });
+      return rpcError(null, -32600, tooLargeMessage(parsed.bytes));
+    }
     return rpcError(null, -32700, 'Parse error');
   }
   const rpc = parsed.v as { jsonrpc: string; id?: unknown; method: string; params?: any };
@@ -1143,7 +1169,7 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
       {
         name: 'upload_file',
         title: 'Upload text file',
-        description: 'Upload a text file into the workspace so it can be attached to templates via file_ids. Any text file, whatever its extension.\n\nFOLDERS: "name" may be a RELATIVE PATH and it is stored exactly as given — that is how a file keeps its place in a folder. Uploading an Agent Skill or any other folder, send each file under its path relative to the folder root (references/type-bar.md, scripts/extract.py), never the bare filename. Sqemes groups files by that prefix into a folder tree, and a skill whose SKILL.md says "see references/x.md" only works when x.md is actually called references/x.md.\n\nFor anything that is not text — images, PDFs, fonts, Office files, archives — use create_upload_url + finalize_upload (uploaded out of band).\n\nThe returned id can be used directly in file_ids on create_template or update_template without a follow-up list_files call.',
+        description: 'Upload a text file into the workspace so it can be attached to templates via file_ids. Any text file, whatever its extension. At most 5 MB per call; larger files go through create_upload_url.\n\nFOLDERS: "name" may be a RELATIVE PATH and it is stored exactly as given — that is how a file keeps its place in a folder. Uploading an Agent Skill or any other folder, send each file under its path relative to the folder root (references/type-bar.md, scripts/extract.py), never the bare filename. Sqemes groups files by that prefix into a folder tree, and a skill whose SKILL.md says "see references/x.md" only works when x.md is actually called references/x.md.\n\nFor anything that is not text — images, PDFs, fonts, Office files, archives — use create_upload_url + finalize_upload (uploaded out of band).\n\nThe returned id can be used directly in file_ids on create_template or update_template without a follow-up list_files call.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1232,6 +1258,12 @@ async function handle(req: Request, mark: (name: string) => void): Promise<Respo
     const args = params?.arguments || {};
 
     if (!toolName) return rpcError(id, -32602, 'Missing tool name');
+    // SQEM-530 — only a tool the server knows is named in the log; anything else stays out of it.
+    if (TOOL_CAPABILITY[toolName]) {
+      call.tool = toolName;
+      const length = Number(req.headers.get('content-length'));
+      logCall('start', toolName, { bytes: Number.isFinite(length) && length > 0 ? length : null });
+    }
 
     // Capability gate (SQEM-064): reject tools the connection isn't scoped for.
     //

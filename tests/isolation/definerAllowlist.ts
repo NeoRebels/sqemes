@@ -27,6 +27,10 @@ export const DEFINER_ALLOWLIST: Record<string, DefinerEntry> = {
     why: 'app: accepting an invitation; matches the LOGIN e-mail of auth.uid() (SQEM-491)',
     probe: { sql: `select public.accept_invitation((select token from public.invitations where email = 'pending-a@isolation.invalid'))`, expect: 'error' },
   },
+  accessible_file_ids: {
+    why: 'RLS helper (workspace_files_select, SQEM-512); the set form of can_access_file for auth.uid()',
+    probe: { sql: `select count(*) from public.accessible_file_ids() f where f = '${A_FILE}'`, expect: 'zero' },
+  },
   can_access_file: {
     why: 'RLS helper (storage + workspace_files); evaluates auth.uid()',
     probe: { sql: `select count(*) from (select public.can_access_file('${A_FILE}', '${A}', '${USERS.a1}') v) x where v`, expect: 'zero' },

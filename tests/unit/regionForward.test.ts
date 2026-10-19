@@ -101,7 +101,8 @@ describe('wiring', () => {
   for (const f of ['supabase/functions/mcp-server/index.ts', 'supabase/functions/mcp-oauth/index.ts']) {
     it(`${f} forwards before doing any work and falls back to serving locally`, () => {
       const src = readFileSync(f, 'utf8');
-      expect(src).toMatch(/if \(shouldForward\(req, region, /);
+      // SQEM-530 — mcp-server skips the hop for a body over its ceiling (refused locally, unread).
+      expect(src).toMatch(/if \((!oversized && )?shouldForward\(req, region, /);
       expect(src).toMatch(/if \(forwarded\) return forwarded;/);
       expect(src).toMatch(/SERVED_REGION_HEADER/);
     });

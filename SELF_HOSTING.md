@@ -1,6 +1,6 @@
 # Self-Hosting Sqemes
 
-Sqemes is **open core**: the AI management platform, MCP server, and Chrome
+Sqemes is **open core**: the AI Management OS, MCP server, and Chrome
 extension are fair-code (**Sustainable Use License** from v1.11.0; AGPL-3.0 for v1.10.0–v1.10.12;
 Apache-2.0 up to and including v1.9.5 — see [LICENSING.md](./LICENSING.md)) and run
 on your own infrastructure with your own AI provider keys (BYOK). A few pieces are **Sqemes Cloud
@@ -477,7 +477,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.11.26       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.11.27       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### ⛔ 3a. Before v1.11.9: count your workspace-wide MCP keys
@@ -681,7 +681,7 @@ If you would rather it did not, block `/#/library/` at your reverse proxy — bu
 reaches the server, so the block has to happen in the browser or not at all. Removing the route in a
 fork is the reliable way.
 
-*Last updated: 2026-10-19 (SQEM-527: version pin v1.11.26 — personas can be created in the browser again, MCP file uploads use the public URL, marketplace copies show what they bring and are checked against the reviewed bundle, MCP tools carry titles and read-only/destructive hints, and the server no longer sends a standing instruction on connect. Before that, SQEM-518: v1.11.25 — skills arrive whole.)*
+*Last updated: 2026-10-19 (SQEM-531: version pin v1.11.27 — the file list checks access once per query, an MCP call carries at most 5 MB (larger files go through create_upload_url), a failed import removes what it created, and Sqemes is described as the AI Management OS. Before that, SQEM-527: v1.11.26 — personas can be created in the browser again, MCP tools carry titles and hints.)*
 `/playbooks` and every old link redirects. Nothing changes for an operator. Earlier the same day
 (SQEM-390) — the assistant template kind is gone: on upgrade the migration
 turns every assistant into a skill with the same text, and a role is a persona. Earlier: 2026-08-19

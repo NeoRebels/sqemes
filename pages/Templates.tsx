@@ -30,6 +30,7 @@ import { Prompt, PromptKind, TemplateCategory } from '../types';
 import Checkbox from '../components/ui/Checkbox';
 import TemplateWizardModal from '../components/TemplateWizardModal';
 import { brandIsComplete } from '../lib/brand';
+import { errorMessage } from '../lib/errorMessage';
 
 const PromptSkeleton = () => (
   <Card className="animate-pulse p-4 flex flex-col gap-3">
@@ -410,7 +411,7 @@ const Templates = () => {
       showToast(`Imported “${importSkillData.title}” with ${files.length} file${files.length === 1 ? '' : 's'}`, 'success');
       setImportSkillData(null);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Import failed', 'error');
+      showToast(errorMessage(e, 'Import failed'), 'error');
     } finally {
       setImporting(false);
     }
@@ -459,7 +460,7 @@ const Templates = () => {
       );
       setImportBundleData(null);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Import failed', 'error');
+      showToast(errorMessage(e, 'Import failed'), 'error');
     } finally {
       setImporting(false);
     }
