@@ -226,6 +226,9 @@ export interface LibraryTemplate {
   voteCount?: number;
   scanRisk?: 'low' | 'medium' | 'high' | null;
   scanReasons?: string[];
+  // SQEM-519 — what a copier is told before "Add to playbooks". Detail only; absent on listings
+  // submitted before the file review existed.
+  copySummary?: { scripts: number; binaries: number; textFiles: number; hosts: string[] } | null;
 }
 
 export interface ChatSession {

@@ -59,7 +59,8 @@ function capabilityNames(): string[] {
  */
 function advertisedNames(): string[] {
   const start = SRC.indexOf("if (method === 'tools/list')");
-  const end = SRC.indexOf('return rpcResult(id, { tools: visibleTools });');
+  // SQEM-523 — anchored on the filter that follows the array, not on the return, whose shape changed.
+  const end = SRC.indexOf('const visibleTools = tools.filter');
   expect(start, 'tools/list branch not found').toBeGreaterThan(-1);
   expect(end, 'tools/list return not found').toBeGreaterThan(start);
   const block = SRC.slice(start, end);

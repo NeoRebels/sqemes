@@ -43,6 +43,15 @@ import { resolve } from 'node:path';
  * being a certainty; it rests on the change having to show an improvement and showing none. That
  * asymmetry is the whole argument, and it is why this file pins the older wording rather than
  * declaring a winner.
+ *
+ * ⛔ **SQEM-526 (2026-10-19) — the guidelines now decide, not the wording experiment.** MCP client
+ * guidelines say a server must not push a client into calls the user did not ask for. "Call this first
+ * whenever the user asks you to write …", "adopt it for the rest of the task" and the server's
+ * `initialize.instructions` ("Before you write … first search the Sqemes playbooks") went. The
+ * measurement above is what made that cheap: the server channel was already ignored, and the trigger
+ * sentence was kept only because a shorter variant measured worse, not because it worked. What reaches
+ * a client on its own is the pasted instruction from Settings — which is exactly the one channel the
+ * guidelines leave us, because a person puts it there on purpose.
  */
 const ROOT = resolve(__dirname, '../../');
 const src = readFileSync(resolve(ROOT, 'supabase/functions/mcp-server/index.ts'), 'utf8');
@@ -54,30 +63,27 @@ function description(tool: string): string {
   return src.slice(from, src.indexOf('\n', from));
 }
 
-describe('SQEM-468 — the measured wording is the one that ships', () => {
-  it('⛔ search_templates carries the wording that measured better, not the shortened one', () => {
-    // The revert target. `ALWAYS call this before` was the experiment; it lost case 4.
+describe('SQEM-526 — descriptions say when a tool fits; nothing tells Claude to call it', () => {
+  it('⛔ search_templates no longer orders a call before every writing task', () => {
     const d = description('search_templates');
-    expect(d).toMatch(/Call this first whenever the user asks you to write, draft, generate, review, or rewrite/);
-    expect(d).not.toMatch(/ALWAYS call this before/);
+    expect(d).not.toMatch(/Call this first|whenever the user asks|ALWAYS call/);
+    expect(d).toMatch(/Useful when the user wants to use, find or check one of their team\\'s playbooks/); // escaped in source
   });
 
-  it('⚠️ the trigger sentence from SQEM-132 is still there, ineffective as it is', () => {
-    // ⛔ Cases 1 and 6 ARE "write" and "rewrite" and still do not fire. The sentence is kept not
-    // because it works, but because removing it measured worse. Do not read its presence as proof
-    // that it does anything.
-    expect(description('search_templates')).toMatch(/whenever the user asks/);
+  it('⛔ get_persona describes what it loads instead of telling Claude to adopt it', () => {
+    expect(description('get_persona')).not.toMatch(/adopt it/);
   });
 
-  it('⭐ one text serves both channels — which is what made the channel the variable', () => {
-    // The moment this stops being true, the comparison above stops being valid: two different texts
-    // would explain the difference by wording again, and the finding would have to be re-measured.
+  it('⛔ the MCP server hands out no session instruction; Settings still offers the text to paste', () => {
     const prompt = readFileSync(resolve(ROOT, 'supabase/functions/_shared/libraryPrompt.ts'), 'utf8');
     const mcp = readFileSync(resolve(ROOT, 'supabase/functions/mcp-server/index.ts'), 'utf8');
     const settings = readFileSync(resolve(ROOT, 'pages/Settings.tsx'), 'utf8');
+    const init = mcp.slice(mcp.indexOf('function initializeResult()'), mcp.indexOf('serverInfo:', mcp.indexOf('function initializeResult()')));
     expect(prompt).toMatch(/export const LIBRARY_SYSTEM_PROMPT/);
-    expect(mcp).toMatch(/LIBRARY_SYSTEM_PROMPT/);
+    expect(init).not.toMatch(/^\s*instructions:/m);
+    expect(mcp).not.toMatch(/import \{ LIBRARY_SYSTEM_PROMPT \}/);
     expect(settings).toMatch(/LIBRARY_SYSTEM_PROMPT/);
+    expect(settings).not.toMatch(/the one the server\s+hands to connected clients/);
   });
 
   it('⛔ the Settings card must not call the pasted instruction optional', () => {

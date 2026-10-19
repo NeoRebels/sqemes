@@ -107,16 +107,6 @@ export function classifySkillFile(name: string, bytes: Uint8Array): SkillFileTyp
 }
 
 /**
- * SQEM-514 — what the marketplace accepts until its security ticket lands: text, or an image/PDF the
- * bytes prove. Returns null when allowed, otherwise the reason (named to the submitter).
- */
-export function marketplaceRejection(name: string, bytes: Uint8Array): string | null {
-  const t = classifySkillFile(name, bytes);
-  if (t.isText || t.rowMime !== OCTET_STREAM) return null;
-  return `"${name}" is neither text, an image nor a PDF — the marketplace does not accept other files yet`;
-}
-
-/**
  * SQEM-514 — how MCP `read_context_file` hands a file out, by PURPOSE (Agent Skills: read vs use):
  * a file to read — text outside `assets/` and `scripts/` — as text; a file to use — `scripts/`,
  * `assets/`, every binary — as a download link. `as` asks for the other; text cannot be made of a

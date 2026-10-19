@@ -5,7 +5,7 @@
 // render without `AppProvider` ever mounting. The store has never run without a session, and the one
 // URL a stranger sees is the wrong place to find out how it behaves. An absent handler is how this
 // component learns an action is unavailable; it never asks who is looking.
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { LibraryTemplate, Step, Variable } from '../../types';
 import KindBadge from '../ui/KindBadge';
 import FullScreenExit from '../ui/FullScreenExit';
@@ -49,6 +49,12 @@ export default function ListingView({
 }: ListingViewProps) {
   const body = listing.content || (listing.steps as Step[] | undefined)?.[0]?.content || '';
   const fileNames = listing.preview?.fileNames ?? [];
+  // SQEM-519 — a listing that brings scripts, other files or web addresses says so before it is added,
+  // and the copy waits for a second click. Text-only listings add in one click, as before.
+  const summary = listing.copySummary;
+  const needsConfirm = !!summary && (summary.scripts > 0 || summary.binaries > 0 || summary.hosts.length > 0);
+  const [confirming, setConfirming] = useState(false);
+  const n = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
   return (
     // Owns its scroll (SQEM-191): this route renders outside Layout, and index.css sets
@@ -115,7 +121,7 @@ export default function ListingView({
         {/* Row 2 — what you can do with it. */}
         <div className="flex flex-wrap items-center gap-3 mt-6">
           {onCopy && (
-            <button onClick={onCopy} disabled={copying || adapting} className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-brand-200 dark:shadow-none disabled:opacity-50">
+            <button onClick={needsConfirm ? () => setConfirming(true) : onCopy} disabled={copying || adapting || confirming} className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-brand-200 dark:shadow-none disabled:opacity-50">
               {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <FilePlus className="w-4 h-4" />} Add to playbooks
             </button>
           )}
@@ -144,6 +150,27 @@ export default function ListingView({
             </button>
           )}
         </div>
+
+        {onCopy && confirming && summary && (
+          <div className="mt-4 rounded-2xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 p-5 text-sm text-slate-700 dark:text-slate-200" data-testid="copy-summary">
+            <h2 className="font-bold mb-2">Before you add it</h2>
+            <p>
+              This playbook brings {n(summary.scripts, 'script', 'scripts')}, {n(summary.binaries, 'other file', 'other files')} and {n(summary.textFiles, 'text file', 'text files')}.
+            </p>
+            {summary.scripts > 0 && (
+              <p className="mt-2">Scripts do nothing on their own. An AI agent that can run code may run them when it uses this playbook, so read them before you use it there.</p>
+            )}
+            {summary.hosts.length > 0 && (
+              <p className="mt-2 break-words">It names these web addresses: <span className="font-mono text-xs">{summary.hosts.join(', ')}</span></p>
+            )}
+            <div className="flex flex-wrap gap-2 mt-4">
+              <button onClick={() => { setConfirming(false); onCopy(); }} disabled={copying} className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-50">
+                <FilePlus className="w-4 h-4" /> Add to playbooks
+              </button>
+              <button onClick={() => setConfirming(false)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-800">Cancel</button>
+            </div>
+          </div>
+        )}
 
         {offer}
 

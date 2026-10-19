@@ -17,6 +17,35 @@ import { getWorkspaceFileSignedUrl, uploadSkillFile, deleteWorkspaceFile } from 
 
 // ---- Export ----------------------------------------------------------------------------------------
 
+/** SQEM-521 — at most this many downloads at a time while a bundle is built. */
+export const FETCH_CONCURRENCY = 4;
+
+/**
+ * The bytes of every file, by id; `null` for one that could not be fetched (skipped, as before).
+ * All links are requested in the same tick, so `queueSign` (`lib/api/files.ts`) sends them in ONE
+ * `sign-file-url` call (up to 200 paths); the downloads then run FETCH_CONCURRENCY at a time.
+ */
+export async function fetchFiles(files: WorkspaceFile[]): Promise<Map<string, Blob | null>> {
+  const urls = await Promise.all(files.map(f => getWorkspaceFileSignedUrl(f.storagePath).catch(() => null)));
+  const out = new Map<string, Blob | null>();
+  let next = 0;
+  const worker = async () => {
+    while (next < files.length) {
+      const i = next++;
+      const url = urls[i];
+      if (!url) { out.set(files[i].id, null); continue; }
+      try {
+        const resp = await fetch(url);
+        out.set(files[i].id, resp.ok ? await resp.blob() : null);
+      } catch {
+        out.set(files[i].id, null);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(FETCH_CONCURRENCY, files.length) }, worker));
+  return out;
+}
+
 /** Serialize the given templates (+ referenced files) into a `.sqemes.zip` blob. */
 export async function exportTemplatesToZip(templates: Prompt[], allFiles: WorkspaceFile[]): Promise<Blob> {
   return (await buildBundle(templates, allFiles)).blob;
@@ -39,33 +68,34 @@ export async function buildBundle(
   const fileRefs = new Map<string, string>();  // fileId → ref
   const bundleFiles: BundleFile[] = [];
 
-  // Fetch + zip a referenced file's bytes; dedupe. Returns its ref, or null if it can't be resolved.
-  const ensureFile = async (fileId: string): Promise<string | null> => {
+  // SQEM-521 — every referenced file is fetched up front, then refs are assigned in the old traversal
+  // order. The fetch used to sit inside this traversal, one `await` per file, so each file was its own
+  // `sign-file-url` call and its own download: 60 files took 41 s of a 46 s submission (measured on
+  // staging, 2026-10-18). Assigning refs afterwards, skipping files that failed, keeps the manifest
+  // identical to the sequential version.
+  const wanted = [...new Set(templates.flatMap(t => t.contextFileIds || []))]
+    .map(id => fileById.get(id))
+    .filter((f): f is WorkspaceFile => !!f); // referenced file deleted/inaccessible → skip (dangling ref pruned)
+  const bytes = await fetchFiles(wanted);
+
+  // Zip a referenced file's bytes; dedupe. Returns its ref, or null if it could not be fetched.
+  const ensureFile = (fileId: string): string | null => {
     if (fileRefs.has(fileId)) return fileRefs.get(fileId)!;
     const f = fileById.get(fileId);
-    if (!f) return null; // referenced file deleted/inaccessible → skip (dangling ref pruned)
-    try {
-      const resp = await fetch(await getWorkspaceFileSignedUrl(f.storagePath));
-      if (!resp.ok) return null;
-      const ref = `f${bundleFiles.length + 1}`;
-      const path = `files/${ref}__${sanitizeName(f.name)}`;
-      zip.file(path, await resp.blob());
-      fileRefs.set(fileId, ref);
-      bundleFiles.push({ ref, name: f.name, mimeType: f.mimeType, sizeBytes: f.sizeBytes, path });
-      return ref;
-    } catch {
-      return null;
-    }
+    const blob = bytes.get(fileId);
+    if (!f || !blob) return null;
+    const ref = `f${bundleFiles.length + 1}`;
+    const path = `files/${ref}__${sanitizeName(f.name)}`;
+    zip.file(path, blob);
+    fileRefs.set(fileId, ref);
+    bundleFiles.push({ ref, name: f.name, mimeType: f.mimeType, sizeBytes: f.sizeBytes, path });
+    return ref;
   };
-  const resolveFileRefs = async (ids: string[]): Promise<string[]> => {
-    const out: string[] = [];
-    for (const id of ids) { const r = await ensureFile(id); if (r) out.push(r); }
-    return out;
-  };
+  const resolveFileRefs = (ids: string[]): string[] => ids.map(ensureFile).filter((r): r is string => !!r);
 
   const bundleTemplates: BundleTemplate[] = [];
   for (const t of templates) {
-    const contextFileRefs = await resolveFileRefs(t.contextFileIds || []);
+    const contextFileRefs = resolveFileRefs(t.contextFileIds || []);
     bundleTemplates.push({
       ref: `t${bundleTemplates.length + 1}`,
       kind: t.kind, title: t.title, description: t.description, tag: t.tag ?? null,
@@ -104,7 +134,7 @@ export async function buildBundle(
 
 /** Read + validate a `.sqemes.zip` before showing the confirmation preview. */
 
-function buildPrompt(b: BundleTemplate, workspaceId: string, userId: string, contextFileIds: string[]): Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'> {
+function buildPrompt(b: BundleTemplate, workspaceId: string, userId: string, contextFileIds: string[], sourceTemplateId?: string): Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'> {
   // SQEM-390 — a pre-2026-09-13 bundle may carry an assistant. It lands as a skill whose body is
   // the old system instruction (the assistant's canonical text), falling back to `content` when
   // there was none — exactly what the database migration did to the rows it found.
@@ -125,12 +155,15 @@ function buildPrompt(b: BundleTemplate, workspaceId: string, userId: string, con
     usageCount: 0,
     isFavorite: false,
     published: true,
+    ...(sourceTemplateId ? { sourceTemplateId } : {}),
   };
 }
 
 /** Apply a validated bundle into a workspace: create files → templates with fresh, remapped ids. */
 export async function importBundle(
   zip: JSZip, manifest: BundleManifest, workspaceId: string, userId: string,
+  // SQEM-519 — set by a Cloud marketplace copy: every template of the bundle records the listing.
+  opts: { sourceTemplateId?: string } = {},
 ): Promise<{ templates: number; personas: number; files: WorkspaceFile[] }> {
   const fileMap = new Map<string, string>();   // BundleFile.ref → new workspace_files id
   const createdFiles: WorkspaceFile[] = [];
@@ -158,7 +191,7 @@ export async function importBundle(
   // SQEM-330 — the created id per bundle ref, so a persona's routes can be re-pointed.
   const templateIdByRef = new Map<string, string>();
   for (const bt of manifest.templates || []) {
-    const created = await createPrompt(buildPrompt(bt, workspaceId, userId, mapFiles(bt.contextFileRefs)), workspaceId);
+    const created = await createPrompt(buildPrompt(bt, workspaceId, userId, mapFiles(bt.contextFileRefs), opts.sourceTemplateId), workspaceId);
     if (created?.id && bt.ref) templateIdByRef.set(bt.ref, created.id);
     templates++;
   }

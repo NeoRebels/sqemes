@@ -61,6 +61,18 @@ describe('mcp-server wiring', () => {
     expect(MCP).toMatch(/if \(!SELF_HOSTED\) \{\s*const \{ data: rec, error \} = await adminClient\.rpc\('record_file_download'/);
   });
 
+  // SQEM-522 — the rule, not one line: SQEM-514 pinned only the download line above, and the older
+  // upload link (SQEM-059) kept handing out the raw storage host until a PPTX upload failed in a
+  // sandbox that allowed only the public API host.
+  it('⛔ every signed URL the server hands an agent is on the public host — downloads AND uploads', () => {
+    const uses = [...MCP.matchAll(/[A-Za-z_.]*\bsignedUrl\b/g)].map(m => MCP.slice(Math.max(0, m.index! - 40), m.index! + 20));
+    const handedOut = uses.filter(u => !/s\.signedUrl &&|&& s\.signedUrl/.test(u)); // the existence check in the loop
+    expect(handedOut.length).toBeGreaterThanOrEqual(2);
+    for (const u of handedOut) expect(u, u).toMatch(/onPublicHost\(/);
+    const upload = MCP.slice(MCP.indexOf("toolName === 'create_upload_url'"), MCP.indexOf("toolName === 'finalize_upload'"));
+    expect(upload).toMatch(/uploadUrl:\s+onPublicHost\(signed\.signedUrl, Deno\.env\.get\('PUBLIC_API_URL'\) \?\? null\)/);
+  });
+
   it('download_skill reads through the library (access rules), and get_template still carries no links', () => {
     const h = MCP.slice(MCP.indexOf("toolName === 'download_skill'"), MCP.indexOf("toolName === 'list_files'"));
     expect(h).toMatch(/await lib\.skillFolder\(/);

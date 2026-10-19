@@ -12,6 +12,7 @@
 //     instances call it from arbitrary domains — the fail-closed getCorsHeaders allowlist can't know them.
 //   • Public like stripe-webhook: no apikey/JWT required (deploy uses --no-verify-jwt; verify_jwt=false).
 import { createAdminClient } from '../_shared/supabase-admin.ts';
+import { copySummaryOf, type ReviewedFile } from '../_shared/fileReview.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -19,15 +20,20 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Public column allowlist — do NOT add workspace_id, created_by, bundle_path, status, scan_risk, scan_reasons.
+// Public column allowlist — do NOT add workspace_id, created_by, bundle_path, status, scan_risk, scan_reasons
+// or file_review (detail reads it only to derive copy_summary, see toPublicRow).
 const LIST_COLS =
   'id, kind, title, description, category, tags, variables, steps, usage_count, created_at, updated_at, score, vote_count, preview';
 const DETAIL_COLS = `${LIST_COLS}, content`;
 
 // Strip bundle_path (leaks the workspace id) and surface only its presence as a boolean.
+// SQEM-519 — `file_review` (paths, hashes, the moderator's flags) stays out of the public feed, which is
+// a minimal allowlist; it is not a secret (a Cloud submitter can read their own row). The copier gets
+// `copy_summary` (counts and hosts) and `bundle_hash`, which it checks against the bundle it downloads.
 function toPublicRow(row: Record<string, unknown>) {
-  const { bundle_path, ...rest } = row as { bundle_path?: string | null };
-  return { ...rest, published: true, has_bundle: !!bundle_path };
+  const { bundle_path, file_review, ...rest } = row as { bundle_path?: string | null; file_review?: { files?: ReviewedFile[]; hosts?: string[] } | null };
+  const copy = file_review?.files ? { copy_summary: copySummaryOf({ files: file_review.files, hosts: file_review.hosts ?? [] }) } : {};
+  return { ...rest, ...copy, published: true, has_bundle: !!bundle_path };
 }
 
 Deno.serve(async (req) => {
@@ -55,7 +61,7 @@ Deno.serve(async (req) => {
       if (!id) return json({ error: 'id required' }, 400);
       const { data, error } = await admin
         .from('library_templates')
-        .select(`${DETAIL_COLS}, bundle_path`)
+        .select(`${DETAIL_COLS}, bundle_path, file_review, bundle_hash`)
         .eq('id', id)
         .eq('published', true)
         .maybeSingle();

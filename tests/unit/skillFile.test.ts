@@ -1,12 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import JSZip from 'jszip';
 import {
-  classifySkillFile, isUtf8Text, sniffBinaryMime, isTextContentMime, marketplaceRejection,
+  classifySkillFile, isUtf8Text, sniffBinaryMime, isTextContentMime,
   TEXT_EXT_TO_MIME, SKILL_STORAGE_MIMES, OCTET_STREAM, STORAGE_TEXT_MIME,
 } from '../../supabase/functions/_shared/skillFile';
-import { bundleFileRejection } from '../../supabase/functions/_shared/submissionManifest';
 import { dropUnsendableParts, dropUnsendableInMessages, isSendableMime } from '../../supabase/functions/_shared/messageParts';
 import { fileTypeLabel } from '../../lib/uploadTypes';
 
@@ -143,41 +142,6 @@ describe('⛔ no reader treats a binary skill file as an image or as text', () =
     const src = code(readFileSync(resolve(ROOT, 'lib/templateContext.ts'), 'utf8'));
     expect(src).toMatch(/fileIds\.includes\(f\.id\) && isTextContentMime\(f\.mimeType\)/);
   });
-});
-
-describe('marketplace — text, images and PDFs only, decided from the bytes', () => {
-  it('a font is refused with its name; text, a real PNG and a PDF pass', () => {
-    expect(marketplaceRejection('Inter.ttf', Uint8Array.from([0, 1, 0, 0]))).toMatch(/"Inter\.ttf" is neither text, an image nor a PDF/);
-    expect(marketplaceRejection('a.md', enc('# hi'))).toBeNull();
-    expect(marketplaceRejection('a.png', new Uint8Array(read('public/icon-192.png')))).toBeNull();
-    expect(marketplaceRejection('a.pdf', enc('%PDF-1.4'))).toBeNull();
-  });
-
-  it('⛔ a forged manifest does not help: the bundle is judged by its bytes', async () => {
-    const z = new JSZip();
-    z.file('manifest.json', JSON.stringify({ files: [{ ref: 'f1', name: 'logo.png', mimeType: 'image/png', path: 'files/f1__logo.png' }] }));
-    z.file('files/f1__logo.png', await docxBytes());
-    const loaded = await JSZip.loadAsync(await z.generateAsync({ type: 'uint8array' }));
-    expect(await bundleFileRejection(loaded)).toMatch(/"logo\.png" is neither/);
-  });
-
-  it('an all-text bundle passes', async () => {
-    const z = new JSZip();
-    z.file('manifest.json', '{}');
-    z.file('files/f1__SKILL-notes.md', '# notes');
-    expect(await bundleFileRejection(await JSZip.loadAsync(await z.generateAsync({ type: 'uint8array' })))).toBeNull();
-  });
-
-  // Both submit functions are pruned from the self-host export (marketplace publishing is Cloud's):
-  // strict in the private repo, silent in the export — the pattern from PRODUCTION_PROMOTION's cut list.
-  const privateRepo = existsSync(resolve(ROOT, 'scripts/build-public-export.sh'));
-  for (const fn of ['marketplace-submit', 'marketplace-submit-cloud']) {
-    it.skipIf(!privateRepo)(`${fn} checks the bundle's files before it lists anything`, () => {
-      const src = code(readFileSync(resolve(ROOT, `supabase/functions/${fn}/index.ts`), 'utf8'));
-      expect(src).toMatch(/const rejected = await bundleFileRejection\(zip\)/);
-      expect(src.indexOf('bundleFileRejection(zip)')).toBeLessThan(src.indexOf('scanForInjection('));
-    });
-  }
 });
 
 describe('labels come from the name for files stored generically', () => {

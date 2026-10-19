@@ -1,9 +1,9 @@
 /**
- * SQEM-378 — the standing instruction about the template library. **One text, three surfaces.**
+ * SQEM-378 — the standing instruction about the template library. **One text, two surfaces** (three until
+ * SQEM-526 took it out of the MCP server's `initialize.instructions` — MCP client guidelines).
  *
  * It is read by:
  *   - `pages/Settings.tsx` (via `constants.ts`) — the copy-paste block in the MCP card
- *   - `supabase/functions/mcp-server` — the `initialize.instructions` a connecting client is handed
  *   - `supabase/functions/chat-message` — in front of the system instruction of every Chat message
  *     **that actually carries the library tools**
  *

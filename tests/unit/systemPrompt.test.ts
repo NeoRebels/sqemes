@@ -66,10 +66,12 @@ describe('LIBRARY_SYSTEM_PROMPT', () => {
     expect(VIA_CONSTANTS).toBe(LIBRARY_SYSTEM_PROMPT);
   });
 
-  it('⛔ the MCP server hands out the same text, not its own wording', () => {
+  it('⛔ the MCP server hands out NO wording of its own either (SQEM-526: it sends none at all)', () => {
     // It used to have a second, differently-worded copy — and only that copy knew about personas.
+    // SQEM-526 then removed the server channel (MCP client guidelines); a copy must not come back with it.
     const mcp = readFileSync(resolve(__dirname, '../../supabase/functions/mcp-server/index.ts'), 'utf8');
-    expect(mcp).toMatch(/instructions:\s*LIBRARY_SYSTEM_PROMPT/);
+    expect(mcp).not.toMatch(/instructions:\s*LIBRARY_SYSTEM_PROMPT/);
+    expect(mcp).not.toMatch(/Before you write, draft, plan, review or rewrite/);
   });
 
   it('⛔ the chat adds it ONLY where the library tools are attached', () => {

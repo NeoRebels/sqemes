@@ -61,10 +61,16 @@ const Modal = ({ open, onClose, size = 'sm', overlayOpacity = 'low', className =
   // specificity — which one wins would depend on the order Tailwind happens to emit them. This
   // structure adds no height utility at all, so those four keep capping themselves exactly as before
   // while everything else simply scrolls.
+  //
+  // ⛔ SQEM-520 — `z-[90]`, not `z-50`: a modal opened from the marketplace moderation drawer
+  // (`z-[80]`) used to sit UNDER it, so "Confirm" on a rejection only closed the drawer and a new
+  // publisher token appeared behind it. Above every other fixed layer (drawer 80, sidebar dialog 70),
+  // below the toast and the chat search (100) and the click-through staging banner (200).
+  // `tests/unit/modalLayer.test.ts` pins the order.
   return createPortal(
     <div
       className={[
-        'fixed inset-0 backdrop-blur-sm z-50 overflow-y-auto overscroll-contain',
+        'fixed inset-0 backdrop-blur-sm z-[90] overflow-y-auto overscroll-contain',
         overlayOpacity === 'high' ? 'bg-slate-900/50' : 'bg-slate-900/20',
       ].join(' ')}
       onMouseDown={e => { pressBeganInside.current = panelRef.current?.contains(e.target as Node) ?? false; }}

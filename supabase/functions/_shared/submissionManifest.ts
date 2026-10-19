@@ -1,11 +1,10 @@
 // SQEM-493 — the one reader of a marketplace submission's manifest, shared by `marketplace-submit`
-// (self-host publishers) and `marketplace-submit-cloud` (Cloud workspaces). Imports nothing but the pure `skillFile.ts`,
+// (self-host publishers) and `marketplace-submit-cloud` (Cloud workspaces). Imports nothing,
 // so the unit tests can load it; the callers unzip, this decides what the listing says.
 //
 // ⛔ The listing's text, hash and scan come from the BUNDLE, never from the request body: the bundle
 // is what "Add to workspace" imports, so it is the thing that has to be scanned and deduplicated.
 
-import { marketplaceRejection } from './skillFile.ts';
 export const BUNDLE_SCHEMA = 'sqemes-bundle/v1';
 export const MAX_BUNDLE_BYTES = 5 * 1024 * 1024; // 5 MB compressed
 export const MAX_ENTRIES = 300;
@@ -71,19 +70,47 @@ export function isCloudBundlePath(path: unknown, workspaceId: string): path is s
     && new RegExp(`^${workspaceId.replace(/[^0-9a-f-]/gi, '')}/[0-9a-f-]{36}/bundle\\.sqemes\\.zip$`, 'i').test(path);
 }
 
-// SQEM-514 — until the marketplace security ticket lands, a listing may carry text, images and PDFs
-// only; a workspace may hold any file since SQEM-514, a public listing not yet. Decided from the BYTES
-// of every file in the bundle — the manifest's `mimeType` is written by the submitting client and can
-// say anything. Returns null when every file passes, otherwise the reason for the first that does not.
-type ZipLike = { files: Record<string, { dir: boolean; name: string; async(t: 'uint8array'): Promise<Uint8Array> }> };
+// SQEM-519 — every file of a bundle, as the review sees it: its bytes, under the name the person gave
+// it (the manifest maps `files/<ref>__<name>` back to that name). Every ZIP entry is reviewed, not just
+// the ones the manifest lists — the manifest is written by the submitting client and can omit files.
+type ZipLike = { files: Record<string, { dir: boolean; name: string; async(t: 'uint8array' | 'string'): Promise<any> }> };
 
-export async function bundleFileRejection(zip: ZipLike): Promise<string | null> {
+export async function bundleReviewInputs(zip: ZipLike): Promise<{ path: string; bytes: Uint8Array }[]> {
+  const names = new Map<string, string>();
+  const manifestEntry = zip.files['manifest.json'];
+  if (manifestEntry) {
+    try {
+      const m = JSON.parse(await manifestEntry.async('string'));
+      for (const f of Array.isArray(m?.files) ? m.files : []) if (f?.path && f?.name) names.set(String(f.path), String(f.name));
+    } catch { /* an unreadable manifest is refused by parseSubmissionManifest; review the bytes anyway */ }
+  }
+  const out: { path: string; bytes: Uint8Array }[] = [];
   for (const entry of Object.values(zip.files)) {
     if (entry.dir || entry.name === 'manifest.json') continue;
-    // Bundle paths are `files/<ref>__<name>` (lib/templateBundle.ts); name the file as the user knows it.
-    const shown = entry.name.replace(/^files\//, '').replace(/^[^_]*__/, '');
-    const reason = marketplaceRejection(shown, await entry.async('uint8array'));
-    if (reason) return reason;
+    const shown = names.get(entry.name) ?? entry.name.replace(/^files\//, '').replace(/^[^_]*__/, '');
+    out.push({ path: shown, bytes: await entry.async('uint8array') });
   }
-  return null;
+  return out;
+}
+
+// SQEM-519 (b) — the bundle's fingerprint: every ZIP entry by its path and SHA-256, `manifest.json`
+// included. The manifest carries the templates, their variables and any personas, so a fingerprint of
+// the files alone would let a swapped manifest add a template or a persona without changing the hash.
+// Written by the submit functions into `bundle_hash`; checked by the copier against the bytes it
+// downloaded, before anything is imported. Paths are the raw ZIP paths — what the importer reads.
+export async function bundleHashOfZip(zip: ZipLike): Promise<string> {
+  const hex = async (b: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', b)))
+    .map(x => x.toString(16).padStart(2, '0')).join('');
+  const lines: string[] = [];
+  for (const entry of Object.values(zip.files)) {
+    if (entry.dir) continue;
+    lines.push(`${await hex(await entry.async('uint8array'))}  ${entry.name}`);
+  }
+  lines.sort((a, b) => a.slice(66).localeCompare(b.slice(66)));
+  return hex(new TextEncoder().encode(lines.join('\n')));
+}
+
+/** The copier's check: `null` when the listing predates the hash (nothing to compare). */
+export async function bundleMatches(zip: ZipLike, expected: string | null | undefined): Promise<boolean> {
+  return !expected || (await bundleHashOfZip(zip)) === expected;
 }

@@ -162,16 +162,15 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
                 instructions is what covers the other four, so on this screen it is the step that
                 decides whether any of this works — not a nicety. */}
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">System prompt — paste this too</p>
-            {/* SQEM-378 — the same text the MCP server hands out and the same one the Sqemes chat
-                works under. Saying so matters: it is the difference between "a snippet we offer" and
+            {/* SQEM-378 — the same text the Sqemes chat works under. SQEM-526: the MCP server no longer
+                hands it out (MCP client guidelines), so pasting it is the only way it reaches a client. Saying so matters: it is the difference between "a snippet we offer" and
                 "the rule this product already follows", and the second is what makes someone paste
                 it. One source, so this claim cannot quietly stop being true. */}
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-              This is the same instruction the Sqemes chat already works under, and the one the server
-              hands to connected clients. ⚠️ Clients largely ignore what the server hands them &mdash;
-              measured, not assumed: without this text in your own standing instructions, most requests
-              never reach your playbooks. Add it where your AI tool keeps them, and it applies to
-              everyone at once.
+              This is the same instruction the Sqemes chat already works under. A connected AI tool
+              follows it only when it is in your own standing instructions &mdash; without it, the tool
+              checks your playbooks when you ask it to, and rarely on its own. Add it where your AI tool
+              keeps its instructions, and it applies to everyone at once.
             </p>
             <div className="relative bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl p-4">
               <pre className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap max-h-44 overflow-y-auto pr-8">{LIBRARY_SYSTEM_PROMPT}</pre>

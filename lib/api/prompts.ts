@@ -179,6 +179,10 @@ export async function fetchPromptDetail(id: string): Promise<Prompt> {
 
 export async function createPrompt(prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'>, workspaceId: string) {
   const row = promptToRow(prompt, workspaceId);
+  // SQEM-519 — provenance, set by "Adapt" and the marketplace bundle copy (Cloud only: it FKs to
+  // library_templates). Until then it was dropped here, so Adapt never recorded its source. Create only:
+  // an update would write back a value whose listing may have been deleted since (FK violation).
+  if (prompt.sourceTemplateId) row.source_template_id = prompt.sourceTemplateId;
   const { data, error } = await supabase
     .from('prompts')
     .insert(row as unknown as Database['public']['Tables']['prompts']['Insert'])

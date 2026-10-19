@@ -86,6 +86,7 @@ export function rowToLibraryTemplate(row: LibraryTemplateRow): LibraryTemplate {
     scanReasons: ((row as { scan_reasons?: string[] }).scan_reasons as string[]) ?? [],
     source: (row as { source?: string }).source ?? 'cloud',
     publisherName: (row as { marketplace_publishers?: { display_name?: string } }).marketplace_publishers?.display_name ?? null,
+    copySummary: (row as { copy_summary?: LibraryTemplate['copySummary'] }).copy_summary ?? null,
   };
 }
 
@@ -154,6 +155,12 @@ export async function fetchLibraryTemplateDetail(id: string): Promise<LibraryTem
     .single();
 
   if (error) throw error;
+  // SQEM-519 — the same summary the public endpoint derives for self-host (marketplace-public).
+  const review = (data as { file_review?: { files?: unknown[]; hosts?: string[] } | null }).file_review;
+  if (review?.files) {
+    const { copySummaryOf } = await import('../../supabase/functions/_shared/fileReview.ts');
+    (data as Record<string, unknown>).copy_summary = copySummaryOf(review as Parameters<typeof copySummaryOf>[0]);
+  }
   return rowToLibraryTemplate(data);
 }
 
@@ -242,25 +249,19 @@ export async function copyTemplateToWorkspace(
 const client = supabase as unknown as { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 /**
- * SQEM-514 — the same check the submit functions run (`bundleFileRejection`), done before anything is
- * uploaded so the person sees which file is the problem straight away. The server repeats it on the
- * bytes it receives; this one is a courtesy, not the guard.
+ * SQEM-519 — the same review the submit functions run (`reviewSubmissionFiles`), done before anything
+ * is uploaded, so the person sees which file is refused straight away. Only the REFUSALS stop the
+ * upload here; flags are for the moderator. The server repeats the review on the bytes it receives;
+ * this one is a courtesy, not the guard.
  */
 async function assertMarketplaceFiles(blob: Blob): Promise<void> {
   const { default: JSZip } = await import('jszip');
-  const { bundleFileRejection } = await import('../../supabase/functions/_shared/submissionManifest.ts');
-  const reason = await bundleFileRejection(await JSZip.loadAsync(blob));
-  if (reason) throw new Error(reason);
+  const { bundleReviewInputs } = await import('../../supabase/functions/_shared/submissionManifest.ts');
+  const { reviewSubmissionFiles, NO_TEXT_SCAN } = await import('../../supabase/functions/_shared/fileReview.ts');
+  const review = await reviewSubmissionFiles(await bundleReviewInputs(await JSZip.loadAsync(blob)), '', NO_TEXT_SCAN);
+  if (review.rejected.length) throw new Error(review.rejected.map(r => r.reason).join(' · '));
 }
 
-/**
- * Publish a workspace template to the marketplace as a moderated bundle snapshot (submit-for-review).
- *
- * SQEM-493 — the browser builds and uploads the bundle to its own workspace folder, then hands it to
- * `marketplace-submit-cloud`, which reads it, runs the injection scan and the content hash on the
- * server, deduplicates, and inserts the pending listing. The client can no longer insert a listing:
- * it used to compute the scan here and write it, so the review queue showed what the browser said.
- */
 export async function publishToMarketplace(input: {
   workspaceId: string; template: Prompt; allFiles: WorkspaceFile[]; userId: string; category?: TemplateCategory;
 }): Promise<LibraryTemplate> {
@@ -311,6 +312,31 @@ async function copyListingFieldsToWorkspace(listing: LibraryTemplate, workspaceI
 
 /** Copy a listing into a workspace. UGC listings (with a bundle) apply the full bundle (files + skills);
  *  curated listings fall back to the text-only copy. Returns the new prompt id (or null for a bundle copy). */
+export const BUNDLE_CHANGED = 'The files of this listing changed after it was reviewed, so nothing was added. Please report it.';
+
+/**
+ * SQEM-519 — the bundle that is imported must be the one that was reviewed. `bundle_hash` is written by
+ * the submit functions only (the trigger refuses it from any client), and covers every ZIP entry with
+ * the manifest. Read fresh here rather than taken from the caller, so a stale listing object cannot
+ * carry an old value. `null`: submitted before the hash existed — nothing to compare.
+ */
+async function expectedBundleHash(listingId: string): Promise<string | null> {
+  if (IS_SELF_HOSTED) {
+    const { listing } = await marketplaceApi<{ listing: { bundle_hash?: string | null } }>('detail', { id: listingId });
+    return listing?.bundle_hash ?? null;
+  }
+  const { data } = await client.from('library_templates').select('bundle_hash').eq('id', listingId).single();
+  return (data as { bundle_hash?: string | null } | null)?.bundle_hash ?? null;
+}
+
+async function readVerifiedBundle(blob: Blob, listingId: string) {
+  const { readBundle } = await import('../templateBundle');
+  const { bundleMatches } = await import('../../supabase/functions/_shared/submissionManifest.ts');
+  const read = await readBundle(new File([blob], 'bundle.sqemes.zip'));
+  if (!(await bundleMatches(read.zip, await expectedBundleHash(listingId)))) throw new Error(BUNDLE_CHANGED);
+  return read;
+}
+
 export async function copyListingToWorkspace(listing: LibraryTemplate, workspaceId: string, userId: string): Promise<void> {
   // Self-host: the marketplace is the global Cloud one — copy via the public endpoint into the local
   // workspace. Bundle listings download the bundle (files + skills); curated ones copy their fields.
@@ -318,8 +344,9 @@ export async function copyListingToWorkspace(listing: LibraryTemplate, workspace
     if (listing.hasBundle) {
       const { url } = await marketplaceApi<{ url: string }>('bundle', { listingId: listing.id });
       const blob = await (await fetch(url)).blob();
-      const { readBundle, importBundle } = await import('../templateBundle');
-      const { zip, manifest } = await readBundle(new File([blob], 'bundle.sqemes.zip'));
+      const { importBundle } = await import('../templateBundle');
+      const { zip, manifest } = await readVerifiedBundle(blob, listing.id);
+      // No provenance: source_template_id FKs to library_templates, and the Cloud id is not a row here.
       await importBundle(zip, manifest, workspaceId, userId);
     } else {
       await copyListingFieldsToWorkspace(listing, workspaceId, userId);
@@ -337,9 +364,10 @@ export async function copyListingToWorkspace(listing: LibraryTemplate, workspace
   const json = await res.json().catch(() => ({}));
   if (!res.ok || !json.url) throw new Error(json.error || `Error ${res.status}`);
   const blob = await (await fetch(json.url)).blob();
-  const { readBundle, importBundle } = await import('../templateBundle');
-  const { zip, manifest } = await readBundle(new File([blob], 'bundle.sqemes.zip'));
-  await importBundle(zip, manifest, workspaceId, userId);
+  const { importBundle } = await import('../templateBundle');
+  const { zip, manifest } = await readVerifiedBundle(blob, listing.id);
+  // SQEM-519 — provenance, as the text-only copy has always recorded it.
+  await importBundle(zip, manifest, workspaceId, userId, { sourceTemplateId: listing.id });
   await supabase.rpc('increment_template_usage', { template_id: listing.id });
 }
 
