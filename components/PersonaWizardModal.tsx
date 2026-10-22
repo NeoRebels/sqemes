@@ -102,7 +102,7 @@ Rules for "routes":
 - The condition completes "load this playbook when …". One short clause, naming the SITUATION.
 - ⚠️ A template's own description is already used when no condition is given, so a condition that merely restates it is worthless. Write what this template means **for this persona specifically** — and if the description truly is the whole answer, return "" for that entry rather than padding it.`;
 
-      setStage('Writing the role and its routes');
+      setStage('Writing the role and choosing its playbooks');
       const raw = await runAuthoringAI({
         workspaceId: workspace.id,
         modelId: authoringModelId(workspace),
@@ -173,10 +173,10 @@ Rules for "routes":
 
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
         <div>
-          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+          <label htmlFor="persona-wizard-modal-what-should-this-persona-be" className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
             What should this persona be?
           </label>
-          <textarea
+          <textarea id="persona-wizard-modal-what-should-this-persona-be"
             value={goal}
             onChange={e => setGoal(e.target.value)}
             disabled={busy}
@@ -188,9 +188,9 @@ Rules for "routes":
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+            <p className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
               Playbooks it may reach for
-            </label>
+            </p>
             <span className="text-2xs text-slate-400">{picked.length} selected</span>
           </div>
 

@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea for Sqemes
+about: Suggest an idea for sqemes
 title: ''
 labels: enhancement
 ---

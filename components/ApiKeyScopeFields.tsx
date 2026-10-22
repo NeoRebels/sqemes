@@ -110,7 +110,7 @@ const CAPS: { key: 'create' | 'update' | 'delete'; label: string; hint: string }
   },
   {
     key: 'update',
-    label: 'Update playbooks & personas, change persona routes',
+    label: 'Update playbooks & personas, change which playbooks a persona uses',
     hint: 'update_template, update_persona, attach_template, detach_template',
   },
   {
@@ -179,10 +179,10 @@ export function ApiKeyScopeFields({
       </div>
 
       <div>
-        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        <label htmlFor="api-key-scope-fields-expires" className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5" /> Expires
         </label>
-        <select
+        <select id="api-key-scope-fields-expires"
           value={value.expiry}
           onChange={e => set({ expiry: e.target.value as KeyScopeValue['expiry'] })}
           className="w-full p-2.5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"

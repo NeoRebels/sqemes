@@ -16,6 +16,7 @@ export default function SegmentedTabs<T extends string>({
   value,
   onChange,
   className = '',
+  fill = false,
 }: {
   tabs: readonly SegmentedTab<T>[];
   value: T;
@@ -23,18 +24,23 @@ export default function SegmentedTabs<T extends string>({
   // Extra classes for the outer container, e.g. `self-stretch` so the tab bar
   // matches the height of a sibling search input in a centered flex row.
   className?: string;
+  /** SQEM-548 — tabs share the full width equally (the sidebar's Work | Manage switch). */
+  fill?: boolean;
 }) {
   return (
-    <div className={`flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-xl p-1 ${className}`}>
+    <div className={`flex gap-1 bg-surface-sunken rounded-xl p-1 ${className}`}>
       {tabs.map((tab) => (
         <button
           key={tab.value}
+          type="button"
           title={tab.title}
+          // SQEM-544 — a screen reader now hears which one is on; the look said it, the markup did not.
+          aria-pressed={value === tab.value}
           onClick={() => onChange(tab.value)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${fill ? 'flex-1 justify-center' : ''} ${
             value === tab.value
-              ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-soft'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              ? 'bg-surface-raised text-ink-strong shadow-soft'
+              : 'text-ink-muted hover:text-slate-700 dark:hover:text-slate-200'
           }`}
         >
           {tab.icon}

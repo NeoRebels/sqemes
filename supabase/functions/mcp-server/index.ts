@@ -558,7 +558,7 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
   // SQEM-083 — server-side paywall: a lapsed workspace may handshake (initialize/ping)
   // but can't use any data method until it has an active subscription.
   if (!(await isWorkspaceSubscriptionActive(adminClient, workspaceId))) {
-    return rpcError(id, -32003, 'This Sqemes workspace has no active subscription. Resubscribe at app.sqemes.com to use MCP.');
+    return rpcError(id, -32003, 'This sqemes workspace has no active subscription. Resubscribe at app.sqemes.com to use MCP.');
   }
 
   /**
@@ -747,6 +747,24 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
   const refuseWrite = (id: unknown, what: string) =>
     rpcError(id as never, -32602,
       `Not allowed: ${what}. Creating, changing and deleting are for editors and admins; a member's connection is read-only. This matches the web app, where the same actions are closed to members.`);
+
+  /**
+   * SQEM-473 — may this connection's person CHANGE this playbook / persona? Asked of the database, so
+   * the server and the app (RLS: `can_edit_template` / `can_edit_persona`) run ONE rule: an admin
+   * always, an editor unless the object names its editors and they are not among them (owner and
+   * groups count). Sight is checked before this, by the existing gates; this only narrows writing.
+   * Fails closed: an RPC error counts as "no".
+   */
+  const mayEdit = async (kind: 'template' | 'persona', objectId: string): Promise<boolean> => {
+    const fn = kind === 'template' ? 'template_edit_allowed' : 'persona_edit_allowed';
+    const arg = kind === 'template' ? { p_template_id: objectId, p_user_id: mcpUserId } : { p_persona_id: objectId, p_user_id: mcpUserId };
+    const { data, error } = await adminClient.rpc(fn, arg);
+    if (error) console.error(`[mcp] SQEM-473 ${fn} failed, refusing the write:`, error.message);
+    return !error && data === true;
+  };
+  const refuseEdit = (id: unknown, what: 'playbook' | 'persona', title?: string | null) =>
+    rpcError(id as never, -32602,
+      `You may use this ${what}${title ? ` ("${title}")` : ''} but not change it: editing it is restricted to named people. Ask its owner or a workspace admin.`);
 
   // SQEM-373 — all four moved into the reader with their comments intact; see
   // `_shared/libraryQueries.ts`. `hiddenFromCaller` is a pure function and is imported directly.
@@ -956,7 +974,7 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
       {
         name: 'list_personas',
         title: 'List personas',
-        description: 'List the workspace\'s personas. A PERSONA is a working role — a general instruction plus conditions saying which template to load when. Use it when the user names a persona ("use the Sales persona from Sqemes", "load persona X"), or when a task clearly belongs to a role the workspace has defined. Returns id, name, description and how many routes each one currently offers you.\n\nA persona is not a template and cannot be fetched with get_template; call get_persona.',
+        description: 'List the workspace\'s personas. A PERSONA is a working role — a general instruction plus conditions saying which template to load when. Use it when the user names a persona ("use the Sales persona from sqemes", "load persona X"), or when a task clearly belongs to a role the workspace has defined. Returns id, name, description and how many routes each one currently offers you.\n\nA persona is not a template and cannot be fetched with get_template; call get_persona.',
         inputSchema: { type: 'object', properties: {} },
       },
       {
@@ -1094,7 +1112,7 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
       {
         name: 'create_template',
         title: 'Create playbook',
-        description: 'Create a new template (prompt or skill) in the workspace. A prompt is a task with {{variables}}; a skill is a block of knowledge applied when it fits. For a ROLE — who to be, and which template to load when — create a persona instead (create_persona).\n\nVariables (kind=prompt only): pass a "variables" array of {name, label?, type?} objects. Alternatively, write {{variable_name}} placeholders in content and they are auto-extracted. "type" can be "text" (default) or "textarea" for longer inputs.\nExample: [{"name":"draft","label":"Email Draft","type":"textarea"},{"name":"tone","type":"text"}]\n\nContext files: pass "file_ids" (array of UUIDs from list_files) to attach workspace files as context.\n\nAgent Skills (kind=skill): a skill is a FOLDER, and Sqemes holds it whole. Put the SKILL.md body in "content", its frontmatter title/description in "title"/"description", and upload EVERY other file in the folder via upload_file under its relative path (references/…, scripts/…, assets/…), then attach them all through file_ids. Uploading only the SKILL.md leaves a skill that describes files nobody has.\n\nWho can see it: the new template follows the workspace default — open to everyone, or restricted to you if the workspace starts new templates restricted. Change it per template in the Sqemes app.',
+        description: 'Create a new template (prompt or skill) in the workspace. A prompt is a task with {{variables}}; a skill is a block of knowledge applied when it fits. For a ROLE — who to be, and which template to load when — create a persona instead (create_persona).\n\nVariables (kind=prompt only): pass a "variables" array of {name, label?, type?} objects. Alternatively, write {{variable_name}} placeholders in content and they are auto-extracted. "type" can be "text" (default) or "textarea" for longer inputs.\nExample: [{"name":"draft","label":"Email Draft","type":"textarea"},{"name":"tone","type":"text"}]\n\nContext files: pass "file_ids" (array of UUIDs from list_files) to attach workspace files as context.\n\nAgent Skills (kind=skill): a skill is a FOLDER, and sqemes holds it whole. Put the SKILL.md body in "content", its frontmatter title/description in "title"/"description", and upload EVERY other file in the folder via upload_file under its relative path (references/…, scripts/…, assets/…), then attach them all through file_ids. Uploading only the SKILL.md leaves a skill that describes files nobody has.\n\nWho can see it: the new template follows the workspace default — open to everyone, or restricted to you if the workspace starts new templates restricted. Change it per template in the sqemes app.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1156,7 +1174,7 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
       {
         name: 'import_skill_from_url',
         title: 'Import skill from GitHub',
-        description: 'Import a whole Anthropic Agent Skill from a public GitHub URL in ONE call. The server downloads the archive, unpacks it, stores every file under its relative path and creates the skill template — the file contents never pass through you.\n\nUSE THIS for any skill that lives in a repository. Uploading a real skill file-by-file via upload_file does not work: a skill folder is routinely megabytes, so you run out of room and it arrives half-complete without anything saying so.\n\nAccepted: https://github.com/owner/repo · https://github.com/owner/repo/tree/<ref>/<folder> · any .zip on a GitHub host. If the archive holds several skills, the call names them and you pass "path" to pick one.\n\nEvery file in the folder is kept, whatever its type — scripts, schemas, fonts, templates.\n\nReturns what actually landed: file count, total bytes, and every file that was skipped with the reason. Nothing else in Sqemes reports a partial import, so read it.',
+        description: 'Import a whole Anthropic Agent Skill from a public GitHub URL in ONE call. The server downloads the archive, unpacks it, stores every file under its relative path and creates the skill template — the file contents never pass through you.\n\nUSE THIS for any skill that lives in a repository. Uploading a real skill file-by-file via upload_file does not work: a skill folder is routinely megabytes, so you run out of room and it arrives half-complete without anything saying so.\n\nAccepted: https://github.com/owner/repo · https://github.com/owner/repo/tree/<ref>/<folder> · any .zip on a GitHub host. If the archive holds several skills, the call names them and you pass "path" to pick one.\n\nEvery file in the folder is kept, whatever its type — scripts, schemas, fonts, templates.\n\nReturns what actually landed: file count, total bytes, and every file that was skipped with the reason. Nothing else in sqemes reports a partial import, so read it.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1346,6 +1364,10 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
       // probe which ids exist (SQEM-291, applied to templates in SQEM-336).
       if (!row || !canAccessPersona(personaId))
         return { ok: false, message: `Persona not found: ${personaId}` };
+
+      // SQEM-473 — seen is not editable. The message admits the persona exists: gate 1 passed.
+      if (!(await mayEdit('persona', personaId)))
+        return { ok: false, message: `You may use this persona ("${(row as { title: string }).title}") but not change it: editing it is restricted to named people. Ask its owner or a workspace admin.` };
 
       // Gate 2 — authority, and its message says so plainly: gate 1 is already passed, so the
       // caller knows the persona exists. Hiding behind "not found" here would explain nothing.
@@ -1723,6 +1745,7 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
           variables:          resolvedVars,
           context_file_ids:   Array.isArray(file_ids) ? file_ids : [],
           created_by:         mcpUserId,
+          updated_by:         mcpUserId, // SQEM-477 — the author of version 1; auth.uid() is empty here
         })
         .select('id, title, kind')
         .single();
@@ -1771,6 +1794,8 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
       // into a way to test which ids exist. `delete_file` has said so since SQEM-291.
       if (!existing || !canAccessTemplate(templateId))
         return rpcError(id, -32602, `Template not found: ${templateId}`);
+      // SQEM-473 — gate 2: seen is not editable.
+      if (!(await mayEdit('template', templateId))) return refuseEdit(id, 'playbook');
 
       const updates: Record<string, any> = { updated_at: new Date().toISOString() };
       if (title              !== undefined) updates.title              = title.trim();
@@ -1791,6 +1816,8 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
 
       if (Object.keys(updates).length === 1)
         return rpcError(id, -32602, 'No fields to update — provide at least one of: title, content, description, variables, file_ids');
+      // SQEM-477 — who the new version is by. Without it the version would carry the previous author.
+      updates.updated_by = mcpUserId;
 
       const { data: updated, error: updateErr } = await adminClient
         .from('prompts')
@@ -1832,6 +1859,8 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
       // worse half of the leak that note describes: with files you could only ask, here you can act.
       if (!existing || !canAccessTemplate(templateId))
         return rpcError(id, -32602, `Template not found: ${templateId}`);
+      // SQEM-473 — gate 2: seen is not deletable.
+      if (!(await mayEdit('template', templateId))) return refuseEdit(id, 'playbook', (existing as { title?: string }).title);
 
       const { error: deleteErr } = await adminClient
         .from('prompts')
@@ -1884,7 +1913,7 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
         // Same rule as create_template: a skill without a description cannot be discovered, and a
         // skill nobody finds is not an import worth completing.
         return rpcError(id, -32602,
-          `${SKILL_ENTRY} has no "description" in its frontmatter. A skill needs one — AI agents use it to discover the skill. Add it and re-run, or import the folder through the Sqemes app and write one there.`);
+          `${SKILL_ENTRY} has no "description" in its frontmatter. A skill needs one — AI agents use it to discover the skill. Add it and re-run, or import the folder through the sqemes app and write one there.`);
       }
 
       // Everything beside SKILL.md, by relative path. SQEM-514: every file, whatever its type — a skill
@@ -1978,6 +2007,7 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
           variables:        [],
           context_file_ids: uploaded.map((u) => u.fileId),
           created_by:       mcpUserId,
+          updated_by:       mcpUserId, // SQEM-477
         })
         .select('id, title, kind')
         .single();
@@ -2265,6 +2295,16 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
           `This file is attached to ${restricted} template(s) you cannot see. Detaching or replacing it there would change work you have no access to, so it needs an editor or admin. Ask one, or remove the file only from the templates you can see (update_template with file_ids).`);
       }
 
+      // SQEM-473 — detaching or swapping changes every referencing playbook, so each must be one this
+      // person may edit. A playbook that restricts its editors protects its files this way; the app
+      // enforces the same rule through `workspace_files_update`.
+      for (const t of referencedBy) {
+        if (!(await mayEdit('template', t.id))) {
+          return rpcError(id, -32602,
+            `This file belongs to a playbook you may use but not change${canAccessTemplate(t.id) ? ` ("${t.title}")` : ''}. Detaching or replacing it there needs that playbook's owner or a workspace admin.`);
+        }
+      }
+
       // 5. Detach (or swap for the replacement) on every referencing template.
       const affected: { id: string; title: string; kind: string }[] = [];
       for (const t of referencedBy) {
@@ -2275,7 +2315,7 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
         next = next.filter((fid: string, i: number) => next.indexOf(fid) === i); // de-dupe
         const { error: updErr } = await adminClient
           .from('prompts')
-          .update({ context_file_ids: next, updated_at: new Date().toISOString() })
+          .update({ context_file_ids: next, updated_at: new Date().toISOString(), updated_by: mcpUserId }) // SQEM-477
           .eq('workspace_id', workspaceId)
           .eq('id', t.id);
         if (updErr) return rpcError(id, -32603, `Failed to update template ${t.id}: ${updErr.message}`);

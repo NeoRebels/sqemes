@@ -456,6 +456,8 @@ export type Database = {
           model: string | null;
           user_id: string | null;
           created_at: string;
+          playbook_ref: Json | null;
+          loaded_template_ids: string[] | null;
         };
         Insert: {
           id?: string;
@@ -465,6 +467,8 @@ export type Database = {
           model?: string | null;
           user_id?: string | null;
           created_at?: string;
+          playbook_ref?: Json | null;
+          loaded_template_ids?: string[] | null;
         };
         Update: {
           id?: string;
@@ -474,6 +478,8 @@ export type Database = {
           model?: string | null;
           user_id?: string | null;
           created_at?: string;
+          playbook_ref?: Json | null;
+          loaded_template_ids?: string[] | null;
         };
         Relationships: [];
       };
@@ -755,6 +761,11 @@ export type Database = {
       workspace_file_usage: {
         Args: { p_workspace_id: string };
         Returns: { file_id: string; total_templates: number }[];
+      };
+      // SQEM-553 — Overview channel cards; admins/editors of the workspace only (42501 otherwise).
+      workspace_usage_summary: {
+        Args: { p_workspace_id: string; p_days?: number };
+        Returns: { channel: string; uses: number; top_template_id: string | null; top_uses: number }[];
       };
       // SQEM-343 — the demotion flow. Admin-gated inside; see the migration for why the handover
       // wrapper exists separately from `reassign_orphaned_content` (the triggers call that one with

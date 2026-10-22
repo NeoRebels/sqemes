@@ -24,7 +24,7 @@ describe('SQEM-415 — the download is a control, and the panel names the thing'
     expect(i).toBeGreaterThan(-1);
     const button = LISTING.slice(Math.max(0, i - 900), i);
     expect(button, 'the underlined link read as fine print next to two filled buttons').not.toMatch(/underline/);
-    expect(button).toMatch(/border border-slate-200/);
+    expect(button).toMatch(/border border-line-strong/); // SQEM-554 (e2): the outline is the token now (was border-slate-200)
     expect(button).toMatch(/rounded-xl/);
   });
 

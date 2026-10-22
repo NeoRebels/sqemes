@@ -40,6 +40,8 @@ export function FullScreenExit({
     if (!escapeEnabled || !escapeReady) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // SQEM-535 — an open dialog already used this Escape to close itself; it is not a request to leave.
+      if (e.defaultPrevented) return;
       // Never steal Escape from someone who is typing.
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
@@ -53,14 +55,14 @@ export function FullScreenExit({
     <button
       onClick={onExit}
       title={escapeEnabled ? `${label} (Esc)` : label}
-      className={`group inline-flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 transition-colors text-sm ${className}`}
+      className={`group inline-flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-line-strong text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 transition-colors text-sm ${className}`}
     >
       <span className="flex items-center gap-1.5 min-w-0">
         <ArrowLeft className="w-4 h-4 shrink-0" />
         <span className="truncate">{label}</span>
       </span>
       {escapeEnabled && (
-        <kbd className="hidden sm:inline text-2xs font-sans font-semibold px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600 text-slate-400 dark:text-slate-500 shrink-0">
+        <kbd className="hidden sm:inline text-2xs font-sans font-semibold px-1.5 py-0.5 rounded border border-line-strong text-ink-subtle shrink-0">
           Esc
         </kbd>
       )}

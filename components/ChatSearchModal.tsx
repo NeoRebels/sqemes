@@ -99,8 +99,8 @@ const ChatSearchModal = ({ open, onClose, workspaceId, onSelect }: Props) => {
   const term = query.trim();
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-[12vh] bg-slate-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden" onClick={e => e.stopPropagation()}>
+    <div role="presentation" className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-[12vh] bg-slate-900/50 backdrop-blur-sm" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label="Search chats" className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-2.5 px-4 border-b border-slate-100 dark:border-slate-700">
           <Search className="w-4 h-4 text-slate-400 shrink-0" />
           <input

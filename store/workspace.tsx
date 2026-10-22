@@ -66,6 +66,7 @@ export function useWorkspaceState(
       if (updates.openrouterModels !== undefined) dbUpdates.openrouter_models = updates.openrouterModels;
       if (updates.brandProfile !== undefined) dbUpdates.brand_profile = updates.brandProfile;
       if (updates.defaultTemplateAccess !== undefined) dbUpdates.default_template_access = updates.defaultTemplateAccess;
+      if (updates.defaultEditRestricted !== undefined) dbUpdates.default_edit_restricted = updates.defaultEditRestricted;
       // SQEM-311 — null is a real value here ("back to automatic"), so the guard is `!== undefined`.
       if (updates.authoringModelId !== undefined) dbUpdates.authoring_model_id = updates.authoringModelId;
 

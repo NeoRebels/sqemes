@@ -18,34 +18,34 @@ export function AboutSection() {
 
   return (
     <Card id="about" className="p-6 md:p-8 scroll-mt-6">
-      <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-6">
-        <Info className="w-5 h-5 text-brand-500" /> About
+      <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2 mb-6">
+        <Info className="w-5 h-5 text-accent" /> About
       </h2>
 
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="text-sm font-bold text-slate-900 dark:text-slate-100">sqemes</div>
-          <div className="text-xs text-slate-500 dark:text-slate-400">Self-hosted</div>
+          <div className="text-sm font-bold text-ink-strong">sqemes</div>
+          <div className="text-xs text-ink-muted">Self-hosted</div>
         </div>
-        <div className="text-sm font-mono text-slate-700 dark:text-slate-200">v{CURRENT_VERSION}</div>
+        <div className="text-sm font-mono text-ink">v{CURRENT_VERSION}</div>
       </div>
 
       {updateAvailable ? (
-        <div className="mt-5 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 p-4">
+        <div className="mt-5 rounded-xl border border-warning/40 bg-warning-soft p-4">
           <div className="flex items-start gap-3">
-            <ArrowUpCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <ArrowUpCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
             <div className="min-w-0">
-              <div className="text-sm font-bold text-amber-900 dark:text-amber-200">
+              <div className="text-sm font-bold text-ink-strong">
                 Version {status!.latest} is available
               </div>
-              <p className="text-xs text-amber-700 dark:text-amber-300/90 mt-0.5">
+              <p className="text-xs text-ink mt-0.5">
                 You&apos;re running v{CURRENT_VERSION}.
               </p>
               <a
                 href={UPDATE_DOCS_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 mt-2 text-sm font-bold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 transition-colors"
+                className="inline-flex items-center gap-1.5 mt-2 text-sm font-bold text-ink-strong hover:underline transition-colors"
               >
                 How to update <ExternalLink className="w-3.5 h-3.5" />
               </a>
@@ -53,7 +53,7 @@ export function AboutSection() {
           </div>
         </div>
       ) : status ? (
-        <div className="mt-4 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+        <div className="mt-4 flex items-center gap-2 text-xs text-success">
           <CheckCircle2 className="w-4 h-4" /> You&apos;re on the latest version.
         </div>
       ) : null}

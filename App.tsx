@@ -3,7 +3,9 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import Sidebar from './components/Sidebar';
 import ErrorBoundary from './components/ErrorBoundary';
-import ChoosePlanScreen from './components/ChoosePlanScreen';
+// SQEM-542 — lazy: shown only to a workspace without a subscription, and it pulls in the account
+// export (JSZip). Eager, it cost every page load ~28 KB gzip.
+const ChoosePlanScreen = React.lazy(() => import('./components/ChoosePlanScreen'));
 import LegalGate from './components/LegalGate';
 import { needsSubscriptionGate } from './lib/subscription';
 import { publicListingIdFromHash } from './lib/publicRoutes';
@@ -14,6 +16,8 @@ const Templates = React.lazy(() => import('./pages/Templates'));
 const TemplateEditor = React.lazy(() => import('./pages/TemplateEditor'));
 const Personas = React.lazy(() => import('./pages/Personas'));           // SQEM-324
 const PersonaEditor = React.lazy(() => import('./pages/PersonaEditor')); // SQEM-324
+const DesignSystem = React.lazy(() => import('./pages/DesignSystem')); // SQEM-545 — gated inside the page
+const Overview = React.lazy(() => import('./pages/Overview')); // SQEM-552 — Manage home; members are sent to Start inside the page
 const PromptRunnerRedirect = () => {
   const { id } = useParams<{ id: string }>();
   const nav = useNavigate();
@@ -85,7 +89,7 @@ const EnvironmentShell = ({ children }: React.PropsWithChildren<{}>) => {
   if (!isStagingSupabaseEnvironment) return <>{children}</>;
 
   return (
-    <div className="staging-environment-shell h-full min-h-0 flex flex-col bg-slate-50 dark:bg-slate-900">
+    <div className="staging-environment-shell h-full min-h-0 flex flex-col bg-surface">
       <StagingEnvironmentBanner />
       <div className="flex-1 min-h-0">
         {children}
@@ -108,15 +112,18 @@ const ToastContainer = () => {
       aria-atomic="true"
       onMouseEnter={pauseToast}
       onMouseLeave={resumeToast}
-      className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-fade-in z-[100] text-white cursor-default ${
-        { error: 'bg-red-500', success: 'bg-slate-900', info: 'bg-blue-500' }[toast.type]
+      // SQEM-554 (a) — a light card like everything else in C (choice A of two): the type is carried by
+      // the icon's colour and, for an error, the edge — not by a filled slab in a colour of its own.
+      // There was no `info` token; blue-500 was the last Tailwind blue in this file.
+      className={`fixed bottom-6 right-6 max-w-[calc(100vw-3rem)] px-4 py-3 rounded-card border bg-surface-raised text-ink-strong shadow-raised flex items-center gap-3 animate-fade-in z-[100] cursor-default ${
+        toast.type === 'error' ? 'border-danger/40' : 'border-line'
       }`}
     >
-      {toast.type === 'success' && <CheckCircle className="w-5 h-5 text-emerald-400" />}
-      {toast.type === 'error' && <AlertTriangle className="w-5 h-5 text-white" />}
-      {toast.type === 'info' && <Info className="w-5 h-5 text-white" />}
+      {toast.type === 'success' && <CheckCircle aria-hidden className="w-5 h-5 text-success shrink-0" />}
+      {toast.type === 'error' && <AlertTriangle aria-hidden className="w-5 h-5 text-danger shrink-0" />}
+      {toast.type === 'info' && <Info aria-hidden className="w-5 h-5 text-accent shrink-0" />}
       <span className="font-medium text-sm">{toast.message}</span>
-      <button onClick={hideToast} aria-label="Dismiss notification"><X className="w-4 h-4 opacity-70 hover:opacity-100" /></button>
+      <button onClick={hideToast} aria-label="Dismiss notification" className="text-ink-subtle hover:text-ink-strong"><X className="w-4 h-4" /></button>
     </div>
   );
 };
@@ -128,25 +135,34 @@ const Layout = ({ children }: React.PropsWithChildren<{}>) => {
   const pull = usePullToRefresh(mainRef);
 
   return (
-    <div className="flex h-dvh w-full bg-slate-50 dark:bg-slate-900 overflow-hidden">
+    <div className="flex h-dvh w-full bg-surface overflow-hidden">
+      {/* SQEM-544 — skip link, first in the tab order, visible only on focus. A button, not
+          `href="#main"`: under HashRouter a fragment link is a route change. */}
+      <button
+        type="button"
+        onClick={() => mainRef.current?.focus()}
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[300] focus:px-4 focus:py-2 focus:rounded-xl focus:bg-brand-600 focus:text-white focus:text-sm focus:font-semibold"
+      >
+        Skip to content
+      </button>
       <Sidebar mobileOpen={mobileMenuOpen} setMobileOpen={setMobileMenuOpen} />
 
       <div className="flex-1 flex flex-col h-full relative overflow-hidden">
          {/* Mobile Header */}
-         <div className="md:hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between shrink-0 z-20">
-            <div className="font-bold text-lg text-slate-900 dark:text-slate-100 flex items-center gap-2">
+         <div className="md:hidden bg-surface-raised border-b border-line-strong p-4 flex items-center justify-between shrink-0 z-20">
+            <div className="font-bold text-lg text-ink-strong flex items-center gap-2">
               <img src="/logo-favicon-V2.png" alt="sqemes" className="w-8 h-8 rounded-lg" />
               sqemes
             </div>
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              className="p-2 text-ink-muted hover:bg-surface-sunken rounded-lg transition-colors"
             >
               <Menu className="w-6 h-6" />
             </button>
          </div>
 
-         <main ref={mainRef} className="flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain scroll-smooth bg-slate-50 dark:bg-slate-900">
+         <main ref={mainRef} id="main-content" tabIndex={-1} className="focus:outline-none flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain scroll-smooth bg-surface">
             <PullToRefreshIndicator {...pull} />
             <ErrorBoundary>
               {children}
@@ -176,35 +192,35 @@ const NoWorkspaceScreen = () => {
   if (isLoading) return <LoadingScreen />;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-surface flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-4">
             <img src="/logo-favicon-V2.png" alt="sqemes" className="w-10 h-10 rounded-xl shadow-soft" />
-            <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">sqemes</span>
+            <span className="text-2xl font-bold text-ink-strong">sqemes</span>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">{IS_SELF_HOSTED ? 'No workspace yet' : 'Create Your First Workspace'}</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">{IS_SELF_HOSTED ? 'Ask an administrator of this instance to invite you to a workspace.' : 'A workspace is where your team collaborates on prompts.'}</p>
+          <h2 className="font-display text-xl font-semibold text-ink-strong">{IS_SELF_HOSTED ? 'No workspace yet' : 'Create Your First Workspace'}</h2>
+          <p className="text-ink-muted text-sm mt-2">{IS_SELF_HOSTED ? 'Ask an administrator of this instance to invite you to a workspace.' : 'A workspace is where your team collaborates on prompts.'}</p>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-700 p-8">
+        <div className="bg-surface-raised rounded-2xl shadow-soft border border-line p-8">
           {/* SQEM-121 — self-host is single-instance: orphaned users can't create a workspace, only be invited */}
           {!IS_SELF_HOSTED && <form onSubmit={handleCreate} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Workspace Name</label>
-              <input
+              <label htmlFor="app-workspace-name" className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-2">Workspace Name</label>
+              <input id="app-workspace-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="My Team"
                 required
-                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                className="w-full px-4 py-3 border border-line-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all bg-surface-field text-ink-strong placeholder:text-ink-subtle"
               />
             </div>
             <button
               type="submit"
               disabled={creating || !name.trim()}
-              className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4" />
               {creating ? 'Creating...' : 'Create Workspace'}
@@ -212,7 +228,7 @@ const NoWorkspaceScreen = () => {
           </form>}
           <button
             onClick={() => signOut()}
-            className="w-full mt-4 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+            className="w-full mt-4 py-3 text-ink-muted hover:text-ink-strong text-sm font-medium flex items-center justify-center gap-2 transition-colors"
           >
             <LogOut className="w-4 h-4" />
             Sign Out
@@ -258,7 +274,7 @@ const AppRoutes = () => {
   if (noWorkspace) return <NoWorkspaceScreen />;
   // SQEM-057/083 — gate non-managed workspaces with no active/trialing subscription
   // (never-subscribed or lapsed) until they (re)subscribe or fix payment.
-  if (workspace.id && needsSubscriptionGate(workspace)) return <ChoosePlanScreen />;
+  if (workspace.id && needsSubscriptionGate(workspace)) return <Suspense fallback={<LoadingScreen />}><ChoosePlanScreen /></Suspense>;
 
   return (
     <Suspense fallback={<LoadingScreen />}>
@@ -305,6 +321,8 @@ const AppRoutes = () => {
         <Route path="/chat-history" element={<Navigate to="/chat" replace />} />
         <Route path="/library" element={<LayoutPage><Library /></LayoutPage>} />
         <Route path="/settings" element={<LayoutPage><Settings /></LayoutPage>} />
+        <Route path="/design" element={<LayoutPage><DesignSystem /></LayoutPage>} />
+        <Route path="/overview" element={<LayoutPage><Overview /></LayoutPage>} />
         <Route path="/workspace" element={<Navigate to="/settings" state={{ initialTab: 'team' }} replace />} />
         <Route path="/invite/:token" element={<InviteAccept />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -317,8 +335,10 @@ const AppRoutes = () => {
 
 // Sets the browser tab title to "<Page> - sqemes" from the current route.
 const pageTitleForPath = (pathname: string): string => {
-  if (pathname === '/') return 'Dashboard';
+  if (pathname === '/') return 'Start'; // SQEM-550 (a)
   if (pathname.startsWith('/chat')) return 'Chat';
+  if (pathname.startsWith('/design')) return 'Design system';
+  if (pathname === '/overview') return 'Overview'; // SQEM-552
   if (pathname.startsWith('/playbooks/') || pathname.startsWith('/prompts/')) return 'Playbook editor';
   if (pathname.startsWith('/personas/')) return 'Persona editor';
   if (pathname.startsWith('/personas')) return 'Personas'; // SQEM-388 — was missing, tab said just "sqemes"
@@ -368,7 +388,8 @@ const AuthenticatedApp = () => {
  */
 const PageLoading = () => (
   <div className="flex items-center justify-center py-24" role="status" aria-label="Loading">
-    <img src="/logo-favicon-V2.png" alt="" className="w-8 h-8 rounded-lg opacity-60 animate-pulse" />
+    {/* SQEM-554 (a) — no pulse for those who asked the system for less motion. */}
+    <img src="/logo-favicon-V2.png" alt="" className="w-8 h-8 rounded-lg opacity-60 motion-safe:animate-pulse" />
   </div>
 );
 
@@ -379,10 +400,10 @@ const LayoutPage = ({ children }: { children: React.ReactNode }) => (
 );
 
 const LoadingScreen = () => (
-  <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+  <div className="min-h-screen bg-surface flex items-center justify-center">
     <div className="text-center">
-      <img src="/logo-favicon-V2.png" alt="sqemes" className="w-10 h-10 rounded-xl shadow-soft mx-auto mb-4 animate-pulse" />
-      <p className="text-slate-400 dark:text-slate-500 text-sm font-medium">Loading...</p>
+      <img src="/logo-favicon-V2.png" alt="sqemes" className="w-10 h-10 rounded-xl shadow-soft mx-auto mb-4 motion-safe:animate-pulse" />
+      <p className="text-ink-subtle text-sm font-medium" role="status">Loading…</p>
     </div>
   </div>
 );

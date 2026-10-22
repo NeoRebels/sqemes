@@ -6,22 +6,21 @@
 // `AppProvider.loadWorkspaceData` would put it in the critical path of every workspace load to serve
 // two routes, and that load is the one thing in the app nobody wants to make slower or riskier.
 // If personas ever reach the Dashboard, this is the moment to reconsider — not before.
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { Plus, Loader2, Route as RouteIcon, Edit, Copy, FolderDown, Trash2, Sparkles, Upload, Star, Bot } from 'lucide-react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import { Plus, Loader2, Sparkles, Upload, Star, Bot } from 'lucide-react';
 import { useWorkspace, useUI, usePrompts, useData } from '../store';
 import { can } from '../lib/permissions';
 import { fetchPersonas, duplicatePersona, deletePersona, setPersonaFavorite, updatePersona } from '../lib/api/personas';
 import { collectWorkspaceTags } from '../lib/workspaceTags';
 import TagFilter from '../components/ui/TagFilter';
-import TagEditor from '../components/ui/TagEditor';
 import { fetchRestrictedPersonaIds } from '../lib/api/personaAccess';
 import AccessBadge from '../components/ui/AccessBadge';
 import type { AccessBadgeMode } from '../lib/accessBadge';
 import { buildBundle, downloadBlob, readBundle, importBundle } from '../lib/templateBundle';
 import type { BundleManifest } from '../lib/bundleFormat';
 import type { Persona } from '../types';
-import TemplateCard from '../components/ui/TemplateCard';
+import PersonaPreview from '../components/PersonaPreview';
 import EmptyState from '../components/ui/EmptyState';
 import SearchInput from '../components/ui/SearchInput';
 import PageHeader from '../components/ui/PageHeader';
@@ -34,41 +33,70 @@ import { errorMessage } from '../lib/errorMessage';
 
 const toSlug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'persona';
 
-/** The routes of a persona, as chips. */
-function RouteChips({ persona }: { persona: Persona }) {
-  // Three, then a count. ⚠️ The count alone was the other candidate and is worse: "7 templates"
-  // tells you a persona is big, the chips tell you what it *does*, which is the question somebody
-  // scanning an archive is actually asking.
-  const shown = persona.routes.slice(0, 3);
-  const rest = persona.routes.length - shown.length;
-
-  if (persona.routes.length === 0) {
-    return (
-      <span className="text-2xs text-slate-400 dark:text-slate-500 italic">
-        No routes yet — this persona loads nothing
-      </span>
-    );
-  }
-
+/**
+ * SQEM-554 (b) — one row of the list (redesign C, the same row as the Playbooks page, SQEM-550 b):
+ * title, "N playbooks · tag", access, favourite. The title is the row's button and its `::after`
+ * covers the row (the SQEM-538 row pattern); checkbox and star sit above it with `relative z-10`.
+ * Every action that used to be on the card is in the preview (`components/PersonaPreview.tsx`).
+ */
+const PersonaRow = memo(function PersonaRow({
+  persona,
+  canEdit,
+  accessMode,
+  active,
+  selected,
+  onSelect,
+  onToggleSelect,
+  onFavorite,
+}: {
+  persona: Persona;
+  canEdit: boolean;
+  accessMode?: AccessBadgeMode;
+  active: boolean;
+  selected: boolean;
+  onSelect: (id: string) => void;
+  onToggleSelect: (id: string) => void;
+  onFavorite: (persona: Persona) => void;
+}) {
+  const n = persona.routes.length;
   return (
-    <div className="flex items-center gap-1 flex-wrap min-w-0">
-      {shown.map(r => (
-        <span
-          key={r.templateId}
-          className="text-2xs font-medium px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 max-w-[10rem] truncate"
-          title={r.condition || r.templateTitle}
-        >
-          {r.templateTitle || 'Untitled'}
-        </span>
-      ))}
-      {rest > 0 && (
-        <span className="text-2xs font-semibold px-2 py-1 rounded-lg text-slate-400 dark:text-slate-500">
-          +{rest}
-        </span>
+    <li className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-control transition-colors ${active ? 'bg-accent-soft' : 'hover:bg-surface-sunken'}`}>
+      {canEdit && (
+        // SQEM-168 — padded label gives the 16px checkbox a hit margin over the stretched row button.
+        <label aria-label={`Select ${persona.title}`} className="relative z-10 p-1 -m-1 cursor-pointer">
+          <Checkbox
+            checked={selected}
+            onChange={() => onToggleSelect(persona.id)}
+            align="center"
+            className={selected ? 'opacity-100' : 'reveal-on-hover'}
+          />
+        </label>
       )}
-    </div>
+      <Bot aria-hidden className="w-4 h-4 text-accent shrink-0" />
+      <button
+        type="button"
+        onClick={() => onSelect(persona.id)}
+        aria-current={active ? 'true' : undefined}
+        className="flex-1 min-w-0 text-left after:absolute after:inset-0 after:rounded-control focus:outline-none"
+      >
+        <span className="block text-sm font-semibold text-ink-strong truncate">{persona.title}</span>
+        <span className={`block text-xs truncate ${n === 0 ? 'text-ink-subtle italic' : 'text-ink-muted'}`}>
+          {n === 0 ? 'Loads nothing yet' : `${n} playbook${n === 1 ? '' : 's'}`}{persona.tags[0] ? ` · ${persona.tags[0]}` : ''}
+        </span>
+      </button>
+      {accessMode && <span className="relative z-10"><AccessBadge mode={accessMode} /></span>}
+      <button
+        type="button"
+        onClick={() => onFavorite(persona)}
+        aria-pressed={!!persona.isFavorite}
+        aria-label={persona.isFavorite ? `Remove ${persona.title} from favourites` : `Add ${persona.title} to favourites`}
+        className="hit-24 relative z-10 p-1 text-ink-subtle hover:text-amber-400 transition-colors"
+      >
+        <Star className={`w-4 h-4 ${persona.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`} />
+      </button>
+    </li>
   );
-}
+});
 
 export default function Personas() {
   const { workspace, currentUser } = useWorkspace();
@@ -90,6 +118,15 @@ export default function Personas() {
   const [importing, setImporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  // SQEM-554 (b) — the selected persona lives in the URL (`?id=`), as on the Playbooks page: a link
+  // to one persona works, and Back returns to the list on a phone.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedParam = searchParams.get('id');
+  const selectPersona = useCallback((id: string) => {
+    setSearchParams(prev => { const next = new URLSearchParams(prev); next.set('id', id); return next; });
+  }, [setSearchParams]);
+  const backToList = () => setSearchParams(prev => { const next = new URLSearchParams(prev); next.delete('id'); return next; });
+  const visiblePlaybookIds = useMemo(() => new Set(prompts.map(p => p.id)), [prompts]);
 
   const canEdit = can(currentUser, workspace, 'prompts:edit');
 
@@ -163,6 +200,9 @@ export default function Personas() {
     }
   };
 
+  const selectedPersona = visible.find(p => p.id === selectedParam) ?? visible[0] ?? null;
+  const showPreviewOnMobile = !!selectedParam && selectedPersona?.id === selectedParam;
+
   const visibleIds = visible.map(p => p.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.has(id));
 
@@ -211,7 +251,7 @@ export default function Personas() {
       showToast(
         templates.length
           ? `Downloaded ${toExport.length} persona${toExport.length === 1 ? '' : 's'} with ${templates.length} playbook${templates.length === 1 ? '' : 's'}`
-          : 'Downloaded — this persona has no routes, so no playbooks travelled with it',
+          : 'Downloaded — this persona uses no playbooks, so none travelled with it',
         'success',
       );
     } catch (err: any) {
@@ -314,7 +354,7 @@ export default function Personas() {
             <input ref={importInputRef} type="file" accept=".zip,.sqemes" onChange={handleImportFile} className="hidden" />
             <button
               onClick={() => importInputRef.current?.click()}
-              title="Import a .sqemes.zip bundle — personas arrive with the playbooks they route to"
+              title="Import a .sqemes.zip bundle — personas arrive with the playbooks they use"
               className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 px-4 py-2.5 rounded-xl font-medium text-sm transition-all justify-center"
             >
               <Upload className="w-4 h-4" /> Import
@@ -364,7 +404,7 @@ export default function Personas() {
       )}
 
       {personas === null && (
-        <div className="flex items-center gap-2 text-slate-400 text-sm py-20 justify-center">
+        <div className="flex items-center gap-2 text-ink-subtle text-sm py-20 justify-center">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading personas…
         </div>
       )}
@@ -374,14 +414,14 @@ export default function Personas() {
           screen a new user sees is the worst possible place to assume the word is self-evident. */}
       {personas !== null && personas.length === 0 && (
         <EmptyState
-          icon={<Bot className="w-8 h-8 text-brand-400" />}
-          iconWrapClassName="bg-brand-50 dark:bg-brand-900/20"
+          icon={<Bot className="w-8 h-8" />}
+          tone="brand"
           title="No personas yet"
           description="A persona bundles the playbooks one role needs, with a condition for each."
           extra={
-            <div className="max-w-md mx-auto mt-4 text-left text-sm text-slate-500 dark:text-slate-400 space-y-2">
+            <div className="max-w-md mx-auto mt-4 text-left text-sm text-ink-muted space-y-2">
               <p>
-                <span className="font-semibold text-slate-700 dark:text-slate-200">Example — “Sales”:</span>{' '}
+                <span className="font-semibold text-ink">Example — “Sales”:</span>{' '}
                 the offer-layout skill when a quote is being written, the workshop playbook when a
                 workshop is offered, the use-case generator when somebody asks what AI could do for them.
               </p>
@@ -404,104 +444,48 @@ export default function Personas() {
 
       {personas !== null && personas.length > 0 && visible.length === 0 && (
         <EmptyState
-          icon={showFavoritesOnly ? <Star className="w-8 h-8 text-amber-300" /> : <Bot className="w-8 h-8 text-slate-400" />}
+          icon={showFavoritesOnly ? <Star className="w-8 h-8 text-amber-300" /> : <Bot className="w-8 h-8" />}
           title={showFavoritesOnly ? 'No favourite personas' : 'Nothing matches'}
           description={showFavoritesOnly ? 'Star personas to see them here.' : 'No persona matches your search or filters.'}
         />
       )}
 
+      {/* SQEM-554 (b) — redesign C: the list on the left, the selected persona on the right, as on the
+          Playbooks page. Below `lg` one at a time: the list, or (with ?id=) the preview with a way back. */}
       {visible.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {visible.map(persona => (
-            <TemplateCard
-              key={persona.id}
-              selected={selectedIds.has(persona.id)}
-              topLeft={canEdit && (
-                /* SQEM-168's padding trick: the label gives the 16px checkbox a hit margin over the
-                   stretched card link, which would otherwise swallow the click. */
-                <label
-                  aria-label={`Select ${persona.title}`}
-                  onClick={e => e.stopPropagation()}
-                  className="absolute top-1 left-1 z-20 p-1.5 cursor-pointer"
-                >
-                  <Checkbox
-                    checked={selectedIds.has(persona.id)}
-                    onChange={() => toggleSelect(persona.id)}
-                    align="center"
-                    className={`bg-white dark:bg-slate-800 shadow transition-opacity ${selectedIds.has(persona.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
-                  />
-                </label>
-              )}
-              topRight={(
-                /* SQEM-393 — the star, exactly where the playbook card has it. */
-                <button
-                  onClick={e => { e.preventDefault(); e.stopPropagation(); void toggleFavorite(persona); }}
-                  className="absolute top-1.5 right-1.5 z-20 p-3 text-slate-300 hover:text-amber-400 hover:scale-110 transition-all focus:outline-none"
-                  title={persona.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                >
-                  <Star className={`w-5 h-5 ${persona.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`} />
-                </button>
-              )}
-              /* SQEM-393 — the tag above the title: chip + "+ tag" while there is none and the person may edit. */
-              badges={(
-                <TagEditor
-                  tags={persona.tags.slice(0, 1)}
-                  available={canEdit && persona.tags.length === 0 ? workspace.tags : []}
-                  canEdit={canEdit}
-                  onAdd={tag => void setTag(persona, tag)}
-                  onRemove={() => void setTag(persona, null)}
-                />
-              )}
-              title={persona.title}
-              /* SQEM-389 — the title opens the persona in Chat, like a playbook card; edit is the pencil. */
-              titleHref={`/personas/${persona.id}`}
-              description={persona.description}
-              /* Title → description → what it routes to → what you can do with it. The chips answer
-                 "what does this persona actually do", which continues the description rather than
-                 classifying the card or acting on it. */
-              extra={<RouteChips persona={persona} />}
-              footerLeft={canEdit ? (
-                <>
-                  <Link to={`/personas/${persona.id}/edit`} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors" title="Edit">
-                    <Edit className="w-4 h-4" />
-                  </Link>
-                  <button
-                    onClick={e => { e.preventDefault(); void handleDuplicate(persona); }}
-                    className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-                    title="Duplicate"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={e => { e.preventDefault(); void handleExport([persona]); }}
-                    className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-                    title="Download persona with its playbooks (.sqemes.zip)"
-                  >
-                    <FolderDown className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={e => { e.preventDefault(); setPendingDelete([persona]); }}
-                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </>
-              ) : undefined}
-              footerRight={
-                <span className="flex items-center gap-2 shrink-0">
-                  {/* SQEM-330 — the same badge as a restricted template card, in the same words. A
-                      second vocabulary for one state is how two screens begin disagreeing about what
-                      "restricted" means. */}
-                  <AccessBadge mode={restrictedIds.get(persona.id)} />
-                  <span className="text-2xs text-slate-400 dark:text-slate-500 flex items-center gap-1" title={`${persona.routes.length} route${persona.routes.length === 1 ? '' : 's'}`}>
-                    <RouteIcon className="w-3 h-3" />
-                    {persona.routes.length}
-                  </span>
-                </span>
-              }
-            />
-          ))}
+        <div className="lg:grid lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-6 lg:items-start">
+          <ul aria-label="Personas" className={`rounded-card border border-line bg-surface-raised p-2 space-y-0.5 ${showPreviewOnMobile ? 'hidden lg:block' : ''}`}>
+            {visible.map(persona => (
+              <PersonaRow
+                key={persona.id}
+                persona={persona}
+                canEdit={canEdit}
+                accessMode={restrictedIds.get(persona.id)}
+                active={selectedPersona?.id === persona.id}
+                selected={selectedIds.has(persona.id)}
+                onSelect={selectPersona}
+                onToggleSelect={toggleSelect}
+                onFavorite={p => void toggleFavorite(p)}
+              />
+            ))}
+          </ul>
+          {selectedPersona && (
+            <div className={`lg:sticky lg:top-4 ${showPreviewOnMobile ? '' : 'hidden lg:block'}`}>
+              <PersonaPreview
+                persona={selectedPersona}
+                canEdit={canEdit}
+                accessMode={restrictedIds.get(selectedPersona.id)}
+                workspaceTags={workspace.tags}
+                visiblePlaybookIds={visiblePlaybookIds}
+                onDuplicate={p => void handleDuplicate(p)}
+                onExport={p => void handleExport([p])}
+                onDelete={p => setPendingDelete([p])}
+                onSetTag={(p, tag) => void setTag(p, tag)}
+                onFavorite={p => void toggleFavorite(p)}
+                onBack={backToList}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -514,7 +498,7 @@ export default function Personas() {
         onCreated={persona => {
           setWizardOpen(false);
           setPersonas(prev => [persona, ...(prev ?? [])]);
-          showToast('Persona generated — review the routes before using it', 'success');
+          showToast('Persona generated — review its playbooks before using it', 'success');
           navigate(`/personas/${persona.id}/edit`);
         }}
       />
@@ -534,11 +518,11 @@ export default function Personas() {
       >
         <p>
           Adds{' '}
-          <span className="font-semibold text-slate-600 dark:text-slate-300">
+          <span className="font-semibold text-ink">
             {(importData?.manifest.personas || []).length} persona{(importData?.manifest.personas || []).length === 1 ? '' : 's'}
           </span>{' '}
           and{' '}
-          <span className="font-semibold text-slate-600 dark:text-slate-300">
+          <span className="font-semibold text-ink">
             {(importData?.manifest.templates || []).length} playbook{(importData?.manifest.templates || []).length === 1 ? '' : 's'}
           </span>
           {(importData?.manifest.files || []).length ? ` plus ${(importData?.manifest.files || []).length} context file${(importData?.manifest.files || []).length === 1 ? '' : 's'}` : ''} to {workspace?.name}.
@@ -558,8 +542,8 @@ export default function Personas() {
         onClose={() => setPendingDelete(null)}
       >
         <p>
-          {pendingDelete && pendingDelete.length > 1 ? 'The personas and their routes are' : 'The persona and its routes are'} removed.{' '}
-          <span className="font-semibold text-slate-600 dark:text-slate-300">The playbooks themselves are not touched</span> — they keep working on their own.
+          {pendingDelete && pendingDelete.length > 1 ? 'The personas are removed, with the lists of playbooks they use.' : 'The persona is removed, with the list of playbooks it uses.'}{' '}
+          <span className="font-semibold text-ink">The playbooks themselves are not touched</span> — they keep working on their own.
         </p>
       </ConfirmModal>
     </div>

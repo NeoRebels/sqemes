@@ -91,10 +91,10 @@ const ResetPassword = () => {
 
   if (phase === 'verifying') {
     return (
-      <ScrollScreen className="bg-slate-50 dark:bg-slate-900">
+      <ScrollScreen className="bg-surface">
         <div className="text-center">
           <img src="/logo-favicon-V2.png" alt="sqemes" className="w-10 h-10 rounded-xl shadow-soft mx-auto mb-4 animate-pulse" />
-          <p className="text-slate-400 dark:text-slate-500 text-sm font-medium">Verifying your reset link…</p>
+          <p className="text-ink-subtle text-sm font-medium">Verifying your reset link…</p>
         </div>
       </ScrollScreen>
     );
@@ -102,14 +102,14 @@ const ResetPassword = () => {
 
   if (phase === 'link_error') {
     return (
-      <ScrollScreen className="bg-slate-50 dark:bg-slate-900">
-        <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-700 p-8 text-center">
-          <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Reset link invalid or expired</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">This password reset link is no longer valid. Request a new one and use it right away.</p>
+      <ScrollScreen className="bg-surface">
+        <div className="w-full max-w-md bg-surface-raised rounded-2xl shadow-soft border border-line p-8 text-center">
+          <AlertTriangle className="w-12 h-12 text-warning mx-auto mb-4" />
+          <h2 className="font-display text-xl font-semibold text-ink-strong mb-2">Reset link invalid or expired</h2>
+          <p className="text-ink-muted text-sm mb-6">This password reset link is no longer valid. Request a new one and use it right away.</p>
           <button
             onClick={() => { window.location.hash = '#/'; }}
-            className="w-full py-3 bg-brand-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-brand-200 dark:shadow-none hover:bg-brand-700 transition-all"
+            className="w-full py-3 bg-accent-strong text-white rounded-xl font-bold text-sm shadow-lg hover:opacity-90 transition-all"
           >
             Back to sign in
           </button>
@@ -120,38 +120,38 @@ const ResetPassword = () => {
 
   if (success) {
     return (
-      <ScrollScreen className="bg-slate-50 dark:bg-slate-900">
-        <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-700 p-8 text-center">
-          <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Password Updated</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">Redirecting you to sign in…</p>
+      <ScrollScreen className="bg-surface">
+        <div className="w-full max-w-md bg-surface-raised rounded-2xl shadow-soft border border-line p-8 text-center">
+          <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
+          <h2 className="font-display text-xl font-semibold text-ink-strong mb-2">Password Updated</h2>
+          <p className="text-ink-muted text-sm">Redirecting you to sign in…</p>
         </div>
       </ScrollScreen>
     );
   }
 
   return (
-    <ScrollScreen className="bg-slate-50 dark:bg-slate-900">
+    <ScrollScreen className="bg-surface">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img src="/logo-favicon-V2.png" alt="sqemes" className="w-12 h-12 rounded-xl shadow-soft mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Set new password</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Choose a strong password for your account.</p>
+          <h1 className="font-display text-2xl font-semibold text-ink-strong">Set new password</h1>
+          <p className="text-ink-muted mt-1 text-sm">Choose a strong password for your account.</p>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-700 p-8">
+        <div className="bg-surface-raised rounded-2xl shadow-soft border border-line p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+              <label htmlFor="reset-password-new-password" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">
                 New Password
               </label>
               <div className="relative">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-subtle">
                   <Lock className="w-4 h-4" />
                 </div>
-                <input
+                <input id="reset-password-new-password" autoComplete="new-password"
                   type={showPassword ? 'text' : 'password'}
-                  className="w-full pl-10 pr-10 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:border-brand-500 focus:bg-white dark:focus:bg-slate-700 transition-colors"
+                  className="w-full pl-10 pr-10 py-3 bg-surface-sunken border border-line-strong rounded-xl text-sm text-ink-strong placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:border-accent focus:bg-surface-field transition-colors"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="At least 8 characters"
@@ -161,7 +161,7 @@ const ResetPassword = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -169,16 +169,16 @@ const ResetPassword = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+              <label htmlFor="reset-password-confirm-password" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">
                 Confirm Password
               </label>
               <div className="relative">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-subtle">
                   <Lock className="w-4 h-4" />
                 </div>
-                <input
+                <input id="reset-password-confirm-password" autoComplete="new-password"
                   type={showPassword ? 'text' : 'password'}
-                  className="w-full pl-10 pr-10 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:border-brand-500 focus:bg-white dark:focus:bg-slate-700 transition-colors"
+                  className="w-full pl-10 pr-10 py-3 bg-surface-sunken border border-line-strong rounded-xl text-sm text-ink-strong placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:border-accent focus:bg-surface-field transition-colors"
                   value={confirm}
                   onChange={e => setConfirm(e.target.value)}
                   placeholder="Repeat your password"
@@ -188,13 +188,13 @@ const ResetPassword = () => {
             </div>
 
             {error && (
-              <p className="text-xs text-red-600 font-medium">{error}</p>
+              <p className="text-xs text-danger font-medium">{error}</p>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-brand-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-brand-200 dark:shadow-none hover:bg-brand-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+              className="w-full py-3 bg-accent-strong text-white rounded-xl font-bold text-sm shadow-lg hover:opacity-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-2"
             >
               {loading ? 'Updating...' : 'Update Password'}
             </button>

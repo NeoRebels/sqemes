@@ -22,7 +22,7 @@
 // drift, and those four are on the primitive now.
 //
 // ⚠️ **Violet still exists, and it means something.** It marks the *assistant* kind (against
-// prompt=brand, skill=emerald), the *managed* plan, one of six avatar tints and one category colour.
+// prompt=brand, skill=petrol since SQEM-547), the *managed* plan, one of six avatar tints and one category colour.
 // ⛔ Those are categorical, not accent — a `tone` prop here would let that meaning leak back into a
 // control that has none. If a checkbox ever needs to look different, the reason will be its context,
 // and the context is where it belongs.

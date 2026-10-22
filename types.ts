@@ -57,6 +57,8 @@ export interface Workspace {
   brandProfile?: BrandProfile;
   /** SQEM-142 — default access (roles) applied to newly-created templates. Empty/undefined = open to everyone. */
   defaultTemplateAccess?: UserRole[];
+  /** SQEM-534 — new playbooks and personas start with "Who can edit" restricted to their creator (and admins). */
+  defaultEditRestricted?: boolean;
 }
 
 /** SQEM-106 — workspace-level brand context, seeded from the onboarding wizard. */
@@ -251,6 +253,16 @@ export interface ChatSession {
   ownerAvatar?: string;
 }
 
+/** SQEM-551 — see lib/playbookRef.ts for what each field means and how it is capped. */
+export interface PlaybookRefField { name: string; value: string }
+export interface PlaybookRef {
+  id: string;
+  title: string;
+  kind: PromptKind;
+  fields: PlaybookRefField[];
+  edited: boolean;
+}
+
 export interface StoredChatMessage {
   id: string;
   sessionId: string;
@@ -261,6 +273,10 @@ export interface StoredChatMessage {
   userId?: string;
   userName?: string;
   userAvatar?: string;
+  /** SQEM-551 — user message: the prompt playbook it started from (lib/playbookRef.ts). */
+  playbookRef?: PlaybookRef | null;
+  /** SQEM-551 — assistant message: what the model loaded for this answer. */
+  loadedTemplateIds?: string[];
 }
 
 export interface Invitation {

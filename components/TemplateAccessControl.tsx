@@ -1,5 +1,5 @@
 // SQEM-142 Phase 2 — template access control. SQEM-143 v2 — per-user rows.
-// Used in the template editor (per template) and Settings → General (the workspace default).
+// Used in the template editor (per template) and Settings → Security (the workspace default; General until SQEM-480).
 //
 // SQEM-210/212 — three states, and the difference between two of them is a row, not a list:
 //   everyone    no rows at all
@@ -181,6 +181,9 @@ export function TemplateAccessControl({
   privateDisabledReason,
   ownerId,
   multiSeat = false,
+  variant = 'access',
+  readOnly = false,
+  readOnlyReason,
 }: {
   value: TemplateAccessValue;
   onChange: (v: TemplateAccessValue) => void;
@@ -218,6 +221,13 @@ export function TemplateAccessControl({
    *  "Restrict access" even while nobody else is there yet: on a multi-seat plan the absence of
    *  colleagues is a matter of time, not a reason to withhold the control. */
   multiSeat?: boolean;
+  /** SQEM-473 — the same control for WHO MAY CHANGE it. "Everyone" then means anyone who may edit at
+   *  all (admins, and editors who can see it); the list offers editors only — admins always may, and
+   *  members never do, so ticking either would promise something the rule does not do. */
+  variant?: 'access' | 'edit';
+  /** SQEM-473 — shown but not changeable (only the owner or an admin sets who may edit). */
+  readOnly?: boolean;
+  readOnlyReason?: string;
 }) {
   const [memberSearch, setMemberSearch] = useState('');
 
@@ -236,8 +246,8 @@ export function TemplateAccessControl({
   const optionClass = (active: boolean) =>
     `w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-sm text-left transition-all ${
       active
-        ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-slate-900 dark:text-slate-100'
-        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+        ? 'border-accent bg-accent-soft text-ink-strong'
+        : 'border-line-strong text-ink hover:bg-surface-sunken'
     }`;
 
   // ⚠️ SQEM-292 — **admins and editors are back in this list, and leaving them out would now be a
@@ -249,9 +259,10 @@ export function TemplateAccessControl({
   // gone, an admin has to be nameable like anyone else.
   // SQEM-300 — minus the owner, who cannot be granted what they already have.
   const grantableMembers = useMemo(
-    () => (members ?? []).filter(m => !ownerId || m.id !== ownerId),
-    [members, ownerId],
+    () => (members ?? []).filter(m => (!ownerId || m.id !== ownerId) && (variant !== 'edit' || m.role === 'editor')),
+    [members, ownerId, variant],
   );
+  const isEdit = variant === 'edit';
   // What the control shows as chosen. Derived rather than read straight off `value`, so a row
   // written before SQEM-300 cannot make the counter disagree with the ticks below it — there would
   // be no member left to render for it.
@@ -296,16 +307,16 @@ export function TemplateAccessControl({
   }, [grantableMembers, memberSearch]);
 
   return (
-    <div>
-      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</label>
-      <p className="text-xs text-slate-400 dark:text-slate-500 mb-3">{hint}</p>
+    <fieldset disabled={readOnly} className={readOnly ? 'opacity-70' : undefined}>
+      <legend className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1">{label}</legend>
+      <p className="text-xs text-ink-subtle mb-3">{readOnly && readOnlyReason ? readOnlyReason : hint}</p>
       {/* SQEM-238 — an old role grant this control cannot list. Saying nothing is what produced the
           bug: the template read as "Only me" while every editor could open it. The warning names
           the stored rule and what Save will do with it, so replacing it is a choice. */}
       {legacyRoles.length > 0 && (
-        <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5">
-          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-          <p className="text-xs text-amber-800 dark:text-amber-200">
+        <div className="mb-3 flex items-start gap-2 rounded-xl border border-warning/40 bg-warning-soft px-3 py-2.5">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-warning" />
+          <p className="text-xs text-ink">
             This playbook carries an older rule granting{' '}
             <span className="font-semibold">{legacyRoles.join(' & ')}s</span> as a group, which this
             list cannot show — it grants roles, not people.{' '}
@@ -317,11 +328,11 @@ export function TemplateAccessControl({
         <button type="button" onClick={() => setMode('everyone')} className={optionClass(value.mode === 'everyone')}>
           <Users className="w-4 h-4 shrink-0" />
           <span>
-            <span className="font-semibold">Everyone</span>
-            <span className="block text-xs text-slate-400">All workspace members can use it</span>
+            <span className="font-semibold">{isEdit ? 'Anyone who may edit' : 'Everyone'}</span>
+            <span className="block text-xs text-ink-subtle">{isEdit ? 'Admins, and editors who can see it' : 'All workspace members can use it'}</span>
           </span>
         </button>
-        {allowPrivate && (
+        {allowPrivate && !isEdit && (
           <button
             type="button"
             onClick={() => { if (!privateDisabledReason) setMode('private'); }}
@@ -337,7 +348,7 @@ export function TemplateAccessControl({
                   does the sentence. If it ever says "only" again, check `can_access_template`.
                   SQEM-240 — when the template has no owner the option states why it is unavailable
                   instead of quietly vanishing. */}
-              <span className="block text-xs text-slate-400">
+              <span className="block text-xs text-ink-subtle">
                 {privateDisabledReason || 'Nobody else — not admins, not editors'}
               </span>
             </span>
@@ -347,9 +358,11 @@ export function TemplateAccessControl({
           <button type="button" onClick={() => setMode('restricted')} className={optionClass(value.mode === 'restricted')}>
             <Lock className="w-4 h-4 shrink-0" />
             <span>
-              <span className="font-semibold">{members ? 'Restrict access' : 'Restricted by default'}</span>
-              <span className="block text-xs text-slate-400">
-                {members
+              <span className="font-semibold">{isEdit ? 'Only selected people' : members ? 'Restrict access' : 'Restricted by default'}</span>
+              <span className="block text-xs text-ink-subtle">
+                {isEdit
+                  ? 'Pick who may change it — everyone who can see it can still use it'
+                  : members
                   ? 'Pick the people who can use it'
                   : 'New playbooks start restricted — choose who can use each one in the playbook itself'}
               </span>
@@ -363,7 +376,7 @@ export function TemplateAccessControl({
               workspace default there are no groups and no members, and a switcher over two empty
               lists is furniture. */}
           {groups && (
-            <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 mb-1">
+            <div className="inline-flex rounded-lg border border-line-strong p-0.5 mb-1">
               {(['groups', 'people'] as const).map(t => (
                 <button
                   key={t}
@@ -371,8 +384,8 @@ export function TemplateAccessControl({
                   onClick={() => setTab(t)}
                   className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                     tab === t
-                      ? 'bg-brand-600 text-white'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      ? 'bg-accent-strong text-white'
+                      : 'text-ink-muted hover:text-ink-strong'
                   }`}
                 >
                   {t === 'groups' ? 'Groups' : 'People'}
@@ -390,15 +403,15 @@ export function TemplateAccessControl({
                    telling them there is nothing here leaves them stuck at the moment they decided to
                    act. The button is absent for editors, who cannot create groups (RLS), so they get
                    the reason instead of a control that fails. */
-                <div className="text-xs text-slate-500 dark:text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
-                  <p className="font-semibold text-slate-600 dark:text-slate-300">No groups yet</p>
+                <div className="text-xs text-ink-muted border border-dashed border-line-strong rounded-xl p-4 text-center">
+                  <p className="font-semibold text-ink">No groups yet</p>
                   <p className="mt-1">A group keeps working as the team changes — add someone once, and every playbook that group reaches follows.</p>
                   {onCreateGroup ? (
-                    <button type="button" onClick={onCreateGroup} className="mt-2 text-brand-600 dark:text-brand-400 font-semibold hover:underline">
+                    <button type="button" onClick={onCreateGroup} className="mt-2 text-accent font-semibold hover:underline">
                       Create your first group →
                     </button>
                   ) : (
-                    <p className="mt-2 text-slate-400">Ask a workspace admin to create one, or pick people instead.</p>
+                    <p className="mt-2 text-ink-subtle">Ask a workspace admin to create one, or pick people instead.</p>
                   )}
                 </div>
               ) : (
@@ -407,14 +420,14 @@ export function TemplateAccessControl({
                    read as two features. */
                 <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
                   {groups.map(g => (
-                    <label key={g.id} className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+                    <label key={g.id} className="flex items-start gap-2.5 text-sm text-ink cursor-pointer select-none">
                       <Checkbox checked={selectedGroupIds.includes(g.id)} onChange={() => toggleGroup(g.id)} />
                       <span className="min-w-0">
                         <span className="font-medium">{g.name}</span>
                         {/* The member count is the difference between picking a name and knowing what
                             it does. An empty group grants nothing, and that is worth seeing before
                             saving rather than after somebody reports missing access. */}
-                        <span className="block text-2xs text-slate-400 truncate">
+                        <span className="block text-2xs text-ink-subtle truncate">
                           {g.memberIds.length === 0 ? 'No members — grants nobody access' : `${g.memberIds.length} ${g.memberIds.length === 1 ? 'person' : 'people'}`}
                         </span>
                       </span>
@@ -429,28 +442,28 @@ export function TemplateAccessControl({
             <div>
               {grantableMembers.length > 6 && (
                 <div className="relative mb-2">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-subtle" />
                   <input
                     type="text"
                     value={memberSearch}
                     onChange={e => setMemberSearch(e.target.value)}
                     placeholder="Search people…"
-                    className="w-full pl-8 pr-2 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:ring-brand-500 focus:border-brand-500"
+                    className="w-full pl-8 pr-2 py-1.5 text-xs rounded-lg border border-line-strong bg-surface-raised text-ink focus:ring-accent focus:border-accent"
                   />
                 </div>
               )}
               <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
                 {filteredMembers.map(m => (
-                  <label key={m.id} className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+                  <label key={m.id} className="flex items-start gap-2.5 text-sm text-ink cursor-pointer select-none">
                     <Checkbox checked={selectedUserIds.includes(m.id)} onChange={() => toggleUser(m.id)} />
                     <span className="min-w-0">
                       <span className="font-medium">{m.name || m.email}</span>
-                      {m.name && <span className="block text-2xs text-slate-400 truncate">{m.email}</span>}
+                      {m.name && <span className="block text-2xs text-ink-subtle truncate">{m.email}</span>}
                     </span>
                   </label>
                 ))}
                 {filteredMembers.length === 0 && (
-                  <p className="text-2xs text-slate-400 py-1">No people match “{memberSearch}”.</p>
+                  <p className="text-2xs text-ink-subtle py-1">No people match “{memberSearch}”.</p>
                 )}
               </div>
             </div>
@@ -473,13 +486,17 @@ export function TemplateAccessControl({
               creator alone. ⛔ The condition now counts **groups as well**: a template with a group
               and no individuals was being described as "the same as Only me", which is exactly the
               untruth this comment was written about. */}
-          <p className="text-2xs text-slate-400 dark:text-slate-500 pt-1">
-            {selectedUserIds.length > 0 || selectedGroupIds.length > 0
+          <p className="text-2xs text-ink-subtle pt-1">
+            {isEdit
+              ? selectedUserIds.length > 0 || selectedGroupIds.length > 0
+                ? 'Only the editors and groups named here, plus the owner and workspace admins, may change it. A group counts for its editors; members never edit.'
+                : 'Nobody is named yet, so only the owner and workspace admins may change it.'
+              : selectedUserIds.length > 0 || selectedGroupIds.length > 0
               ? 'Only the people and groups named here, plus whoever created the playbook. Naming a person is per person — somebody who joins later does not get it automatically; a group does follow the team.'
               : 'Nobody is named yet, so this is the same as Only me — the creator alone.'}
           </p>
         </div>
       )}
-    </div>
+    </fieldset>
   );
 }

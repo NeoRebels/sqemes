@@ -40,11 +40,14 @@ export const OWNERSHIP: Record<string, Ownership> = {
   mcp_auth_codes: ws(),
   mcp_refresh_tokens: ws(),
   persona_access: ws(),
+  persona_editors: ws(),   // SQEM-473 — who may change a persona
   personas: ws(),
   prompts: ws(),
   rate_limit_counters: ws(),
   sqemes_api_keys: ws(),
   template_access: ws(),
+  template_editors: ws(),  // SQEM-473 — who may change a playbook
+  template_versions: ws(), // SQEM-477 — version history, written by a trigger only
   usage_daily: ws(),   // SQEM-517 — counts per workspace, no client access at all
   workspace_api_keys: ws(),
   workspace_connectors: ws(),

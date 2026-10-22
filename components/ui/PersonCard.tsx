@@ -38,12 +38,16 @@ export function PersonCard({
 }) {
   const interactive = !!onClick;
 
+  // SQEM-538 — a clickable card is a real button (keyboard, name, role); a plain one stays a div.
+  // Collapsed, the name is not rendered, so it is given as the accessible name instead.
+  const Tag = interactive ? 'button' : 'div';
   return (
-    <div
+    <Tag
+      {...(interactive ? { type: 'button' as const, 'aria-label': collapsed ? name : undefined } : {})}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className={`flex items-center ${collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-3'} rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 ${
+      className={`${interactive ? 'w-full text-left ' : ''}flex items-center ${collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-3'} rounded-xl border border-line bg-slate-50/50 dark:bg-slate-800/50 ${
         interactive ? 'cursor-pointer hover:bg-white dark:hover:bg-slate-700 hover:shadow-soft transition-all group' : ''
       } ${className}`}
     >
@@ -51,7 +55,7 @@ export function PersonCard({
       {!collapsed && (
         <div className="overflow-hidden flex-1">
           <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{name}</p>
+            <p className="text-sm font-semibold text-ink truncate">{name}</p>
             {role && (
               <span className="text-2xs font-bold uppercase tracking-wider px-1.5 py-0.5 bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 rounded border border-slate-300 dark:border-slate-500 shrink-0">
                 {role}
@@ -60,7 +64,7 @@ export function PersonCard({
           </div>
           {subtitle && (
             <p
-              className={`text-xs text-slate-500 dark:text-slate-400 truncate ${
+              className={`text-xs text-ink-muted truncate ${
                 interactive ? 'group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors' : ''
               }`}
             >
@@ -69,7 +73,7 @@ export function PersonCard({
           )}
         </div>
       )}
-    </div>
+    </Tag>
   );
 }
 

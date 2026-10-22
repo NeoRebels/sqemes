@@ -1,5 +1,6 @@
-/* Inter font */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* SQEM-542 — the UI fonts are served from our own origin (since SQEM-547 Figtree + Bricolage Grotesque,
+   `@fontsource-variable/*`, OFL-1.1, imported in `index.tsx`; before that Inter), never from Google Fonts: one request chain less before the first text, and no
+   visitor IP sent to Google (LG München, 2022). Do not re-add a Google Fonts @import here. */
 
 @tailwind base;
 @tailwind components;
@@ -20,15 +21,74 @@
    Wer hier Werte anfasst, prüft das mit — eine invertierte Skala ist eine Falle, die erst
    Monate später jemandem auffällt. */
 :root {
-  --c-slate-400: 91 100 114;  /* #5b6472 — 5,98:1 auf Weiss, 5,44:1 auf slate-100 */
-  --c-slate-500: 79 88 102;   /* #4f5866 — 7,19:1 auf Weiss, 6,53:1 auf slate-100 */
+  --c-slate-400: 94 88 115;   /* #5e5873 — 6,73:1 auf Weiss, 5,87:1 auf slate-100 (SQEM-547 getönt) */
+  --c-slate-500: 79 73 102;   /* #4f4966 — 8,48:1 auf Weiss, 7,39:1 auf slate-100 */
   --c-focus: 147 51 234;      /* brand-600 */
 }
 
 .dark {
-  --c-slate-400: 156 163 175; /* #9ca3af — auf dunklem Grund bereits kontrastreich */
-  --c-slate-500: 107 114 128; /* #6b7280 — unverändert, auf dunklem Grund ausreichend */
+  --c-slate-400: 171 165 191; /* #aba5bf — 7,17:1 auf slate-800 (SQEM-547 getönt) */
+  /* SQEM-537 — war #6b7280 mit dem Vermerk „ausreichend“; gemessen 3,0:1 auf slate-800 und
+     3,7:1 auf slate-900, also unter AA — die Rechnung oben (3,54:1) stand schon daneben. Jetzt
+     4,7:1 auf slate-800 und 5,7:1 auf slate-900, und weiterhin dunkler als slate-400.
+     ⚠️ Auf slate-700-Flächen (Hover, Eingabefelder) reicht auch dieser Wert nicht (~3,3:1) —
+     dort wie bisher dark:text-slate-400 oder heller verwenden.
+     `tests/unit/darkContrast.test.ts` rechnet beides nach. */
+  --c-slate-500: 142 136 163; /* #8e88a3 — 5,01:1 auf slate-800 */
   --c-focus: 192 132 252;     /* brand-400 — auf dunklem Grund sichtbarer als brand-600 */
+}
+
+/* SQEM-545 — semantic colour tokens: the webapp's design system names roles, not palette steps.
+   Each value is EXACTLY the light/dark pair the code used most often before (counted, not chosen), so
+   switching a class from `bg-white dark:bg-slate-800` to `bg-surface-raised` changes no pixel.
+   The two text roles below 700 follow the themed slate variables above (SQEM-202/537), so their AA
+   contrast is the one `darkContrast.test.ts` already guards. `tests/unit/designTokens.test.ts` pins
+   every value against the palette it came from — change one there, on purpose, or not at all. */
+:root {
+  --c-surface: 248 247 251;          /* slate-50  — page */
+  --c-surface-raised: 255 255 255;   /* white     — card, panel, dialog */
+  --c-surface-sunken: 241 238 246;   /* slate-100 — track, well, chip */
+  --c-surface-field: 255 255 255;    /* white     — input */
+  --c-line: 241 238 246;             /* slate-100 — card edge */
+  --c-line-strong: 230 226 238;      /* slate-200 — input edge, divider */
+  --c-ink-strong: 20 16 38;          /* slate-900 — headings, values */
+  --c-ink: 44 39 66;                 /* slate-700 — body */
+  --c-ink-muted: var(--c-slate-500); /* secondary text */
+  --c-ink-subtle: var(--c-slate-400);/* hints, icons */
+  --c-accent: 147 51 234;            /* brand-600 */
+  --c-accent-strong: 147 51 234;     /* brand-600 — filled primary */
+  --c-danger: 220 38 38;             /* red-600 */
+  --c-warning: 217 119 6;            /* amber-600 */
+  --c-success: 5 150 105;            /* emerald-600 */
+  --c-accent-soft: rgb(250 245 255);  /* brand-50 */
+  --c-danger-soft: rgb(254 242 242);  /* red-50 */
+  --c-warning-soft: rgb(255 251 235); /* amber-50 */
+  --c-success-soft: rgb(236 253 245); /* emerald-50 */
+  --c-skill: 15 118 110;             /* teal-700 — petrol, the skill kind (SQEM-547) */
+  --c-skill-soft: rgb(230 244 241);
+}
+.dark {
+  --c-surface: 20 16 38;             /* slate-900 */
+  --c-surface-raised: 29 25 50;      /* slate-800 */
+  --c-surface-sunken: 44 39 66;      /* slate-700 */
+  --c-surface-field: 44 39 66;       /* slate-700 */
+  --c-line: 44 39 66;                /* slate-700 */
+  --c-line-strong: 74 68 98;         /* slate-600 */
+  --c-ink-strong: 241 238 246;       /* slate-100 */
+  --c-ink: 230 226 238;              /* slate-200 */
+  --c-ink-muted: 171 165 191;        /* slate-400 (dark) */
+  --c-ink-subtle: 142 136 163;       /* slate-500 (dark, SQEM-537) */
+  --c-accent: 192 132 252;           /* brand-400 */
+  --c-accent-strong: 147 51 234;     /* brand-600 — the filled button keeps its colour */
+  --c-danger: 248 113 113;           /* red-400 */
+  --c-warning: 251 191 36;           /* amber-400 */
+  --c-success: 52 211 153;           /* emerald-400 */
+  --c-accent-soft: rgb(88 28 135 / 0.2);  /* brand-900/20 */
+  --c-danger-soft: rgb(127 29 29 / 0.2);  /* red-900/20 */
+  --c-warning-soft: rgb(120 53 15 / 0.2); /* amber-900/20 */
+  --c-success-soft: rgb(6 78 59 / 0.2);   /* emerald-900/20 */
+  --c-skill: 94 196 182;             /* petrol, light step for dark ground */
+  --c-skill-soft: rgb(20 48 45 / 0.6);
 }
 
 /* SQEM-202 — sichtbarer Tastaturfokus, global.
@@ -96,7 +156,7 @@ body {
 }
 
 body {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Figtree Variable', 'Figtree', sans-serif;
 }
 
 /* Custom Scrollbar */
@@ -153,4 +213,40 @@ body {
     opacity: 1;
     transform: none;
   }
+}
+
+/* SQEM-540 — an action that appears on hover must also appear for a keyboard and on a touch screen.
+   `opacity-0 group-hover:opacity-100` hid eleven actions on every phone (there is no hover) and from
+   every keyboard (focus did not reveal them). This one class replaces that pair: hidden at rest on a
+   pointer device, shown on hover of its group, shown while anything in the group has focus, and
+   always shown where the primary input cannot hover.
+   ⚠️ Plain CSS after `@tailwind utilities`, so it wins over `opacity-100` on the same element — give
+   an element that must stay visible (a selected card's checkbox) `opacity-100` INSTEAD of this class,
+   never both. `group/tag` is the named group of `TagEditor`, `group/name` the file name in Files. */
+.reveal-on-hover { opacity: 0; }
+.group:hover .reveal-on-hover,
+.group\/tag:hover .reveal-on-hover,
+.group\/name:hover .reveal-on-hover,
+.group:focus-within .reveal-on-hover,
+.group\/tag:focus-within .reveal-on-hover,
+.group\/name:focus-within .reveal-on-hover,
+.reveal-on-hover:focus-within { opacity: 1; }
+@media (hover: none) {
+  .reveal-on-hover { opacity: 1; }
+}
+
+/* SQEM-540 — a touch target of at least 24 × 24 px (WCAG 2.5.8, the chosen floor) for an icon
+   that is drawn smaller. The visible icon keeps its size; an invisible ::after, centred on it, takes
+   the click. Use it in dense rows where padding would move the layout — and only where neighbouring
+   targets are at least a few pixels apart, or the later one swallows the earlier one's taps.
+   ⚠️ The element must be positioned (`relative` or `absolute`) — the class does not set it, because
+   overriding an `absolute` badge button with `relative` would move it. */
+.hit-24::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, 24px);
+  height: max(100%, 24px);
+  transform: translate(-50%, -50%);
 }

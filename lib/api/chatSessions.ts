@@ -1,6 +1,7 @@
 import { supabase } from '../supabase';
-import type { Database } from '../database.types';
-import type { ChatSession, StoredChatMessage } from '../../types';
+import type { Database, Json } from '../database.types';
+import type { ChatSession, PlaybookRef, StoredChatMessage } from '../../types';
+import { messagePlaybookFields } from '../playbookRef';
 
 // SQEM-390 — `assistant_id` is optional here because the explicit column lists no longer select it;
 // the column itself stays on the table (legacy, unread) and `select('*')` still returns it.
@@ -49,6 +50,7 @@ function rowToStoredMessage(row: ChatMessageRow): StoredChatMessage {
     userId: row.user_id || undefined,
     userName: row.profiles?.name || undefined,
     userAvatar: row.profiles?.avatar || undefined,
+    ...messagePlaybookFields(row), // SQEM-551
   };
 }
 
@@ -127,11 +129,17 @@ export async function addChatMessage(
   content: string,
   model?: string,
   userId?: string,
-  id?: string
+  id?: string,
+  // SQEM-551 — the playbook card (user message) or the "Used" ids (answer); see lib/playbookRef.ts.
+  extra?: { playbookRef?: PlaybookRef | null; loadedTemplateIds?: string[] },
 ): Promise<StoredChatMessage> {
   const { data, error } = await supabase
     .from('chat_messages')
-    .insert({ ...(id ? { id } : {}), session_id: sessionId, role, content, model: model || null, user_id: userId || null })
+    .insert({
+      ...(id ? { id } : {}), session_id: sessionId, role, content, model: model || null, user_id: userId || null,
+      ...(extra?.playbookRef ? { playbook_ref: extra.playbookRef as unknown as Json } : {}),
+      ...(extra?.loadedTemplateIds?.length ? { loaded_template_ids: extra.loadedTemplateIds } : {}),
+    })
     .select()
     .single();
 

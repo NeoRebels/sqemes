@@ -92,7 +92,8 @@ describe('⛔ SQEM-386 — the key step in three variants', () => {
 
 describe('⛔ SQEM-386 — exits say what they do', () => {
   it('the whole-wizard exit names the way back; the step exit is "Skip for now"', () => {
-    expect(WIZARD_CODE).toMatch(/Later — reopen from the dashboard/);
+    // SQEM-558 — the dashboard is Start since 550 (a), and "Finish setup" lives on the Overview since 555.
+    expect(WIZARD_CODE).toMatch(/Later — you can finish it from the Overview/);
     expect(WIZARD_CODE).not.toMatch(/I&apos;ll do this later/);
     expect(WIZARD_CODE).not.toMatch(/Skip this step/);
     expect(WIZARD_CODE).toMatch(/'Skip for now'/);
@@ -196,7 +197,7 @@ describe('SQEM-386 — the words that confused people', () => {
     expect(form).toMatch(/Who is your audience\?/);
   });
   it('"Finish setup" stretches across on a phone', () => {
-    const dash = read('pages/Dashboard.tsx');
+    const dash = read('pages/Overview.tsx') /* SQEM-555 — the banners moved from Start to the Overview */;
     const i = dash.indexOf('Finish setup <ArrowRight');
     expect(i).toBeGreaterThan(-1);
     // SQEM-419 restyled the button (white on the brand band); the phone rule survives it.
@@ -206,7 +207,7 @@ describe('SQEM-386 — the words that confused people', () => {
 
 // SQEM-419 — the two banners above the wizard now look like the wizard they lead into.
 describe('SQEM-419 — the dashboard banners', () => {
-  const dash = read('pages/Dashboard.tsx');
+  const dash = read('pages/Overview.tsx') /* SQEM-555 — the banners moved from Start to the Overview */;
 
   it('the setup banner is the wizard’s brand band, and survives dark mode', () => {
     const i = dash.indexOf('Finish setting up your workspace');
@@ -321,7 +322,7 @@ describe('SQEM-425 — the MCP row states what is known', () => {
 
 // SQEM-424 — four wordings the owner caught while walking the wizard.
 describe('SQEM-424 — what the copy promises and in which order', () => {
-  const dash = read('pages/Dashboard.tsx');
+  const dash = read('pages/Overview.tsx') /* SQEM-555 — the banners moved from Start to the Overview */;
 
   it('the welcome screen promises reversibility, not mechanics', () => {
     expect(WIZARD_CODE).toContain('Nothing here is final — you can change any of it later in Settings.');
@@ -348,7 +349,8 @@ describe('SQEM-424 — what the copy promises and in which order', () => {
   });
 
   it('the dashboard says the same words as the step it leads to', () => {
-    expect(dash).toMatch(/flex-1">AI provider keys<\/span>/);
+    // SQEM-552 — the Connections rows moved from Start to the Manage Overview; the words came along.
+    expect(readFileSync(resolve(ROOT, 'pages/Overview.tsx'), 'utf8')).toMatch(/'AI provider keys' : 'Add AI provider key'/);
   });
 });
 
@@ -379,7 +381,7 @@ describe('SQEM-423 — step and card are the same thing', () => {
 
   it('⛔ the ledger says sqemes Chat once, not twice', () => {
     const done = WIZARD_CODE.slice(WIZARD_CODE.indexOf("current === 'done' && ("));
-    const rows = [...done.matchAll(/font-semibold text-slate-900 dark:text-slate-100">(sqemes Chat|AI in sqemes[^<]*)</g)];
+    const rows = [...done.matchAll(/font-semibold text-ink-strong">(sqemes Chat|AI in sqemes[^<]*)</g)]; // SQEM-554 (f1): token class
     expect(rows.map(r => r[1])).toEqual(['sqemes Chat', 'AI in sqemes']);
     // They never render together: one needs Chat, the other needs Chat NOT to be there.
     expect(done).toMatch(/!channels\.includes\('chat'\) && keyMode === 'required'/);
@@ -490,8 +492,10 @@ describe('SQEM-417 — the first impression', () => {
   const css = readFileSync(resolve(__dirname, '../../index.css'), 'utf8');
   const step = readFileSync(resolve(__dirname, '../../components/WizardCreateStep.tsx'), 'utf8');
 
-  it('the header is the brand band the app already uses, and the progress sits inside it', () => {
-    expect(WIZARD_CODE).toMatch(/from-brand-900 via-brand-800 to-brand-700/);
+  // SQEM-554 (f1) — still a strong band for the first impression, but flat: C uses no gradients.
+  it('the header is a strong accent band (flat, no gradient), and the progress sits inside it', () => {
+    expect(WIZARD_CODE).toMatch(/px-6 py-6 md:px-8 md:py-7 bg-accent-strong text-white/);
+    expect(WIZARD_CODE).not.toMatch(/bg-gradient-to/);
     // The bars moved onto the band — white on a quarter-opacity track, not slate on white.
     expect(WIZARD_CODE).toMatch(/i < step \? 'bg-white' : 'bg-white\/25'/);
   });
@@ -583,11 +587,13 @@ describe('SQEM-414 — where to use them', () => {
     expect(WIZARD_CODE).not.toMatch(/mcpServers/);
   });
 
-  it('⛔ names no client as "signs in" or "needs a key" — nothing here verifies that per client', () => {
+  it('⛔ names no client as "signs in" or "needs a key" in its own code — those claims live in lib/mcpClients.ts', () => {
     for (const claim of [/Claude Desktop signs in/, /Cursor needs a key/, /sign in with Claude/i]) {
       expect(WIZARD_CODE).not.toMatch(claim);
     }
-    expect(WIZARD_CODE).toMatch(/Some tools then ask you to sign in; others ask for a key/);
+    // SQEM-533 — the per-client steps come from one source, each entry checked against the client's own
+    // documentation (docsUrl + checkedOn); the wizard only renders them.
+    expect(WIZARD_CODE).toMatch(/<McpClientGuide url=\{MCP_URL\} compact \/>/);
   });
 
   it('the ledger only claims what was chosen', () => {

@@ -135,8 +135,8 @@ export default function AccessGroupsCard({
           SQEM-304 the neighbour is "Playbook Access", which has none either. The reason held through
           the move, which is the useful kind of reason. */}
       <div className="mb-1">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Access Groups</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+        <h2 className="font-display text-xl font-semibold text-ink-strong">Access Groups</h2>
+        <p className="text-sm text-ink-muted mt-1">
           Name a set of people once, then grant a playbook to the group instead of to each person. Adding somebody to a group gives them everything that group can reach.
         </p>
       </div>
@@ -155,15 +155,15 @@ export default function AccessGroupsCard({
       </div>
 
       {groups === null ? (
-        <div className="flex items-center gap-2 text-sm text-slate-400 py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
+        <div className="flex items-center gap-2 text-sm text-ink-subtle py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
       ) : groups.length === 0 ? (
-        <p className="text-sm text-slate-400 dark:text-slate-500 py-4 text-center border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+        <p className="text-sm text-ink-subtle py-4 text-center border border-dashed border-line-strong rounded-xl">
           No groups yet. A group keeps working as the team changes — a list of names does not.
         </p>
       ) : (
         <div className="space-y-2">
           {groups.map(g => (
-            <div key={g.id} className="border border-slate-200 dark:border-slate-700 rounded-xl">
+            <div key={g.id} className="border border-line-strong rounded-xl">
               <div className="flex items-center gap-2 p-3">
                 {renaming?.id === g.id ? (
                   <>
@@ -173,32 +173,32 @@ export default function AccessGroupsCard({
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void handleRename(); } }}
                       className="flex-1"
                     />
-                    <button type="button" onClick={() => void handleRename()} disabled={busy} className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg"><Check className="w-4 h-4" /></button>
-                    <button type="button" onClick={() => setRenaming(null)} className="p-1.5 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg"><X className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => void handleRename()} disabled={busy} className="p-1.5 text-success hover:bg-success-soft rounded-lg"><Check className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => setRenaming(null)} className="p-1.5 text-ink-subtle hover:bg-surface-sunken rounded-lg"><X className="w-4 h-4" /></button>
                   </>
                 ) : (
                   <>
                     <button type="button" onClick={() => setEditing(editing === g.id ? null : g.id)} className="flex-1 text-left min-w-0">
-                      <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{g.name}</span>
+                      <span className="block text-sm font-semibold text-ink-strong truncate">{g.name}</span>
                       {/* An empty group grants nobody anything. Saying so here means it is not
                           discovered later, when somebody reports that a template "does not work". */}
-                      <span className="block text-xs text-slate-400">
+                      <span className="block text-xs text-ink-subtle">
                         {g.memberIds.length === 0 ? 'No members — grants nobody access' : `${g.memberIds.length} ${g.memberIds.length === 1 ? 'person' : 'people'}`}
                       </span>
                     </button>
-                    <button type="button" onClick={() => setRenaming({ id: g.id, name: g.name })} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg"><Pencil className="w-3.5 h-3.5" /></button>
-                    <button type="button" onClick={() => void askDelete(g)} disabled={busy} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
+                    <button type="button" onClick={() => setRenaming({ id: g.id, name: g.name })} className="p-1.5 text-ink-subtle hover:text-ink hover:bg-surface-sunken rounded-lg"><Pencil className="w-3.5 h-3.5" /></button>
+                    <button type="button" onClick={() => void askDelete(g)} disabled={busy} className="p-1.5 text-ink-subtle hover:text-danger hover:bg-danger-soft rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
                   </>
                 )}
               </div>
               {editing === g.id && (
-                <div className="border-t border-slate-100 dark:border-slate-700 p-3 space-y-1 max-h-56 overflow-y-auto">
+                <div className="border-t border-line p-3 space-y-1 max-h-56 overflow-y-auto">
                   {members.map(m => (
-                    <label key={m.id} className="flex items-start gap-2.5 p-1.5 text-sm text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/40 cursor-pointer select-none">
+                    <label key={m.id} className="flex items-start gap-2.5 p-1.5 text-sm text-ink rounded-lg hover:bg-surface-sunken cursor-pointer select-none">
                       <Checkbox checked={g.memberIds.includes(m.id)} onChange={() => void toggleMember(g, m.id)} />
                       <span className="min-w-0">
                         <span className="font-medium">{m.name || m.email}</span>
-                        <span className="block text-2xs text-slate-400 truncate">{m.email} · {m.role}</span>
+                        <span className="block text-2xs text-ink-subtle truncate">{m.email} · {m.role}</span>
                       </span>
                     </label>
                   ))}
@@ -223,7 +223,7 @@ export default function AccessGroupsCard({
       >
         {pendingDelete && pendingDelete.used > 0 ? (
           <p>
-            <span className="font-semibold text-slate-600 dark:text-slate-300">
+            <span className="font-semibold text-ink">
               {pendingDelete.used} playbook{pendingDelete.used === 1 ? '' : 's'}
             </span>{' '}
             currently grant access through this group — they will lose it, and nothing at the

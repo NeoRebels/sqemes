@@ -115,42 +115,42 @@ const ChoosePlanScreen = () => {
   };
 
   return (
-    <div className="h-dvh overflow-y-auto bg-slate-50 dark:bg-slate-900 flex flex-col items-center px-4 pt-10 pb-32">
+    <div className="h-dvh overflow-y-auto bg-surface flex flex-col items-center px-4 pt-10 pb-32">
       <div className="w-full max-w-6xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-10">
           <div className="inline-flex items-center gap-2">
             <img src="/logo-favicon-V2.png" alt="sqemes" className="w-9 h-9 rounded-xl shadow-soft" />
-            <span className="text-xl font-bold text-slate-900 dark:text-slate-100">sqemes</span>
+            <span className="text-xl font-bold text-ink-strong">sqemes</span>
           </div>
           <button
             onClick={() => signOut()}
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            className="inline-flex items-center gap-2 text-sm font-medium text-ink-muted hover:text-ink-strong transition-colors"
           >
             <LogOut className="w-4 h-4" /> Sign out
           </button>
         </div>
 
         {confirming ? (
-          <div className="max-w-md mx-auto text-center bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-700 p-8">
-            <Loader2 className="w-8 h-8 text-brand-500 animate-spin mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Confirming your subscription…</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">This only takes a moment — you&apos;ll be taken to <span className="font-semibold">{workspace.name}</span> automatically.</p>
+          <div className="max-w-md mx-auto text-center bg-surface-raised rounded-2xl shadow-soft border border-line p-8">
+            <Loader2 className="w-8 h-8 text-accent animate-spin mx-auto mb-4" />
+            <h2 className="font-display text-xl font-semibold text-ink-strong">Confirming your subscription…</h2>
+            <p className="text-sm text-ink-muted mt-2">This only takes a moment — you&apos;ll be taken to <span className="font-semibold">{workspace.name}</span> automatically.</p>
           </div>
         ) : isAdmin ? (
           paymentFailing ? (
-            <div className="max-w-md mx-auto text-center bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-700 p-8">
-              <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-4">
-                <CreditCard className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <div className="max-w-md mx-auto text-center bg-surface-raised rounded-2xl shadow-soft border border-line p-8">
+              <div className="w-12 h-12 rounded-full bg-warning-soft flex items-center justify-center mx-auto mb-4">
+                <CreditCard className="w-5 h-5 text-warning" />
               </div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Your last payment failed</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+              <h2 className="font-display text-xl font-semibold text-ink-strong">Your last payment failed</h2>
+              <p className="text-sm text-ink-muted mt-2">
                 Update your payment method to keep <span className="font-semibold">{workspace.name}</span> active. Your plan and data are unchanged.
               </p>
               <button
                 onClick={openBillingPortal}
                 disabled={portalLoading}
-                className="w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 bg-slate-900 dark:bg-brand-600 text-white hover:bg-slate-700 dark:hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 bg-ink-strong text-surface-raised hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {portalLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Opening…</> : 'Update payment method'}
               </button>
@@ -158,28 +158,28 @@ const ChoosePlanScreen = () => {
           ) : (
           <>
             <div className="text-center mb-8">
-              <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">{isLapsed ? 'Your subscription has ended' : 'Choose a plan to get started'}</h1>
-              <p className="text-slate-500 dark:text-slate-400 mt-2">
+              <h1 className="font-display text-2xl md:text-3xl font-semibold text-ink-strong tracking-tight">{isLapsed ? 'Your subscription has ended' : 'Choose a plan to get started'}</h1>
+              <p className="text-ink-muted mt-2">
                 {isLapsed
-                  ? <>Resubscribe to restore access to <span className="font-semibold text-brand-600">{workspace.name}</span>.</>
-                  : <>Start a {TRIAL_DAYS}-day free trial for <span className="font-semibold text-brand-600">{workspace.name}</span>. Cancel anytime before it ends.</>}
+                  ? <>Resubscribe to restore access to <span className="font-semibold text-accent">{workspace.name}</span>.</>
+                  : <>Start a {TRIAL_DAYS}-day free trial for <span className="font-semibold text-accent">{workspace.name}</span>. Cancel anytime before it ends.</>}
               </p>
             </div>
 
             {/* Billing cycle toggle */}
             <div className="flex justify-center mb-8">
-              <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+              <div className="flex bg-surface-sunken p-1 rounded-xl">
                 <button
                   onClick={() => setBillingCycle('monthly')}
-                  className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                  className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-surface-field shadow-sm text-ink-strong' : 'text-ink-muted hover:text-ink-strong'}`}
                 >
                   Monthly
                 </button>
                 <button
                   onClick={() => setBillingCycle('yearly')}
-                  className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                  className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-surface-field shadow-sm text-ink-strong' : 'text-ink-muted hover:text-ink-strong'}`}
                 >
-                  Yearly <span className="text-2xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md uppercase tracking-wide">Save 20%</span>
+                  Yearly <span className="text-2xs bg-success-soft text-ink-strong px-1.5 py-0.5 rounded-md uppercase tracking-wide">Save 20%</span>
                 </button>
               </div>
             </div>
@@ -191,20 +191,20 @@ const ChoosePlanScreen = () => {
                 const billingText = billingCycle === 'yearly' ? `€${p.priceYearly * 12} billed yearly` : 'Billed monthly';
                 const isLoading = loadingTier === tier;
                 return (
-                  <div key={tier} className="relative p-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col hover:border-brand-300 dark:hover:border-brand-500 hover:shadow-soft-lg transition-all">
-                    <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">{tier}</h3>
-                    <p className="text-xs mt-0.5 mb-4 text-slate-500 dark:text-slate-400">{p.tagline}</p>
+                  <div key={tier} className="relative p-6 rounded-2xl border border-line-strong bg-surface-raised flex flex-col hover:border-accent/50 hover:shadow-soft-lg transition-all">
+                    <h3 className="font-bold text-lg text-ink-strong">{tier}</h3>
+                    <p className="text-xs mt-0.5 mb-4 text-ink-muted">{p.tagline}</p>
                     <div className="mb-6">
-                      <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">€{price}<span className="text-base font-medium text-slate-400">/mo</span></p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">{billingText}</p>
+                      <p className="text-3xl font-bold text-ink-strong">€{price}<span className="text-base font-medium text-ink-subtle">/mo</span></p>
+                      <p className="text-xs text-ink-muted font-medium mt-1">{billingText}</p>
                       {/* SQEM-283 — the Terms promise consumers that a shown price includes VAT.
                           This is where that promise has to be visible, not two screens later. */}
-                      <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">{VAT_NOTE}</p>
+                      <p className="text-2xs text-ink-subtle mt-1">{VAT_NOTE}</p>
                     </div>
-                    <ul className="space-y-2.5 text-sm flex-1 text-slate-600 dark:text-slate-300">
+                    <ul className="space-y-2.5 text-sm flex-1 text-ink">
                       {p.features.map(feature => (
                         <li key={feature} className="flex items-center gap-2.5">
-                          <Check className="w-3.5 h-3.5 shrink-0 text-brand-500" />
+                          <Check className="w-3.5 h-3.5 shrink-0 text-accent" />
                           {feature}
                         </li>
                       ))}
@@ -212,7 +212,7 @@ const ChoosePlanScreen = () => {
                     <button
                       disabled={isLoading}
                       onClick={() => startTrial(tier)}
-                      className="w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 bg-slate-900 dark:bg-brand-600 text-white hover:bg-slate-700 dark:hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 bg-ink-strong text-surface-raised hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Redirecting…</> : isLapsed ? 'Resubscribe' : `Start ${TRIAL_DAYS}-day trial`}
                     </button>
@@ -221,17 +221,17 @@ const ChoosePlanScreen = () => {
               })}
 
               {/* SQEM-098 — Enterprise: contact-sales card (not a Stripe plan). */}
-              <div className="relative p-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col hover:border-brand-300 dark:hover:border-brand-500 hover:shadow-soft-lg transition-all">
-                <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">Enterprise</h3>
-                <p className="text-xs mt-0.5 mb-4 text-slate-500 dark:text-slate-400">For organisations with custom needs</p>
+              <div className="relative p-6 rounded-2xl border border-line-strong bg-surface-raised flex flex-col hover:border-accent/50 hover:shadow-soft-lg transition-all">
+                <h3 className="font-bold text-lg text-ink-strong">Enterprise</h3>
+                <p className="text-xs mt-0.5 mb-4 text-ink-muted">For organisations with custom needs</p>
                 <div className="mb-6">
-                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">Let&apos;s talk</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Custom pricing for your team</p>
+                  <p className="text-3xl font-bold text-ink-strong">Let&apos;s talk</p>
+                  <p className="text-xs text-ink-muted font-medium mt-1">Custom pricing for your team</p>
                 </div>
-                <ul className="space-y-2.5 text-sm flex-1 text-slate-600 dark:text-slate-300">
+                <ul className="space-y-2.5 text-sm flex-1 text-ink">
                   {['Everything in Business', '30+ team members', 'Custom AI credit volume', 'Dedicated support & SLA', 'Custom onboarding'].map(feature => (
                     <li key={feature} className="flex items-center gap-2.5">
-                      <Check className="w-3.5 h-3.5 shrink-0 text-brand-500" />
+                      <Check className="w-3.5 h-3.5 shrink-0 text-accent" />
                       {feature}
                     </li>
                   ))}
@@ -240,25 +240,25 @@ const ChoosePlanScreen = () => {
                   href="https://sqemes.com/enterprise"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 bg-slate-900 dark:bg-brand-600 text-white hover:bg-slate-700 dark:hover:bg-brand-700"
+                  className="w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 bg-ink-strong text-surface-raised hover:opacity-90"
                 >
                   Talk to us <ExternalLink className="w-4 h-4" />
                 </a>
               </div>
             </div>
-            <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-4">
+            <p className="text-center text-xs text-ink-subtle mt-4">
               {isLapsed ? 'You’ll be charged when you resubscribe.' : "A card is required to start the trial. You won't be charged until it ends."}{' '}
               Prices exclude VAT, calculated at checkout.
             </p>
           </>
           )
         ) : (
-          <div className="max-w-md mx-auto text-center bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-700 p-8">
-            <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-4">
-              <Building2 className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+          <div className="max-w-md mx-auto text-center bg-surface-raised rounded-2xl shadow-soft border border-line p-8">
+            <div className="w-12 h-12 rounded-full bg-warning-soft flex items-center justify-center mx-auto mb-4">
+              <Building2 className="w-5 h-5 text-warning" />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">{isLapsed ? "This workspace's subscription is inactive" : 'This workspace needs an active plan'}</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+            <h2 className="font-display text-xl font-semibold text-ink-strong">{isLapsed ? "This workspace's subscription is inactive" : 'This workspace needs an active plan'}</h2>
+            <p className="text-sm text-ink-muted mt-2">
               <span className="font-semibold">{workspace.name}</span> {isLapsed ? 'no longer has an active subscription' : "doesn't have an active subscription yet"}. Ask a workspace admin to {paymentFailing ? 'update billing' : 'start a plan'}.
             </p>
           </div>
@@ -289,13 +289,13 @@ const ChoosePlanScreen = () => {
             what the rest of this screen is for. */}
         {isLapsed && (
         <div className="max-w-md mx-auto mt-8 text-center">
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-ink-muted">
             Your playbooks and files are yours. You can download all of them at any time, whether or not you resubscribe.
           </p>
           <button
             onClick={handleExport}
             disabled={exportBusy}
-            className="inline-flex items-center justify-center gap-2 mt-3 text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center justify-center gap-2 mt-3 text-sm font-semibold text-accent hover:text-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {exportBusy
               ? <><Loader2 className="w-4 h-4 animate-spin" /> {exportStep ?? 'Preparing your download…'}</>
@@ -309,18 +309,18 @@ const ChoosePlanScreen = () => {
             SQEM-489 nobody can grant themselves that flag); managed also sets credits_limit = 0, so the
             workspace is unmetered, not just ungated. Once `isManaged` flips, App drops this screen. */}
         {isSqemesAdmin && !workspace.isManaged && (
-          <div className="max-w-md mx-auto mt-8 flex items-center justify-between gap-4 p-4 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800/50 rounded-xl">
+          <div className="max-w-md mx-auto mt-8 flex items-center justify-between gap-4 p-4 bg-accent-soft border border-accent/20 rounded-xl">
             <div className="flex items-center gap-3">
-              <Shield className="w-5 h-5 text-brand-600 dark:text-brand-400 shrink-0" />
+              <Shield className="w-5 h-5 text-accent shrink-0" />
               <div>
-                <p className="text-sm font-bold text-brand-900 dark:text-brand-300">Sqemes admin</p>
-                <p className="text-xs text-brand-600 dark:text-brand-400 mt-0.5">Make <span className="font-semibold">{workspace.name}</span> a managed workspace — no plan, no paywall, AI not metered.</p>
+                <p className="text-sm font-bold text-ink-strong">Sqemes admin</p>
+                <p className="text-xs text-accent mt-0.5">Make <span className="font-semibold">{workspace.name}</span> a managed workspace — no plan, no paywall, AI not metered.</p>
               </div>
             </div>
             <button
               onClick={async () => { setManagedBusy(true); try { await setWorkspaceManaged(workspace.id, true); } finally { setManagedBusy(false); } }}
               disabled={managedBusy}
-              className="shrink-0 inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="shrink-0 inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg bg-accent-strong text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {managedBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Make managed
             </button>
@@ -330,11 +330,11 @@ const ChoosePlanScreen = () => {
         {/* Workspace switcher — for users who belong to other workspaces */}
         {otherWorkspaces.length > 0 && (
           <div className="max-w-md mx-auto mt-8">
-            <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 text-center">Or switch workspace</p>
+            <p className="text-xs font-bold text-ink-subtle uppercase tracking-wider mb-2 text-center">Or switch workspace</p>
             <select
               value=""
               onChange={(e) => { if (e.target.value) switchWorkspace(e.target.value); }}
-              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+              className="w-full px-4 py-3 border border-line-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all bg-surface-raised text-ink"
             >
               <option value="" disabled>Select workspace</option>
               {otherWorkspaces.map(w => (

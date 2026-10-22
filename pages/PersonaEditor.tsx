@@ -9,6 +9,7 @@ import { useNavigate, useParams } from 'react-router';
 import {
   Save, Trash2, Plus, GripVertical, Sparkles, Loader2, X, AlertTriangle,
   Settings, PenTool, ListTree, Search, Wand2, UserRound, Lock,
+  Bot,
 } from 'lucide-react';
 import { useWorkspace, useUI, usePrompts } from '../store';
 import { TagPicker } from '../components/TagPicker';
@@ -23,6 +24,8 @@ import FullScreenExit from '../components/ui/FullScreenExit';
 import Modal from '../components/ui/Modal';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import PersonCard from '../components/ui/PersonCard';
+import MoveButtons from '../components/ui/MoveButtons';
+import { moveItem } from '../lib/moveItem';
 import Button from '../components/ui/Button';
 import SegmentedTabs from '../components/ui/SegmentedTabs';
 import KindBadge from '../components/ui/KindBadge';
@@ -33,6 +36,7 @@ import {
 } from '../components/TemplateAccessControl';
 import { accessAppliesTo, isMultiSeat } from '../lib/templateAccessScope';
 import { fetchGroups } from '../lib/api/groups';
+import { fetchEditors, setEditors, fetchEditRights } from '../lib/api/editors';
 import {
   fetchPersonaAccess, setPersonaAccess, accessValueToPersonaAccess, personaAccessToValue,
   fetchRestrictedTemplateIdsAmong,
@@ -46,7 +50,18 @@ export default function PersonaEditor() {
   const { showToast } = useUI();
   const { prompts } = usePrompts();
 
-  const canEdit = can(currentUser, workspace, 'prompts:edit');
+  // SQEM-473 — role AND this persona's edit right; every control below keys on `canEdit`, so a persona
+  // someone may use but not change opens read-only.
+  const roleCanEdit = can(currentUser, workspace, 'prompts:edit');
+  const [editRight, setEditRight] = useState(true);
+  const [canManageEditors, setCanManageEditors] = useState(!id);
+  // SQEM-534 — a NEW one starts as the workspace default says; the database writes the same restriction
+  // on insert, so this only shows it (and lets the creator open it again before the first save).
+  const [editors, setEditorsValue] = useState<TemplateAccessValue>(() => ({
+    mode: !id && workspace?.defaultEditRestricted ? 'restricted' : 'everyone', userIds: [], groupIds: [],
+  }));
+  const [editorsDirty, setEditorsDirty] = useState(false);
+  const canEdit = roleCanEdit && editRight;
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -106,6 +121,13 @@ export default function PersonaEditor() {
           } catch (err: any) {
             showToast(err?.message || 'Could not read who may use this persona', 'error');
           }
+          // SQEM-473 — who may change it, and whether this person may.
+          try {
+            const e = await fetchEditors('persona', persona.id);
+            setEditorsValue({ mode: e.userIds.length || e.groupIds.length ? 'restricted' : 'everyone', userIds: e.userIds, groupIds: e.groupIds });
+            const r = await fetchEditRights('persona', persona.id);
+            setEditRight(r.canEdit); setCanManageEditors(r.canManage);
+          } catch { /* the editor stays editable; RLS still refuses a write that is not allowed */ }
         }
       } catch (err: any) {
         if (!cancelled) showToast(err?.message || 'Could not load the persona', 'error');
@@ -189,12 +211,11 @@ export default function PersonaEditor() {
     const from = dragIndex.current;
     dragIndex.current = null;
     if (from === null || from === target) return;
-    setRoutes(prev => {
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(target, 0, moved);
-      return next.map((r, i) => ({ ...r, sortOrder: i }));
-    });
+    moveRoute(from, target);
+  };
+  // SQEM-540 — shared by drag-and-drop and the Move up / Move down buttons.
+  const moveRoute = (from: number, to: number) => {
+    setRoutes(prev => moveItem(prev, from, to).map((r, i) => ({ ...r, sortOrder: i })));
     setIsDirty(true);
   };
 
@@ -311,6 +332,22 @@ Rules:
     }
   };
 
+  // SQEM-473 — the editor list, only by its owner or an admin. ⛔ "Only selected people" with nobody
+  // ticked writes the owner as the single editor: no row would mean "no restriction".
+  const saveEditors = async (personaId: string, owner: string | null) => {
+    if (!canManageEditors || !editorsDirty) return;
+    try {
+      const named = { userIds: editors.userIds, groupIds: editors.groupIds ?? [] };
+      if (editors.mode === 'restricted' && named.userIds.length === 0 && named.groupIds.length === 0) {
+        named.userIds = [owner || currentUser.id];
+      }
+      await setEditors('persona', personaId, workspace.id, editors.mode === 'restricted' ? named : { userIds: [], groupIds: [] });
+      setEditorsDirty(false);
+    } catch {
+      showToast('Saved, but updating who can edit failed — try again.', 'error');
+    }
+  };
+
   const handleSave = async () => {
     if (!title.trim()) {
       showToast('Give the persona a name.', 'error');
@@ -323,6 +360,7 @@ Rules:
         await setPersonaRoutes(id, routes);
         if (!IS_SELF_HOSTED) {
           await setPersonaAccess(id, workspace.id, accessValueToPersonaAccess(access, ownerId));
+          await saveEditors(id, ownerId);
         }
       } else {
         const created = await createPersona(
@@ -344,6 +382,7 @@ Rules:
             );
           }
         }
+        if (!IS_SELF_HOSTED) await saveEditors(created.id, currentUser.id || null);
         navigate(`/personas/${created.id}/edit`, { replace: true });
       }
       setIsDirty(false);
@@ -382,10 +421,12 @@ Rules:
   }
 
   return (
-    <div className="flex flex-col h-dvh bg-white dark:bg-slate-900 overflow-hidden">
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 h-16 px-4 md:px-6 flex items-center justify-between shrink-0 z-10">
+    <div className="flex flex-col h-dvh bg-surface overflow-hidden">
+      <header className="bg-surface-raised border-b border-line h-16 px-4 md:px-6 flex items-center justify-between shrink-0 z-10">
         <div className="flex items-center gap-2">
           <img src="/logo-favicon-V2.png" alt="sqemes" className="w-8 h-8 rounded-lg shrink-0" />
+          {/* SQEM-544 — the page's h1, for screen readers; the visible name is the field below. */}
+          <h1 className="sr-only">{title || (id ? 'Edit persona' : 'New persona')}</h1>
           <FullScreenExit label="Back to Personas" onExit={handleBack} />
         </div>
         <div className="flex items-center gap-2 md:gap-3">
@@ -401,25 +442,37 @@ Rules:
           {canEdit && (
             <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save
+              {/* SQEM-539 — the same verbs as the playbook editor. */}
+              {id ? 'Save changes' : 'Create persona'}
             </Button>
           )}
         </div>
       </header>
 
+      {/* SQEM-473 — may use, may not change: said once, with whom to ask. */}
+      {id && roleCanEdit && !editRight && (
+        <div className="flex items-start gap-2.5 border-b border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 px-4 md:px-6 py-2.5">
+          <Lock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <p className="text-xs text-amber-800 dark:text-amber-200">
+            <span className="font-semibold">You can use this persona but not change it.</span>{' '}
+            Editing is limited to the people its owner{owner ? ` (${owner.name || owner.email})` : ''} chose. Ask them or a workspace admin.
+          </p>
+        </div>
+      )}
+
       {/* Mobile tab switcher — the three columns cannot sit side by side on a phone, and stacking
           them buries the routes under a long textarea. Same three-way switch as the template
           editor, so the two pages behave identically where it matters most. */}
-      <div className="xl:hidden flex border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+      <div className="xl:hidden flex border-b border-line bg-surface-raised">
         {([
           { id: 'details' as const, label: 'Details', icon: <Settings className="w-4 h-4" /> },
           { id: 'role' as const, label: 'Role', icon: <PenTool className="w-4 h-4" /> },
-          { id: 'routes' as const, label: 'Routes', icon: <ListTree className="w-4 h-4" /> },
+          { id: 'routes' as const, label: 'Playbooks', icon: <ListTree className="w-4 h-4" /> },
         ]).map(t => (
           <button
             key={t.id}
             onClick={() => setMobileTab(t.id)}
-            className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${mobileTab === t.id ? 'text-brand-600 border-b-2 border-brand-600 bg-white dark:bg-slate-700' : 'text-slate-500 dark:text-slate-400'}`}
+            className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${mobileTab === t.id ? 'text-ink-strong border-b-2 border-accent' : 'text-ink-muted'}`}
           >
             {t.icon} {t.label}
           </button>
@@ -435,22 +488,11 @@ Rules:
             SQEM-387 — `flex-1 min-h-0` below `xl` (a column there): with `shrink-0` the panel grew
             to its content and the parent's `overflow-hidden` cut it off — nothing to scroll. Same
             on the routes rail. On `xl` it is a row and `xl:flex-none` keeps the fixed width. */}
-        <div className={`w-full xl:w-[420px] bg-slate-50/50 dark:bg-slate-800/50 border-r border-slate-100 dark:border-slate-700 overflow-y-auto p-6 flex-1 min-h-0 xl:flex-none ${mobileTab === 'details' ? 'block' : 'hidden xl:block'}`}>
+        <div className={`w-full xl:w-[340px] bg-surface-sunken/60 border-r border-line overflow-y-auto p-6 flex-1 min-h-0 xl:flex-none ${mobileTab === 'details' ? 'block' : 'hidden xl:block'}`}>
           <div className="space-y-8">
             <div>
-              <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Name</label>
-              <input
-                value={title}
-                onChange={e => { setTitle(e.target.value); setIsDirty(true); }}
-                disabled={!canEdit}
-                placeholder="Sales"
-                className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
-              />
-            </div>
-
-            <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Description</label>
+                <label htmlFor="persona-editor-description" className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Description</label>
                 {canEdit && (
                   <button
                     onClick={handleGenerateDescription}
@@ -462,7 +504,7 @@ Rules:
                   </button>
                 )}
               </div>
-              <textarea
+              <textarea id="persona-editor-description"
                 value={description}
                 onChange={e => { setDescription(e.target.value); setIsDirty(true); }}
                 disabled={!canEdit}
@@ -479,7 +521,7 @@ Rules:
             {/* SQEM-393 — the same picker and the same registry as the playbook editor: one tag, from
                 `workspace.tags`, a new one added to the registry on the spot. */}
             <div>
-              <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Tag</label>
+              <p className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Tag</p>
               <TagPicker
                 value={tag}
                 tags={workspace.tags}
@@ -507,7 +549,7 @@ Rules:
                 members={workspace?.members}
                 groups={groups}
                 onCreateGroup={currentUser?.role === 'admin'
-                  ? () => navigate('/settings', { state: { initialTab: 'general' } })
+                  ? () => navigate('/settings', { state: { initialTab: 'security' } }) // SQEM-480 — groups live there now
                   : undefined}
                 allowPrivate
                 multiSeat={isMultiSeat(workspace)}
@@ -524,6 +566,23 @@ Rules:
               />
             )}
 
+            {/* SQEM-473 — who may CHANGE it; set by the owner or an admin, read-only for everyone else. */}
+            {!IS_SELF_HOSTED && canEdit && accessAppliesTo(workspace, editors.mode !== 'everyone') && (
+              <TemplateAccessControl
+                variant="edit"
+                label="Who can edit"
+                hint="Who may change this persona and its routes. Everyone who can see it can still use it."
+                value={editors}
+                onChange={v => { setEditorsValue(v); setEditorsDirty(true); setIsDirty(true); }}
+                members={workspace?.members}
+                groups={groups}
+                ownerId={ownerId || (id ? null : currentUser.id)}
+                multiSeat={isMultiSeat(workspace)}
+                readOnly={!canManageEditors}
+                readOnlyReason="Only the owner or a workspace admin can change who may edit this persona."
+              />
+            )}
+
             {/* SQEM-330 — whose persona this is, **last in the rail**, exactly where the template
                 editor puts it (Type · Title · Description · … · Access · Owner). It is the only
                 block nobody edits, so it belongs below everything that is edited.
@@ -535,7 +594,7 @@ Rules:
                 "None recorded" dresses up an absence as somebody. */}
             {id && (
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Owner</label>
+                <p className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Owner</p>
                 {owner ? (
                   <PersonCard
                     name={owner.name || owner.email}
@@ -566,9 +625,27 @@ Rules:
         {/* ── Middle: the orchestrator prose ────────────────────────────────
             Full height, like the template editor's content column: this is the thing being
             written, and it gets the room. */}
-        <div className={`flex flex-col bg-white dark:bg-slate-900 overflow-hidden flex-1 min-w-0 ${mobileTab === 'role' ? 'flex' : 'hidden xl:flex'}`}>
-          <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 dark:border-slate-700 shrink-0">
-            <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Role &amp; rules</label>
+        <div className={`flex flex-col bg-surface overflow-hidden flex-1 min-w-0 ${mobileTab === 'role' ? 'flex' : 'hidden xl:flex'}`}>
+          {/* SQEM-550 (d) — redesign C: the persona's name heads the page in the display face, beside
+              its mark — moved here from the details rail, as the playbook editor's title (c). */}
+          <div className="px-6 md:px-10 pt-6 pb-4 shrink-0 flex items-center gap-4">
+            <div aria-hidden className="w-12 h-12 md:w-14 md:h-14 rounded-card bg-accent-strong text-white flex items-center justify-center shrink-0">
+              <Bot className="w-6 h-6 md:w-7 md:h-7" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <label htmlFor="persona-editor-name" className="sr-only">Name</label>
+              <input id="persona-editor-name"
+                value={title}
+                onChange={e => { setTitle(e.target.value); setIsDirty(true); }}
+                disabled={!canEdit}
+                placeholder="Sales"
+                className="w-full bg-transparent font-display text-2xl md:text-3xl font-semibold tracking-tight text-ink-strong outline-none placeholder:text-ink-subtle"
+              />
+              {description && <p className="text-sm text-ink-muted truncate">{description}</p>}
+            </div>
+          </div>
+          <div className="flex items-center justify-between px-6 md:px-10 py-2 shrink-0">
+            <label htmlFor="persona-editor-role-and-rules" className="block text-2xs font-bold text-ink-subtle uppercase tracking-wider">Role &amp; rules</label>
             {canEdit && (
               <button
                 onClick={handleEnhance}
@@ -580,16 +657,16 @@ Rules:
               </button>
             )}
           </div>
-          <textarea
+          <textarea id="persona-editor-role-and-rules"
             value={content}
             onChange={e => { setContent(e.target.value); setIsDirty(true); }}
             disabled={!canEdit}
             placeholder={'You work in sales at …\n\nAsk for the customer context before drafting anything.\nNever quote a price that is not in the attached material.'}
-            className="flex-1 p-6 text-sm font-mono text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 resize-none outline-none leading-relaxed placeholder-slate-300 dark:placeholder-slate-600"
+            className="flex-1 mx-4 md:mx-8 p-5 md:p-6 rounded-card border border-line bg-surface-raised text-sm md:text-base text-ink resize-none outline-none leading-relaxed placeholder:text-ink-subtle focus:border-line-strong"
           />
           {/* ⚠️ Stated rather than left to be discovered: people will try to write the routing into
               this box, because that is how it reads once the client renders it. */}
-          <p className="text-2xs text-slate-400 px-6 py-2.5 border-t border-slate-100 dark:border-slate-700 shrink-0">
+          <p className="text-2xs text-ink-subtle px-6 md:px-10 py-2.5 shrink-0">
             Only the role itself. The routing table is built from the routes and added automatically.
           </p>
         </div>
@@ -598,10 +675,10 @@ Rules:
             Its own rail rather than a section under the prose: attaching a template and writing the
             role are two different activities, and the routes have to stay visible while the role is
             written — the role is *about* them. */}
-        <div className={`w-full xl:w-[380px] bg-slate-50/50 dark:bg-slate-800/50 border-l border-slate-100 dark:border-slate-700 overflow-y-auto p-6 flex-1 min-h-0 xl:flex-none ${mobileTab === 'routes' ? 'block' : 'hidden xl:block'}`}>
+        <div className={`w-full xl:w-[420px] bg-surface-sunken/60 border-l border-line overflow-y-auto p-6 flex-1 min-h-0 xl:flex-none ${mobileTab === 'routes' ? 'block' : 'hidden xl:block'}`}>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Routes</label>
+              <p className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Playbooks</p>
               {canEdit && (
                 <button
                   onClick={() => { setPickSearch(''); setPicking(true); }}
@@ -619,11 +696,14 @@ Rules:
 
             {routes.length === 0 && (
               <div className="text-xs text-slate-500 dark:text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
-                <p className="font-semibold text-slate-600 dark:text-slate-300">No routes yet</p>
-                <p className="mt-1">Without a route this persona is a role description and nothing else — it can load nothing.</p>
+                <p className="font-semibold text-slate-600 dark:text-slate-300">No playbooks yet</p>
+                <p className="mt-1">Without a playbook this persona is a role description and nothing else — it can load nothing.</p>
               </div>
             )}
 
+            {/* SQEM-550 (d) — redesign C: each route reads as a step of a flow — "If {condition}" →
+                "Load {playbook}" — instead of a card with the playbook on top and the condition below.
+                Same fields, same order semantics (drag, MoveButtons), same fallback note. */}
             {routes.map((route, i) => (
               <div
                 key={route.templateId}
@@ -631,88 +711,95 @@ Rules:
                 onDragStart={() => { dragIndex.current = i; }}
                 onDragOver={e => e.preventDefault()}
                 onDrop={() => onDrop(i)}
-                className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3"
+                className="relative"
               >
-                <div className="flex items-start gap-2 mb-2">
-                  {canEdit && <GripVertical className="w-4 h-4 text-slate-300 dark:text-slate-600 shrink-0 mt-0.5 cursor-grab" />}
+                <div className="rounded-card border border-line bg-surface-raised p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <label htmlFor={`persona-route-condition-${route.templateId}`} className="text-2xs font-bold text-ink-subtle uppercase tracking-wider">
+                      If
+                    </label>
+                    {canEdit && (
+                      <button
+                        onClick={() => handleGenerateCondition(route)}
+                        disabled={conditioning === route.templateId}
+                        className="flex items-center gap-1 text-2xs font-semibold text-accent hover:opacity-80 disabled:opacity-50 transition-opacity"
+                        title="Write a condition for this persona specifically"
+                      >
+                        {conditioning === route.templateId
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : <Sparkles className="w-3 h-3" />}
+                        Write
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    id={`persona-route-condition-${route.templateId}`}
+                    value={route.condition}
+                    onChange={e => setCondition(route.templateId, e.target.value)}
+                    disabled={!canEdit}
+                    placeholder={templateById.get(route.templateId)?.description || 'when the user wants an offer laid out'}
+                    className="w-full px-2.5 py-2 text-sm rounded-control border border-line bg-surface-field text-ink outline-none focus:border-line-strong"
+                  />
+                  {/* ⛔ Empty is a normal, good state — not a warning. The fallback is the template's
+                      own description, resolved when the persona is rendered so it never goes stale.
+                      The override exists for the case that description cannot cover: the same
+                      template meaning different things in two personas. */}
+                  {!route.condition.trim() && (
+                    <p className="text-2xs text-ink-subtle mt-1.5">
+                      {templateById.get(route.templateId)?.description
+                        ? <>Using the playbook&apos;s own description. Write something here only if it means something different <span className="italic">in this persona</span>.</>
+                        : <>This playbook has no description either — without one the model gets only its title. Write a condition, or give the playbook a description.</>}
+                    </p>
+                  )}
+                </div>
+                <div aria-hidden className="ml-6 h-3 border-l-2 border-accent" />
+                <div className="rounded-card bg-accent-soft p-3 flex items-start gap-2">
+                  {canEdit && <GripVertical className="w-4 h-4 text-ink-subtle shrink-0 mt-0.5 cursor-grab" />}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="block text-2xs font-bold text-accent uppercase tracking-wider">Load</span>
+                    <p className="text-sm font-semibold text-ink-strong truncate" title={route.templateTitle}>
+                      {route.templateTitle || 'Untitled playbook'}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
                       {route.templateKind && <KindBadge kind={route.templateKind} />}
-                      {/* SQEM-330 — the row the sentence below is counting. Without this the warning
-                          gives a number and leaves the reader to work out which three of seven.
-
-                          ⚠️ **Amber here, slate on the Templates page, and the word is the same.**
-                          On a template card "Restricted" is a fact about that template. Inside a
-                          persona it is a *consequence* — this route will not reach part of the
-                          team — and it is the same amber as the sentence that spells the
-                          consequence out, so the two read as one statement. Different weight, not a
-                          second vocabulary: change the word here and the two screens start
-                          disagreeing about what restricted means. SQEM-400 — and the word is now
-                          the one the rule deserves: "Only me" for the principal-less row,
-                          "Restricted" for people or groups, from `lib/accessBadge.ts` like the cards. */}
                       {!IS_SELF_HOSTED && restrictedRouteIds.has(route.templateId) && (
                         <span
                           className="text-2xs font-bold px-2 py-0.5 rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
                           title={restrictedRouteIds.get(route.templateId) === 'private'
-                            ? 'Only me — colleagues receive this persona without this route'
-                            : 'Restricted — colleagues who cannot open it receive this persona without this route'}
+                            ? 'Only me — colleagues receive this persona without this playbook'
+                            : 'Restricted — colleagues who cannot open it receive this persona without this playbook'}
                         >
                           <Lock className="w-3 h-3" /> {ACCESS_BADGE_LABEL[restrictedRouteIds.get(route.templateId) ?? 'restricted']}
                         </span>
                       )}
                     </div>
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate" title={route.templateTitle}>
-                      {route.templateTitle || 'Untitled playbook'}
-                    </p>
                   </div>
+                  {canEdit && (
+                    <MoveButtons label={route.templateTitle || 'playbook'} index={i} count={routes.length} onMove={to => moveRoute(i, to)} />
+                  )}
                   {canEdit && (
                     <button
                       onClick={() => removeRoute(route.templateId)}
-                      className="p-1 text-slate-300 hover:text-red-500 transition-colors shrink-0"
-                      title="Remove this route"
+                      className="p-1.5 text-ink-subtle hover:text-danger transition-colors shrink-0"
+                      title="Remove this playbook from the persona"
+                      aria-label={`Remove ${route.templateTitle || 'playbook'} from this persona`}
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-2xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                    Load when
-                  </span>
-                  {canEdit && (
-                    <button
-                      onClick={() => handleGenerateCondition(route)}
-                      disabled={conditioning === route.templateId}
-                      className="flex items-center gap-1 text-2xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 disabled:opacity-50 transition-colors"
-                      title="Write a condition for this persona specifically"
-                    >
-                      {conditioning === route.templateId
-                        ? <Loader2 className="w-3 h-3 animate-spin" />
-                        : <Sparkles className="w-3 h-3" />}
-                      Write
-                    </button>
-                  )}
-                </div>
-                <input
-                  value={route.condition}
-                  onChange={e => setCondition(route.templateId, e.target.value)}
-                  disabled={!canEdit}
-                  placeholder={templateById.get(route.templateId)?.description || 'when the user wants an offer laid out'}
-                  className="w-full px-2.5 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-200 outline-none focus:border-brand-500"
-                />
-                {/* ⛔ Empty is a normal, good state — not a warning. The fallback is the template's
-                    own description, resolved when the persona is rendered so it never goes stale.
-                    The override exists for the case that description cannot cover: the same
-                    template meaning different things in two personas. */}
-                {!route.condition.trim() && (
-                  <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1.5">
-                    {templateById.get(route.templateId)?.description
-                      ? <>Using the playbook&apos;s own description. Write something here only if it means something different <span className="italic">in this persona</span>.</>
-                      : <>This playbook has no description either — without one the model gets only its title. Write a condition, or give the playbook a description.</>}
-                  </p>
-                )}
               </div>
             ))}
+
+            {canEdit && routes.length > 0 && (
+              <button
+                type="button"
+                onClick={() => { setPickSearch(''); setPicking(true); }}
+                className="w-full flex items-center justify-center gap-1.5 py-3 rounded-card border-2 border-dashed border-line-strong text-sm font-semibold text-ink-muted hover:text-ink-strong hover:border-accent transition-colors"
+              >
+                <Plus className="w-4 h-4" /> Add a condition
+              </button>
+            )}
 
             {/* ⛔ SQEM-326 — the sentence that stops this feature degrading in silence. A persona
                 shared with the workspace may attach a template restricted to its author; colleagues
@@ -736,7 +823,7 @@ Rules:
                   </p>
                   <p className="mt-1.5">
                     Colleagues who cannot open {restrictedRouteIds.size === 1 ? 'it' : 'them'} receive this
-                    persona <span className="font-semibold">without {restrictedRouteIds.size === 1 ? 'that route' : 'those routes'}</span> —
+                    persona <span className="font-semibold">without {restrictedRouteIds.size === 1 ? 'that playbook' : 'those playbooks'}</span> —
                     the route is left out entirely, never shown as unavailable. Share the playbook if they should have it.
                   </p>
                 </div>
@@ -787,7 +874,7 @@ Rules:
             <div className="text-center py-10 text-sm text-slate-400 dark:text-slate-500">
               {/* Three different empty states, because they call for three different actions. */}
               {prompts.length === 0
-                ? 'This workspace has no playbooks yet — a persona needs something to route to.'
+                ? 'This workspace has no playbooks yet — a persona needs playbooks to use.'
                 : routes.length > 0 && pickSearch.trim() === '' && pickKind === 'all'
                   ? 'Every playbook is already attached.'
                   : 'Nothing matches.'}

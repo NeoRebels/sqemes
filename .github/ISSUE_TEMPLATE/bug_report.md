@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a problem with Sqemes
+about: Report a problem with sqemes
 title: ''
 labels: bug
 ---

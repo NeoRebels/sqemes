@@ -185,16 +185,16 @@ export default function MarketplaceTemplate() {
     >
       {/* Report modal */}
       <Modal open={reportOpen} onClose={() => !reporting && setReportOpen(false)} size="sm" className="p-6">
-        <div className="flex items-center gap-2.5 mb-2"><Flag className="w-6 h-6 text-red-500" /><h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Report this playbook</h3></div>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Tell us what&apos;s wrong. Our team reviews reports and can unpublish a listing.</p>
-        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Reason</label>
-        <select value={reportReason} onChange={e => setReportReason(e.target.value)} className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
+        <div className="flex items-center gap-2.5 mb-2"><Flag className="w-6 h-6 text-danger" /><h3 className="font-display text-xl font-semibold text-ink-strong">Report this playbook</h3></div>
+        <p className="text-sm text-ink-muted mb-4">Tell us what&apos;s wrong. Our team reviews reports and can unpublish a listing.</p>
+        <label htmlFor="marketplace-template-reason" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Reason</label>
+        <select id="marketplace-template-reason" value={reportReason} onChange={e => setReportReason(e.target.value)} className="w-full p-3 mb-4 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20">
           {REPORT_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
-        <textarea value={reportDetails} onChange={e => setReportDetails(e.target.value)} rows={3} placeholder="Optional details…" className="w-full p-3 mb-5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 resize-none placeholder:text-slate-400" />
+        <textarea value={reportDetails} onChange={e => setReportDetails(e.target.value)} rows={3} placeholder="Optional details…" className="w-full p-3 mb-5 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 resize-none placeholder:text-ink-subtle" />
         <div className="flex gap-2">
-          <button onClick={() => setReportOpen(false)} disabled={reporting} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50">Cancel</button>
-          <button onClick={submitReport} disabled={reporting} className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+          <button onClick={() => setReportOpen(false)} disabled={reporting} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors disabled:opacity-50">Cancel</button>
+          <button onClick={submitReport} disabled={reporting} className="flex-1 py-2.5 bg-danger hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
             {reporting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Reporting…</> : 'Submit report'}
           </button>
         </div>

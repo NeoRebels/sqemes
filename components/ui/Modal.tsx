@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -11,6 +11,19 @@ interface ModalProps {
   className?: string;
   children: React.ReactNode;
 }
+
+/**
+ * SQEM-535 — the open modals, innermost last. Escape and the Tab trap act only for the top one, so
+ * a confirmation opened from inside another dialog closes alone and leaves its parent standing.
+ */
+const openStack: object[] = [];
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), ' +
+  'textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
+
+const focusables = (panel: HTMLElement) =>
+  Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(el => !el.closest('[hidden], [inert]'));
 
 const sizeClasses: Record<ModalSize, string> = {
   sm: 'max-w-sm',
@@ -41,6 +54,69 @@ const Modal = ({ open, onClose, size = 'sm', overlayOpacity = 'low', className =
    * changes nothing about propagation. `tests/unit/modalDragSelect.test.ts` pins both halves.
    */
   const pressBeganInside = useRef<boolean | null>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  const fallbackLabelId = useId();
+
+  /**
+   * SQEM-535 — a dialog, not a box: name, Escape, focus in and focus back.
+   *
+   * ⛔ The listener sits on `document` in the BUBBLE phase, not on `window` and not in capture.
+   * - A handler inside the dialog sees Escape first and can claim it with `preventDefault()` (the
+   *   provider dropdown in `SetupWizard` does: Escape closes the dropdown, not the wizard). React
+   *   listens on the portal container (`body`), which is below `document` on the event path.
+   * - `FullScreenExit` listens on `window`, which comes after `document`. It skips an Escape that is
+   *   already `defaultPrevented` — before this, Escape in the report dialog of a marketplace listing
+   *   left the whole page.
+   *
+   * The name is the first heading in the panel, wired imperatively so none of the call sites had to
+   * change. Without `onClose` (an upload is running) Escape does nothing, like a click beside it —
+   * but it is still swallowed, so it cannot leave the page underneath either.
+   */
+  useEffect(() => {
+    if (!open) return;
+    const token = {};
+    openStack.push(token);
+    const panel = panelRef.current;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    if (panel) {
+      const heading = panel.querySelector<HTMLElement>('h1, h2, h3, h4');
+      if (heading) {
+        if (!heading.id) heading.id = fallbackLabelId;
+        panel.setAttribute('aria-labelledby', heading.id);
+      }
+      // An `autoFocus` field inside already has focus; leave it there.
+      if (!panel.contains(document.activeElement)) (focusables(panel)[0] ?? panel).focus();
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (openStack[openStack.length - 1] !== token || !panel) return;
+      if (e.key === 'Escape') {
+        if (e.defaultPrevented) return;
+        e.preventDefault();
+        onCloseRef.current?.();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = focusables(panel);
+      if (items.length === 0) { e.preventDefault(); panel.focus(); return; }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !panel.contains(active))) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (active === last || !panel.contains(active))) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      const i = openStack.indexOf(token);
+      if (i !== -1) openStack.splice(i, 1);
+      if (previouslyFocused?.isConnected) previouslyFocused.focus();
+    };
+  }, [open, fallbackLabelId]);
+
   if (!open) return null;
 
   // Portal to <body> so the overlay is always viewport-fixed and full-page (backdrop blur + centred),
@@ -69,6 +145,7 @@ const Modal = ({ open, onClose, size = 'sm', overlayOpacity = 'low', className =
   // `tests/unit/modalLayer.test.ts` pins the order.
   return createPortal(
     <div
+      role="presentation"
       className={[
         'fixed inset-0 backdrop-blur-sm z-[90] overflow-y-auto overscroll-contain',
         overlayOpacity === 'high' ? 'bg-slate-900/50' : 'bg-slate-900/20',
@@ -85,8 +162,13 @@ const Modal = ({ open, onClose, size = 'sm', overlayOpacity = 'low', className =
       <div className="flex min-h-full items-center justify-center p-4">
         <div
           ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
           className={[
-            'bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 animate-scale-up w-full',
+            'focus:outline-none',
+            // SQEM-554 (a) — the dialog tokens (same values as the 2xl pair they replace).
+            'bg-surface-raised rounded-overlay shadow-overlay border border-line animate-scale-up w-full',
             sizeClasses[size],
             className,
           ].join(' ')}

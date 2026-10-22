@@ -78,7 +78,7 @@ export function renderBrandedEmail(opts: BrandedEmailOptions): string {
           <tr>
             <td align="center" style="padding:24px 16px 0;">
               ${footerNoteHtml}
-              <p style="margin:0; color:#cbd5e1; font-size:12px;">&copy; Sqemes &middot; <a href="https://sqemes.com" style="color:#94a3b8; text-decoration:none;">sqemes.com</a></p>
+              <p style="margin:0; color:#cbd5e1; font-size:12px;">&copy; sqemes &middot; <a href="https://sqemes.com" style="color:#94a3b8; text-decoration:none;">sqemes.com</a></p>
             </td>
           </tr>
         </table>

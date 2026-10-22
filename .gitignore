@@ -31,3 +31,6 @@ coverage/
 # node_modules/.deno is covered by the node_modules rule above; deno.lock is not.
 deno.lock
 .ops-monitor/
+
+# SQEM-487 — prompt measurement output
+scripts/prompt-eval/results/

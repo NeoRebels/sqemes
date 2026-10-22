@@ -3,7 +3,7 @@
 // list), or remove it. Workspace-shared connectors are admin/editor only; anyone can add a personal one.
 import { useEffect, useState, type ComponentType } from 'react';
 import { useSearchParams } from 'react-router';
-import { Plug, Plus, Trash2, Check, Loader2, Wand2, Users, User as UserIcon, AlertCircle, LayoutGrid, ArrowUpRight, Settings2 } from 'lucide-react';
+import { Plug, Plus, Trash2, Check, Loader2, Wand2, Users, User as UserIcon, AlertCircle, AlertTriangle, LayoutGrid, ArrowUpRight, Settings2 } from 'lucide-react';
 import Card from './ui/Card';
 import Modal from './ui/Modal';
 import { IS_SELF_HOSTED } from '../lib/env';
@@ -505,52 +505,52 @@ export default function ConnectorsCard({
     <Card className="p-6 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Plug className="w-5 h-5 text-brand-500" />
+          <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
+            <Plug className="w-5 h-5 text-accent" />
             Connectors
           </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-sm text-ink-muted mt-1">
             Connect external MCP tools to use in Chat.
           </p>
         </div>
         <button
           onClick={openAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none shrink-0"
+          className="flex items-center gap-2 px-4 py-2 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-lg shrink-0"
         >
           <Plus className="w-4 h-4" /> Add connector
         </button>
       </div>
 
       {loaded && manualConnectors.length === 0 ? (
-        <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-          <Plug className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">No connectors yet</p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Add a hosted MCP endpoint to use its tools in Chat.</p>
+        <div className="text-center py-10 border-2 border-dashed border-line-strong rounded-2xl">
+          <Plug className="w-8 h-8 text-ink-subtle mx-auto mb-3" />
+          <p className="text-sm font-semibold text-ink-muted">No connectors yet</p>
+          <p className="text-xs text-ink-subtle mt-1">Add a hosted MCP endpoint to use its tools in Chat.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {manualConnectors.map(c => (
-            <div key={c.id} className="flex items-center justify-between gap-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
+            <div key={c.id} className="flex items-center justify-between gap-4 p-4 bg-surface-sunken rounded-xl border border-line">
               <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{c.name}</p>
-                <p className="text-xs font-mono text-slate-400 dark:text-slate-500 mt-0.5 truncate">{c.mcp_url}</p>
+                <p className="text-sm font-bold text-ink-strong truncate">{c.name}</p>
+                <p className="text-xs font-mono text-ink-subtle mt-0.5 truncate">{c.mcp_url}</p>
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                  <span className={`text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md flex items-center gap-1 ${c.user_id ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'}`}>
+                  <span className={`text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md flex items-center gap-1 ${c.user_id ? 'bg-success-soft text-ink-strong' : 'bg-accent-soft text-accent'}`}>
                     {c.user_id ? <><UserIcon className="w-3 h-3" /> Personal</> : <><Users className="w-3 h-3" /> Workspace</>}
                   </span>
                   {c.allowed_tools?.length ? (
-                    <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300">{c.allowed_tools.length} tools</span>
+                    <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-line-strong text-ink">{c.allowed_tools.length} tools</span>
                   ) : null}
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <button onClick={() => handleTest(c.id)} disabled={testingId === c.id} className="px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 flex items-center gap-1.5">
+                <button onClick={() => handleTest(c.id)} disabled={testingId === c.id} className="px-3 py-1.5 text-xs font-bold text-ink bg-surface-field border border-line-strong rounded-lg hover:bg-surface-sunken transition-colors disabled:opacity-50 flex items-center gap-1.5">
                   {testingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Test
                 </button>
-                <button onClick={() => openToolsModal(c)} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors" title="Tools">
+                <button onClick={() => openToolsModal(c)} className="p-2 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors" title="Tools">
                   <Settings2 className="w-4 h-4" />
                 </button>
-                <button onClick={() => handleDelete(c.id)} disabled={deletingId === c.id} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50" title="Remove">
+                <button onClick={() => handleDelete(c.id)} disabled={deletingId === c.id} className="p-2 text-ink-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors disabled:opacity-50" title="Remove">
                   {deletingId === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 </button>
               </div>
@@ -563,35 +563,36 @@ export default function ConnectorsCard({
     {/* SQEM-150 — one-click OAuth connectors (sign-in apps). Extensible via OAUTH_APPS. */}
     <Card className="p-6 md:p-8">
       <div className="mb-6">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <LayoutGrid className="w-5 h-5 text-brand-500" />
+        <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
+          <LayoutGrid className="w-5 h-5 text-accent" />
           Apps
         </h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+        <p className="text-sm text-ink-muted mt-1">
           One-click connectors — sign in once, then use them in Chat.
         </p>
       </div>
       {/* SQEM-452 — the advert covers the tiles it is actually about, and nothing else. It used to
           replace the whole card; see `needsCloudOAuth`. The names come from the list, so this text
-          cannot go stale the way the hard-coded one did. */}
+          cannot go stale the way the hard-coded one did.
+          SQEM-554 (d5): a plain accent surface instead of the brand gradient (C uses no gradients). */}
       {IS_SELF_HOSTED && (
-        <div className="rounded-2xl border border-brand-100 dark:border-brand-900/40 bg-gradient-to-br from-brand-50 to-white dark:from-brand-900/20 dark:to-slate-800/50 p-6 text-center mb-6">
+        <div className="rounded-card border border-accent/20 bg-accent-soft p-6 text-center mb-6">
           <div className="flex items-center justify-center gap-1.5 mb-4">
             {CLOUD_ONLY_APPS.map(app => (
-              <div key={app.id} className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-sm">
+              <div key={app.id} className="w-9 h-9 rounded-xl bg-surface-raised border border-line flex items-center justify-center shadow-sm">
                 <app.Icon className="w-5 h-5" />
               </div>
             ))}
           </div>
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">One-click sign-in connectors</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 max-w-md mx-auto">
+          <h3 className="text-base font-bold text-ink-strong">One-click sign-in connectors</h3>
+          <p className="text-sm text-ink-muted mt-1.5 max-w-md mx-auto">
             {CLOUD_ONLY_APPS.map(a => a.name).join(', ')} need an OAuth app we host, so they are available on sqemes Cloud. Everything below works on this instance.
           </p>
           <a
             href="https://sqemes.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none"
+            className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-lg"
           >
             Explore sqemes Cloud <ArrowUpRight className="w-4 h-4" />
           </a>
@@ -609,27 +610,30 @@ export default function ConnectorsCard({
           // to remove it. Blocking every button would trap a connector nobody could get rid of.
           const blocked = !!app.unavailable;
           return (
-            <div key={app.id} className="flex items-center justify-between gap-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
+            <div key={app.id} className="flex items-center justify-between gap-4 p-4 bg-surface-sunken rounded-xl border border-line">
               <div className={`flex items-center gap-3 min-w-0 ${blocked && !connected ? 'opacity-60' : ''}`}>
                 <div className="relative shrink-0">
-                  <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-surface-raised border border-line flex items-center justify-center">
                     <app.Icon className="w-6 h-6" />
                   </div>
                   {connected && (
-                    <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-800 flex items-center justify-center" title="Connected">
+                    <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-success ring-2 ring-surface-raised flex items-center justify-center" title="Connected">
                       <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
                     </span>
                   )}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{app.name}</p>
+                  <p className="text-sm font-bold text-ink-strong truncate">{app.name}</p>
                   {/* SQEM-274 — the reason replaces the description rather than sitting beside it.
                       A tile that reads "Read & draft your email" next to a dead button describes a
                       capability the person cannot have; the sentence they need is why not. */}
+                  {/* SQEM-554 (f1) — the blocked reason in dark text with an amber icon:
+                      amber text at this size misses AA; the icon keeps it reading as a warning. */}
                   <p className={`text-xs mt-0.5 truncate ${
-                    connected ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
-                      : blocked ? 'text-amber-600 dark:text-amber-400 font-semibold'
-                      : 'text-slate-400 dark:text-slate-500'}`}>
+                    connected ? 'text-success font-semibold'
+                      : blocked ? 'text-ink font-semibold'
+                      : 'text-ink-subtle'}`}>
+                    {blocked && !connected && <AlertTriangle aria-hidden className="inline w-3 h-3 mr-1 -mt-0.5 text-warning" />}
                     {connected ? 'Connected' : blocked ? app.unavailable : app.description}
                   </p>
                 </div>
@@ -639,12 +643,12 @@ export default function ConnectorsCard({
                   onClick={() => (app.auth === 'token' || app.auth === 'oauth-id' || app.auth === 'public' ? openTokenModal(app) : connectApp(app.id))}
                   disabled={connectingApp === app.id || blocked}
                   title={blocked ? app.unavailable : undefined}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 ${connected ? 'text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600' : 'text-white bg-brand-600 hover:bg-brand-700'}`}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 ${connected ? 'text-ink bg-surface-field border border-line-strong hover:bg-surface-sunken' : 'text-white bg-accent-strong hover:opacity-90'}`}
                 >
                   {connectingApp === app.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : connected ? 'Reconnect' : 'Connect'}
                 </button>
                 {connected && appConnector && (
-                  <button onClick={() => openToolsModal(appConnector)} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors" title="Tools">
+                  <button onClick={() => openToolsModal(appConnector)} className="p-2 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors" title="Tools">
                     <Settings2 className="w-4 h-4" />
                   </button>
                 )}
@@ -652,7 +656,7 @@ export default function ConnectorsCard({
                   <button
                     onClick={() => handleDelete(appConnector.id)}
                     disabled={deletingId === appConnector.id}
-                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+                    className="p-2 text-ink-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors disabled:opacity-50"
                     title="Disconnect"
                   >
                     {deletingId === appConnector.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
@@ -667,49 +671,49 @@ export default function ConnectorsCard({
 
       {/* Add connector modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} size="sm" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Add connector</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Point at a hosted MCP endpoint. We ask the server how it wants to be connected.</p>
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">Add connector</h3>
+        <p className="text-sm text-ink-muted mb-5">Point at a hosted MCP endpoint. We ask the server how it wants to be connected.</p>
 
-        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Name</label>
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. My Shopify store"
-          className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400" />
+        <label htmlFor="connectors-card-name" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Name</label>
+        <input id="connectors-card-name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. My Shopify store"
+          className="w-full p-3 mb-4 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle" />
 
-        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">MCP URL</label>
-        <input value={mcpUrl} onChange={e => { setMcpUrl(e.target.value); setProbe(null); setInspected(null); }} placeholder="https://…/mcp"
-          className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-mono outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400" />
+        <label htmlFor="connectors-card-mcp-url" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">MCP URL</label>
+        <input id="connectors-card-mcp-url" value={mcpUrl} onChange={e => { setMcpUrl(e.target.value); setProbe(null); setInspected(null); }} placeholder="https://…/mcp"
+          className="w-full p-3 mb-4 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm font-mono outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle" />
 
         {/* SQEM-444 — what the server said, and only the fields it actually needs. Nothing below this
             line appears until the address has been checked, because until then we would be guessing. */}
         {inspected?.kind === 'none' && (
-          <div className="mb-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 text-xs">
+          <div className="mb-4 p-3 rounded-xl bg-success-soft text-ink-strong text-xs">
             <div className="font-bold flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Open server — no sign-in needed{inspected.serverName ? ` (${inspected.serverName})` : ''}</div>
             {(inspected.tools || []).length > 0 && <div className="mt-1">{(inspected.tools || []).length} tools available.</div>}
           </div>
         )}
 
         {inspected?.kind === 'oauth' && (
-          <div className="mb-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700 text-xs">
-            <div className="font-bold text-slate-700 dark:text-slate-200">Signs you in with {new URL(inspected.issuer).hostname}</div>
+          <div className="mb-4 p-3 rounded-xl bg-surface-sunken border border-line text-xs">
+            <div className="font-bold text-ink">Signs you in with {new URL(inspected.issuer).hostname}</div>
             {inspected.registration ? (
-              <p className="text-slate-500 dark:text-slate-400 mt-1">Nothing to enter — this server issues its own credentials.</p>
+              <p className="text-ink-muted mt-1">Nothing to enter — this server issues its own credentials.</p>
             ) : (
               <>
                 {/* ⛔ SQEM-439 — the redirect URI is the one value nobody can guess, and registering the
                     wrong one fails with an error that names neither it nor the mistake. */}
-                <p className="text-slate-500 dark:text-slate-400 mt-1 mb-2">This server needs an app you register yourself. Use this redirect URI:</p>
+                <p className="text-ink-muted mt-1 mb-2">This server needs an app you register yourself. Use this redirect URI:</p>
                 <div className="flex items-center gap-2 mb-3">
-                  <code className="flex-1 text-2xs font-mono text-slate-700 dark:text-slate-200 break-all">{connectorRedirectUri()}</code>
+                  <code className="flex-1 text-2xs font-mono text-ink break-all">{connectorRedirectUri()}</code>
                   <button onClick={() => { navigator.clipboard?.writeText(connectorRedirectUri()); setAddCopied(true); }}
-                    className="shrink-0 px-2 py-1 text-2xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">
+                    className="shrink-0 px-2 py-1 text-2xs font-bold text-ink bg-surface-field border border-line-strong rounded-lg hover:bg-surface-sunken transition-colors">
                     {addCopied ? 'Copied' : 'Copy'}
                   </button>
                 </div>
-                <label className="block text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Client ID</label>
-                <input value={addClientId} onChange={e => setAddClientId(e.target.value)} type="text" placeholder="from the app you registered"
-                  className="w-full p-2.5 mb-2 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg text-xs outline-none focus:border-brand-500 transition-all placeholder:text-slate-400" />
-                <label className="block text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Client Secret <span className="normal-case tracking-normal font-medium text-slate-400">— optional</span></label>
-                <input value={addClientSecret} onChange={e => setAddClientSecret(e.target.value)} type="password" placeholder="leave empty if none was issued"
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg text-xs outline-none focus:border-brand-500 transition-all placeholder:text-slate-400" />
+                <label htmlFor="connectors-card-client-id" className="block text-2xs font-bold text-ink-muted uppercase tracking-wider mb-1">Client ID</label>
+                <input id="connectors-card-client-id" value={addClientId} onChange={e => setAddClientId(e.target.value)} type="text" placeholder="from the app you registered"
+                  className="w-full p-2.5 mb-2 border border-line-strong bg-surface-field text-ink-strong rounded-lg text-xs outline-none focus:border-accent transition-all placeholder:text-ink-subtle" />
+                <label htmlFor="connectors-card-client-secret-optional" className="block text-2xs font-bold text-ink-muted uppercase tracking-wider mb-1">Client Secret <span className="normal-case tracking-normal font-medium text-ink-subtle">— optional</span></label>
+                <input id="connectors-card-client-secret-optional" value={addClientSecret} onChange={e => setAddClientSecret(e.target.value)} type="password" placeholder="leave empty if none was issued"
+                  className="w-full p-2.5 border border-line-strong bg-surface-field text-ink-strong rounded-lg text-xs outline-none focus:border-accent transition-all placeholder:text-ink-subtle" />
               </>
             )}
           </div>
@@ -719,16 +723,16 @@ export default function ConnectorsCard({
             not the default it used to be. */}
         {inspected?.kind === 'token' && (
           <>
-            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Bearer token</label>
-            <input value={token} onChange={e => { setToken(e.target.value); setProbe(null); }} type="password" placeholder="the token this server expects"
-              className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400" />
+            <label htmlFor="connectors-card-bearer-token" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Bearer token</label>
+            <input id="connectors-card-bearer-token" value={token} onChange={e => { setToken(e.target.value); setProbe(null); }} type="password" placeholder="the token this server expects"
+              className="w-full p-3 mb-4 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle" />
           </>
         )}
 
         {canShare && (
-          <label className="flex items-start gap-2.5 mb-4 text-sm text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+          <label className="flex items-start gap-2.5 mb-4 text-sm text-ink cursor-pointer select-none">
             <input type="checkbox" checked={shared} onChange={e => setShared(e.target.checked)} className="mt-0.5 w-4 h-4 rounded accent-brand-600 cursor-pointer shrink-0" />
-            <span>Share with the whole workspace<span className="block text-2xs text-slate-400">Off = personal to you. Shared connectors need admin/editor.</span></span>
+            <span>Share with the whole workspace<span className="block text-2xs text-ink-subtle">Off = personal to you. Shared connectors need admin/editor.</span></span>
           </label>
         )}
 
@@ -736,23 +740,23 @@ export default function ConnectorsCard({
         <div className="mb-4">
           {/* SQEM-444 — "check" rather than "test": it decides what the dialog asks for next, so it is
               a step in the flow and not an optional reassurance. */}
-          <button onClick={runInspect} disabled={inspecting || !mcpUrl.trim()} className="text-xs font-bold text-brand-600 hover:text-brand-700 disabled:opacity-50 flex items-center gap-1.5">
+          <button onClick={runInspect} disabled={inspecting || !mcpUrl.trim()} className="text-xs font-bold text-accent hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5">
             {inspecting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking…</> : <><Check className="w-3.5 h-3.5" /> Check server</>}
           </button>
           {inspected?.kind === 'token' && (
-            <button onClick={runProbe} disabled={probing || !mcpUrl.trim()} className="mt-2 text-xs font-bold text-brand-600 hover:text-brand-700 disabled:opacity-50 flex items-center gap-1.5">
+            <button onClick={runProbe} disabled={probing || !mcpUrl.trim()} className="mt-2 text-xs font-bold text-accent hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5">
               {probing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Testing…</> : <><Check className="w-3.5 h-3.5" /> Test with this token</>}
             </button>
           )}
           {probe && (
-            <div className={`mt-2 text-xs rounded-lg p-2.5 ${probe.ok ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300'}`}>
+            <div className={`mt-2 text-xs rounded-lg p-2.5 ${probe.ok ? 'bg-success-soft text-ink-strong' : 'bg-danger-soft text-danger'}`}>
               {probe.ok ? (
                 <>
                   <div className="font-bold flex items-center gap-1"><Check className="w-3.5 h-3.5" /> {probe.serverName || 'Connected'} — {(probe.tools || []).length} tools</div>
                   {(probe.tools || []).length > 0 && (
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {(probe.tools || []).slice(0, 12).map(t => (
-                        <span key={t.name} className="inline-flex items-center gap-1 bg-white/70 dark:bg-slate-800/60 px-1.5 py-0.5 rounded"><Wand2 className="w-3 h-3" />{t.name}</span>
+                        <span key={t.name} className="inline-flex items-center gap-1 bg-surface-raised/70 px-1.5 py-0.5 rounded"><Wand2 className="w-3 h-3" />{t.name}</span>
                       ))}
                     </div>
                   )}
@@ -765,19 +769,19 @@ export default function ConnectorsCard({
         </div>
 
         <div className="flex gap-2">
-          <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
+          <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">Cancel</button>
           {/* ⛔ SQEM-444 — an OAuth server is not "added", it is *connected*: the row appears when the
               person comes back from the provider. Two different endings, so two different buttons. */}
           {inspected?.kind === 'oauth' ? (
             <button
               onClick={connectAdHoc}
               disabled={saving || !name.trim() || (!inspected.registration && !addClientId.trim())}
-              className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              className="flex-1 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
               {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Connecting…</> : 'Continue'}
             </button>
           ) : (
             <button onClick={handleAdd} disabled={saving || !inspected || !name.trim() || !/^https:\/\//i.test(mcpUrl.trim())}
-              className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              className="flex-1 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
               {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Adding…</> : 'Add connector'}
             </button>
           )}
@@ -790,69 +794,69 @@ export default function ConnectorsCard({
           <>
             <div className="flex items-center gap-2.5 mb-2">
               <tokenApp.Icon className="w-6 h-6" />
-              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Connect {tokenApp.name}</h3>
+              <h3 className="font-display text-xl font-semibold text-ink-strong">Connect {tokenApp.name}</h3>
             </div>
             {/* ⛔ SQEM-439 — the redirect URI comes FIRST, before the help text that refers to it.
                 It is the one value the person cannot obtain anywhere else, and registering an app
                 without it produces a token-endpoint error that names everything except the URI. */}
             {tokenApp.auth === 'oauth-id' && tokenApp.needsRedirectUri && (
-              <div className="mb-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700">
-                <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Redirect URI — register this in Nifty</p>
+              <div className="mb-4 p-3 rounded-xl bg-surface-sunken border border-line">
+                <p className="text-2xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Redirect URI — register this in Nifty</p>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 text-2xs font-mono text-slate-700 dark:text-slate-200 break-all">{connectorRedirectUri()}</code>
+                  <code className="flex-1 text-2xs font-mono text-ink break-all">{connectorRedirectUri()}</code>
                   <button
                     onClick={() => { navigator.clipboard?.writeText(connectorRedirectUri()); setRedirectCopied(true); }}
-                    className="shrink-0 px-2 py-1 text-2xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                    className="shrink-0 px-2 py-1 text-2xs font-bold text-ink bg-surface-field border border-line-strong rounded-lg hover:bg-surface-sunken transition-colors"
                   >
                     {redirectCopied ? 'Copied' : 'Copy'}
                   </button>
                 </div>
                 {/* Staging and production are different hosts, so they need separate apps. */}
-                <p className="text-2xs text-slate-400 mt-1.5">This address is specific to this sqemes instance — an app registered for another one will be rejected.</p>
+                <p className="text-2xs text-ink-subtle mt-1.5">This address is specific to this sqemes instance — an app registered for another one will be rejected.</p>
               </div>
             )}
 
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">{tokenApp.help}</p>
+            <p className="text-sm text-ink-muted mb-5">{tokenApp.help}</p>
 
             {tokenApp.auth === 'token' && tokenApp.needsShop && (
               <>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Shop domain</label>
-                <input value={tokenShop} onChange={e => setTokenShop(e.target.value)} placeholder="your-store.myshopify.com"
-                  className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-mono outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400" />
+                <label htmlFor="connectors-card-shop-domain" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Shop domain</label>
+                <input id="connectors-card-shop-domain" value={tokenShop} onChange={e => setTokenShop(e.target.value)} placeholder="your-store.myshopify.com"
+                  className="w-full p-3 mb-4 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm font-mono outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle" />
               </>
             )}
 
-            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">{tokenApp.auth === 'public' ? tokenApp.hostLabel : tokenApp.tokenLabel}</label>
+            <label htmlFor="connectors-card-" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">{tokenApp.auth === 'public' ? tokenApp.hostLabel : tokenApp.tokenLabel}</label>
             {/* ⚠️ SQEM-437 — a client id is NOT a secret (Microsoft publishes its own in a 401
                 header), and masking it would stop the person checking what they pasted. A token is
                 masked for the opposite reason. */}
             {/* ⚠️ SQEM-441 — a shop domain is public information, so it is plain text like the client
                 id above and unlike a token. */}
-            <input value={tokenValue} onChange={e => setTokenValue(e.target.value)} type={tokenApp.auth === 'token' && !tokenApp.needsSecret ? 'password' : 'text'} placeholder={tokenApp.placeholder}
-              className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400" />
+            <input id="connectors-card-" value={tokenValue} onChange={e => setTokenValue(e.target.value)} type={tokenApp.auth === 'token' && !tokenApp.needsSecret ? 'password' : 'text'} placeholder={tokenApp.placeholder}
+              className="w-full p-3 mb-4 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle" />
 
             {((tokenApp.auth === 'oauth-id') || (tokenApp.auth === 'token' && tokenApp.needsSecret)) && tokenApp.secretLabel && (
               <>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                  {tokenApp.secretLabel}{tokenApp.secretOptional && <span className="ml-1 normal-case tracking-normal font-medium text-slate-400">— optional</span>}
+                <label htmlFor="connectors-card--2" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">
+                  {tokenApp.secretLabel}{tokenApp.secretOptional && <span className="ml-1 normal-case tracking-normal font-medium text-ink-subtle">— optional</span>}
                 </label>
                 {/* ⚠️ Masked, unlike the Client ID above: this one IS a secret. */}
-                <input value={tokenSecret} onChange={e => setTokenSecret(e.target.value)} type="password" placeholder={tokenApp.auth === 'token' ? 'shpss_…' : 'leave empty if Nifty did not issue one'}
-                  className="w-full p-3 mb-4 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400" />
+                <input id="connectors-card--2" value={tokenSecret} onChange={e => setTokenSecret(e.target.value)} type="password" placeholder={tokenApp.auth === 'token' ? 'shpss_…' : 'leave empty if Nifty did not issue one'}
+                  className="w-full p-3 mb-4 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle" />
               </>
             )}
 
             {canShare && (tokenApp.auth === 'token' || tokenApp.auth === 'public') && (
-              <label className="flex items-start gap-2.5 mb-4 text-sm text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+              <label className="flex items-start gap-2.5 mb-4 text-sm text-ink cursor-pointer select-none">
                 <input type="checkbox" checked={tokenShared} onChange={e => setTokenShared(e.target.checked)} className="mt-0.5 w-4 h-4 rounded accent-brand-600 cursor-pointer shrink-0" />
-                <span>Share with the whole workspace<span className="block text-2xs text-slate-400">Off = personal to you. Shared connectors need admin/editor.</span></span>
+                <span>Share with the whole workspace<span className="block text-2xs text-ink-subtle">Off = personal to you. Shared connectors need admin/editor.</span></span>
               </label>
             )}
 
             <div className="flex gap-2">
-              <button onClick={() => setTokenApp(null)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
+              <button onClick={() => setTokenApp(null)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">Cancel</button>
               <button onClick={connectToken} disabled={tokenSaving || !tokenValue.trim() || (tokenApp.auth === 'token' && tokenApp.needsShop && !tokenShop.trim())}
-                className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                className="flex-1 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {tokenSaving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Connecting…</> : (tokenApp.auth === 'oauth-id' ? 'Continue' : 'Connect')}
               </button>
             </div>
@@ -866,28 +870,28 @@ export default function ConnectorsCard({
         {toolsFor && (
           <>
             <div className="flex items-center gap-2.5 mb-1">
-              <Settings2 className="w-5 h-5 text-slate-400" />
-              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{toolsFor.name} — tools</h3>
+              <Settings2 className="w-5 h-5 text-ink-subtle" />
+              <h3 className="font-display text-xl font-semibold text-ink-strong">{toolsFor.name} — tools</h3>
             </div>
-            <p className="text-xs font-mono text-slate-400 dark:text-slate-500 mb-4 truncate">{toolsFor.mcp_url}</p>
+            <p className="text-xs font-mono text-ink-subtle mb-4 truncate">{toolsFor.mcp_url}</p>
 
             {/* ⚠️ The two states mean opposite things and look alike in a list of unticked boxes:
                 "no restriction" follows the provider as they add tools, a list freezes today's set. */}
             <div className="space-y-2 mb-4">
-              <label className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+              <label className="flex items-start gap-2.5 text-sm text-ink cursor-pointer select-none">
                 <input type="radio" checked={toolsPick === null} onChange={() => setToolsPick(null)} className="mt-0.5 w-4 h-4 accent-brand-600 cursor-pointer shrink-0" />
-                <span>All tools<span className="block text-2xs text-slate-400">Whatever this service offers, now and later. New tools are included automatically.</span></span>
+                <span>All tools<span className="block text-2xs text-ink-subtle">Whatever this service offers, now and later. New tools are included automatically.</span></span>
               </label>
-              <label className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+              <label className="flex items-start gap-2.5 text-sm text-ink cursor-pointer select-none">
                 <input type="radio" checked={toolsPick !== null} onChange={() => setToolsPick(toolsList ? toolsList.map(t => t.name) : [])} className="mt-0.5 w-4 h-4 accent-brand-600 cursor-pointer shrink-0" />
-                <span>Only the ones I pick<span className="block text-2xs text-slate-400">Fewer tools means smaller requests and fewer wrong guesses — but a tool added later stays off until you come back.</span></span>
+                <span>Only the ones I pick<span className="block text-2xs text-ink-subtle">Fewer tools means smaller requests and fewer wrong guesses — but a tool added later stays off until you come back.</span></span>
               </label>
             </div>
 
-            {toolsLoading && <p className="text-xs text-slate-400 flex items-center gap-2 mb-4"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading the tool list…</p>}
+            {toolsLoading && <p className="text-xs text-ink-subtle flex items-center gap-2 mb-4"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading the tool list…</p>}
 
             {toolsError && (
-              <div className="flex items-start gap-2 p-3 mb-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300">
+              <div className="flex items-start gap-2 p-3 mb-4 rounded-xl bg-warning-soft text-ink-strong">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 {/* Not "no tools" — the saved selection is still in force and still editable. */}
                 <p className="text-xs">Could not load the live tool list ({toolsError}). Your saved selection is unchanged and can still be edited below.</p>
@@ -895,30 +899,30 @@ export default function ConnectorsCard({
             )}
 
             {toolsPick !== null && (
-              <div className="max-h-56 overflow-y-auto border border-slate-100 dark:border-slate-700 rounded-xl p-1.5 mb-4">
+              <div className="max-h-56 overflow-y-auto border border-line rounded-xl p-1.5 mb-4">
                 {(toolsList ?? (toolsPick.map(name => ({ name, description: undefined })))).map(t => {
                   const on = toolsPick.includes(t.name);
                   return (
-                    <label key={t.name} className="w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
+                    <label key={t.name} className="w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg hover:bg-surface-sunken cursor-pointer">
                       <input type="checkbox" checked={on} className="mt-0.5 w-4 h-4 rounded accent-brand-600 cursor-pointer shrink-0"
                         onChange={() => setToolsPick(prev => (prev ?? []).includes(t.name) ? (prev ?? []).filter(x => x !== t.name) : [...(prev ?? []), t.name])} />
                       <span className="min-w-0">
-                        <span className="block text-sm font-mono text-slate-700 dark:text-slate-200 truncate">{t.name}</span>
-                        {t.description && <span className="block text-2xs text-slate-400 line-clamp-2">{t.description}</span>}
+                        <span className="block text-sm font-mono text-ink truncate">{t.name}</span>
+                        {t.description && <span className="block text-2xs text-ink-subtle line-clamp-2">{t.description}</span>}
                       </span>
                     </label>
                   );
                 })}
                 {!toolsList && toolsPick.length === 0 && (
-                  <p className="text-xs text-slate-400 px-2.5 py-2">No tool list available right now.</p>
+                  <p className="text-xs text-ink-subtle px-2.5 py-2">No tool list available right now.</p>
                 )}
               </div>
             )}
 
             <div className="flex gap-2">
-              <button onClick={() => setToolsFor(null)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
+              <button onClick={() => setToolsFor(null)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">Cancel</button>
               <button onClick={saveTools} disabled={toolsSaving}
-                className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                className="flex-1 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {toolsSaving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</> : 'Save'}
               </button>
             </div>

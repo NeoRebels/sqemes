@@ -82,13 +82,14 @@ describe('⛔ SQEM-389 — the wiring', () => {
     for (const m of api.matchAll(/\.select\('([^']*applied_skill_ids[^']*)'\)/g)) expect(m[1]).toContain('persona_id');
   });
 
-  it('a persona card opens Chat; edit stays on the pencil', () => {
+  // SQEM-554 (b) — the card's title became the preview's "Use now"; Edit is a button there.
+  it('a persona opens Chat from "Use now"; edit stays a separate link', () => {
     const app = code(read('App.tsx'));
     expect(app).toMatch(/<Route path="\/personas\/:id" element=\{<PersonaChatRedirect \/>\} \/>/);
     expect(app).toMatch(/state: \{ launchPersonaId: id \}/);
-    const personas = code(read('pages/Personas.tsx'));
-    expect(personas).toMatch(/titleHref=\{`\/personas\/\$\{persona\.id\}`\}/);
-    expect(personas).toMatch(/to=\{`\/personas\/\$\{persona\.id\}\/edit`\}/);
+    const preview = code(read('components/PersonaPreview.tsx'));
+    expect(preview).toMatch(/<Link to=\{`\/personas\/\$\{persona\.id\}`\}[^>]*>\s*<Play className="w-4 h-4" \/> Use now\s*<\/Link>/);
+    expect(preview).toMatch(/to=\{`\/personas\/\$\{persona\.id\}\/edit`\}/);
   });
 
   it('Chat: the persona is the role — applied, persisted, restored, cleared', () => {

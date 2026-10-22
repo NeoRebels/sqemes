@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
 
       if (resendApiKey) {
         const html = renderBrandedEmail({
-          title: 'Your Sqemes workspace will be deleted soon',
+          title: 'Your sqemes workspace will be deleted soon',
           preheader: `Download your data from "${c.name}" before it is removed.`,
           heading: 'Your workspace will be deleted soon',
           bodyHtml:
@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
           headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             from, to: recipients,
-            subject: `Your Sqemes workspace "${c.name}" will be deleted soon`,
+            subject: `Your sqemes workspace "${c.name}" will be deleted soon`,
             html,
           }),
         }).catch((e) => console.error('warning email failed', c.workspace_id, e?.message));

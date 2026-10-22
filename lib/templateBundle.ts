@@ -2,7 +2,9 @@
 // (+ all referenced context-file bytes) into a portable `.sqemes.zip` bundle, and
 // applies a bundle back into a workspace with fresh ids. Client-side (JSZip). Reused later by share links
 // (Phase 2) and the UGC marketplace (Phase 3).
-import JSZip from 'jszip';
+// SQEM-542 — type-only: JSZip (28 KB gzip) is loaded on first use, not with the app. A value import here
+// put it in every page load's modulepreload, because this module is reachable from the start.
+import type JSZip from 'jszip';
 import type { Persona, Prompt, PromptKind, WorkspaceFile } from '../types';
 // SQEM-258 — the format itself lives in `bundleFormat.ts`, which imports nothing but JSZip. This
 // module keeps the two halves that genuinely need the network. Re-exported so no call site moved.
@@ -64,7 +66,8 @@ export async function buildBundle(
    */
   personas: Persona[] = [],
 ): Promise<{ blob: Blob; manifest: BundleManifest }> {
-  const zip = new JSZip();
+  const JSZipLib = (await import('jszip')).default;
+  const zip = new JSZipLib();
   const fileById = new Map(allFiles.map(f => [f.id, f]));
   const fileRefs = new Map<string, string>();  // fileId → ref
   const bundleFiles: BundleFile[] = [];

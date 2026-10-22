@@ -29,6 +29,8 @@ export function rowToWorkspace(row: WorkspaceRow, members: User[] = []): Workspa
     brandProfile: row.brand_profile ? (row.brand_profile as unknown as BrandProfile) : undefined,
     // SQEM-142 — column added by migration; not yet in generated types, hence the cast.
     defaultTemplateAccess: (row as unknown as { default_template_access?: UserRole[] }).default_template_access ?? undefined,
+    // SQEM-534 — likewise.
+    defaultEditRestricted: (row as unknown as { default_edit_restricted?: boolean }).default_edit_restricted ?? false,
     // SQEM-311 — likewise added by migration, not yet in the generated types.
     authoringModelId: (row as unknown as { authoring_model_id?: string | null }).authoring_model_id ?? null,
   };
@@ -103,6 +105,7 @@ export async function updateWorkspace(id: string, updates: Partial<{
   openrouter_models: string[];
   brand_profile: BrandProfile | null;
   default_template_access: string[] | null;
+  default_edit_restricted: boolean;
   authoring_model_id: string | null;
 }>) {
   const { data, error } = await supabase

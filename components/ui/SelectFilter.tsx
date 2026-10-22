@@ -23,7 +23,7 @@ export default function SelectFilter({
 }) {
   const active = !!value;
   return (
-    <div className={`relative flex items-center self-stretch rounded-xl border shadow-sm transition-all ${active ? 'bg-slate-900 dark:bg-slate-100 border-slate-900 dark:border-slate-100' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+    <div className={`relative flex items-center self-stretch rounded-xl border shadow-sm transition-all ${active ? 'bg-slate-900 dark:bg-slate-100 border-slate-900 dark:border-slate-100' : 'bg-surface-raised border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
       <Icon className={`absolute left-3 w-3.5 h-3.5 pointer-events-none ${active ? 'text-white dark:text-slate-900' : 'text-slate-400'}`} />
       <select
         value={value ?? ''}

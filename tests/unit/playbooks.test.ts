@@ -147,7 +147,7 @@ describe('SQEM-394 — what a person reads', () => {
 
 describe('SQEM-394 — the model hears the same word, and the tools keep their names', () => {
   it('the library instruction says playbooks and still names the tools', () => {
-    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/Sqemes playbooks/);
+    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/sqemes playbooks/); // SQEM-558: the brand is lowercase mid-sentence
     expect(LIBRARY_SYSTEM_PROMPT).toMatch(/Playbooks come in two kinds/);
     expect(LIBRARY_SYSTEM_PROMPT).toMatch(/The tools call a playbook a template/);
     for (const tool of ['search_templates', 'get_template', 'list_personas', 'get_persona']) expect(LIBRARY_SYSTEM_PROMPT).toContain(tool);

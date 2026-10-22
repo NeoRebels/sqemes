@@ -15,7 +15,7 @@ export default function AccessBadge({ mode }: { mode?: AccessBadgeMode }) {
   if (!mode) return null;
   return (
     <span
-      className="text-2xs font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0"
+      className="text-2xs font-bold px-2.5 py-1 bg-surface-sunken text-slate-500 dark:text-slate-300 rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0"
       title={ACCESS_BADGE_TITLE[mode]}
     >
       <Lock className="w-3 h-3" /> {ACCESS_BADGE_LABEL[mode]}

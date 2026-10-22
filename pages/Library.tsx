@@ -2,10 +2,10 @@ import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useUI, useWorkspace, useData } from '../store';
 import { IS_SELF_HOSTED, MARKETPLACE_ENABLED } from '../lib/env';
-import { TEMPLATE_CATEGORIES, CATEGORY_COLORS } from '../constants';
+import { TEMPLATE_CATEGORIES } from '../constants';
 import { LibraryTemplate, TemplateCategory, PromptKind } from '../types';
 import { voteListing, fetchMyVotes } from '../lib/api/library';
-import { Edit, Trash2, EyeOff, ArrowUpRight, Flame, Snowflake, PenTool, Wand2, Layers } from 'lucide-react';
+import { Edit, Trash2, EyeOff, ArrowRight, Flame, Snowflake, PenTool, Wand2, Layers } from 'lucide-react';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import Modal from '../components/ui/Modal';
@@ -19,19 +19,19 @@ import MarketplaceAdminEntry from '../components/MarketplaceAdminEntry';
 const LibrarySkeleton = () => (
   <Card className="animate-pulse p-6 flex flex-col gap-3">
     <div className="flex items-start justify-between mb-1">
-      <div className="h-5 w-20 bg-slate-100 rounded-lg" />
-      <div className="h-5 w-14 bg-slate-100 rounded-lg" />
+      <div className="h-5 w-20 bg-surface-sunken rounded-lg" />
+      <div className="h-5 w-14 bg-surface-sunken rounded-lg" />
     </div>
-    <div className="h-5 w-3/4 bg-slate-100 rounded-lg" />
-    <div className="h-4 w-full bg-slate-100 rounded-lg" />
-    <div className="h-4 w-5/6 bg-slate-100 rounded-lg" />
+    <div className="h-5 w-3/4 bg-surface-sunken rounded-lg" />
+    <div className="h-4 w-full bg-surface-sunken rounded-lg" />
+    <div className="h-4 w-5/6 bg-surface-sunken rounded-lg" />
     <div className="flex gap-2 mt-1">
-      <div className="h-4 w-12 bg-slate-100 rounded-lg" />
-      <div className="h-4 w-16 bg-slate-100 rounded-lg" />
+      <div className="h-4 w-12 bg-surface-sunken rounded-lg" />
+      <div className="h-4 w-16 bg-surface-sunken rounded-lg" />
     </div>
-    <div className="mt-auto pt-3 border-t border-slate-50 flex gap-2">
-      <div className="h-9 flex-1 bg-slate-100 rounded-xl" />
-      <div className="h-9 w-9 bg-slate-100 rounded-xl" />
+    <div className="mt-auto pt-3 border-t border-line flex gap-2">
+      <div className="h-9 flex-1 bg-surface-sunken rounded-xl" />
+      <div className="h-9 w-9 bg-surface-sunken rounded-xl" />
     </div>
   </Card>
 );
@@ -151,8 +151,8 @@ const Library = () => {
             onClick={() => setActiveCategory(cat)}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border ${
               activeCategory === cat
-                ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
-                : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                ? 'bg-accent-strong text-white border-accent shadow-sm'
+                : 'bg-surface-raised text-ink-muted border-line-strong hover:border-ink-subtle'
             }`}
           >
             {cat}
@@ -166,12 +166,12 @@ const Library = () => {
           {Array.from({ length: 6 }).map((_, i) => <LibrarySkeleton key={i} />)}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 border-dashed">
-          <div className="w-16 h-16 bg-slate-50 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Layers className="w-8 h-8 text-slate-300 dark:text-slate-500" />
+        <div className="text-center py-20 bg-surface-raised rounded-3xl border border-line border-dashed">
+          <div className="w-16 h-16 bg-surface-sunken rounded-full flex items-center justify-center mx-auto mb-4">
+            <Layers className="w-8 h-8 text-ink-subtle" />
           </div>
-          <h3 className="text-slate-900 dark:text-slate-100 font-bold text-lg">No playbooks found</h3>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+          <h3 className="font-display text-xl font-semibold text-ink-strong">No playbooks found</h3>
+          <p className="text-ink-muted text-sm mt-1">
             {search ? 'Try a different search term' : 'No playbooks in this category yet'}
           </p>
         </div>
@@ -195,11 +195,11 @@ const Library = () => {
 
       {/* Delete Confirmation Modal */}
       <Modal open={!!deleteModalId} onClose={() => setDeleteModalId(null)} size="sm" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Delete Playbook?</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">This will permanently remove this playbook from the marketplace.</p>
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">Delete Playbook?</h3>
+        <p className="text-sm text-ink-muted mb-6">This will permanently remove this playbook from the marketplace.</p>
         <div className="flex gap-2">
-          <button onClick={() => setDeleteModalId(null)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
-          <Button variant="danger" onClick={() => handleDelete(deleteModalId!)} className="flex-1 py-2.5 text-xs shadow-lg hover:shadow-red-200">Yes, Delete</Button>
+          <button onClick={() => setDeleteModalId(null)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">Cancel</button>
+          <Button variant="danger" onClick={() => handleDelete(deleteModalId!)} className="flex-1 py-2.5 text-xs shadow-lg">Yes, Delete</Button>
         </div>
       </Modal>
 
@@ -226,17 +226,16 @@ const MarketplaceCard = memo(function MarketplaceCard({
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
-  const colors = CATEGORY_COLORS[template.category] || CATEGORY_COLORS.General;
 
   return (
     <TemplateCard
       topRight={isAdmin && (
         // SQEM-168 — bigger padding + gap so the hover admin buttons clear the stretched card link.
-        <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onEdit(template.id)} className="p-2.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors bg-white/80 dark:bg-slate-800/80" title="Edit">
+        <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1.5 reveal-on-hover transition-opacity">
+          <button onClick={() => onEdit(template.id)} className="p-2.5 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors bg-surface-raised/80" title="Edit">
             <Edit className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => onDelete(template.id)} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors bg-white/80 dark:bg-slate-800/80" title="Delete">
+          <button onClick={() => onDelete(template.id)} className="p-2.5 text-ink-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors bg-surface-raised/80" title="Delete">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -244,11 +243,13 @@ const MarketplaceCard = memo(function MarketplaceCard({
       badges={(
         <>
           <KindBadge kind={template.kind} />
-          <span className={`text-2xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg ${colors.bg} ${colors.text}`}>
+          {/* SQEM-554 (e2) — neutral: colour belongs to the kind and the accent; eight
+              category hues competed with C's palette. */}
+          <span className="text-2xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-surface-sunken text-ink-muted">
             {template.category}
           </span>
           {!template.published && isAdmin && (
-            <span className="text-2xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-amber-50 text-amber-600 flex items-center gap-1">
+            <span className="text-2xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-warning-soft text-ink-strong flex items-center gap-1">
               <EyeOff className="w-3 h-3" /> Draft
             </span>
           )}
@@ -259,24 +260,27 @@ const MarketplaceCard = memo(function MarketplaceCard({
       description={template.description}
       footerLeft={canVote && (
         // SQEM-169 — temperature votes on the card: 🔥 hot (red) vs ❄️ cold (ice-blue); score in degrees.
-        // h-8 (32px) = the exact height of the py-2 text-xs "See template details" button beside it.
+        // h-8 (32px) — it sat beside a filled "See playbook details" button of that height until
+        // SQEM-554 (e2) made that a quiet "Details →" link; the height stays as the widget's own.
         // SQEM-178 — hidden on self-host (voting needs a Cloud account).
-        <div className="flex items-stretch h-8 rounded-lg border border-slate-200 dark:border-slate-700">
-          <button onClick={() => onVote(template.id, score, 1)} title="Hot" className={`flex items-center px-2 rounded-l-lg transition-colors ${myVote === 1 ? 'text-red-500 bg-red-50 dark:bg-red-900/20' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+        <div className="flex items-stretch h-8 rounded-lg border border-line-strong">
+          <button onClick={() => onVote(template.id, score, 1)} title="Hot" className={`flex items-center px-2 rounded-l-lg transition-colors ${myVote === 1 ? 'text-danger bg-danger-soft' : 'text-ink-subtle hover:bg-surface-sunken'}`}>
             <Flame className="w-3.5 h-3.5" />
           </button>
-          <span className={`flex items-center px-1.5 text-xs font-bold tabular-nums ${score > 0 ? 'text-red-500' : score < 0 ? 'text-sky-500' : 'text-slate-400'}`}>{score > 0 ? `+${score}` : score}°</span>
-          <button onClick={() => onVote(template.id, score, -1)} title="Cold" className={`flex items-center px-2 rounded-r-lg transition-colors ${myVote === -1 ? 'text-sky-500 bg-sky-50 dark:bg-sky-900/20' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+          <span className={`flex items-center px-1.5 text-xs font-bold tabular-nums ${score > 0 ? 'text-danger' : score < 0 ? 'text-sky-500' : 'text-ink-subtle'}`}>{score > 0 ? `+${score}` : score}°</span>
+          <button onClick={() => onVote(template.id, score, -1)} title="Cold" className={`flex items-center px-2 rounded-r-lg transition-colors ${myVote === -1 ? 'text-sky-500 bg-sky-50 dark:bg-sky-900/20' : 'text-ink-subtle hover:bg-surface-sunken'}`}>
             <Snowflake className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
       footerRight={(
+        // SQEM-554 (e2) — a quiet link, not a filled button on every card (the same move
+        // SQEM-330 made on the playbook cards). The title is the card's main link to the same page.
         <Link
           to={`/library/${template.id}`}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-brand-600 text-white text-xs font-bold rounded-lg hover:bg-brand-700 transition-all shadow-sm"
+          className="ml-auto inline-flex items-center gap-1 text-sm font-semibold text-accent hover:underline"
         >
-          <ArrowUpRight className="w-3.5 h-3.5" /> See playbook details
+          Details <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       )}
     />

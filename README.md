@@ -109,7 +109,7 @@ v1.10.0 through v1.10.12      AGPL-3.0                permanently
 from v1.11.0                  Sustainable Use License
 ```
 
-**You may run Sqemes for yourself. You may not run it for someone else.**
+**You may run sqemes for yourself. You may not run it for someone else.**
 
 The test is **who the users are** — not who owns the server, and not whose hands are on the keyboard:
 
@@ -123,9 +123,9 @@ The test is **who the users are** — not who owns the server, and not whose han
 Those last two can look identical from outside. The difference is **whose instance it is.**
 **[LICENSING.md](./LICENSING.md) spells out the cases**, including the ones that sit near the line.
 
-**There is deliberately no paid self-hosting licence.** If somebody else's users need Sqemes, the
+**There is deliberately no paid self-hosting licence.** If somebody else's users need sqemes, the
 answer is a Cloud contract for them — we would rather run it ourselves and be accountable for it than
-sell permission to run instances we cannot see, support or secure. **If you place Sqemes with clients,
+sell permission to run instances we cannot see, support or secure. **If you place sqemes with clients,
 talk to us:** the client takes Cloud and you earn on it, and the early partner terms are better than
 the market.
 

@@ -17,28 +17,28 @@ export default function handler(req, res) {
     "img-src 'self' data: https:; " +
     `connect-src 'self' ${supabaseUrl || "https://api.sqemes.com"} https://*.supabase.co`
   );
+  // SQEM-542 — no web font: the CSP above never allowed Google Fonts, so the DM Sans link that stood
+  // in the head was blocked on every load and the page always rendered in the system font. The dead
+  // links are gone; the system stack is now what the page asks for, not what it fell back to.
   res.status(200).send(`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Connect to Sqemes</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;background:#f0f6fc;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f0f6fc;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
 
 .card{background:#fff;border-radius:22px;box-shadow:0 12px 40px rgba(12,42,82,0.22);padding:44px 40px;width:100%;max-width:440px}
 
 /* Logo */
 .logo{display:flex;align-items:center;gap:12px;margin-bottom:32px}
 .logo-img{width:40px;height:40px;border-radius:10px}
-.logo-name{font-family:'DM Sans',sans-serif;font-weight:700;font-size:24px;letter-spacing:-0.96px;color:#0c2a52;line-height:1}
+.logo-name{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:700;font-size:24px;letter-spacing:-0.96px;color:#0c2a52;line-height:1}
 
 /* Headings */
-h1{font-family:'DM Sans',sans-serif;font-weight:700;font-size:22px;line-height:22px;letter-spacing:-0.88px;color:#0c2a52;margin-bottom:8px}
+h1{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:700;font-size:22px;line-height:22px;letter-spacing:-0.88px;color:#0c2a52;margin-bottom:8px}
 .sub{font-size:14px;line-height:1.7;letter-spacing:-0.154px;color:rgba(12,42,82,0.65);margin-bottom:24px}
 
 /* User row */
@@ -57,12 +57,12 @@ h1{font-family:'DM Sans',sans-serif;font-weight:700;font-size:22px;line-height:2
 /* Connection name */
 .conn-name{margin-bottom:24px}
 .name-title{font-size:12px;font-weight:700;color:rgba(12,42,82,0.55);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px;display:block}
-#sc-name{width:100%;padding:11px 14px;border:1.5px solid #e9eaec;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:14px;color:#0c2a52;background:#fff;outline:none}
+#sc-name{width:100%;padding:11px 14px;border:1.5px solid #e9eaec;border-radius:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#0c2a52;background:#fff;outline:none}
 #sc-name:focus{border-color:#857aff}
 .name-note{font-size:12px;line-height:1.6;color:rgba(12,42,82,0.5);margin-top:8px;letter-spacing:-0.1px}
 
 /* Primary button — purple pill with arrow pip */
-.btn{width:100%;height:50px;padding:0 8px 0 24px;background:#857aff;border:0;border-radius:100px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:background .15s;font-family:'DM Sans',sans-serif}
+.btn{width:100%;height:50px;padding:0 8px 0 24px;background:#857aff;border:0;border-radius:100px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:background .15s;font-family:inherit}
 .btn:hover:not(:disabled){background:#743de6}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn-label{font-size:16px;font-weight:500;color:#fff;letter-spacing:-0.4px;padding-right:4px}

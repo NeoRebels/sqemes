@@ -1,4 +1,4 @@
-# Self-Hosting Sqemes
+# Self-Hosting sqemes
 
 Sqemes is **open core**: the AI Management OS, MCP server, and Chrome
 extension are fair-code (**Sustainable Use License** from v1.11.0; AGPL-3.0 for v1.10.0–v1.10.12;
@@ -6,7 +6,7 @@ Apache-2.0 up to and including v1.9.5 — see [LICENSING.md](./LICENSING.md)) an
 on your own infrastructure with your own AI provider keys (BYOK). A few pieces are **Sqemes Cloud
 only** and simply stay off when their secret is absent — nothing breaks.
 
-> **What the licence means for you as a self-hoster.** One line: **you may run Sqemes for yourself,
+> **What the licence means for you as a self-hoster.** One line: **you may run sqemes for yourself,
 > not for someone else.** The test is **who the users are** — not who owns the server, and not whose
 > hands are on the keyboard:
 >
@@ -21,7 +21,7 @@ only** and simply stay off when their secret is absent — nothing breaks.
 > The second and third points can look identical from outside. The difference is **whose instance it
 > is.** [LICENSING.md](./LICENSING.md) spells out the cases.
 >
-> **If you place Sqemes with clients, talk to us** — the client takes a Cloud contract and you earn
+> **If you place sqemes with clients, talk to us** — the client takes a Cloud contract and you earn
 > on it. Short conversation, and the early partner terms are better than the market.
 
 > This guide ships with the public repo — it is what self-hosters read. It documents how a
@@ -31,11 +31,11 @@ only** and simply stay off when their secret is absent — nothing breaks.
 
 ## What runs self-host vs. what's Cloud-only
 
-| ✅ Fair-code (self-host) | ☁️ Sqemes Cloud only |
+| ✅ Fair-code (self-host) | ☁️ sqemes Cloud only |
 |---|---|
 | Core data model, prompt/skill/persona management | Managed hosting & infrastructure |
 | MCP server + OAuth (Claude Desktop / claude.ai) | Billing & subscriptions (Stripe) |
-| Chrome extension | Platform "Sqemes AI" funded model |
+| Chrome extension | Platform "sqemes AI" funded model |
 | Multi-user workspaces, invites, roles | Transactional email delivery (Resend) |
 | BYOK AI providers (OpenAI, Anthropic, Gemini, Mistral, …) | Error monitoring (Sentry) |
 | Workspace file library + signed-URL delivery | Priority support / SLA, Enterprise SSO, audit logs |
@@ -144,7 +144,7 @@ lines, and `PROXY_DOMAIN` if you use the bundled Caddy TLS overlay.
 ## Path A — bring your own Supabase
 
 Everything above this point describes **Path B** (the bundled stack). If you already operate a
-Supabase and only want the Sqemes frontend + edge functions on top of it, follow this path instead —
+Supabase and only want the sqemes frontend + edge functions on top of it, follow this path instead —
 you do not need `selfhost/` at all.
 
 **Prerequisites:**
@@ -256,7 +256,7 @@ Sign up (creates your workspace), then **Settings → Integrations → add an AI
 
 ## Bring Your Own Keys (BYOK)
 
-Without `MISTRAL_API_KEY` there is no funded "Sqemes AI" model — every workspace uses its own
+Without `MISTRAL_API_KEY` there is no funded "sqemes AI" model — every workspace uses its own
 provider keys (added in Settings → Integrations), encrypted at rest with `API_KEY_ENCRYPTION_KEY`.
 
 ---
@@ -266,7 +266,7 @@ provider keys (added in Settings → Integrations), encrypted at rest with `API_
 | Missing secret | Effect |
 |---|---|
 | `STRIPE_*` | No billing UI/flows; `SELF_HOSTED=true` removes the paywall entirely. |
-| `MISTRAL_API_KEY` | No funded "Sqemes AI"; BYOK only. |
+| `MISTRAL_API_KEY` | No funded "sqemes AI"; BYOK only. |
 | `RESEND_API_KEY` | Invite emails don't send — the app shows a **copyable invite link** instead (SQEM-112). |
 | `VITE_SENTRY_DSN` | No Sentry; structured console logging remains. |
 | `PUBLIC_API_URL` | MCP/OAuth advertise the raw Supabase project URL instead of a custom domain. |
@@ -309,7 +309,7 @@ points itself at your instance — no rebuild or side-load. Cloud users keep the
 > SPA fallback answers with `index.html` and the extension can't discover the config. The endpoint emits
 > `appOrigin` as `https://<host>`, so serve your instance over **HTTPS**.
 
-**Custom sites (SQEM-122).** The same extension can also load the Sqemes widget on your own sites
+**Custom sites (SQEM-122).** The same extension can also load the sqemes widget on your own sites
 (e.g. a self-hosted Copilot): add the site URL under options → **Custom sites**, grant access, and
 reload that tab. Best-effort — the widget and template insertion work on standard text/contenteditable
 composers; deeply site-specific behaviour (and exotic editors) may vary.
@@ -326,12 +326,12 @@ nothing to configure. Controlled by `VITE_MARKETPLACE_API_URL` in the bundle `.e
 
 | Value | Effect |
 |---|---|
-| unset (default) | Reads the official Sqemes Cloud marketplace |
+| unset (default) | Reads the official sqemes Cloud marketplace |
 | a URL | Reads that instance's marketplace instead |
 | **empty** | **Marketplace disabled** — the nav item hides entirely |
 
 **Submitting your own playbooks** needs a **publisher token** (submissions are reviewed, so the
-marketplace stays curated — it is invite-based today). Request one from Sqemes, then set it in the
+marketplace stays curated — it is invite-based today). Request one from sqemes, then set it in the
 app under **Settings → General → Marketplace Publisher**. It is stored **encrypted in your database**
 and takes effect immediately — no restart, no rebuild. The env var `MARKETPLACE_PUBLISHER_TOKEN` in
 `selfhost/.env` is the alternative if you'd rather configure it at deploy time.
@@ -347,7 +347,7 @@ below) — without them, submit and the token field fail.
 
 ## Connectors — external MCP tools
 
-Connectors let a workspace attach third-party MCP tools and expose them inside Sqemes. They ship with
+Connectors let a workspace attach third-party MCP tools and expose them inside sqemes. They ship with
 self-host in full: `manage-connectors` plus the OAuth pair `connector-oauth-start` /
 `connector-oauth-callback`, and an edge function for each vendor that has no MCP server of its own
 (`mcp-shopify`, `mcp-outlook`, `mcp-msgraph`).
@@ -454,7 +454,7 @@ or every `git pull` will conflict.
 New versions are published to the [releases feed](https://github.com/NeoRebels/sqemes/releases).
 On a self-hosted instance, **Settings → About** and the **sidebar footer** show your running version
 and an "update available" notice when the feed has a newer one (SQEM-118 / SQEM-123). It's driven by
-`VITE_UPDATE_CHECK_URL` in the bundle `.env` (defaults to the official Sqemes releases feed). So the
+`VITE_UPDATE_CHECK_URL` in the bundle `.env` (defaults to the official sqemes releases feed). So the
 loop is: a new release is tagged → your instance flags it → you pull + rebuild.
 
 ### 1. Back up first
@@ -477,7 +477,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.11.27       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.11.28       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### ⛔ 3a. Before v1.11.9: count your workspace-wide MCP keys
@@ -681,7 +681,7 @@ If you would rather it did not, block `/#/library/` at your reverse proxy — bu
 reaches the server, so the block has to happen in the browser or not at all. Removing the route in a
 fork is the reliable way.
 
-*Last updated: 2026-10-19 (SQEM-531: version pin v1.11.27 — the file list checks access once per query, an MCP call carries at most 5 MB (larger files go through create_upload_url), a failed import removes what it created, and Sqemes is described as the AI Management OS. Before that, SQEM-527: v1.11.26 — personas can be created in the browser again, MCP tools carry titles and hints.)*
+*Last updated: 2026-10-22 (SQEM-559: version pin v1.11.28 — a new design (new typefaces served from the image, Work | Manage navigation, an Overview page), playbook versions with restore, “Who can edit” with a workspace default, a Security tab, and the playbook card in Chat. Before that, SQEM-531: v1.11.27 — the file list checks access once per query, an MCP call carries at most 5 MB (larger files go through create_upload_url), a failed import removes what it created, and sqemes is described as the AI Management OS.)*
 `/playbooks` and every old link redirects. Nothing changes for an operator. Earlier the same day
 (SQEM-390) — the assistant template kind is gone: on upgrade the migration
 turns every assistant into a skill with the same text, and a role is a persona. Earlier: 2026-08-19

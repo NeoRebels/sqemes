@@ -75,10 +75,13 @@ describe('SQEM-400 — the fetchers select the principals, the sites render the 
 
   it('the two card pages share one badge component; the route chip keeps its own weight but the same words', () => {
     expect(code(read('pages/Templates.tsx'))).toMatch(/<AccessBadge mode=\{accessMode\} \/>/);
-    expect(code(read('pages/Personas.tsx'))).toMatch(/<AccessBadge mode=\{restrictedIds\.get\(persona\.id\)\} \/>/);
+    // SQEM-554 (b) — the persona list: the row and the preview both carry the same badge.
+    expect(code(read('pages/Personas.tsx'))).toMatch(/accessMode=\{restrictedIds\.get\(persona\.id\)\}/);
+    expect(code(read('pages/Personas.tsx'))).toMatch(/\{accessMode && <span className="relative z-10"><AccessBadge mode=\{accessMode\} \/><\/span>\}/);
+    expect(code(read('components/PersonaPreview.tsx'))).toMatch(/<AccessBadge mode=\{accessMode\} \/>/);
     const chip = code(read('pages/PersonaEditor.tsx'));
     expect(chip).toMatch(/ACCESS_BADGE_LABEL\[restrictedRouteIds\.get\(route\.templateId\)/);
-    expect(chip).toMatch(/Only me — colleagues receive this persona without this route/);
+    expect(chip).toMatch(/Only me — colleagues receive this persona without this playbook/); // SQEM-544 — "route" is "playbook" in the UI
     const badge = code(read('components/ui/AccessBadge.tsx'));
     expect(badge).toMatch(/ACCESS_BADGE_LABEL\[mode\]/);
     expect(badge).toMatch(/ACCESS_BADGE_TITLE\[mode\]/);
@@ -90,8 +93,11 @@ describe('SQEM-400 — the fetchers select the principals, the sites render the 
     expect(nav, 'sidebar personas entry').not.toBeNull();
     const icon = nav![1];
     const personas = code(read('pages/Personas.tsx'));
-    const emptyIcons = [...personas.matchAll(/icon=\{[^}]*?<(\w+) className="w-8 h-8 [^"]*" \/>/g)].map(m => m[1]);
-    expect(emptyIcons.length).toBeGreaterThanOrEqual(1);
+    // SQEM-554 (b) — `w-8 h-8[^"]*`: since (a) the icons carry no colour class, and the old pattern
+    // (`w-8 h-8 ` plus a class) matched only the favourites star, which is skipped — the check had
+    // gone silent. Now the persona icon must be found, not just "something".
+    const emptyIcons = [...personas.matchAll(/icon=\{[^}]*?<(\w+) className="w-8 h-8[^"]*" \/>/g)].map(m => m[1]);
+    expect(emptyIcons.filter(n => n !== 'Star').length).toBeGreaterThanOrEqual(1);
     for (const name of emptyIcons) {
       if (name === 'Star') continue; // the favourites filter's own empty state keeps its star
       expect(name, 'empty-state icon').toBe(icon);

@@ -1,10 +1,10 @@
 # Sqemes Contributor License Agreement
 
-Thank you for contributing to Sqemes. Before we can merge your work, we need your permission to use
+Thank you for contributing to sqemes. Before we can merge your work, we need your permission to use
 it — this page is that permission, and it is deliberately short.
 
 **Why this exists.** Sqemes is developed as one codebase that serves two things: this open,
-self-hostable repository and the hosted Sqemes Cloud service. We cannot ship your contribution in
+self-hostable repository and the hosted sqemes Cloud service. We cannot ship your contribution in
 both without your say-so, and we would rather ask you once than quietly assume it. That is the whole
 reason for this document.
 
@@ -23,7 +23,7 @@ irrevocable licence to reproduce, modify, publicly display, publicly perform, su
 distribute your contribution and works derived from it, **and to license it under any terms,
 including commercial and proprietary ones.**
 
-That last clause is the operative one, so plainly: it lets your contribution ship in Sqemes Cloud,
+That last clause is the operative one, so plainly: it lets your contribution ship in sqemes Cloud,
 which is a paid product, and it lets us change this project's licence in future without having to
 find you again.
 

@@ -10,7 +10,9 @@
 //
 // Writing a bundle (`buildBundle`) and applying one (`importBundle`) stay in `templateBundle.ts`:
 // they genuinely need the network. It re-exports everything below, so existing imports are unchanged.
-import JSZip from 'jszip';
+// SQEM-542 — type-only: JSZip (28 KB gzip) is loaded on first use, not with the app. A value import here
+// put it in every page load's modulepreload, because this module is reachable from the start.
+import type JSZip from 'jszip';
 import type { PromptKind, Variable } from '../types';
 
 export const BUNDLE_SCHEMA = 'sqemes-bundle/v1';
@@ -89,7 +91,7 @@ export type BundleManifest = {
 export const sanitizeName = (name: string) => name.replace(/[^\w.-]+/g, '_').slice(0, 80) || 'file';
 
 export async function readBundle(zipFile: File): Promise<{ zip: JSZip; manifest: BundleManifest }> {
-  const zip = await JSZip.loadAsync(zipFile);
+  const zip = await ((await import('jszip')).default).loadAsync(zipFile);
   const entry = zip.file('manifest.json');
   if (!entry) throw new Error('Not a sqemes bundle (manifest.json missing).');
   let manifest: BundleManifest;

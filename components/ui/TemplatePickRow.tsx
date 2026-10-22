@@ -40,7 +40,7 @@ export default function TemplatePickRow({
       disabled={disabled}
       className={`w-full text-left ${multi ? 'pl-3' : 'pl-4'} pr-2 py-3 rounded-xl border transition-all flex items-center gap-3 disabled:opacity-50 ${
         selected
-          ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
+          ? 'border-brand-500 bg-accent-soft'
           : 'border-transparent hover:border-slate-200 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
       }`}
     >
@@ -54,10 +54,10 @@ export default function TemplatePickRow({
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2 mb-0.5">
           <KindBadge kind={template.kind} />
-          <span className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{template.title}</span>
+          <span className="text-sm font-semibold text-ink-strong truncate">{template.title}</span>
         </span>
         {template.description && (
-          <span className="block text-xs text-slate-500 dark:text-slate-400 line-clamp-1 ml-0.5">{template.description}</span>
+          <span className="block text-xs text-ink-muted line-clamp-1 ml-0.5">{template.description}</span>
         )}
       </span>
     </button>

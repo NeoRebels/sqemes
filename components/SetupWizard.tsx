@@ -13,6 +13,7 @@ import Modal from './ui/Modal';
 import ChromeWebStoreIcon from './icons/ChromeWebStoreIcon';
 import McpIcon from './McpIcon';
 import SecretInput from './ui/SecretInput';
+import McpClientGuide from './McpClientGuide';
 import {
   Key, Puzzle, Check, Copy, ExternalLink, Loader2, ArrowRight, ArrowLeft, Sparkles, ChevronDown, CheckCircle2, Circle, Wand2, Chromium, MessageSquare,
 } from 'lucide-react';
@@ -46,7 +47,7 @@ const EXTENSION_LLMS = [
  *                     screen after signup. The dashboard already lists it under "Connections",
  *                     optional and named; Settings → API & MCP has the full version.
  *   Template access — asked in a workspace that has exactly one member, with the correct default
- *                     already selected. Lives in Settings → General, and in the editor per template.
+ *                     already selected. Lives in Settings → Security (General until SQEM-480), and in the editor per template.
  *
  * Steps are keyed by **id, not index**. The old code guarded each block with `step === N`, so the
  * self-host variant (a shorter array) and the Cloud variant silently disagreed about which number
@@ -133,9 +134,9 @@ const STEPS_FOR = (channels: Channel[], keyRequired: boolean): { id: StepId; lab
 ];
 
 const PRIMARY_BTN =
-  'inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-brand-200 dark:shadow-none';
+  'inline-flex items-center gap-2 px-5 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg';
 const MUTED_BTN =
-  'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors';
+  'inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-ink-muted hover:text-ink-strong transition-colors';
 
 interface SetupWizardProps {
   /** Called when the wizard is dismissed or completed. `completed` distinguishes the two. */
@@ -325,14 +326,15 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
         screen a new customer ever sees read like a settings dialog. The band is the same dark brand
         gradient the app already uses for the plan card and the marketplace offer tile, so it is a
         pattern the product has rather than a new one invented here.
+        SQEM-554 (f1): still a strong band for the first impression, but a flat accent
+        surface — redesign C uses no gradients, and the blurred glow went with it.
       */}
-      <div className="relative overflow-hidden px-6 py-6 md:px-8 md:py-7 bg-gradient-to-br from-brand-900 via-brand-800 to-brand-700 text-white">
-        <div aria-hidden className="pointer-events-none absolute -top-24 -right-20 w-64 h-64 rounded-full bg-brand-500/30 blur-3xl" />
+      <div className="relative overflow-hidden px-6 py-6 md:px-8 md:py-7 bg-accent-strong text-white">
         <div className="relative">
-          <div className="flex items-center gap-2 text-2xs font-bold uppercase tracking-[0.12em] text-brand-200 mb-1.5">
+          <div className="flex items-center gap-2 text-2xs font-bold uppercase tracking-[0.12em] text-white/80 mb-1.5">
             <Sparkles className="w-3.5 h-3.5" /> Getting started
           </div>
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Set up your workspace</h2>
+          <h2 className="font-display text-2xl md:text-3xl font-semibold tracking-tight">Set up your workspace</h2>
           {/* The why and the outcome live on the welcome screen (round 2) — the header stays a header. */}
           <div className="flex items-center gap-1.5 mt-5">
             {/* `i < step`: the welcome screen sits at index 0 and fills nothing. */}
@@ -340,7 +342,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
               <div key={s.id} className={`h-1.5 rounded-full flex-1 transition-all duration-500 ${i < step ? 'bg-white' : 'bg-white/25'}`} />
             ))}
           </div>
-          <p className="text-xs text-brand-100/90 mt-2.5 font-medium">
+          <p className="text-xs text-white/85 mt-2.5 font-medium">
             {current === 'welcome' ? 'Welcome' : current === 'done' ? 'All done' : <>Step {step} of {WORK_STEPS.length} · {STEPS[step].label}</>}
           </p>
         </div>
@@ -355,15 +357,15 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
         {current === 'welcome' && (
           <div>
             <div className="flex items-start gap-3 mb-5">
-              <div className="p-2.5 rounded-xl bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 shrink-0">
+              <div className="p-2.5 rounded-xl bg-accent-soft text-accent shrink-0">
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">Welcome to sqemes</h3>
+                <h3 className="text-lg font-bold text-ink-strong tracking-tight">Welcome to sqemes</h3>
                 {/* SQEM-420 — no step count any more. It used to say "two"/"three"; since SQEM-414 the
                     list is built from the channels a person has not chosen yet (self-host 2–4, Cloud
                     2–5), so any number printed here is a guess made before the question is asked. */}
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                <p className="text-sm text-ink-muted mt-1 leading-relaxed">
                   {IS_SELF_HOSTED
                     ? <>A few minutes, and your playbooks work where you already do — in sqemes Chat, in ChatGPT, Claude &amp; Co., or in your desktop and coding tools.</>
                     : <>A few minutes, and your first playbooks are ready — waiting where you already work.</>}
@@ -396,12 +398,12 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                 <li
                   key={item.title}
                   style={{ '--i': i } as React.CSSProperties}
-                  className="animate-stagger flex items-start gap-3 p-3 rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-700/20"
+                  className="animate-stagger flex items-start gap-3 p-3 rounded-2xl border border-line bg-surface-sunken/60"
                 >
-                  <div className="p-2 rounded-xl bg-white dark:bg-slate-700 text-brand-600 dark:text-brand-400 shadow-sm shrink-0">{item.icon}</div>
+                  <div className="p-2 rounded-xl bg-surface-field text-accent shadow-sm shrink-0">{item.icon}</div>
                   <div className="text-sm">
-                    <p className="font-bold text-slate-900 dark:text-slate-100">{item.title}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{item.sub}</p>
+                    <p className="font-bold text-ink-strong">{item.title}</p>
+                    <p className="text-xs text-ink-muted mt-0.5">{item.sub}</p>
                   </div>
                 </li>
               ))}
@@ -417,14 +419,14 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                   ⛔ When it is NOT (self-host, or Cloud without funded AI and no Chat picked — see
                   SQEM-418), it keeps the key icon and the key title: there the step is about drafting
                   and adapting playbooks, and "In sqemes Chat" would simply be false. */}
-              <div className="p-2.5 rounded-xl bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 shrink-0">
+              <div className="p-2.5 rounded-xl bg-accent-soft text-accent shrink-0">
                 {channels.includes('chat') ? <MessageSquare className="w-5 h-5" /> : <Key className="w-5 h-5" />}
               </div>
               <div>
                 {keyMode === 'required' ? (
                   <>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">{channels.includes('chat') ? 'In sqemes Chat' : 'Add an AI provider key'}</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                    <h3 className="text-lg font-bold text-ink-strong tracking-tight">{channels.includes('chat') ? 'In sqemes Chat' : 'Add an AI provider key'}</h3>
+                    <p className="text-sm text-ink-muted mt-1 leading-relaxed">
                       {/* SQEM-418 — Chat is named only when it was chosen. Whoever picked the browser
                           alone still needs a key here, but for drafting and adapting playbooks — telling
                           them it is for a Chat they did not ask for is how the step read as pointless. */}
@@ -439,8 +441,8 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                         mandatory. SQEM-423 gives the headline to the channel — so the word moves to the
                         front of the sentence, and the green "You can start right away" block below is
                         untouched. Do not drop it from both places. */}
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">{channels.includes('chat') ? 'In sqemes Chat' : 'Optional: add your own key'}</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Optional — unlimited AI with your own ChatGPT, Claude, Gemini or Mistral account. You can also do this any time later in Settings → Integrations.</p>
+                    <h3 className="text-lg font-bold text-ink-strong tracking-tight">{channels.includes('chat') ? 'In sqemes Chat' : 'Optional: add your own key'}</h3>
+                    <p className="text-sm text-ink-muted mt-1 leading-relaxed">Optional — unlimited AI with your own ChatGPT, Claude, Gemini or Mistral account. You can also do this any time later in Settings → Integrations.</p>
                   </>
                 )}
               </div>
@@ -449,8 +451,8 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
             {/* SQEM-386 — the reassurance comes FIRST. It used to sit under the provider grid, in
                 small type, after a divider — and two testers read the step as mandatory anyway. */}
             {keyMode !== 'required' && (
-              <div className="flex items-start gap-3 mb-5 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20">
-                <div className="p-2 rounded-xl bg-white/70 dark:bg-slate-800/60 text-emerald-600 dark:text-emerald-400 shrink-0">
+              <div className="flex items-start gap-3 mb-5 p-4 rounded-2xl bg-success-soft">
+                <div className="p-2 rounded-xl bg-surface-raised/70 text-success shrink-0">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
@@ -462,19 +464,19 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                           against an advertised 25,000). Naming the plan would turn that mismatch into
                           a false promise to a paying customer; naming the workspace stays true either
                           way, and the plan card still carries the tier's own number. */}
-                      <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">You can start right away</h3>
-                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                      <h3 className="text-lg font-bold text-ink-strong tracking-tight">You can start right away</h3>
+                      <p className="text-xs text-ink mt-1 leading-relaxed">
                         Your workspace already includes {creditsIncluded.toLocaleString('en-US')} AI credits a month.{' '}
                         {hasByokText
                           ? <>Your own key is used first, so those credits stay untouched — and AI stays unlimited.</>
                           : <>Chat and your playbooks work without a key. Add one to make AI unlimited and leave the included credits untouched.</>}
-                        {' '}<span className="text-slate-400 dark:text-slate-500">1 credit = 1,000 tokens.</span>
+                        {' '}<span className="text-ink-subtle">1 credit = 1,000 tokens.</span>
                       </p>
                     </>
                   ) : (
                     <>
-                      <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">AI is included in your workspace</h3>
-                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                      <h3 className="text-lg font-bold text-ink-strong tracking-tight">AI is included in your workspace</h3>
+                      <p className="text-xs text-ink mt-1 leading-relaxed">
                         No key needed — Chat and your playbooks work right away. Add your own key only if you want a specific provider or model.
                       </p>
                     </>
@@ -485,25 +487,28 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
 
             {/* One row: provider dropdown (with icons) + input + save */}
             <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative sm:w-52 shrink-0" onKeyDown={e => { if (e.key === 'Escape') setProviderOpen(false); }}>
+              <div className="relative sm:w-52 shrink-0" onKeyDown={e => {
+                // SQEM-535 — claim Escape while the list is open, so the wizard's dialog does not close too.
+                if (e.key === 'Escape' && providerOpen) { e.preventDefault(); setProviderOpen(false); }
+              }}>
                 <button
                   type="button"
                   onClick={() => setProviderOpen(o => !o)}
                   aria-haspopup="listbox"
                   aria-expanded={providerOpen}
-                  className="w-full flex items-center gap-2 p-2.5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                  className="w-full flex items-center gap-2 p-2.5 border border-line-strong bg-surface-field rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
                 >
                   <ProviderIcon provider={provider} className="w-5 h-5 shrink-0" />
-                  <span className="flex-1 text-left text-slate-900 dark:text-slate-100 truncate">{activeProvider.name}</span>
+                  <span className="flex-1 text-left text-ink-strong truncate">{activeProvider.name}</span>
                   {configured.has(provider) && !keyValue && (
-                    <span className="text-2xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded-md font-bold shrink-0">Configured</span>
+                    <span className="text-2xs bg-success-soft text-ink-strong px-1.5 py-0.5 rounded-md font-bold shrink-0">Configured</span>
                   )}
-                  <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${providerOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 text-ink-subtle shrink-0 transition-transform ${providerOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {providerOpen && (
                   <>
                     <button type="button" tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setProviderOpen(false)} aria-hidden />
-                    <div role="listbox" aria-label="AI provider" className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-xl overflow-hidden py-1">
+                    <div role="listbox" aria-label="AI provider" className="absolute z-20 mt-1 w-full bg-surface-raised border border-line-strong rounded-xl shadow-xl overflow-hidden py-1">
                       {PROVIDERS.map(p => (
                         <button
                           key={p.id}
@@ -511,11 +516,11 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                           role="option"
                           aria-selected={p.id === provider}
                           onClick={() => { setProvider(p.id); setProviderOpen(false); setConfirmRemove(false); }}
-                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${p.id === provider ? 'bg-brand-50 dark:bg-brand-900/20' : ''}`}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface-sunken transition-colors ${p.id === provider ? 'bg-accent-soft' : ''}`}
                         >
                           <ProviderIcon provider={p.id} className="w-5 h-5 shrink-0" />
-                          <span className="flex-1 text-left text-slate-700 dark:text-slate-200 truncate">{p.name}</span>
-                          {configured.has(p.id) && <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
+                          <span className="flex-1 text-left text-ink truncate">{p.name}</span>
+                          {configured.has(p.id) && <Check className="w-3.5 h-3.5 text-success shrink-0" />}
                         </button>
                       ))}
                     </div>
@@ -528,18 +533,18 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                 onChange={e => setKeyValue(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleSaveKey(); }}
                 placeholder={configured.has(provider) ? '••••••••  (enter new key to replace)' : activeProvider.placeholder}
-                className={`p-2.5 border rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500 font-mono text-slate-900 dark:text-slate-100 ${configured.has(provider) && !keyValue ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/30 dark:bg-emerald-900/10' : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700'}`}
+                className={`p-2.5 border rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle font-mono text-ink-strong ${configured.has(provider) && !keyValue ? 'border-success/40 bg-success-soft' : 'border-line-strong bg-surface-field'}`}
               />
               <button
                 onClick={handleSaveKey}
                 disabled={!keyValue.trim() || savingKey}
-                className="shrink-0 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="shrink-0 px-5 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {savingKey ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
               </button>
             </div>
             <div className="flex items-center justify-between gap-3 mt-2.5 flex-wrap">
-              <a href={activeProvider.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline group/link">
+              <a href={activeProvider.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-accent hover:underline group/link">
                 Get a {activeProvider.name} key <ExternalLink className="w-3 h-3 transition-transform group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5" />
               </a>
 
@@ -549,19 +554,19 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
               {configured.has(provider) && !keyValue && (
                 confirmRemove ? (
                   <span className="inline-flex items-center gap-2 text-xs">
-                    <span className="text-slate-500 dark:text-slate-400">Remove the saved {activeProvider.name} key?</span>
+                    <span className="text-ink-muted">Remove the saved {activeProvider.name} key?</span>
                     <button
                       type="button"
                       onClick={handleRemoveKey}
                       disabled={removingKey}
-                      className="font-bold text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors disabled:opacity-50"
+                      className="font-bold text-danger hover:opacity-80 transition-colors disabled:opacity-50"
                     >
                       {removingKey ? 'Removing…' : 'Remove'}
                     </button>
                     <button
                       type="button"
                       onClick={() => setConfirmRemove(false)}
-                      className="font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                      className="font-bold text-ink-muted hover:text-ink-strong transition-colors"
                     >
                       Cancel
                     </button>
@@ -570,7 +575,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                   <button
                     type="button"
                     onClick={() => setConfirmRemove(true)}
-                    className="text-xs font-bold text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 transition-colors"
+                    className="text-xs font-bold text-ink-muted hover:text-danger transition-colors"
                   >
                     Remove key
                   </button>
@@ -585,14 +590,14 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
         {current === 'channels' && (
           <div>
             <div className="flex items-start gap-3 mb-5">
-              <div className="p-2.5 rounded-xl bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 shrink-0">
+              <div className="p-2.5 rounded-xl bg-accent-soft text-accent shrink-0">
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">Where do you want to use your playbooks?</h3>
+                <h3 className="text-lg font-bold text-ink-strong tracking-tight">Where do you want to use your playbooks?</h3>
                 {/* The question exists because the wizard used to answer it for everyone: a tester who
                     works in the ChatGPT desktop app was walked through a browser extension. */}
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Pick everything that fits — you only get the setup steps for what you pick, and you can add the rest later.</p>
+                <p className="text-sm text-ink-muted mt-1 leading-relaxed">Pick everything that fits — you only get the setup steps for what you pick, and you can add the rest later.</p>
               </div>
             </div>
 
@@ -607,19 +612,19 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                     onClick={() => setChannels(prev => (prev.includes(c.id) ? prev.filter(x => x !== c.id) : [...prev, c.id]))}
                     className={`w-full text-left flex items-start gap-3 p-3.5 rounded-xl border transition-colors ${
                       on
-                        ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-900/20'
-                        : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500'
+                        ? 'border-accent bg-accent-soft'
+                        : 'border-line-strong hover:border-line-strong'
                     }`}
                   >
                     {on
-                      ? <CheckCircle2 className="w-5 h-5 text-brand-600 dark:text-brand-400 shrink-0 mt-0.5" />
-                      : <Circle className="w-5 h-5 text-slate-300 dark:text-slate-600 shrink-0 mt-0.5" />}
+                      ? <CheckCircle2 className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+                      : <Circle className="w-5 h-5 text-ink-subtle shrink-0 mt-0.5" />}
                     <span className="min-w-0">
-                      <span className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        <span className={on ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400 dark:text-slate-500'}>{c.icon}</span>
+                      <span className="flex items-center gap-2 text-sm font-semibold text-ink-strong">
+                        <span className={on ? 'text-accent' : 'text-ink-subtle'}>{c.icon}</span>
                         {c.title}
                       </span>
-                      <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{c.text}</span>
+                      <span className="block text-xs text-ink-muted mt-1 leading-relaxed">{c.text}</span>
                     </span>
                   </button>
                 );
@@ -632,7 +637,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
         {current === 'mcp' && (
           <div>
             <div className="flex items-start gap-3 mb-5">
-              <div className="p-2.5 rounded-xl bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 shrink-0">
+              <div className="p-2.5 rounded-xl bg-accent-soft text-accent shrink-0">
                 <McpIcon className="w-5 h-5" />
               </div>
               <div>
@@ -642,32 +647,35 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                 {/* SQEM-423 — the card's title. ⚠️ The full client list moved into the line below
                     rather than disappearing: SQEM-201's rule is that this screen leads with tools a
                     person recognises, never with the acronym, and the title still names three. */}
-                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">In Claude Code, Cursor and Codex</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Claude Desktop, Cursor, VS Code, Codex and Claude Code reach your playbooks and personas as tools — over MCP, one endpoint per tool.</p>
+                <h3 className="text-lg font-bold text-ink-strong tracking-tight">In Claude Code, Cursor and Codex</h3>
+                <p className="text-sm text-ink-muted mt-1 leading-relaxed">Claude Desktop, Cursor, VS Code, Codex and Claude Code reach your playbooks and personas as tools — over MCP, one endpoint per tool.</p>
               </div>
             </div>
 
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Endpoint URL</p>
-            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 overflow-hidden">
-              <span className="text-xs font-mono text-slate-600 dark:text-slate-300 truncate flex-1 min-w-0">{MCP_URL}</span>
+            <p className="text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5">Endpoint URL</p>
+            <div className="flex items-center gap-2 bg-surface-sunken border border-line-strong rounded-xl px-3 py-2.5 overflow-hidden">
+              <span className="text-xs font-mono text-ink truncate flex-1 min-w-0">{MCP_URL}</span>
               <button
                 type="button"
                 onClick={async () => { await copyToClipboard(MCP_URL); setMcpCopied(true); setTimeout(() => setMcpCopied(false), 2000); }}
-                className="shrink-0 text-slate-400 hover:text-brand-500 transition-colors"
+                className="shrink-0 text-ink-subtle hover:text-accent transition-colors"
                 title="Copy URL"
               >
-                {mcpCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                {mcpCopied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
             </div>
 
-            {/* ⚠️ Deliberately not a list of which client signs in and which needs a key: nothing in
-                this repository verifies that per client, and a wrong name here costs the person the
-                one step they came for. Both paths are named, neither is promised. */}
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-4 leading-relaxed">
-              Add it in your tool as a custom MCP server. Some tools then ask you to sign in; others ask for a key —
-              create one under <span className="font-semibold text-slate-600 dark:text-slate-300">Settings → MCP Server</span>, where the ready-made config snippet sits as well.
+            {/* SQEM-533 — the per-client steps, the same component the Settings card shows. Until then
+                this screen deliberately named no client, because nothing here verified which signs in
+                and which needs a key; lib/mcpClients.ts now carries that, each entry checked against the
+                client's own documentation and linked to it. Compact: the notes live in Settings. */}
+            <div className="mt-4">
+              <McpClientGuide url={MCP_URL} compact />
+            </div>
+            <p className="text-xs text-ink-muted mt-3 leading-relaxed">
+              A tool that needs a key: create one under <span className="font-semibold text-ink">Settings → MCP Server</span>.
             </p>
-            <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2">
+            <p className="text-2xs text-ink-subtle mt-2">
               This step asks nothing of you here — the connecting happens inside the other tool, whenever you get to it.
             </p>
           </div>
@@ -680,16 +688,16 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
               {/* SQEM-423 — the step wears its card's icon and title. Picking "In your browser" and
                   landing on a differently-named screen with a different icon reads as a different
                   subject; the card is the promise, the step is where it is kept. */}
-              <div className="p-2.5 rounded-xl bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 shrink-0">
+              <div className="p-2.5 rounded-xl bg-accent-soft text-accent shrink-0">
                 <Chromium className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">In your browser</h3>
+                <h3 className="text-lg font-bold text-ink-strong tracking-tight">In your browser</h3>
                 {/* The WHY, what is missing without it, and that it can wait — all three testers asked
                     "why do I need this?". Round 2 dropped the two 50/50 cards (a wall of logos left, a
                     lone Chrome mark right) for the store badge and two quiet lines. */}
                 {/* SQEM-420 — "Sqemes Chat only" predates SQEM-414, which made MCP a channel of its own. */}
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">The extension brings your playbooks into the AI you already use. Without it, they still work in sqemes Chat and in your MCP tools — and you can install it any time from Settings.</p>
+                <p className="text-sm text-ink-muted mt-1 leading-relaxed">The extension brings your playbooks into the AI you already use. Without it, they still work in sqemes Chat and in your MCP tools — and you can install it any time from Settings.</p>
               </div>
             </div>
 
@@ -697,7 +705,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                 and nothing here ever changed. `useExtensionInstalled` has existed since SQEM-079 and
                 the sidebar already used it; the step that asks for the install did not. */}
             {extensionInstalled ? (
-              <p className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-sm font-bold">
+              <p className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-success-soft text-success text-sm font-bold">
                 <Check className="w-4 h-4" /> Extension installed — you&apos;re set
               </p>
             ) : (
@@ -709,7 +717,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                   href={CHROME_STORE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-lg"
                 >
                   <ChromeWebStoreIcon className="w-4 h-4" /> Install from Chrome Web Store <ExternalLink className="w-4 h-4" />
                 </a>
@@ -721,7 +729,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                     there, so this is not a manifest fix waiting to happen — it is a property of the
                     platform. What a self-hoster actually needs is the step that Cloud does not have:
                     pointing the extension at this instance (SELF_HOSTING.md → "Chrome extension"). */}
-                <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2">
+                <p className="text-2xs text-ink-subtle mt-2">
                   {IS_SELF_HOSTED
                     ? <>Opens the Chrome Web Store in a new tab. After installing, open the extension&apos;s options, enter this instance&apos;s address under <span className="font-semibold">Instance</span> and connect — a self-hosted instance cannot be detected from this page, so this step will keep offering the install either way.</>
                     : <>Opens the Chrome Web Store in a new tab. Come back here after installing — this step will notice.</>}
@@ -729,9 +737,9 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
               </div>
             )}
 
-            <div className="mt-5 space-y-1.5 text-2xs text-slate-500 dark:text-slate-400">
+            <div className="mt-5 space-y-1.5 text-2xs text-ink-muted">
               <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                <span className="font-semibold uppercase tracking-wider text-slate-400">Works with</span>
+                <span className="font-semibold uppercase tracking-wider text-ink-subtle">Works with</span>
                 {EXTENSION_LLMS.map(llm => (
                   <span key={llm.label} className="inline-flex items-center gap-1">
                     <ProviderIcon provider={llm.provider} className="w-3.5 h-3.5" /> {llm.label}
@@ -739,7 +747,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                 ))}
               </p>
               <p>
-                <span className="font-semibold uppercase tracking-wider text-slate-400">In</span> Chrome, Edge, Brave, Arc, Opera, Vivaldi
+                <span className="font-semibold uppercase tracking-wider text-ink-subtle">In</span> Chrome, Edge, Brave, Arc, Opera, Vivaldi
               </p>
             </div>
           </div>
@@ -761,15 +769,17 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
           <div>
             {/* SQEM-417 — the last screen of the first run says what was achieved before it lists what
                 is where. It stays a ledger (SQEM-386): a banner, then the same honest rows. */}
-            <div className="rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white p-5 mb-5 flex items-start gap-3.5">
-              <div className="p-2 rounded-xl bg-white/15 shrink-0"><CheckCircle2 className="w-6 h-6" /></div>
+            {/* SQEM-554 (f1) — no gradient; the success hue sits in the background and the icon, the text
+                stays dark (white on green misses AA at this size). */}
+            <div className="rounded-card bg-success-soft border border-success/30 text-ink-strong p-5 mb-5 flex items-start gap-3.5">
+              <div className="p-2 rounded-xl bg-surface-raised text-success shrink-0"><CheckCircle2 className="w-6 h-6" /></div>
               <div>
                 <h3 className="text-lg font-bold tracking-tight">
                   {createdCount > 0
                     ? <>{createdCount} playbook{createdCount === 1 ? '' : 's'} ready</>
                     : <>Your workspace is ready</>}
                 </h3>
-                <p className="text-sm text-emerald-50 mt-1 leading-relaxed">
+                <p className="text-sm text-ink mt-1 leading-relaxed">
                   {channelSummary
                     ? <>They work in {channelSummary}. Everything below can be changed later.</>
                     : <>Here is where your workspace stands. Everything below can be changed later.</>}
@@ -780,16 +790,16 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
               {/* Templates */}
               <li className="flex items-start gap-3">
                 {createdCount > 0
-                  ? <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                  : <Circle className="w-5 h-5 text-slate-300 dark:text-slate-600 shrink-0 mt-0.5" />}
+                  ? <CheckCircle2 className="w-5 h-5 text-success shrink-0 mt-0.5" />
+                  : <Circle className="w-5 h-5 text-ink-subtle shrink-0 mt-0.5" />}
                 <div className="text-sm">
-                  <p className="font-semibold text-slate-900 dark:text-slate-100">Playbooks</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className="font-semibold text-ink-strong">Playbooks</p>
+                  <p className="text-xs text-ink-muted mt-0.5">
                     {createdCount > 0
-                      ? <>{createdCount} playbook{createdCount === 1 ? '' : 's'} created — find them under <Link to="/playbooks" onClick={closeOnly} className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">Playbooks</Link>.</>
-                      : <>No playbooks yet. Your library fills from the <Link to="/playbooks/new" onClick={closeOnly} className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">editor</Link>, a <Link to="/playbooks" onClick={closeOnly} className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">.sqemes import</Link>, or the <Link to="/library" onClick={closeOnly} className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">Marketplace</Link>.</>}
+                      ? <>{createdCount} playbook{createdCount === 1 ? '' : 's'} created — find them under <Link to="/playbooks" onClick={closeOnly} className="font-semibold text-accent hover:underline">Playbooks</Link>.</>
+                      : <>No playbooks yet. Your library fills from the <Link to="/playbooks/new" onClick={closeOnly} className="font-semibold text-accent hover:underline">editor</Link>, a <Link to="/playbooks" onClick={closeOnly} className="font-semibold text-accent hover:underline">.sqemes import</Link>, or the <Link to="/library" onClick={closeOnly} className="font-semibold text-accent hover:underline">Marketplace</Link>.</>}
                     {/* Round 2 (owner): promote the wizards where the person is — the ledger. */}
-                    {!IS_SELF_HOSTED && <> Need another one? The <Link to="/playbooks" onClick={closeOnly} className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">Playbook Wizard</Link> writes it from a sentence.</>}
+                    {!IS_SELF_HOSTED && <> Need another one? The <Link to="/playbooks" onClick={closeOnly} className="font-semibold text-accent hover:underline">Playbook Wizard</Link> writes it from a sentence.</>}
                   </p>
                 </div>
               </li>
@@ -798,18 +808,18 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
               {channels.includes('browser') && (
               <li className="flex items-start gap-3">
                 {extensionInstalled
-                  ? <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                  : <Circle className="w-5 h-5 text-slate-300 dark:text-slate-600 shrink-0 mt-0.5" />}
+                  ? <CheckCircle2 className="w-5 h-5 text-success shrink-0 mt-0.5" />
+                  : <Circle className="w-5 h-5 text-ink-subtle shrink-0 mt-0.5" />}
                 <div className="text-sm">
-                  <p className="font-semibold text-slate-900 dark:text-slate-100">Browser extension</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className="font-semibold text-ink-strong">Browser extension</p>
+                  <p className="text-xs text-ink-muted mt-0.5">
                     {extensionInstalled
                       ? <>Installed — your playbooks are available inside ChatGPT, Claude &amp; Co.</>
                       : IS_SELF_HOSTED
                         // SQEM-420 — "Not yet" would be a claim this instance cannot check (see the
                         // extension step): the ping never reaches a self-hosted origin.
-                        ? <>Can&apos;t be checked from a self-hosted instance. Install it from the <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">Chrome Web Store</a> and connect it to this instance in its options.</>
-                        : <>Not yet — install it any time from the <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">Chrome Web Store</a>.</>}
+                        ? <>Can&apos;t be checked from a self-hosted instance. Install it from the <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent hover:underline">Chrome Web Store</a> and connect it to this instance in its options.</>
+                        : <>Not yet — install it any time from the <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent hover:underline">Chrome Web Store</a>.</>}
                   </p>
                 </div>
               </li>
@@ -823,14 +833,14 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                       honest states instead: the MCP mark as a signpost, and a real check once a tool has
                       actually called this workspace (`last_used_at` on the key it authenticated with). */}
                   {mcpConnected
-                    ? <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                    : <McpIcon className="w-5 h-5 text-slate-300 dark:text-slate-600 shrink-0 mt-0.5" />}
+                    ? <CheckCircle2 className="w-5 h-5 text-success shrink-0 mt-0.5" />
+                    : <McpIcon className="w-5 h-5 text-ink-subtle shrink-0 mt-0.5" />}
                   <div className="text-sm">
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">Desktop apps and code editors</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    <p className="font-semibold text-ink-strong">Desktop apps and code editors</p>
+                    <p className="text-xs text-ink-muted mt-0.5">
                       {mcpConnected
-                        ? <>Connected — a tool has already used this workspace&apos;s endpoint. Add more from <Link to="/settings" onClick={closeOnly} className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">Settings → MCP Server</Link>.</>
-                        : <>Add the endpoint in Claude Desktop, Cursor, VS Code or Codex — it and the config snippet live under <Link to="/settings" onClick={closeOnly} className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">Settings → MCP Server</Link>.</>}
+                        ? <>Connected — a tool has already used this workspace&apos;s endpoint. Add more from <Link to="/settings" onClick={closeOnly} className="font-semibold text-accent hover:underline">Settings → MCP Server</Link>.</>
+                        : <>Add the endpoint in Claude Desktop, Cursor, VS Code or Codex — it and the config snippet live under <Link to="/settings" onClick={closeOnly} className="font-semibold text-accent hover:underline">Settings → MCP Server</Link>.</>}
                     </p>
                   </div>
                 </li>
@@ -840,18 +850,18 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                   the same subject twice, one after the other. Ready and powered-by belong together. */}
               {channels.includes('chat') && (
                 <li className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-5 h-5 text-success shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">sqemes Chat</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Ready — open <Link to="/chat" onClick={closeOnly} className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">Chat</Link> and it finds the playbook that fits what you ask for.{' '}
+                    <p className="font-semibold text-ink-strong">sqemes Chat</p>
+                    <p className="text-xs text-ink-muted mt-0.5">
+                      Ready — open <Link to="/chat" onClick={closeOnly} className="font-semibold text-accent hover:underline">Chat</Link> and it finds the playbook that fits what you ask for.{' '}
                       {configured.size > 0
                         ? <>Your own key powers it, so AI here is unlimited.</>
                         : keyMode === 'credits'
-                          ? <>It runs on the AI credits included in your workspace; add your own key any time in <Link to="/settings" onClick={closeOnly} className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">Settings → Integrations</Link>.</>
+                          ? <>It runs on the AI credits included in your workspace; add your own key any time in <Link to="/settings" onClick={closeOnly} className="font-semibold text-accent hover:underline">Settings → Integrations</Link>.</>
                           : keyMode === 'included'
                             ? <>AI is included in your workspace — nothing to do.</>
-                            : <>⚠️ It still needs a provider key — add one in <Link to="/settings" onClick={closeOnly} className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">Settings → Integrations</Link>.</>}
+                            : <>⚠️ It still needs a provider key — add one in <Link to="/settings" onClick={closeOnly} className="font-semibold text-accent hover:underline">Settings → Integrations</Link>.</>}
                     </p>
                   </div>
                 </li>
@@ -863,14 +873,14 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
               {!channels.includes('chat') && keyMode === 'required' && (
               <li className="flex items-start gap-3">
                 {configured.size > 0
-                  ? <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                  : <Circle className="w-5 h-5 text-slate-300 dark:text-slate-600 shrink-0 mt-0.5" />}
+                  ? <CheckCircle2 className="w-5 h-5 text-success shrink-0 mt-0.5" />
+                  : <Circle className="w-5 h-5 text-ink-subtle shrink-0 mt-0.5" />}
                 <div className="text-sm">
-                  <p className="font-semibold text-slate-900 dark:text-slate-100">AI in sqemes</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className="font-semibold text-ink-strong">AI in sqemes</p>
+                  <p className="text-xs text-ink-muted mt-0.5">
                     {configured.size > 0
                       ? <>Your own key is set — AI here is unlimited.</>
-                      : <>Not yet — a provider key is needed for drafting and adapting playbooks. Add it in <Link to="/settings" onClick={closeOnly} className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">Settings → Integrations</Link>.</>}
+                      : <>Not yet — a provider key is needed for drafting and adapting playbooks. Add it in <Link to="/settings" onClick={closeOnly} className="font-semibold text-accent hover:underline">Settings → Integrations</Link>.</>}
                   </p>
                 </div>
               </li>
@@ -881,19 +891,19 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-4 md:px-8 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
+      <div className="px-6 py-4 md:px-8 border-t border-line flex items-center justify-between gap-3">
         {current === 'done' ? (
           <span />
         ) : step > 0 ? (
-          <button onClick={back} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+          <button onClick={back} className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-muted hover:text-ink-strong transition-colors">
             <ArrowLeft className="w-4 h-4" /> Back
           </button>
         ) : (
           // SQEM-386 — this closes the WHOLE wizard, and the old label ("I'll do this later") did not
           // say so next to a step-level "Skip". A tester feared losing the step for good. The way back
           // is named: the dashboard banner reopens it.
-          <button onClick={() => onClose(false)} className="text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
-            Later — reopen from the dashboard
+          <button onClick={() => onClose(false)} className="text-sm font-semibold text-ink-muted hover:text-ink-strong transition-colors">
+            Later — you can finish it from the Overview
           </button>
         )}
 

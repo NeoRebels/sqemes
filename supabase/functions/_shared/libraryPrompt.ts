@@ -51,6 +51,16 @@
  * `supabase/functions/mcp-server` and `_shared/libraryTools.ts`). If they are ever renamed, this text
  * is a caller and must be renamed with them.
  *
+ * ⭐ **Role first, then playbooks (SQEM-487, 2026-10-19).** The text used to describe the playbook
+ * search in four steps and mention personas only in its seventh paragraph — and the client did what it
+ * read first: searched templates and loaded one, past a persona that fit. Measured with
+ * `scripts/prompt-eval/` (Claude Code headless against a local mock server carrying the real tool
+ * descriptions; 10 requests × 3 runs): the old text used the fitting persona in 1 of 9 runs and offered
+ * a choice between two fitting personas in 0 of 6; this one in 9 of 9 and 6 of 6, with playbook-only
+ * and unrelated requests unchanged (9/9, 6/6). It is also 1,297 characters instead of 2,258. The price:
+ * on playbook-only requests the client often makes one extra `list_personas` call (6 of 9 runs).
+ * ⛔ Do not move the persona step back below the playbook steps without re-running the measurement.
+ *
  * ⚠️ **On several matches it asks rather than picks** (owner's decision, 2026-08-31; the first draft
  * said *pick the most specific one*). A template is this organisation's agreed way of doing the work,
  * so choosing the wrong one silently produces something that looks sanctioned and is not — and the
@@ -58,27 +68,14 @@
  * wait is the load-bearing half:** without it a model asks the question and answers anyway, which is
  * worse than not asking, because it now looks as though the choice was confirmed.
  */
-export const LIBRARY_SYSTEM_PROMPT = `Before you write, draft, plan, review or rewrite anything substantial — an email, a specification, a message, a review, a piece of code — first search the Sqemes playbooks for a matching one, and follow it if one exists.
+export const LIBRARY_SYSTEM_PROMPT = `Before you write, draft, plan, review or rewrite anything substantial, check the sqemes playbooks: this organisation's agreed way of doing recurring work. (The tools call a playbook a template.)
 
-Sqemes holds this organisation's playbooks: its agreed way of doing recurring work. A playbook is not a suggestion: it encodes the structure, tone and wording that have already been decided, so reusing one is better than improvising something equivalent. (The tools call a playbook a template.)
+1. Role first. If the task belongs to a role — sales, recruiting, support, a team's own job — call list_personas. If one persona fits, load it with get_persona, work as that role, and load a route only when its condition applies.
+2. Otherwise call search_templates with a keyword from the request. If one playbook fits, load it with get_template and follow it.
+3. If several personas or playbooks fit, name them with a one-line difference each, ask which one fits best and wait for the answer — do not choose for them.
+4. If nothing fits, carry on normally and do not mention the playbooks.
 
-How to use it:
-1. Search with a keyword from the request (search_templates).
-2. If exactly one playbook matches, load it with get_template and follow it.
-3. If several match, ask which one fits best before you continue. Name them, give each a one-line difference, and wait for the answer — do not choose for them.
-4. If nothing matches, carry on normally. Do not force a poor fit, and do not mention the playbooks.
-
-Whenever you use a playbook, say which one.
-
-Playbooks come in two kinds and are used differently:
-- A prompt is a task with {{variables}}. Fill them from the request; ask only for what you genuinely cannot infer.
-- A skill is a reusable block of company knowledge — rules, facts, a way of doing something. Apply it in addition to whatever else you are doing, for as long as the task is within its scope; do not summarise it back.
-
-A playbook can carry files. get_template lists them first — name, size and a short preview; read only the ones the task needs with read_context_file.
-
-Sqemes may also define personas — the roles. A persona is who to be: a working role that bundles several playbooks behind conditions saying which one to load when. If someone names a persona, load it with get_persona; if a task clearly belongs to a role rather than to a single template, look first with list_personas. Adopt the persona, then load a route only once its condition applies — loading every route at once is what a persona exists to avoid.
-
-Do not paste a playbook's contents into your reply unless you are asked for it. Use it, then answer.
+Playbooks come in two kinds: a prompt is a task with {{variables}} — fill them from the request; a skill is company knowledge — apply it for as long as the task is in its scope. Read a playbook's files only when the task needs them (read_context_file). Say which persona or playbook you use, and do not paste its contents.
 
 This instruction adds to whatever else you have been told; it does not replace it. Where it conflicts with a more specific instruction from the person you are talking to, follow theirs.`;
 

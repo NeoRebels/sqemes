@@ -12,11 +12,9 @@ import { importSkillBundle } from '../lib/skillBundleIo';
 import { publishToMarketplace, submitToMarketplaceViaProxy, fetchCanPublish } from '../lib/api/library';
 import { TEMPLATE_CATEGORIES, KIND_HELP } from '../constants';
 import type JSZip from 'jszip';
-import { Link, useSearchParams } from 'react-router';
-import { Search, Plus, Edit, Trash2, Copy, Star, PenTool, Wand2, Sparkles, Loader2, Store, Upload, Package, FolderDown } from 'lucide-react';
-import Card from '../components/ui/Card';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import { Search, Plus, Trash2, Star, PenTool, Wand2, Sparkles, Loader2, Store, Upload, Package, FolderDown } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
-import TemplateCard from '../components/ui/TemplateCard';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import BulkActionBar from '../components/ui/BulkActionBar';
@@ -24,163 +22,84 @@ import SearchInput from '../components/ui/SearchInput';
 import SegmentedTabs from '../components/ui/SegmentedTabs';
 import EmptyState from '../components/ui/EmptyState';
 import TagFilter from '../components/ui/TagFilter';
-import TagEditor from '../components/ui/TagEditor';
-import KindBadge from '../components/ui/KindBadge';
 import { Prompt, PromptKind, TemplateCategory } from '../types';
 import Checkbox from '../components/ui/Checkbox';
 import TemplateWizardModal from '../components/TemplateWizardModal';
+import PlaybookPreview, { type LoadedBy } from '../components/PlaybookPreview';
+import { fetchPersonas } from '../lib/api/personas';
 import { brandIsComplete } from '../lib/brand';
 import { errorMessage } from '../lib/errorMessage';
 
 const PromptSkeleton = () => (
-  <Card className="animate-pulse p-4 flex flex-col gap-3">
-    <div className="flex justify-between items-start">
-      <div className="flex gap-2">
-        <div className="h-5 w-14 bg-slate-100 rounded-lg" />
-        <div className="h-5 w-20 bg-slate-100 rounded-lg" />
-      </div>
-      <div className="w-5 h-5 bg-slate-100 rounded-full" />
+  <div className="animate-pulse flex items-center gap-3 px-3 py-3">
+    <div className="w-2.5 h-2.5 rounded-full bg-surface-sunken" />
+    <div className="flex-1 space-y-1.5">
+      <div className="h-4 w-2/3 bg-surface-sunken rounded-chip" />
+      <div className="h-3 w-1/3 bg-surface-sunken rounded-chip" />
     </div>
-    <div className="h-5 w-3/4 bg-slate-100 rounded-lg mt-1" />
-    <div className="h-4 w-full bg-slate-100 rounded-lg" />
-    <div className="h-4 w-2/3 bg-slate-100 rounded-lg" />
-    <div className="mt-auto pt-3 flex justify-between items-center">
-      <div className="h-4 w-16 bg-slate-100 rounded-lg" />
-      <div className="h-8 w-24 bg-slate-100 rounded-xl" />
-    </div>
-  </Card>
+  </div>
 );
 
-const PromptCard = memo(function PromptCard({
+/**
+ * SQEM-550 (b) — one row of the list (redesign C): kind dot, title, kind · tag, access, favourite.
+ * The title is the row's button and its `::after` covers the row (the SQEM-538 row pattern); the
+ * checkbox and the star sit above it with `relative z-10`. Every action that used to be on the card
+ * is in the preview now (`components/PlaybookPreview.tsx`).
+ */
+const PlaybookRow = memo(function PlaybookRow({
   prompt,
   canEdit,
-  workspaceTags,
   accessMode,
+  active,
   selected,
+  onSelect,
   onToggleSelect,
   onFavorite,
-  onDuplicate,
-  onExportSkill,
-  onDeleteRequest,
-  onSetTag,
-  onPublish,
-  showPublish,
 }: {
   prompt: Prompt;
   canEdit: boolean;
-  workspaceTags: string[];
   accessMode?: AccessBadgeMode; // SQEM-400 — undefined = open to everyone (no badge)
+  active: boolean;
   selected: boolean;
+  onSelect: (id: string) => void;
   onToggleSelect: (id: string) => void;
   onFavorite: (prompt: Prompt) => void;
-  onDuplicate: (prompt: Prompt) => void;
-  onExportSkill: (prompt: Prompt) => void;
-  onDeleteRequest: (id: string) => void;
-  onSetTag: (prompt: Prompt, tag: string | null) => void;
-  onPublish: (prompt: Prompt) => void;
-  showPublish: boolean;
 }) {
   return (
-  <TemplateCard
-    selected={selected}
-    topLeft={canEdit && (
-      // SQEM-168 — padded label gives the 16px checkbox a ~6px hit margin over the stretched card link.
-      <label
-        aria-label={`Select ${prompt.title}`}
-        onClick={(e) => e.stopPropagation()}
-        className="absolute top-1 left-1 z-20 p-1.5 cursor-pointer"
-      >
-        <Checkbox
-          checked={selected}
-          onChange={() => onToggleSelect(prompt.id)}
-          align="center"
-          className={`bg-white dark:bg-slate-800 shadow transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
-        />
-      </label>
-    )}
-    topRight={(
+    <li className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-control transition-colors ${active ? 'bg-accent-soft' : 'hover:bg-surface-sunken'}`}>
+      {canEdit && (
+        // SQEM-168 — padded label gives the 16px checkbox a hit margin over the stretched row button.
+        <label aria-label={`Select ${prompt.title}`} className="relative z-10 p-1 -m-1 cursor-pointer">
+          <Checkbox
+            checked={selected}
+            onChange={() => onToggleSelect(prompt.id)}
+            align="center"
+            className={selected ? 'opacity-100' : 'reveal-on-hover'}
+          />
+        </label>
+      )}
+      <span aria-hidden className={`w-2.5 h-2.5 rounded-full shrink-0 ${prompt.kind === 'prompt' ? 'bg-accent' : 'bg-skill'}`} />
       <button
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onFavorite(prompt); }}
-        className="absolute top-1.5 right-1.5 z-20 p-3 text-slate-300 hover:text-amber-400 hover:scale-110 transition-all focus:outline-none"
-        title={prompt.isFavorite ? "Remove from favorites" : "Add to favorites"}
+        type="button"
+        onClick={() => onSelect(prompt.id)}
+        aria-current={active ? 'true' : undefined}
+        title={KIND_HELP[prompt.kind]}
+        className="flex-1 min-w-0 text-left after:absolute after:inset-0 after:rounded-control focus:outline-none"
       >
-        <Star className={`w-5 h-5 ${prompt.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`} />
+        <span className="block text-sm font-semibold text-ink-strong truncate">{prompt.title}</span>
+        <span className="block text-xs text-ink-muted truncate capitalize">{prompt.kind}{prompt.tag ? ` · ${prompt.tag}` : ''}</span>
       </button>
-    )}
-    badges={(
-      <>
-        <KindBadge kind={prompt.kind} />
-        {/* SQEM-210 — no "Draft" badge: the draft axis is gone from workspace templates, and
-            `published` is now always true for them. What it used to signal is the "Restricted"
-            badge above, which reads the access rules that actually govern visibility. */}
-        <TagEditor
-          tags={prompt.tag ? [prompt.tag] : []}
-          available={canEdit && !prompt.tag ? workspaceTags : []}
-          canEdit={canEdit}
-          onAdd={(tag) => onSetTag(prompt, tag)}
-          onRemove={() => onSetTag(prompt, null)}
-        />
-      </>
-    )}
-    title={prompt.title}
-    titleHref={`/playbooks/${prompt.id}`}
-    description={prompt.description}
-    footerLeft={canEdit && (
-      <>
-        <Link to={`/playbooks/${prompt.id}/edit`} className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors" title="Edit">
-          <Edit className="w-4 h-4" />
-        </Link>
-        <button
-          onClick={(e) => { e.preventDefault(); onDuplicate(prompt); }}
-          className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-          title="Duplicate"
-        >
-          <Copy className="w-4 h-4" />
-        </button>
-        {/* SQEM-302 — one template leaves as a `.sqemes.zip`, the same format the multi-select export
-            has always produced. Until now this wrote an Agent Skill folder and was shown for skills
-            only, because a prompt's variables (and, back then, an assistant's brand config) have no place in a
-            SKILL.md. The bundle carries all three kinds, so the restriction lost its reason and the
-            button belongs on every card.
-            ⚠️ Import is untouched: an Agent Skill folder can still be uploaded (SQEM-243). */}
-        <button
-          onClick={(e) => { e.preventDefault(); onExportSkill(prompt); }}
-          className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-          title="Download Playbook (.sqemes.zip)"
-        >
-          <FolderDown className="w-4 h-4" />
-        </button>
-        {/* SQEM-178/181 — self-host shows Publish only when a publisher token is configured (Phase B). */}
-        {showPublish && (
-          <button
-            onClick={(e) => { e.preventDefault(); onPublish(prompt); }}
-            className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-            title={IS_SELF_HOSTED ? 'Submit to the community Marketplace' : 'Publish to Marketplace'}
-          >
-            <Store className="w-4 h-4" />
-          </button>
-        )}
-        <button
-          onClick={(e) => { e.preventDefault(); onDeleteRequest(prompt.id); }}
-          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-          title="Delete"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </>
-    )}
-    /* SQEM-330 — "Use in Chat" is gone and the Restricted badge takes the slot, matching the
-       persona cards.
-
-       ⛔ The button was the loudest element on every card — solid brand fill, in a footer of quiet
-       icon actions — for a path that already exists twice: the card links to the template, and Chat
-       has its own picker with search, kind tabs and favourites. It bought one click and spent the
-       card's only strong accent on it.
-
-       ⚠️ Nothing is lost: `/chat` still accepts `launchTemplateId` in its route state, so any deep
-       link into a template continues to work. Only this entry point is removed. */
-    footerRight={accessMode ? <AccessBadge mode={accessMode} /> : undefined}
-  />
+      {accessMode && <span className="relative z-10"><AccessBadge mode={accessMode} /></span>}
+      <button
+        type="button"
+        onClick={() => onFavorite(prompt)}
+        aria-pressed={!!prompt.isFavorite}
+        aria-label={prompt.isFavorite ? `Remove ${prompt.title} from favourites` : `Add ${prompt.title} to favourites`}
+        className="hit-24 relative z-10 p-1 text-ink-subtle hover:text-amber-400 transition-colors"
+      >
+        <Star className={`w-4 h-4 ${prompt.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`} />
+      </button>
+    </li>
   );
 });
 
@@ -193,8 +112,20 @@ const Templates = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const selectedKind = (searchParams.get('kind') ?? 'all') as 'all' | PromptKind;
   const setSelectedKind = (kind: 'all' | PromptKind) => {
-    setSearchParams(kind === 'all' ? {} : { kind }, { replace: true });
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (kind === 'all') next.delete('kind'); else next.set('kind', kind);
+      return next;
+    }, { replace: true });
   };
+  // SQEM-550 (b) — the selected playbook lives in the URL (?id=), so Back and a shared link work.
+  // Below `lg` an id means "show the preview instead of the list".
+  const selectedParam = searchParams.get('id');
+  const selectPlaybook = useCallback((id: string) => {
+    setSearchParams(prev => { const next = new URLSearchParams(prev); next.set('id', id); return next; });
+  }, [setSearchParams]);
+  const backToList = () => setSearchParams(prev => { const next = new URLSearchParams(prev); next.delete('id'); return next; });
+  const navigate = useNavigate();
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   // Delete Modal State
@@ -285,6 +216,26 @@ const Templates = () => {
 
     return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [prompts, searchTerm, selectedKind, selectedTag, showFavoritesOnly, canEdit]);
+
+  // SQEM-550 (b) — the playbook in the preview: the one in ?id= if it is in the list, else the first.
+  const selectedPrompt = filteredPrompts.find(p => p.id === selectedParam) ?? filteredPrompts[0] ?? null;
+  const showPreviewOnMobile = !!selectedParam && selectedPrompt?.id === selectedParam;
+
+  // "Loaded by" — which personas route to which playbook. Loaded once per workspace; small list.
+  const [loadedByMap, setLoadedByMap] = useState<Map<string, LoadedBy[]>>(new Map());
+  useEffect(() => {
+    if (!workspace?.id) return;
+    let cancelled = false;
+    fetchPersonas(workspace.id).then(personas => {
+      if (cancelled) return;
+      const map = new Map<string, LoadedBy[]>();
+      for (const persona of personas) for (const r of persona.routes || []) {
+        map.set(r.templateId, [...(map.get(r.templateId) || []), { id: persona.id, title: persona.title, condition: r.condition }]);
+      }
+      setLoadedByMap(map);
+    }).catch(() => { /* the field then just says nobody loads it */ });
+    return () => { cancelled = true; };
+  }, [workspace?.id]);
 
   const handleDeleteRequest = useCallback((id: string) => {
     setPromptToDelete(id);
@@ -470,7 +421,7 @@ const Templates = () => {
     <div className="p-4 md:p-8 pb-16 md:pb-20 max-w-7xl mx-auto">
       <PageHeader
         title="Playbooks"
-        subtitle="Manage and organize your team's prompts and skills"
+        subtitle="Your team's playbooks — prompts for tasks, skills for knowledge."
         actions={canEdit && (
           <>
             <input ref={importInputRef} type="file" accept=".zip,.sqemes" onChange={handleImportFile} className="hidden" />
@@ -541,7 +492,7 @@ const Templates = () => {
       )}
 
       {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="lg:max-w-sm rounded-card border border-line bg-surface-raised p-2 mb-8">
           {Array.from({ length: 6 }).map((_, i) => <PromptSkeleton key={i} />)}
         </div>
       )}
@@ -554,8 +505,8 @@ const Templates = () => {
           the editor cannot drift apart. */}
       {!isLoading && prompts.length === 0 && (
         <EmptyState
-          icon={<Plus className="w-8 h-8 text-brand-400" />}
-          iconWrapClassName="bg-brand-50 dark:bg-brand-900/20"
+          icon={<Plus className="w-8 h-8" />}
+          tone="brand"
           title="No playbooks yet"
           description="Two kinds, depending on what you need:"
           extra={
@@ -584,32 +535,51 @@ const Templates = () => {
 
       {!isLoading && prompts.length > 0 && filteredPrompts.length === 0 && (
         <EmptyState
-          icon={showFavoritesOnly ? <Star className="w-8 h-8 text-amber-300" /> : <Search className="w-8 h-8 text-slate-300 dark:text-slate-500" />}
+          icon={showFavoritesOnly ? <Star className="w-8 h-8 text-amber-300" /> : <Search className="w-8 h-8" />}
           title={showFavoritesOnly ? 'No favourite playbooks' : 'No playbooks found'}
           description={showFavoritesOnly ? 'Star playbooks to see them here.' : 'Try adjusting your search or filters.'}
         />
       )}
 
+      {/* SQEM-550 (b) — redesign C: the list on the left, the selected playbook on the right. Below
+          `lg` one at a time: the list, or (with ?id=) the preview with a way back. */}
       {!isLoading && filteredPrompts.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPrompts.map(prompt => (
-            <PromptCard
-              key={prompt.id}
-              prompt={prompt}
-              canEdit={canEdit}
-              workspaceTags={workspace.tags}
-              accessMode={restrictedIds.get(prompt.id)}
-              selected={selectedIds.has(prompt.id)}
-              onToggleSelect={toggleSelect}
-              onFavorite={toggleFavorite}
-              onDuplicate={handleDuplicate}
-              onExportSkill={handleExportSkill}
-              onDeleteRequest={handleDeleteRequest}
-              onSetTag={handleSetTag}
-              onPublish={openPublish}
-              showPublish={true}
-            />
-          ))}
+        <div className="lg:grid lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-6 lg:items-start">
+          <ul aria-label="Playbooks" className={`rounded-card border border-line bg-surface-raised p-2 space-y-0.5 ${showPreviewOnMobile ? 'hidden lg:block' : ''}`}>
+            {filteredPrompts.map(prompt => (
+              <PlaybookRow
+                key={prompt.id}
+                prompt={prompt}
+                canEdit={canEdit}
+                accessMode={restrictedIds.get(prompt.id)}
+                active={selectedPrompt?.id === prompt.id}
+                selected={selectedIds.has(prompt.id)}
+                onSelect={selectPlaybook}
+                onToggleSelect={toggleSelect}
+                onFavorite={toggleFavorite}
+              />
+            ))}
+          </ul>
+          {selectedPrompt && (
+            <div className={`lg:sticky lg:top-4 ${showPreviewOnMobile ? '' : 'hidden lg:block'}`}>
+              <PlaybookPreview
+                prompt={selectedPrompt}
+                canEdit={canEdit}
+                accessMode={restrictedIds.get(selectedPrompt.id)}
+                workspaceTags={workspace.tags}
+                loadedBy={loadedByMap.get(selectedPrompt.id) || []}
+                showPublish={true}
+                onUse={p => navigate('/chat', { state: { launchTemplateId: p.id } })}
+                onDuplicate={handleDuplicate}
+                onExport={handleExportSkill}
+                onPublish={openPublish}
+                onDelete={handleDeleteRequest}
+                onSetTag={handleSetTag}
+                onFavorite={toggleFavorite}
+                onBack={backToList}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -663,8 +633,8 @@ const Templates = () => {
               snapshot others can copy. It&apos;s <span className="font-semibold">submitted for review</span> and goes live once approved.
               {publishTarget.kind === 'skill' && <span className="block mt-1 text-amber-600 dark:text-amber-400">Skills get extra review before they go live.</span>}
             </p>
-            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Category</label>
-            <select value={publishCategory} onChange={e => setPublishCategory(e.target.value as TemplateCategory)}
+            <label htmlFor="templates-category" className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Category</label>
+            <select id="templates-category" value={publishCategory} onChange={e => setPublishCategory(e.target.value as TemplateCategory)}
               className="w-full p-3 mb-5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all">
               {TEMPLATE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>

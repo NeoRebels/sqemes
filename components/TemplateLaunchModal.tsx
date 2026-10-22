@@ -20,7 +20,8 @@ export type { ContextImage };
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onInsert: (text: string, template: Prompt, images: ContextImage[]) => void;
+  /** SQEM-551 — `inputs` are the field values as filled in, for the playbook card in the history. */
+  onInsert: (text: string, template: Prompt, images: ContextImage[], inputs: Record<string, string>) => void;
   /** SQEM-371 — a skill is APPLIED (system context), not pasted into the composer. */
   onSkillSelect: (template: Prompt, context: string, images: ContextImage[]) => void;
   initialTemplateId?: string | null;
@@ -127,7 +128,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
       if (content.trim()) parts.push(content.trim());
 
       const images = await resolveAttachmentFiles(allFileIds);
-      onInsert(parts.join('\n\n'), template, images);
+      onInsert(parts.join('\n\n'), template, images, variableInputs);
       handleClose();
     } finally {
       setIsResolving(false);
@@ -287,16 +288,16 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
             )}
             {templateVars.map(v => (
               <div key={v.id}>
-                <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">{v.label}</label>
+                <label htmlFor={`launch-var-${v.id}`} className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">{v.label}</label>
                 {v.type === 'textarea' ? (
-                  <textarea
+                  <textarea id={`launch-var-${v.id}`}
                     className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all bg-white dark:bg-slate-700 placeholder:text-slate-400"
                     rows={4}
                     value={inputs[v.name] ?? ''}
                     onChange={e => setInputs(prev => ({ ...prev, [v.name]: e.target.value }))}
                   />
                 ) : v.type === 'select' ? (
-                  <select
+                  <select id={`launch-var-${v.id}`}
                     className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all bg-white dark:bg-slate-700 appearance-none"
                     value={inputs[v.name] ?? ''}
                     onChange={e => setInputs(prev => ({ ...prev, [v.name]: e.target.value }))}
@@ -329,7 +330,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
                         <Upload className="w-5 h-5 text-brand-500 mx-auto mb-2" />
                         <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Click or drag file</p>
                         <p className="text-xs text-slate-400 mt-0.5">Images, PDF, text · max {MAX_FILE_SIZE_MB} MB</p>
-                        <input
+                        <input id={`launch-var-${v.id}`}
                           type="file"
                           accept={ACCEPT_STRING}
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -339,7 +340,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
                     )}
                   </div>
                 ) : (
-                  <input
+                  <input id={`launch-var-${v.id}`}
                     type="text"
                     className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all bg-white dark:bg-slate-700 placeholder:text-slate-400"
                     value={inputs[v.name] ?? ''}

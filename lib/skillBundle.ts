@@ -19,7 +19,9 @@
 // contributed script, it inherits every sandboxing and supply-chain problem that comes with it, and
 // a marketplace of shared skills turns that into someone else's code on our machines. Storing and
 // handing back has no such edge. Do not "finish" this by adding execution.
-import JSZip from 'jszip';
+// SQEM-542 — no import of 'jszip' here: it is loaded on first use (`await import('jszip')` below). A
+// value import put its 28 KB gzip in every page load's modulepreload, because this module is
+// reachable from the start.
 
 export const SKILL_ENTRY = 'SKILL.md';
 // SQEM-250 — was 100, which no real skill fits: `diagram-design` is 152 files. The workaround
@@ -218,7 +220,8 @@ function deriveTitle(body: string, fallback: string): string {
 // directly** — then this goes, and the reader is tested against what an Agent Skill folder actually
 // looks like rather than against our own writer.
 export async function buildSkillZip(b: SkillBundle): Promise<Blob> {
-  const zip = new JSZip();
+  const JSZipLib = (await import('jszip')).default;
+  const zip = new JSZipLib();
   zip.file(SKILL_ENTRY, buildSkillMd(b));
   for (const f of b.files) {
     // A context file literally called SKILL.md would overwrite the instructions. Refuse loudly
@@ -329,7 +332,7 @@ export function findSkillRoot(paths: string[], subPath?: string | null): string 
  * `.DS_Store`) is dropped, or every import from a Mac arrives carrying junk nobody asked for.
  */
 export async function readSkillZip(file: File): Promise<SkillBundle> {
-  const zip = await JSZip.loadAsync(file);
+  const zip = await ((await import('jszip')).default).loadAsync(file);
 
   const entries = Object.values(zip.files).filter(e => !e.dir && !isArchiveJunk(e.name));
   if (!entries.length) throw new SkillArchiveError('The archive is empty.', 'empty');

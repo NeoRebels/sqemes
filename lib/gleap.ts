@@ -23,6 +23,23 @@ const KEY = (import.meta.env.VITE_GLEAP_API_KEY ?? '').trim();
 export const gleapConfigured = KEY !== '';
 
 let started = false;
+// SQEM-485 — the loaded SDK, so "What's new" can open its News view without importing it again.
+let gleapSdk: { openNews: (showBackButton?: boolean) => void } | null = null;
+
+/**
+ * SQEM-485 — open the changelog ("What's new") inside the Gleap window. Returns false when Gleap is not
+ * running in this session (no key in this build, the script was blocked, or it has not started yet),
+ * so the caller can fall back to a link instead of a click that does nothing.
+ */
+export function openWhatsNew(): boolean {
+  if (!gleapSdk) return false;
+  try {
+    gleapSdk.openNews(false);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Start Gleap for a signed-in person.
@@ -77,6 +94,7 @@ export async function startGleap(user: User, workspace: Workspace): Promise<void
    */
   Gleap.setReplayOptions({ maskAllInputs: true, maskTextSelector: '*' });
   Gleap.initialize(KEY);
+  gleapSdk = Gleap;
 
   // Who is asking — so a reply reaches the person, and so the owner can follow up on a report.
   // Exactly the data named in the privacy policy: identity, and the workspace it came from.

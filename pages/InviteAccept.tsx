@@ -75,34 +75,34 @@ const InviteAccept = () => {
   }, [token, session, loading, navigate]);
 
   return (
-    <ScrollScreen className="bg-slate-50 dark:bg-slate-900">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-soft border border-slate-100 p-8 text-center">
+    <ScrollScreen className="bg-surface">
+      <div className="w-full max-w-md bg-surface-raised rounded-2xl shadow-soft border border-line p-8 text-center">
         {status === 'loading' && (
           <>
-            <Loader2 className="w-12 h-12 text-brand-600 animate-spin mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Accepting Invitation</h2>
-            <p className="text-slate-500 text-sm">Please wait while we add you to the workspace...</p>
+            <Loader2 className="w-12 h-12 text-accent animate-spin mx-auto mb-4" />
+            <h1 className="font-display text-xl font-semibold text-ink-strong mb-2">Accepting Invitation</h1>
+            <p className="text-ink-muted text-sm">Please wait while we add you to the workspace...</p>
           </>
         )}
 
         {status === 'success' && (
           <>
-            <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Invitation Accepted!</h2>
-            <p className="text-slate-500 text-sm">Redirecting you to the workspace...</p>
+            <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
+            <h1 className="font-display text-xl font-semibold text-ink-strong mb-2">Invitation Accepted!</h1>
+            <p className="text-ink-muted text-sm">Redirecting you to the workspace...</p>
           </>
         )}
 
         {status === 'error' && (
           <>
-            <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Something went wrong</h2>
-            <p className="text-slate-500 text-sm mb-4">{errorMessage}</p>
+            <AlertTriangle className="w-12 h-12 text-danger mx-auto mb-4" />
+            <h1 className="font-display text-xl font-semibold text-ink-strong mb-2">Something went wrong</h1>
+            <p className="text-ink-muted text-sm mb-4">{errorMessage}</p>
             <button
               onClick={() => navigate('/', { replace: true })}
-              className="px-6 py-3 bg-brand-600 text-white rounded-xl font-bold text-sm hover:bg-brand-700 transition-all"
+              className="px-6 py-3 bg-accent-strong text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all"
             >
-              Go to Dashboard
+              Go to Start
             </button>
           </>
         )}

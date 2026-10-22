@@ -93,6 +93,19 @@ describe('LIBRARY_SYSTEM_PROMPT', () => {
     expect(LIBRARY_SYSTEM_PROMPT).not.toMatch(/the search_templates tool/);
   });
 
+  // SQEM-487 — measured: with personas in the seventh paragraph the client used a fitting persona in
+  // 1 of 9 runs and offered a choice between two in 0 of 6; with the role step first, 9/9 and 6/6.
+  // The order IS the fix, so it is pinned (scripts/prompt-eval re-measures it).
+  it('⛔ puts the role step before the playbook search', () => {
+    expect(LIBRARY_SYSTEM_PROMPT.indexOf('list_personas')).toBeGreaterThan(-1);
+    expect(LIBRARY_SYSTEM_PROMPT.indexOf('list_personas')).toBeLessThan(LIBRARY_SYSTEM_PROMPT.indexOf('search_templates'));
+    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/1\. Role first\./);
+  });
+
+  it('stays short and precise (SQEM-487: 2,258 → under 1,300 characters)', () => {
+    expect(LIBRARY_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1300);
+  });
+
   it('⛔ does not name list_templates — Chat deliberately does not offer it', () => {
     // SQEM-373: the one call whose response grows with the workspace. A prompt naming a tool half
     // the surfaces lack is how a model ends up calling something that is not there.

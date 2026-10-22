@@ -213,7 +213,10 @@ export async function updatePrompt(prompt: Prompt, workspaceId: string) {
     .select();
 
   if (error) throw error;
-  return rowToPrompt(data![0] as unknown as PromptRow);
+  // SQEM-473 — RLS filters an UPDATE the person may not make (an editor not on the playbook's editor
+  // list): no error, zero rows. Said plainly instead of crashing on `data[0]`.
+  if (!data || data.length === 0) throw new Error('You may use this playbook but not change it.');
+  return rowToPrompt(data[0] as unknown as PromptRow);
 }
 
 export async function deletePrompt(id: string) {

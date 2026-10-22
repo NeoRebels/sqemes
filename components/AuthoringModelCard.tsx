@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Sparkles, AlertTriangle, KeyRound } from 'lucide-react';
 import Card from './ui/Card';
+import CardSaveBar from './ui/CardSaveBar';
 import { buildEnabledModels, isImageModel } from '../lib/enabledModels';
 import { authoringModelState } from '../lib/authoringAI';
 import type { Workspace } from '../types';
@@ -22,11 +23,15 @@ import type { Workspace } from '../types';
  */
 export default function AuthoringModelCard({
   workspace,
-  onChange,
+  onSave,
+  onDirtyChange,
   onOpenApiKeys,
 }: {
   workspace: Workspace;
-  onChange: (modelId: string | null) => void;
+  /** SQEM-539 — called by the card's Save button, never by choosing in the list. */
+  onSave: (modelId: string | null) => Promise<void> | void;
+  /** Lets Settings ask before a tab change throws an unsaved choice away. */
+  onDirtyChange?: (dirty: boolean) => void;
   onOpenApiKeys: () => void;
 }) {
   // No funded option here on purpose. Funded is not a *choice* — it is what happens when there is
@@ -35,30 +40,40 @@ export default function AuthoringModelCard({
   const models = buildEnabledModels(workspace.apiKeys, workspace.openrouterModels).filter(m => !isImageModel(m.id));
   const state = authoringModelState(workspace);
   const effective = models.find(m => m.id === state.effectiveId);
+  // SQEM-539 — the choice is a draft until Save; `undefined` = untouched.
+  const [draft, setDraft] = useState<string | null | undefined>(undefined);
+  const [saving, setSaving] = useState(false);
+  const dirty = draft !== undefined && draft !== (state.chosenId ?? null);
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  const save = async () => {
+    if (!dirty) return;
+    setSaving(true);
+    try { await onSave(draft ?? null); setDraft(undefined); } finally { setSaving(false); }
+  };
 
   return (
     <Card className="p-6 md:p-8">
-      <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-2">
-        <Sparkles className="w-5 h-5 text-brand-600 dark:text-brand-400" />
+      <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2 mb-2">
+        <Sparkles className="w-5 h-5 text-accent" />
         AI for authoring
       </h2>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+      <p className="text-sm text-ink-muted mb-6">
         Used when sqemes writes for you — enhancing a prompt, generating a description, the setup and
         playbook wizards, and adapting a playbook to your brand. It does not affect Chat, where you pick
         the model each time.
       </p>
 
       {models.length === 0 ? (
-        <div className="flex items-start gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-4 py-3">
-          <KeyRound className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 rounded-xl border border-line-strong bg-surface-sunken px-4 py-3">
+          <KeyRound className="w-4 h-4 text-ink-subtle shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
+            <p className="text-sm text-ink">
               There is nothing to choose yet — a model can only be offered here once its provider has an
               API key.
             </p>
             <button
               onClick={onOpenApiKeys}
-              className="mt-2 text-sm font-bold text-brand-600 dark:text-brand-400 hover:underline"
+              className="mt-2 text-sm font-bold text-accent hover:underline"
             >
               Add a provider key in the API tab →
             </button>
@@ -66,14 +81,14 @@ export default function AuthoringModelCard({
         </div>
       ) : (
         <>
-          <label htmlFor="authoring-model" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+          <label htmlFor="authoring-model" className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-2">
             Model
           </label>
           <select
             id="authoring-model"
-            value={state.chosenId ?? ''}
-            onChange={e => onChange(e.target.value || null)}
-            className="w-full max-w-md p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+            value={(draft !== undefined ? draft : state.chosenId) ?? ''}
+            onChange={e => setDraft(e.target.value || null)}
+            className="w-full max-w-md p-3 bg-surface-field border border-line-strong text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
           >
             <option value="">
               Automatic{effective ? ` — currently ${effective.name}` : ''}
@@ -87,9 +102,9 @@ export default function AuthoringModelCard({
               look identical from outside: it simply used something else. Saying so is the whole
               point; a silent fallback would recreate the problem this setting exists to fix. */}
           {state.status === 'unavailable' && (
-            <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5 max-w-md">
-              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-800 dark:text-amber-300">
+            <div className="mt-3 flex items-start gap-2 rounded-xl border border-warning/40 bg-warning-soft px-3 py-2.5 max-w-md">
+              <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+              <p className="text-xs text-ink">
                 <span className="font-semibold">{state.chosenId}</span> can&apos;t be used right now — it
                 was either retired or its provider key was removed.{' '}
                 {effective ? <>Authoring is running on <span className="font-semibold">{effective.name}</span> until you pick another.</> : null}
@@ -98,11 +113,13 @@ export default function AuthoringModelCard({
           )}
 
           {state.status === 'auto' && (
-            <p className="mt-2 text-2xs text-slate-400 dark:text-slate-500 max-w-md">
+            <p className="mt-2 text-2xs text-ink-subtle max-w-md">
               Automatic takes the first model with a key, in the order the catalogue happens to list
               them — pick one explicitly if that matters to you.
             </p>
           )}
+
+          <CardSaveBar dirty={dirty} saving={saving} onSave={save} onCancel={() => setDraft(undefined)} />
         </>
       )}
     </Card>

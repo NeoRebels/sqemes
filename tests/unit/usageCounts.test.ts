@@ -70,7 +70,8 @@ describe('where the server counts', () => {
     expect(code('supabase/functions/mcp-server/index.ts')).toMatch(/lib\.getTemplate\([\s\S]{0,200}\)\.then\(t => \{[\s\S]{0,200}countUsage\(adminClient, workspaceId, 'mcp', 'playbook_loaded', t\.id\)/);
   });
   it('chat passes the counter to its tools', () => {
-    expect(code('supabase/functions/chat-message/index.ts')).toMatch(/onTemplateLoaded: \(templateId\) => countUsage\(createAdminClient\(\), workspaceId, 'chat', 'playbook_loaded', templateId\)/);
+    // SQEM-551 — the same callback also records the id for the "Used" chips; the count must stay in it.
+    expect(code('supabase/functions/chat-message/index.ts')).toMatch(/onTemplateLoaded: \(templateId\) => \{[\s\S]{0,200}countUsage\(createAdminClient\(\), workspaceId, 'chat', 'playbook_loaded', templateId\);\s*\}/);
   });
   it('record-usage: only the extension event, budget first, access with the caller\'s token, then count', () => {
     const fn = code('supabase/functions/record-usage/index.ts');

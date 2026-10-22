@@ -84,10 +84,16 @@ describe('SQEM-393 — the archive and the editor', () => {
     expect(page).toMatch(/No favourite personas/);
   });
 
-  it('the card carries the star top-right and the tag above the title, one tag, registry-sourced', () => {
-    expect(page).toMatch(/topRight=\{\([\s\S]{0,600}void toggleFavorite\(persona\)/);
-    expect(page).toMatch(/badges=\{\(\s*<TagEditor\s+tags=\{persona\.tags\.slice\(0, 1\)\}/);
-    expect(page).toMatch(/available=\{canEdit && persona\.tags\.length === 0 \? workspace\.tags : \[\]\}/);
+  // SQEM-554 (b) — the card became a row + preview: the star is on both, the tag editor in the preview.
+  it('the star on the row and in the preview; one tag above the title, registry-sourced', () => {
+    const preview = code(read('components/PersonaPreview.tsx'));
+    expect(page).toMatch(/onFavorite=\{p => void toggleFavorite\(p\)\}/);
+    expect(page).toMatch(/onClick=\{\(\) => onFavorite\(persona\)\}\s*aria-pressed=\{!!persona\.isFavorite\}/);
+    expect(preview).toMatch(/onClick=\{\(\) => onFavorite\(persona\)\}\s*aria-pressed=\{!!persona\.isFavorite\}/);
+    expect(preview).toMatch(/<TagEditor\s+tags=\{persona\.tags\.slice\(0, 1\)\}/);
+    expect(preview).toMatch(/available=\{canEdit && persona\.tags\.length === 0 \? workspaceTags : \[\]\}/);
+    expect(page).toMatch(/workspaceTags=\{workspace\.tags\}/);
+    expect(page).toMatch(/onSetTag=\{\(p, tag\) => void setTag\(p, tag\)\}/);
     expect(page).toMatch(/updatePersona\(persona\.id, \{ tags \}\)/);
   });
 

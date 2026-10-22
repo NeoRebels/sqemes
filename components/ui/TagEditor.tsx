@@ -28,13 +28,13 @@ export default function TagEditor({
       {tags.map(tag => (
         <span
           key={tag}
-          className="group/tag flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-lg uppercase tracking-wide"
+          className="group/tag flex items-center gap-1 text-xs font-semibold px-2 py-0.5 bg-slate-50 dark:bg-slate-700 text-ink-muted rounded-lg uppercase tracking-wide"
         >
           {tag}
           {canEdit && (
             <button
               onClick={e => { e.preventDefault(); e.stopPropagation(); onRemove(tag); }}
-              className="opacity-0 group-hover/tag:opacity-100 transition-opacity ml-0.5 text-slate-400 hover:text-slate-600"
+              className="relative hit-24 reveal-on-hover transition-opacity ml-0.5 text-slate-400 hover:text-slate-600"
               title="Remove tag"
             >
               <X className="w-2.5 h-2.5" />
@@ -50,7 +50,7 @@ export default function TagEditor({
             onBlur={() => setPicking(false)}
             autoFocus
             aria-label="Add a workspace tag"
-            className="text-[11px] px-2 py-0.5 border border-brand-300 rounded-lg outline-none focus:border-brand-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 cursor-pointer"
+            className="text-xs px-2 py-0.5 border border-brand-300 rounded-lg outline-none focus:border-brand-500 bg-surface-field text-slate-800 dark:text-slate-200 cursor-pointer"
           >
             <option value="" disabled>Choose a tag…</option>
             {available.map(tag => <option key={tag} value={tag}>{tag}</option>)}
@@ -58,7 +58,7 @@ export default function TagEditor({
         ) : (
           <button
             onClick={e => { e.preventDefault(); e.stopPropagation(); setPicking(true); }}
-            className="flex items-center gap-0.5 text-[11px] text-slate-400 hover:text-brand-500 transition-colors"
+            className="flex items-center gap-0.5 text-xs text-slate-400 hover:text-brand-500 transition-colors"
             title="Add tag"
           >
             <Plus className="w-3 h-3" />

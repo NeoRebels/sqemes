@@ -7,12 +7,14 @@ import { KIND_HELP } from '../../constants';
 // Shared by the Templates page cards and the Chat template modal so they look
 // identical.
 
+// SQEM-547 — skill is petrol (`skill` token), no longer the green of `success`: a kind is not a
+// status. Prompt stays on the accent.
 // SQEM-390 — two kinds. The violet assistant entry (SQEM-307 had kept it against the accent sweep,
 // and noted that violet and brand read as one colour) went with the kind; the open design question
 // it recorded is closed by having nothing left to distinguish.
 const CONFIG: Record<PromptKind, { label: string; Icon: typeof PenTool; className: string }> = {
-  prompt: { label: 'Prompt', Icon: PenTool, className: 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300' },
-  skill: { label: 'Skill', Icon: Wand2, className: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' },
+  prompt: { label: 'Prompt', Icon: PenTool, className: 'bg-accent-soft text-brand-700 dark:text-brand-300' },
+  skill: { label: 'Skill', Icon: Wand2, className: 'bg-skill-soft text-skill' },
 };
 
 /**

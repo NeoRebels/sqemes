@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
         const daysLeft = Math.max(1, Math.ceil(RETENTION_DAYS - ageDays));
         if (resendApiKey && c.owner_email) {
           const html = renderBrandedEmail({
-            title: 'Your Sqemes workspace will be deleted soon',
+            title: 'Your sqemes workspace will be deleted soon',
             preheader: `Keep "${c.name}" by starting a plan or adding content.`,
             heading: 'Your workspace will be deleted soon',
             bodyHtml:
@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
             headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
               from, to: [c.owner_email],
-              subject: `Your Sqemes workspace "${c.name}" will be deleted soon`,
+              subject: `Your sqemes workspace "${c.name}" will be deleted soon`,
               html,
             }),
           }).catch((e) => console.error('warning email failed', c.workspace_id, e?.message));

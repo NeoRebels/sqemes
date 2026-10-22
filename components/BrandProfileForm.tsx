@@ -32,9 +32,10 @@ export function brandFormFromProfile(p?: BrandProfile): BrandFormValue {
   };
 }
 
+// SQEM-554 (d1) — on tokens; the same form sits in the setup wizard, so only colours changed here.
 const inputCls =
-  'w-full p-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500';
-const labelCls = 'block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5';
+  'w-full p-3 border border-line-strong bg-surface-field text-ink-strong rounded-control text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle';
+const labelCls = 'block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5';
 
 export function BrandProfileForm({
   value,
@@ -97,11 +98,11 @@ export function BrandProfileForm({
       {/* Website URL — analyzes the homepage and fills the form */}
       {(!collapsible || view === 'website') && (
       <div className="mb-4">
-        <label className={labelCls}>
-          Analyze your website <span className="normal-case font-normal text-slate-400">(optional — fills the form)</span>
+        <label htmlFor="brand-profile-form-website" className={labelCls}>
+          Analyze your website <span className="normal-case font-normal text-ink-subtle">(optional — fills the form)</span>
         </label>
         <div className="flex flex-col sm:flex-row gap-2">
-          <input
+          <input id="brand-profile-form-website"
             type="url"
             value={value.website}
             onChange={e => { onChange({ website: e.target.value }); setWebsiteError(null); }}
@@ -110,27 +111,27 @@ export function BrandProfileForm({
             disabled={disabled}
             aria-invalid={!!websiteError}
             aria-describedby={websiteError ? 'website-error' : undefined}
-            className={`flex-1 p-3 border bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:ring-2 transition-all placeholder:text-slate-400 ${
+            className={`flex-1 p-3 border bg-surface-field text-ink-strong rounded-control text-sm outline-none focus:ring-2 transition-all placeholder:text-ink-subtle ${
               websiteError
-                ? 'border-red-400 dark:border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                : 'border-slate-200 dark:border-slate-600 focus:border-brand-500 focus:ring-brand-500/20'
+                ? 'border-danger focus:border-danger focus:ring-danger/20'
+                : 'border-line-strong focus:border-accent focus:ring-accent/20'
             }`}
           />
           <button
             onClick={handleAnalyze}
             disabled={disabled || !canUseAI || !value.website.trim() || analyzing}
-            className="shrink-0 px-4 py-3 bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 dark:hover:bg-slate-600 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="shrink-0 px-4 py-3 bg-ink-strong hover:opacity-90 text-surface-raised rounded-control text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing…</> : <><Globe className="w-4 h-4" /> Analyze</>}
           </button>
         </div>
         {websiteError && (
-          <p id="website-error" role="alert" className="flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400 mt-1.5">
+          <p id="website-error" role="alert" className="flex items-start gap-1.5 text-xs text-danger mt-1.5">
             <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-px" /> {websiteError}
           </p>
         )}
         {!canUseAI && !websiteError && (
-          <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">Add a provider key or enable sqemes AI to analyze a website.</p>
+          <p className="text-2xs text-ink-subtle mt-1">Add a provider key or enable sqemes AI to analyze a website.</p>
         )}
       </div>
       )}
@@ -140,7 +141,7 @@ export function BrandProfileForm({
           <button
             type="button"
             onClick={() => setView('manual')}
-            className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline mb-4"
+            className="text-xs font-semibold text-accent hover:underline mb-4"
           >
             Or fill in the details yourself
           </button>
@@ -148,32 +149,32 @@ export function BrandProfileForm({
           <button
             type="button"
             onClick={() => setView('website')}
-            className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline mb-4"
+            className="text-xs font-semibold text-accent hover:underline mb-4"
           >
             ← Analyze a website instead
           </button>
         )
       ) : (
         <div className="flex items-center gap-3 mb-4">
-          <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
-          <span className="text-2xs font-semibold text-slate-400 uppercase tracking-wider">or fill in manually</span>
-          <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+          <div className="flex-1 h-px bg-line-strong" />
+          <span className="text-2xs font-semibold text-ink-subtle uppercase tracking-wider">or fill in manually</span>
+          <div className="flex-1 h-px bg-line-strong" />
         </div>
       )}
 
       {(!collapsible || view === 'manual') && (
       <div className="space-y-3">
         <div>
-          <label className={labelCls}>Brand name</label>
-          <input value={value.brandName} onChange={e => onChange({ brandName: e.target.value })} placeholder="Acme Inc." disabled={disabled} className={inputCls} />
+          <label htmlFor="brand-profile-form-brand-name" className={labelCls}>Brand name</label>
+          <input id="brand-profile-form-brand-name" value={value.brandName} onChange={e => onChange({ brandName: e.target.value })} placeholder="Acme Inc." disabled={disabled} className={inputCls} />
         </div>
         <div>
-          <label className={labelCls}>What does your brand do?</label>
-          <input value={value.whatItDoes} onChange={e => onChange({ whatItDoes: e.target.value })} placeholder="One sentence — e.g. we run leadership workshops for tech teams" disabled={disabled} className={inputCls} />
+          <label htmlFor="brand-profile-form-what-does-your-brand-do" className={labelCls}>What does your brand do?</label>
+          <input id="brand-profile-form-what-does-your-brand-do" value={value.whatItDoes} onChange={e => onChange({ whatItDoes: e.target.value })} placeholder="One sentence — e.g. we run leadership workshops for tech teams" disabled={disabled} className={inputCls} />
         </div>
         <div>
-          <label className={labelCls}>Who is your audience?</label>
-          <input value={value.audience} onChange={e => onChange({ audience: e.target.value })} placeholder="e.g. HR leaders at mid-size companies" disabled={disabled} className={inputCls} />
+          <label htmlFor="brand-profile-form-who-is-your-audience" className={labelCls}>Who is your audience?</label>
+          <input id="brand-profile-form-who-is-your-audience" value={value.audience} onChange={e => onChange({ audience: e.target.value })} placeholder="e.g. HR leaders at mid-size companies" disabled={disabled} className={inputCls} />
         </div>
       </div>
       )}

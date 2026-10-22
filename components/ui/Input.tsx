@@ -1,7 +1,7 @@
 import React from 'react';
 
 const baseClasses =
-  'w-full border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500';
+  'w-full border border-line-strong rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all bg-surface-field text-ink-strong placeholder:text-slate-400 dark:placeholder:text-slate-500';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
 

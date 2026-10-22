@@ -3,15 +3,16 @@ import { useUI, useWorkspace } from '../store';
 import { can } from '../lib/permissions';
 import { useLocation, useNavigate } from 'react-router';
 import { PLANS, ROLE_LABELS, TRIAL_DAYS, VAT_NOTE } from '../constants';
+import PlanStorageUsage from '../components/PlanStorageUsage';
 import { LIBRARY_SYSTEM_PROMPT } from '../lib/libraryPrompt';
 import { hasActiveSubscription, isTrialing } from '../lib/subscription';
 import { IS_SELF_HOSTED, functionsUrl, functionCallUrl } from '../lib/env';
 import { getWorkspaceStorageUsage } from '../lib/api/files';
 import { copyToClipboard } from '../lib/clipboard';
 import { fetchCanPublish, setPublisherToken } from '../lib/api/library';
-import { UserRole } from '../types';
+import { UserRole, type Workspace } from '../types';
 import { BrandProfileForm, brandFormFromProfile, type BrandFormValue } from '../components/BrandProfileForm';
-import { TemplateAccessControl, workspaceDefaultToValue, valueToWorkspaceDefault } from '../components/TemplateAccessControl';
+import { TemplateAccessControl, workspaceDefaultToValue, valueToWorkspaceDefault, type TemplateAccessValue } from '../components/TemplateAccessControl';
 import { supabase } from '../lib/supabase';
 import { saveApiKey, deleteApiKey, getApiKeyStatus } from '../lib/api/apiKeys';
 import {
@@ -24,13 +25,20 @@ import { ProviderIcon } from '../components/ProviderIcon';
 import McpIcon from '../components/McpIcon';
 import ConnectorsCard from '../components/ConnectorsCard';
 import Card from '../components/ui/Card';
+import PageHeader from '../components/ui/PageHeader';
+import SettingsCardHeader, { SETTINGS_FIELD_LABEL } from '../components/ui/SettingsCardHeader';
+import { Input } from '../components/ui/Input';
+import Switch from '../components/ui/Switch';
 import AccessGroupsCard from '../components/AccessGroupsCard';
 import AuthoringModelCard from '../components/AuthoringModelCard';
 import { isMultiSeat } from '../lib/templateAccessScope';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
+import ConfirmModal from '../components/ui/ConfirmModal';
+import CardSaveBar from '../components/ui/CardSaveBar';
 import AboutSection from '../components/AboutSection';
 import Avatar, { randomAvatarDataUri } from '../components/ui/Avatar';
+import McpClientGuide from '../components/McpClientGuide';
 import { buildAccountExport, accountExportFilename } from '../lib/accountExport';
 import { downloadBlob } from '../lib/templateBundle';
 import {
@@ -76,7 +84,13 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 
-type TabId = 'general' | 'brand' | 'team' | 'plans' | 'api' | 'connectors' | 'profile';
+// SQEM-539 — the Content Governance switches, saved together by their card's Save button.
+type GovernanceKey = 'blockEmails' | 'blockIban' | 'blockPhone';
+/** Same role set, order ignored — a draft equal to the saved default is no draft. */
+const sameRoles = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && [...a].sort().join() === [...b].sort().join();
+
+type TabId = 'general' | 'brand' | 'team' | 'security' | 'plans' | 'api' | 'connectors' | 'profile';
 
 const MASKED_KEY_RE = /(?:\u2022){4,}|^\*{4,}$/;
 
@@ -86,112 +100,127 @@ const isPlaceholderKey = (value: string) => {
   return MASKED_KEY_RE.test(trimmed) || /enter new key to replace/i.test(trimmed);
 };
 
+// SQEM-554 (c) — a numbered step of the MCP card: the number, a heading, the content.
+const McpStep = ({ n, title, children }: { n: number; title: string; children: React.ReactNode }) => (
+  <li className="flex gap-3">
+    <span aria-hidden className="w-6 h-6 shrink-0 rounded-full bg-accent-soft text-accent text-xs font-bold flex items-center justify-center mt-0.5">{n}</span>
+    <div className="min-w-0 flex-1">
+      <h3 className="text-sm font-semibold text-ink-strong mb-2">{title}</h3>
+      {children}
+    </div>
+  </li>
+);
+
 const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () => void }) => {
   const mcpUrl = functionsUrl('mcp-server');
-  const snippet = `{\n  "mcpServers": {\n    "sqemes": {\n      "url": "${mcpUrl}",\n      "headers": {\n        "Authorization": "Bearer sqm_live_YOUR_KEY"\n      }\n    }\n  }\n}`;
   const [mcpUrlCopied, setMcpUrlCopied] = useState(false);
-  const [snippetCopied, setSnippetCopied] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
   return (
+    // SQEM-554 (c) — first card of the tab (MCP is one of the three channels; it was third, under two
+    // key cards), three numbered steps, the client tabs with logos.
     <Card className="p-6 md:p-8 relative overflow-hidden">
       <div className="mb-6">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <McpIcon className="w-5 h-5 text-brand-500" />
+        <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
+          <McpIcon className="w-5 h-5 text-accent" />
           MCP Server
         </h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Connect any MCP-compatible AI client (Claude Desktop, Cursor) to your full playbook library — prompts and skills — and to your personas.
+        <p className="text-sm text-ink-muted mt-1">
+          Connect Claude, ChatGPT, Claude Code, Codex, Cursor, VS Code or any other MCP client to your full playbook library — prompts and skills — and to your personas.
         </p>
       </div>
       {locked ? (
         <div className="flex flex-col items-center justify-center py-8 text-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-            <Lock className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+          <div className="w-12 h-12 rounded-full bg-surface-sunken flex items-center justify-center">
+            <Lock className="w-5 h-5 text-ink-subtle" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">MCP access requires Team or Business</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Upgrade your plan to connect Claude Desktop, Cursor, and other MCP clients.</p>
+            <p className="text-sm font-semibold text-ink">MCP access requires Team or Business</p>
+            <p className="text-xs text-ink-subtle mt-1">Upgrade your plan to connect Claude, ChatGPT, Cursor and other MCP clients.</p>
           </div>
           <button
             onClick={onUpgrade}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-accent-strong hover:opacity-90 text-white rounded-control text-sm font-bold transition-opacity"
           >
             Upgrade plan
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Endpoint URL</p>
-            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 overflow-hidden">
-              <span className="text-xs font-mono text-slate-600 dark:text-slate-300 truncate flex-1 min-w-0">{mcpUrl}</span>
+        <ol className="space-y-6">
+          <McpStep n={1} title="Copy the endpoint">
+            <div className="flex items-center gap-2 bg-surface-sunken border border-line-strong rounded-control px-3 py-2.5 overflow-hidden">
+              <span className="text-xs font-mono text-ink truncate flex-1 min-w-0">{mcpUrl}</span>
               <button
                 type="button"
                 onClick={async () => { await copyToClipboard(mcpUrl); setMcpUrlCopied(true); setTimeout(() => setMcpUrlCopied(false), 2000); }}
-                className="shrink-0 text-slate-400 hover:text-brand-500 transition-colors"
+                className="shrink-0 text-ink-subtle hover:text-accent transition-colors"
                 title="Copy URL"
+                aria-label="Copy endpoint URL"
               >
-                {mcpUrlCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                {mcpUrlCopied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
             </div>
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Client Config (Claude Desktop / Cursor)</p>
-            <div className="relative bg-slate-900 dark:bg-slate-950 rounded-xl p-4 overflow-hidden">
-              <pre className="text-xs font-mono text-slate-300 overflow-x-auto whitespace-pre">{snippet}</pre>
-              <button
-                type="button"
-                onClick={async () => { await copyToClipboard(snippet); setSnippetCopied(true); setTimeout(() => setSnippetCopied(false), 2000); }}
-                className="absolute top-3 right-3 p-1.5 text-slate-500 hover:text-slate-200 transition-colors"
-                title="Copy snippet"
-              >
-                {snippetCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">Replace <code className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded">sqm_live_YOUR_KEY</code> with one of your API keys above.</p>
-          </div>
+          </McpStep>
+
+          {/* SQEM-533 — one tab per client instead of one JSON block for all of them; the steps and
+              snippets live in lib/mcpClients.ts, shared with the setup wizard. */}
+          <McpStep n={2} title="Connect your AI tool">
+            <McpClientGuide url={mcpUrl} />
+          </McpStep>
 
           {/* SQEM-303 — the system prompt lives here, inside the MCP card, and not as a feature of
               its own. It instructs a model to use tools it can only reach through the connection set
               up directly above; on its own it achieves nothing. Somewhere else in the product it
               would be a text people copy and then wonder why nothing changed. */}
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
-            {/* ⛔ SQEM-468 — this said "(optional)" until 2026-09-26, and the measurement says the
-                opposite. Six typical requests, custom instructions switched off: only two reached
-                the library through the server alone. The same text pasted into the client's standing
-                instructions is what covers the other four, so on this screen it is the step that
-                decides whether any of this works — not a nicety. */}
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">System prompt — paste this too</p>
+          {/* ⛔ SQEM-468 — this said "(optional)" until 2026-09-26, and the measurement says the
+              opposite. Six typical requests, custom instructions switched off: only two reached
+              the library through the server alone. The same text pasted into the client's standing
+              instructions is what covers the other four, so on this screen it is the step that
+              decides whether any of this works — not a nicety.
+              SQEM-554 (c): therefore NOT collapsed away (the audit's first idea). The step, its
+              "paste this too" and the Copy button always show; only the long text is cut to a few
+              lines until "Show full text". */}
+          <McpStep n={3} title="Paste the system prompt too">
             {/* SQEM-378 — the same text the Sqemes chat works under. SQEM-526: the MCP server no longer
                 hands it out (MCP client guidelines), so pasting it is the only way it reaches a client. Saying so matters: it is the difference between "a snippet we offer" and
                 "the rule this product already follows", and the second is what makes someone paste
                 it. One source, so this claim cannot quietly stop being true. */}
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-              This is the same instruction the Sqemes chat already works under. A connected AI tool
+            <p className="text-xs text-ink-muted mb-2">
+              This is the same instruction the sqemes chat already works under. A connected AI tool
               follows it only when it is in your own standing instructions &mdash; without it, the tool
               checks your playbooks when you ask it to, and rarely on its own. Add it where your AI tool
               keeps its instructions, and it applies to everyone at once.
             </p>
-            <div className="relative bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl p-4">
-              <pre className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap max-h-44 overflow-y-auto pr-8">{LIBRARY_SYSTEM_PROMPT}</pre>
+            <div className="relative bg-surface-sunken border border-line-strong rounded-control p-4">
+              {/* Collapsed: exactly five lines (text-xs = 1rem lines), fading out, so the cut never lands mid-line. */}
+              <pre id="mcp-system-prompt" className={`text-xs leading-4 text-ink whitespace-pre-wrap pr-20 ${promptOpen ? 'max-h-80 overflow-y-auto' : 'max-h-20 overflow-hidden [mask-image:linear-gradient(to_bottom,black_60%,transparent)]'}`}>{LIBRARY_SYSTEM_PROMPT}</pre>
               <button
                 type="button"
                 onClick={async () => { await copyToClipboard(LIBRARY_SYSTEM_PROMPT); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 2000); }}
-                className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-brand-500 transition-colors"
+                className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-1 rounded-control bg-surface-raised border border-line text-xs font-semibold text-ink hover:text-accent transition-colors"
                 title="Copy system prompt"
               >
-                {promptCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                {promptCopied ? <><Check className="w-3.5 h-3.5 text-success" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPromptOpen(o => !o)}
+                aria-expanded={promptOpen}
+                aria-controls="mcp-system-prompt"
+                className="mt-2 text-xs font-semibold text-accent hover:underline"
+              >
+                {promptOpen ? 'Show less' : 'Show full text'}
               </button>
             </div>
             {/* Two places, not one — and they are genuinely different settings, so naming only the
                 personal one would leave a team lead to discover the other by accident. */}
-            <dl className="mt-2.5 space-y-1.5 text-xs text-slate-400 dark:text-slate-500">
+            <dl className="mt-2.5 space-y-1.5 text-xs text-ink-subtle">
               <div>
-                <dt className="inline font-bold text-slate-500 dark:text-slate-400">Just for you: </dt>
+                <dt className="inline font-bold text-ink-muted">Just for you: </dt>
                 <dd className="inline">ChatGPT → Settings → Personalization → Custom instructions. Claude → Settings → your own instructions.</dd>
               </div>
               <div>
-                <dt className="inline font-bold text-slate-500 dark:text-slate-400">Everyone at once: </dt>
+                <dt className="inline font-bold text-ink-muted">Everyone at once: </dt>
                 {/* Checked against both vendors' own documentation on 2026-08-31. Claude states that
                     organization instructions apply "in every conversation across your organization";
                     OpenAI documents nothing equivalent, so this says what its nearest option actually
@@ -199,8 +228,8 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
                 <dd className="inline">on Claude Team or Enterprise an admin can set it under Organization and access, and it then applies to every conversation in the organisation. ChatGPT has no documented setting that reaches every chat; a shared Skill is the closest, and it is applied when the model judges it relevant.</dd>
               </div>
             </dl>
-          </div>
-        </div>
+          </McpStep>
+        </ol>
       )}
     </Card>
   );
@@ -454,7 +483,48 @@ const Settings = () => {
     title: string;
     message: string;
     onConfirm: () => void;
+    /** SQEM-539 — typed confirmation, for deleting the whole workspace only. */
+    confirmText?: string;
+    confirmLabel?: string;
   } | null>(null);
+
+  // SQEM-539 — settings save on a click, never as a side effect of choosing.
+  // Each card that edits a value keeps a draft here; `null`/empty = untouched. Settings knows all of
+  // them so that a tab change can ask before throwing one away.
+  const [accessDraft, setAccessDraft] = useState<TemplateAccessValue | null>(null);
+  const [editDraft, setEditDraft] = useState<boolean | null>(null);
+  const [governanceDraft, setGovernanceDraft] = useState<Partial<Record<GovernanceKey, boolean>>>({});
+  const [authoringDirty, setAuthoringDirty] = useState(false);
+  const [authoringResetKey, setAuthoringResetKey] = useState(0);
+  const [savingCard, setSavingCard] = useState<'access' | 'edit' | 'governance' | null>(null);
+  const [pendingTab, setPendingTab] = useState<TabId | null>(null);
+  const hasUnsaved = accessDraft !== null || editDraft !== null || Object.keys(governanceDraft).length > 0 || authoringDirty;
+  const discardDrafts = () => {
+    setAccessDraft(null);
+    setEditDraft(null);
+    setGovernanceDraft({});
+    setAuthoringDirty(false);
+    setAuthoringResetKey(k => k + 1); // remounts AuthoringModelCard, which drops its own draft
+  };
+  /** A tab change the person asked for. Deep-link effects call `setActiveTab` directly. */
+  const requestTab = (id: TabId) => {
+    if (id === activeTab) return;
+    if (hasUnsaved) setPendingTab(id);
+    else setActiveTab(id);
+  };
+  const saveCard = async (card: 'access' | 'edit' | 'governance', updates: Partial<Workspace>, clear: () => void) => {
+    setSavingCard(card);
+    try { await updateWorkspace(updates); clear(); } finally { setSavingCard(null); }
+  };
+  // Leaving the page (reload, close) with a draft gets the browser's own question. Leaving through
+  // the sidebar does not: HashRouter has no navigation blocker, and the drafts are small enough that
+  // a tab-change guard plus the visible "Unsaved changes" line carry it.
+  useEffect(() => {
+    if (!hasUnsaved) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [hasUnsaved]);
 
   // Profile State
   const [passwords, setPasswords] = useState({ new: '', confirm: '' });
@@ -559,15 +629,24 @@ const Settings = () => {
     { id: 'general', label: 'General', icon: Building },
     { id: 'brand', label: 'Brand', icon: Sparkles },
     { id: 'team', label: 'Team Members', icon: Users },
+    { id: 'security', label: 'Security', icon: Shield },
     { id: 'plans', label: 'Plans & Billing', icon: CreditCard },
     { id: 'api', label: 'API & MCP', icon: Key },
     { id: 'connectors', label: 'Connectors', icon: Plug },
     { id: 'profile', label: 'My Profile', icon: User },
   ];
 
+  // SQEM-480 — the Security tab holds only cards with their own conditions; it is shown when one of
+  // them would be. Cloud: Content Governance is for admins and editors (as it was in General), the
+  // access cards for admins. Self-host: only the admins' access card exists there.
+  const securityTabVisible = IS_SELF_HOSTED
+    ? can(currentUser, workspace, 'team:manage')
+    : can(currentUser, workspace, 'settings:general');
+
   const visibleTabs = tabs.filter(tab => {
     if (IS_SELF_HOSTED && tab.id === 'plans') return false; // SQEM-119 — no billing on self-host
     if (IS_SELF_HOSTED && tab.id === 'brand') return false;  // SQEM-170 — Brand is Cloud-only
+    if (tab.id === 'security' && !securityTabVisible) return false;
     // Members (no settings:general) still get their Profile + Connectors (they may add personal ones)
     // and, since SQEM-328, **API & MCP** — the only place to obtain the key their own MCP client
     // needs. ⚠️ The tab is not the permission: the provider-keys card inside it stays behind
@@ -615,7 +694,10 @@ const Settings = () => {
 
     if (location.state && (location.state as any).initialTab) {
       const requestedTab = (location.state as any).initialTab;
-      if (!can(currentUser, workspace, 'plans:manage') && requestedTab === 'plans') {
+      // SQEM-480 — a link into Security for someone who would find it empty lands on General.
+      if (requestedTab === 'security' && !securityTabVisible) {
+        if (activeTab !== 'general') setActiveTab('general');
+      } else if (!can(currentUser, workspace, 'plans:manage') && requestedTab === 'plans') {
         if (activeTab !== 'general') setActiveTab('general');
       } else {
         if (activeTab !== requestedTab) setActiveTab(requestedTab);
@@ -625,8 +707,8 @@ const Settings = () => {
 
     // Deep-link via URL query (e.g. opened in a new tab): ?tab=plans
     const urlTab = new URLSearchParams(location.search).get('tab');
-    if (urlTab && ['general', 'brand', 'team', 'plans', 'api', 'connectors', 'profile'].includes(urlTab) && !(IS_SELF_HOSTED && urlTab === 'brand')) {
-      if (!can(currentUser, workspace, 'plans:manage') && urlTab === 'plans') {
+    if (urlTab && ['general', 'brand', 'team', 'security', 'plans', 'api', 'connectors', 'profile'].includes(urlTab) && !(IS_SELF_HOSTED && urlTab === 'brand')) {
+      if ((!can(currentUser, workspace, 'plans:manage') && urlTab === 'plans') || (urlTab === 'security' && !securityTabVisible)) {
         if (activeTab !== 'general') setActiveTab('general');
       } else if (activeTab !== urlTab) {
         setActiveTab(urlTab as TabId);
@@ -897,27 +979,28 @@ const Settings = () => {
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto min-h-screen">
-      <div className="mb-8 md:mb-10">
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Workspace Settings</h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-2">Manage your workspace preferences and team</p>
-      </div>
+      {/* SQEM-554 (d1) — the page head every other page has (display face). */}
+      <PageHeader title="Workspace Settings" subtitle="Manage your workspace preferences and team" />
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Sidebar Navigation — sticky on md+ (SQEM-147). Sticky must live on this wrapper flex-item,
             which stretches with the content column, not on the Card (whose parent is Card-height). */}
         <div className="lg:w-64 shrink-0 md:sticky md:top-4 lg:self-start z-10">
-          <Card overflow className="p-2 flex lg:block overflow-x-auto lg:overflow-visible">
+          {/* SQEM-540 — below lg the tabs wrap instead of scrolling sideways: at 390 px the scrolling row
+              cut "Team Members" in half and hid Security and everything after it, with nothing to say
+              there was more. Wrapped, every tab is visible at once. */}
+          <Card overflow className="p-2 flex flex-wrap gap-1 lg:block">
             {visibleTabs.map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 lg:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                onClick={() => requestTab(tab.id)}
+                className={`flex-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 lg:px-4 py-2.5 lg:py-3 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap ${
                   activeTab === tab.id
-                    ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 shadow-sm'
-                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100'
+                    ? 'bg-accent-soft text-accent shadow-sm'
+                    : 'text-ink-muted hover:bg-surface-sunken hover:text-ink-strong'
                 }`}
               >
-                <tab.icon className={`w-5 h-5 ${activeTab === tab.id ? 'text-brand-600' : 'text-slate-400'}`} />
+                <tab.icon className={`w-5 h-5 ${activeTab === tab.id ? 'text-accent' : 'text-ink-subtle'}`} />
                 {tab.label}
               </button>
             ))}
@@ -931,65 +1014,66 @@ const Settings = () => {
           {activeTab === 'general' && can(currentUser, workspace, 'settings:general') && (
             <div className="space-y-6 animate-fade-in">
               <Card className="p-6 md:p-8">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">Workspace Details</h2>
+                <SettingsCardHeader title="Workspace Details" />
                 <div className="space-y-6">
                   {can(currentUser, workspace, 'team:manage') && (
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Workspace Name</label>
+                      <label htmlFor="settings-workspace-name" className={SETTINGS_FIELD_LABEL}>Workspace Name</label>
                       <div className="flex gap-2">
-                        <input
-                          className="flex-1 p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                        <Input id="settings-workspace-name"
+                          className="flex-1 !w-auto min-w-0"
                           value={wsName}
                           onChange={e => { setWsName(e.target.value); setWsNameDirty(true); }}
                         />
-                        <button
+                        <Button
                           onClick={() => { updateWorkspace({ name: wsName }); setWsNameDirty(false); }}
                           disabled={!wsNameDirty || !wsName.trim()}
-                          className="px-5 py-3 bg-brand-600 text-white rounded-xl text-sm font-bold hover:bg-brand-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                          className="px-5"
                         >
                           <Save className="w-4 h-4" /> Save
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )}
                   {isSqemesAdmin && (
-                    <div className="flex items-center justify-between p-4 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800/50 rounded-xl">
+                    <div className="flex items-center justify-between gap-4 p-4 bg-accent-soft border border-accent/20 rounded-control">
                       <div className="flex items-center gap-3">
-                        <Shield className="w-5 h-5 text-brand-600 dark:text-brand-400" />
+                        <Shield className="w-5 h-5 text-accent" />
                         <div>
-                          <p className="text-sm font-bold text-brand-900 dark:text-brand-300">Managed Workspace</p>
-                          <p className="text-xs text-brand-600 dark:text-brand-400 mt-0.5">Unlimited seats, no plan restrictions</p>
+                          <p id="settings-managed-label" className="text-sm font-bold text-ink-strong">Managed Workspace</p>
+                          <p id="settings-managed-hint" className="text-xs text-accent mt-0.5">Unlimited seats, no plan restrictions</p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => setWorkspaceManaged(workspace.id, !workspace.isManaged)}
-                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none ${workspace.isManaged ? 'bg-brand-600' : 'bg-slate-200 dark:bg-slate-600'}`}
-                        title={workspace.isManaged ? 'Disable managed mode' : 'Enable managed mode'}
-                      >
-                        <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${workspace.isManaged ? 'translate-x-6' : 'translate-x-0'}`} />
-                      </button>
+                      {/* SQEM-554 (d1) — the shared Switch (SQEM-545) instead of a hand-built one: same
+                          on/off, and now a real `role="switch"` named by the label beside it. */}
+                      <Switch
+                        checked={!!workspace.isManaged}
+                        onChange={() => setWorkspaceManaged(workspace.id, !workspace.isManaged)}
+                        labelledBy="settings-managed-label"
+                        describedBy="settings-managed-hint"
+                      />
                     </div>
                   )}
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Workspace Tags</label>
+                    <label htmlFor="settings-workspace-tags" className={SETTINGS_FIELD_LABEL}>Workspace Tags</label>
                     <div className="flex gap-2 mb-3">
-                      <input 
-                        className="flex-1 p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all" 
-                        placeholder="Add a tag..."
+                      <Input id="settings-workspace-tags"
+                        className="flex-1 !w-auto min-w-0"
+                        placeholder="Add a tag…"
                         value={newTag}
                         onChange={e => setNewTag(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleAddTag()}
                       />
-                      <button onClick={handleAddTag} className="px-4 bg-slate-900 dark:bg-slate-700 text-white rounded-xl hover:bg-slate-800 dark:hover:bg-slate-600 transition-colors">
+                      <Button variant="secondary" onClick={handleAddTag} aria-label="Add tag" className="px-4">
                         <Plus className="w-5 h-5" />
-                      </button>
+                      </Button>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {workspace.tags.map(tag => (
-                        <span key={tag} className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-sm font-medium">
+                        <span key={tag} className="inline-flex items-center gap-1 px-3 py-1 bg-surface-sunken text-ink rounded-lg text-sm font-medium">
                           {tag}
-                          <button onClick={() => removeTag(tag)} className="p-0.5 hover:text-red-500 rounded-full transition-colors"><X className="w-3 h-3" /></button>
+                          <button onClick={() => removeTag(tag)} aria-label={`Remove tag ${tag}`} className="p-0.5 hover:text-danger rounded-full transition-colors"><X className="w-3 h-3" /></button>
                         </span>
                       ))}
                     </div>
@@ -1001,50 +1085,96 @@ const Settings = () => {
                   BYOK-only, so there is no funded fallback there and the choice matters more, not less. */}
               {can(currentUser, workspace, 'api-keys:manage') && (
                 <AuthoringModelCard
+                  key={authoringResetKey}
                   workspace={workspace}
-                  onChange={modelId => updateWorkspace({ authoringModelId: modelId })}
-                  onOpenApiKeys={() => setActiveTab('api')}
+                  onSave={modelId => updateWorkspace({ authoringModelId: modelId })}
+                  onDirtyChange={setAuthoringDirty}
+                  onOpenApiKeys={() => requestTab('api')}
                 />
               )}
 
               {/* SQEM-183 — self-host marketplace publisher token (Cloud publishes directly; self-host only) */}
               {IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
                 <Card className="p-6 md:p-8">
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Marketplace Publisher</h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                    A publisher token lets this instance <span className="font-semibold">submit</span> playbooks to the sqemes community marketplace (browsing + copying works without one). It&apos;s stored encrypted and never shown again.{' '}
-                    <a href="https://sqemes.com/publisher" target="_blank" rel="noopener noreferrer" className="text-brand-600 dark:text-brand-400 font-semibold hover:underline">Apply for a publisher key →</a>
-                  </p>
+                  <SettingsCardHeader
+                    className="mb-4"
+                    title="Marketplace Publisher"
+                    description={<>
+                      A publisher token lets this instance <span className="font-semibold">submit</span> playbooks to the sqemes community marketplace (browsing + copying works without one). It&apos;s stored encrypted and never shown again.{' '}
+                      <a href="https://sqemes.com/publisher" target="_blank" rel="noopener noreferrer" className="text-accent font-semibold hover:underline">Apply for a publisher key →</a>
+                    </>}
+                  />
                   <div className="mb-2">
-                    <span className={`text-xs font-bold px-2 py-1 rounded-lg ${pubConfigured ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`}>
+                    <span className={`text-xs font-bold px-2 py-1 rounded-lg ${pubConfigured ? 'bg-success-soft text-success' : 'bg-surface-sunken text-ink-muted'}`}>
                       {pubConfigured ? 'Configured' : 'Not configured'}
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    <input
+                    <Input
                       type="password"
+                      aria-label="Publisher token"
                       value={pubToken}
                       onChange={e => setPubToken(e.target.value)}
                       placeholder={pubConfigured ? 'Enter a new token to replace it…' : 'smp_…'}
                       autoComplete="off"
-                      className="flex-1 p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all font-mono"
+                      className="flex-1 !w-auto min-w-0 font-mono"
                     />
-                    <button
+                    <Button
                       onClick={() => savePublisherToken()}
                       disabled={pubSaving || !pubToken.trim()}
-                      className="px-5 py-3 bg-brand-600 text-white rounded-xl text-sm font-bold hover:bg-brand-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                      className="px-5"
                     >
                       {pubSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
-                    </button>
+                    </Button>
                   </div>
                   {pubConfigured && (
-                    <button onClick={() => savePublisherToken('')} disabled={pubSaving} className="mt-3 text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50">
+                    <button onClick={() => savePublisherToken('')} disabled={pubSaving} className="mt-3 text-xs font-semibold text-danger hover:underline disabled:opacity-50">
                       Clear token
                     </button>
                   )}
                 </Card>
               )}
 
+              {/* Self-host only — version + update notice (SQEM-118); renders nothing on Cloud */}
+              <AboutSection />
+
+              {/* SQEM-554 — no link to /design from the app. The page stays, reached by
+                  its URL only, under the same access rule (lib/designAccess.ts). */}
+
+              {/* SQEM-121 — self-host is a single-instance deployment: no deleting the workspace */}
+              {!IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
+                <div className="bg-danger-soft rounded-card border border-danger/30 p-6 md:p-8">
+                  <SettingsCardHeader tone="danger" title="Danger Zone" description="Permanently delete this workspace and all associated data. This action cannot be undone." />
+                  <button
+                    onClick={() => setConfirmDialog({
+                      title: `Delete workspace "${workspace.name}"?`,
+                      // SQEM-213 — the subscription part belongs in the dialog, not in the small
+                      // print afterwards: this is the moment the money decision is actually made.
+                      // Keyed on the subscription id, not `hasActiveSubscription` — that is also
+                      // true for managed workspaces, which have no Stripe subscription to cancel.
+                      message: workspace.stripeSubscriptionId
+                        ? 'This will permanently delete all playbooks, personas, files, chats and members. The subscription is cancelled immediately — the rest of the paid period is not refunded. This action cannot be undone.'
+                        : 'This will permanently delete all playbooks, personas, files, chats and members. This action cannot be undone.',
+                      // SQEM-539 — typed, because this one cannot be undone at any scale; a playbook is not.
+                      confirmText: workspace.name,
+                      confirmLabel: 'Delete workspace',
+                      onConfirm: async () => { await deleteWorkspace(workspace.id); navigate('/'); },
+                    })}
+                    className="px-4 py-2 bg-surface-raised border border-danger/40 text-danger font-bold text-sm rounded-control hover:bg-danger hover:text-surface-raised hover:border-danger transition-all shadow-sm"
+                  >
+                    Delete Workspace
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* --- Security Tab --- */}
+          {/* SQEM-480 — who may see what, and what is blocked: moved here from General, where they sat
+              beside the workspace's name and the danger zone. Every card keeps the condition it had there;
+              the tab itself is shown only when at least one of them is (`securityTabVisible`). */}
+          {activeTab === 'security' && securityTabVisible && (
+            <div className="space-y-6 animate-fade-in">
               {/* SQEM-170 — Template Access (default) is a Cloud-only feature.
                   SQEM-314 — and a Solo-plan one is a setting with nothing to set: it decides whether
                   *new* templates start restricted, and with one seat there is nobody to restrict them
@@ -1053,17 +1183,64 @@ const Settings = () => {
                   hides no state. The templates it created keep their own control. */}
               {!IS_SELF_HOSTED && isMultiSeat(workspace) && can(currentUser, workspace, 'team:manage') && (
                 <Card className="p-6 md:p-8">
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Playbook Access</h2>
                   {/* SQEM-211 — this setting decides *whether* new templates start restricted, not
                       who may use them. Who may use a template is chosen in the template itself, by
                       name; a workspace-wide list of people would be a second place to maintain the
                       same thing and would drift from the first. */}
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">How newly-created playbooks start. Who may use one is chosen in the playbook itself.</p>
+                  <SettingsCardHeader title="Playbook Access" description="How newly-created playbooks start. Who may use one is chosen in the playbook itself." />
                   <TemplateAccessControl
                     label="Default for new playbooks"
                     hint="Applies to playbooks created after this is saved"
-                    value={workspaceDefaultToValue(workspace.defaultTemplateAccess ?? [])}
-                    onChange={v => updateWorkspace({ defaultTemplateAccess: valueToWorkspaceDefault(v) })}
+                    value={accessDraft ?? workspaceDefaultToValue(workspace.defaultTemplateAccess ?? [])}
+                    onChange={v => {
+                      const same = sameRoles(valueToWorkspaceDefault(v), workspace.defaultTemplateAccess ?? []);
+                      setAccessDraft(same ? null : v);
+                    }}
+                  />
+                  <CardSaveBar
+                    dirty={accessDraft !== null}
+                    saving={savingCard === 'access'}
+                    onCancel={() => setAccessDraft(null)}
+                    onSave={() => accessDraft && saveCard('access', { defaultTemplateAccess: valueToWorkspaceDefault(accessDraft) }, () => setAccessDraft(null))}
+                  />
+                </Card>
+              )}
+
+              {/* SQEM-534 — the same question for CHANGING: do new playbooks and personas start open to
+                  every editor who can see them, or with "Who can edit" restricted to their creator? Same
+                  conditions as the card above, and as "Who can edit" in the editors (Cloud, several
+                  seats). The database applies it on every insert, MCP included, and lets only an admin
+                  change it — this card is the one place it is chosen, not the place it is enforced. */}
+              {!IS_SELF_HOSTED && isMultiSeat(workspace) && can(currentUser, workspace, 'team:manage') && (
+                <Card className="p-6 md:p-8">
+                  <SettingsCardHeader title="Who can edit new playbooks and personas" description="How newly-created ones start. Who may change one is chosen in the playbook or persona itself, under “Who can edit”. Applies to ones created after this is saved, also over MCP." />
+                  <div role="radiogroup" aria-label="Who can edit new playbooks and personas" className="space-y-3">
+                    {([
+                      [false, 'Anyone who may edit', 'Every admin, and every editor who can see it.'],
+                      [true, 'Only the creator and admins', 'Other editors can use it, and duplicate it into a copy of their own, but not change it.'],
+                    ] as const).map(([value, label, description]) => {
+                      const saved = workspace.defaultEditRestricted ?? false;
+                      const selected = (editDraft ?? saved) === value;
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => setEditDraft(value === saved ? null : value)}
+                          className={`w-full text-left p-4 rounded-xl border transition-colors ${selected ? 'border-accent bg-accent-soft' : 'border-line-strong hover:border-ink-subtle'}`}
+                        >
+                          <p className="text-sm font-semibold text-ink-strong">{label}</p>
+                          <p className="text-xs text-ink-muted mt-0.5">{description}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <CardSaveBar
+                    dirty={editDraft !== null}
+                    saving={savingCard === 'edit'}
+                    onCancel={() => setEditDraft(null)}
+                    onSave={() => editDraft !== null && saveCard('edit', { defaultEditRestricted: editDraft }, () => setEditDraft(null))}
                   />
                 </Card>
               )}
@@ -1111,25 +1288,18 @@ const Settings = () => {
                   says what is missing leaves the actual rule unsaid. */}
               {IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
                 <Card className="p-6 md:p-8">
-                  <div className="mb-6">
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <Lock className="w-5 h-5 text-brand-500" />
-                      Playbook Access
-                    </h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                      Every playbook in this workspace is available to all of its members.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-brand-100 dark:border-brand-900/40 bg-gradient-to-br from-brand-50 to-white dark:from-brand-900/20 dark:to-slate-800/50 p-6 text-center">
+                  <SettingsCardHeader icon={<Lock />} title="Playbook Access" description="Every playbook in this workspace is available to all of its members." />
+                  {/* SQEM-554 (d2) — a plain accent surface instead of the brand gradient (C uses no gradients). */}
+                  <div className="rounded-card border border-accent/20 bg-accent-soft p-6 text-center">
                     <div className="flex items-center justify-center gap-1.5 mb-4">
                       {[Users, Lock, User].map((Icon, i) => (
-                        <div key={i} className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-sm">
-                          <Icon className="w-5 h-5 text-brand-500" />
+                        <div key={i} className="w-9 h-9 rounded-xl bg-surface-raised border border-line flex items-center justify-center shadow-sm">
+                          <Icon className="w-5 h-5 text-accent" />
                         </div>
                       ))}
                     </div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Access control and groups</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 max-w-md mx-auto">
+                    <h3 className="text-base font-bold text-ink-strong">Access control and groups</h3>
+                    <p className="text-sm text-ink-muted mt-1.5 max-w-md mx-auto">
                       Decide per playbook who may see and use it: everyone, only you, or named people
                       and groups that keep following your team as it changes. Available on sqemes Cloud.
                     </p>
@@ -1137,7 +1307,7 @@ const Settings = () => {
                       href="https://sqemes.com"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none"
+                      className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-lg"
                     >
                       Explore sqemes Cloud <ArrowUpRight className="w-4 h-4" />
                     </a>
@@ -1148,35 +1318,35 @@ const Settings = () => {
               {/* SQEM-170 — Content Governance is a Cloud-only feature */}
               {!IS_SELF_HOSTED && (
               <Card className="p-8">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-6">
-                  <ShieldAlert className="w-5 h-5 text-red-500" />
+                <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2 mb-6">
+                  <ShieldAlert className="w-5 h-5 text-danger" />
                   Content Governance
                 </h2>
                 <div className="mb-6">
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Blacklisted Terms</label>
+                  <label htmlFor="settings-blacklisted-terms" className={SETTINGS_FIELD_LABEL}>Blacklisted Terms</label>
                   <div className="flex gap-3 max-w-xl mb-4">
-                     <input
-                       className="flex-1 p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                     <input id="settings-blacklisted-terms"
+                       className="flex-1 p-3 bg-surface-field border border-line-strong text-ink-strong placeholder:text-ink-subtle rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
                        placeholder="e.g. secret_project"
                        value={blacklistedTerm}
                        onChange={e => setBlacklistedTerm(e.target.value)}
                        onKeyDown={e => e.key === 'Enter' && addTerm()}
                      />
-                     <button onClick={addTerm} className="px-6 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-xl text-sm font-bold transition-colors">Add</button>
+                     <button onClick={addTerm} className="px-6 bg-surface-sunken text-ink hover:bg-line-strong rounded-xl text-sm font-bold transition-colors">Add</button>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {workspace.blacklistedTerms.map(term => (
-                      <span key={term} className="bg-red-50 text-red-600 border border-red-100 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2">
+                      <span key={term} className="bg-danger-soft text-danger border border-danger/20 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2">
                         {term}
-                        <button onClick={() => removeTerm(term)} className="hover:text-red-800"><X className="w-3 h-3" /></button>
+                        <button onClick={() => removeTerm(term)} aria-label={`Remove ${term}`} className="hover:opacity-70"><X className="w-3 h-3" /></button>
                       </span>
                     ))}
-                    {workspace.blacklistedTerms.length === 0 && <span className="text-sm text-slate-400 italic">No restricted terms added.</span>}
+                    {workspace.blacklistedTerms.length === 0 && <span className="text-sm text-ink-subtle italic">No restricted terms added.</span>}
                   </div>
                 </div>
 
-                <div className="border-t border-slate-100 pt-6 space-y-4">
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">PII Blocking</label>
+                <div className="border-t border-line pt-6 space-y-4">
+                  <p className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-4">PII Blocking</p>
                   {([
                     { key: 'blockEmails', label: 'Email Addresses', description: 'Block submissions containing email addresses' },
                     { key: 'blockIban',   label: 'IBAN Numbers',    description: 'Block submissions containing IBAN bank account numbers' },
@@ -1184,71 +1354,48 @@ const Settings = () => {
                   ] as const).map(({ key, label, description }) => (
                     <div key={key} className="flex items-center justify-between max-w-xl">
                       <div>
-                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{label}</p>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{description}</p>
+                        <p id={`governance-${key}`} className="text-sm font-semibold text-ink">{label}</p>
+                        <p id={`governance-${key}-hint`} className="text-xs text-ink-subtle mt-0.5">{description}</p>
                       </div>
-                      <button
-                        role="switch"
-                        aria-checked={workspace[key]}
-                        onClick={() => updateWorkspace({ [key]: !workspace[key] })}
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${workspace[key] ? 'bg-brand-600' : 'bg-slate-200 dark:bg-slate-600'}`}
-                      >
-                        <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ${workspace[key] ? 'translate-x-5' : 'translate-x-0'}`} />
-                      </button>
+                      {/* SQEM-554 (d2) — the shared Switch (SQEM-545 named this one as the first to move onto
+                          it); the same draft logic, the same names. */}
+                      <Switch
+                        checked={!!(governanceDraft[key] ?? workspace[key])}
+                        labelledBy={`governance-${key}`}
+                        describedBy={`governance-${key}-hint`}
+                        onChange={() => setGovernanceDraft(prev => {
+                          const next = { ...prev };
+                          const value = !(prev[key] ?? workspace[key]);
+                          if (value === workspace[key]) delete next[key]; else next[key] = value;
+                          return next;
+                        })}
+                      />
                     </div>
                   ))}
+                  <CardSaveBar
+                    dirty={Object.keys(governanceDraft).length > 0}
+                    saving={savingCard === 'governance'}
+                    onCancel={() => setGovernanceDraft({})}
+                    onSave={() => saveCard('governance', governanceDraft, () => setGovernanceDraft({}))}
+                  />
                 </div>
               </Card>
               )}
-
-              {/* Self-host only — version + update notice (SQEM-118); renders nothing on Cloud */}
-              <AboutSection />
-
-              {/* SQEM-121 — self-host is a single-instance deployment: no deleting the workspace */}
-              {!IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
-                <div className="bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-100 dark:border-red-800/50 p-8">
-                  <h2 className="text-lg font-bold text-red-900 dark:text-red-300 mb-2">Danger Zone</h2>
-                  <p className="text-sm text-red-600 dark:text-red-400 mb-6">Permanently delete this workspace and all associated data. This action cannot be undone.</p>
-                  <button
-                    onClick={() => setConfirmDialog({
-                      title: `Delete workspace "${workspace.name}"?`,
-                      // SQEM-213 — the subscription part belongs in the dialog, not in the small
-                      // print afterwards: this is the moment the money decision is actually made.
-                      // Keyed on the subscription id, not `hasActiveSubscription` — that is also
-                      // true for managed workspaces, which have no Stripe subscription to cancel.
-                      message: workspace.stripeSubscriptionId
-                        ? 'This will permanently delete all prompts, history, results, and members. The subscription is cancelled immediately — the rest of the paid period is not refunded. This action cannot be undone.'
-                        : 'This will permanently delete all prompts, history, results, and members. This action cannot be undone.',
-                      onConfirm: async () => { await deleteWorkspace(workspace.id); navigate('/'); },
-                    })}
-                    className="px-4 py-2 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 font-bold text-sm rounded-xl hover:bg-red-600 dark:hover:bg-red-900/30 hover:text-white dark:hover:text-red-300 hover:border-red-600 dark:hover:border-red-700 transition-all shadow-sm"
-                  >
-                    Delete Workspace
-                  </button>
-                </div>
-              )}
             </div>
           )}
-
           {/* --- Brand Tab --- */}
           {activeTab === 'brand' && !IS_SELF_HOSTED && can(currentUser, workspace, 'settings:general') && (
             <div className="space-y-6 animate-fade-in">
               <Card className="p-6 md:p-8">
-                <div className="flex items-start justify-between mb-6 gap-4">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Brand Profile</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                      Captured during onboarding. Used to tailor AI generation and to adapt marketplace playbooks to your brand.
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleSaveBrand}
-                    disabled={!bpDirty}
-                    className="shrink-0 px-5 py-3 bg-brand-600 text-white rounded-xl text-sm font-bold hover:bg-brand-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    <Save className="w-4 h-4" /> Save
-                  </button>
-                </div>
+                <SettingsCardHeader
+                  title="Brand Profile"
+                  description="Captured during onboarding. Used to tailor AI generation and to adapt marketplace playbooks to your brand."
+                  actions={
+                    <Button onClick={handleSaveBrand} disabled={!bpDirty} className="px-5">
+                      <Save className="w-4 h-4" /> Save
+                    </Button>
+                  }
+                />
                 <BrandProfileForm
                   value={brandForm}
                   onChange={patch => { setBrandForm(f => ({ ...f, ...patch })); setBpDirty(true); }}
@@ -1260,29 +1407,29 @@ const Settings = () => {
           {/* --- Team Tab --- */}
           {activeTab === 'team' && can(currentUser, workspace, 'settings:general') && (<>
             <Card overflow className="animate-fade-in">
-              <div className="p-6 md:p-8 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="p-6 md:p-8 border-b border-line flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Team Members</h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  <h2 className="font-display text-xl font-semibold text-ink-strong">Team Members</h2>
+                  <p className="text-sm text-ink-muted mt-1">
                     {memberCount} active member{memberCount === 1 ? '' : 's'}{(workspace.isManaged || IS_SELF_HOSTED) ? ' · Unlimited seats' : ` of ${memberLimit} seats`}
                   </p>
                   {storageUsage && (
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5" data-testid="storage-usage">
+                    <p className="text-sm text-ink-muted mt-0.5" data-testid="storage-usage">
                       Storage: {fmtBytes(storageUsage.used)}{storageUsage.limit == null ? ' · unlimited' : ` of ${fmtBytes(storageUsage.limit)}`}
                     </p>
                   )}
                 </div>
                 {can(currentUser, workspace, 'team:manage') && (isLimitReached ? (
                    <button
-                     onClick={() => setActiveTab('plans')}
-                     className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl font-medium text-sm transition-all shadow-lg shadow-amber-200 dark:shadow-none w-full md:w-auto justify-center"
+                     onClick={() => requestTab('plans')}
+                     className="flex items-center gap-2 bg-warning hover:opacity-90 text-white px-4 py-2 rounded-control font-medium text-sm transition-all shadow-raised w-full md:w-auto justify-center"
                    >
                      <Zap className="w-4 h-4" /> Upgrade to Invite
                    </button>
                 ) : (
                    <Button
                      onClick={() => setIsInviteModalOpen(true)}
-                     className="shadow-lg shadow-brand-200 w-full md:w-auto justify-center"
+                     className="shadow-lg w-full md:w-auto justify-center"
                    >
                      <Mail className="w-4 h-4" /> Invite Member
                    </Button>
@@ -1291,29 +1438,29 @@ const Settings = () => {
               
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm min-w-[600px]">
-                  <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium border-b border-slate-100 dark:border-slate-700">
+                  <thead className="bg-surface-sunken text-ink-muted font-medium border-b border-line">
                     <tr>
                       <th className="px-6 py-4 w-1/2">User</th>
                       <th className="px-6 py-4">Role</th>
                       {can(currentUser, workspace, 'team:manage') && <th className="px-6 py-4 text-right">Actions</th>}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
+                  <tbody className="divide-y divide-line">
                     {workspace.members.map(member => (
-                      <tr key={member.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/50 transition-colors">
+                      <tr key={member.id} className="hover:bg-surface-sunken/60 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <Avatar src={member.avatar} name={member.name} className="w-10 h-10" />
                             <div>
-                              <p className="font-bold text-slate-900 dark:text-slate-100">{member.name}</p>
-                              <p className="text-slate-500 dark:text-slate-400">{member.email}</p>
+                              <p className="font-bold text-ink-strong">{member.name}</p>
+                              <p className="text-ink-muted">{member.email}</p>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           {can(currentUser, workspace, 'team:manage') ? (
                             <select
-                              className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold uppercase tracking-wider rounded-lg py-1.5 px-3 outline-none focus:border-brand-500 cursor-pointer hover:border-slate-300 dark:hover:border-slate-500 transition-colors"
+                              className="bg-surface-field border border-line-strong text-ink text-xs font-bold uppercase tracking-wider rounded-lg py-1.5 px-3 outline-none focus:border-accent cursor-pointer hover:border-line-strong transition-colors"
                               value={member.role}
                               onChange={(e) => handleRoleChange(member, e.target.value as UserRole)}
                               disabled={member.id === currentUser.id}
@@ -1323,7 +1470,7 @@ const Settings = () => {
                               ))}
                             </select>
                           ) : (
-                            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                            <span className="text-xs font-bold uppercase tracking-wider text-ink-muted bg-surface-sunken px-2.5 py-1 rounded-lg">
                               {member.role}
                             </span>
                           )}
@@ -1336,7 +1483,7 @@ const Settings = () => {
                                 message: `${member.name} will lose access to this workspace immediately.`,
                                 onConfirm: () => removeMember(member.id),
                               })}
-                              className="text-slate-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                              className="text-ink-subtle hover:text-danger p-2 hover:bg-danger-soft rounded-lg transition-colors"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1352,15 +1499,15 @@ const Settings = () => {
             {/* Pending Invitations */}
             {pendingInvitations.length > 0 && (
               <Card overflow className="animate-fade-in mt-6">
-                <div className="p-6 md:p-8 border-b border-slate-50">
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-amber-500" />
+                <div className="p-6 md:p-8 border-b border-line">
+                  <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-warning" />
                     Pending Invitations ({pendingInvitations.length})
                   </h2>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm min-w-[600px]">
-                    <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium border-b border-slate-100 dark:border-slate-700">
+                    <thead className="bg-surface-sunken text-ink-muted font-medium border-b border-line">
                       <tr>
                         <th className="px-6 py-4 w-1/2">Email</th>
                         <th className="px-6 py-4">Role</th>
@@ -1368,23 +1515,23 @@ const Settings = () => {
                         <th className="px-6 py-4 text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
+                    <tbody className="divide-y divide-line">
                       {pendingInvitations.map(inv => (
-                        <tr key={inv.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/50 transition-colors">
+                        <tr key={inv.id} className="hover:bg-surface-sunken/60 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center">
-                                <Mail className="w-5 h-5 text-amber-500" />
+                              <div className="w-10 h-10 rounded-full bg-warning-soft flex items-center justify-center">
+                                <Mail className="w-5 h-5 text-warning" />
                               </div>
-                              <p className="font-bold text-slate-900 dark:text-slate-100">{inv.email}</p>
+                              <p className="font-bold text-ink-strong">{inv.email}</p>
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-lg">
+                            <span className="text-xs font-bold uppercase tracking-wider text-ink-muted bg-surface-sunken px-2.5 py-1 rounded-lg">
                               {inv.role}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-sm">
+                          <td className="px-6 py-4 text-ink-muted text-sm">
                             {new Date(inv.expiresAt).toLocaleDateString()}
                           </td>
                           <td className="px-6 py-4 text-right">
@@ -1397,7 +1544,7 @@ const Settings = () => {
                                     const ok = await copyToClipboard(link);
                                     showToast(ok ? 'Invite link copied' : 'Could not copy link', ok ? 'success' : 'error');
                                   }}
-                                  className="flex items-center gap-1.5 whitespace-nowrap shrink-0 text-slate-500 hover:text-brand-600 px-2.5 py-1.5 hover:bg-brand-50 rounded-lg transition-colors text-xs font-medium"
+                                  className="flex items-center gap-1.5 whitespace-nowrap shrink-0 text-ink-muted hover:text-accent px-2.5 py-1.5 hover:bg-accent-soft rounded-lg transition-colors text-xs font-medium"
                                   title="Copy invite link"
                                 >
                                   <Copy className="w-3.5 h-3.5" />
@@ -1410,7 +1557,7 @@ const Settings = () => {
                                     setResendingIds(prev => { const s = new Set(prev); s.delete(inv.id); return s; });
                                   }}
                                   disabled={resendingIds.has(inv.id)}
-                                  className="flex items-center gap-1.5 text-slate-500 hover:text-brand-600 px-2.5 py-1.5 hover:bg-brand-50 rounded-lg transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="flex items-center gap-1.5 text-ink-muted hover:text-accent px-2.5 py-1.5 hover:bg-accent-soft rounded-lg transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                                   title="Resend invitation"
                                 >
                                   <RotateCw className={`w-3.5 h-3.5 ${resendingIds.has(inv.id) ? 'animate-spin' : ''}`} />
@@ -1422,7 +1569,7 @@ const Settings = () => {
                                     message: `The invitation for ${inv.email} will be cancelled and the link will stop working.`,
                                     onConfirm: () => cancelInvitation(inv.id),
                                   })}
-                                  className="text-slate-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                                  className="text-ink-subtle hover:text-danger p-2 hover:bg-danger-soft rounded-lg transition-colors"
                                   title="Cancel invitation"
                                 >
                                   <X className="w-4 h-4" />
@@ -1445,46 +1592,46 @@ const Settings = () => {
             <Card className="p-6 md:p-8 animate-fade-in">
               {workspace.isManaged ? (
                 <div className="flex flex-col items-center text-center py-8">
-                  <div className="w-16 h-16 bg-brand-100 rounded-2xl flex items-center justify-center mb-4">
-                    <Shield className="w-8 h-8 text-brand-600" />
+                  <div className="w-16 h-16 bg-accent-soft rounded-2xl flex items-center justify-center mb-4">
+                    <Shield className="w-8 h-8 text-accent" />
                   </div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Managed Workspace</h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm">
+                  <h2 className="font-display text-xl font-semibold text-ink-strong mb-2">Managed Workspace</h2>
+                  <p className="text-sm text-ink-muted max-w-sm">
                     This workspace is managed by sqemes. You have unlimited seats and full access to all features — no subscription required.
                   </p>
                   <div className="mt-6 flex gap-6 text-center">
-                    <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/50 rounded-xl px-6 py-4">
-                      <p className="text-2xl font-bold text-brand-700 dark:text-brand-400">∞</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Team Members</p>
+                    <div className="bg-accent-soft border border-accent/20 rounded-xl px-6 py-4">
+                      <p className="text-2xl font-bold text-accent">∞</p>
+                      <p className="text-xs text-ink-muted mt-1 font-medium">Team Members</p>
                     </div>
-                    <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/50 rounded-xl px-6 py-4">
-                      <p className="text-2xl font-bold text-brand-700 dark:text-brand-400">€0</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Monthly Cost</p>
+                    <div className="bg-accent-soft border border-accent/20 rounded-xl px-6 py-4">
+                      <p className="text-2xl font-bold text-accent">€0</p>
+                      <p className="text-xs text-ink-muted mt-1 font-medium">Monthly Cost</p>
                     </div>
                   </div>
                 </div>
               ) : (<>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Subscription Plan</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Current Plan: <span className="font-bold text-brand-600">{workspace.plan}</span></p>
+                    <h2 className="font-display text-xl font-semibold text-ink-strong">Subscription Plan</h2>
+                    <p className="text-sm text-ink-muted mt-1">Current Plan: <span className="font-bold text-accent">{workspace.plan}</span></p>
                  </div>
 
                  {/* Only show billing cycle toggle for Solo — paid users manage billing via portal */}
                  {!hasActiveSub && (
-                   <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl self-start sm:self-auto">
+                   <div className="flex bg-surface-sunken p-1 rounded-xl self-start sm:self-auto">
                       <button
                           onClick={() => setBillingCycle('monthly')}
-                          className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                          className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-surface-raised shadow-sm text-ink-strong' : 'text-ink-muted hover:text-ink-strong'}`}
                       >
                           Monthly
                       </button>
                       <button
                           onClick={() => setBillingCycle('yearly')}
-                          className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                          className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-surface-raised shadow-sm text-ink-strong' : 'text-ink-muted hover:text-ink-strong'}`}
                       >
                           Yearly
-                          <span className="text-2xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md uppercase tracking-wide hidden sm:inline-block">Save 20%</span>
+                          <span className="text-2xs bg-success-soft text-ink-strong px-1.5 py-0.5 rounded-md uppercase tracking-wide hidden sm:inline-block">Save 20%</span>
                       </button>
                    </div>
                  )}
@@ -1514,36 +1661,38 @@ const Settings = () => {
                       key={tier}
                       className={`relative p-6 rounded-2xl border transition-all flex flex-col ${
                         isActivePlan
-                          ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 ring-2 ring-brand-500/20 shadow-md'
+                          ? 'border-accent bg-accent-soft ring-2 ring-accent/20 shadow-md'
                           : !canSubscribe
-                            ? 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 opacity-60'
-                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-brand-300 dark:hover:border-brand-500 hover:shadow-soft-lg'
+                            ? 'border-line-strong bg-surface-sunken/60 opacity-60'
+                            : 'border-line-strong bg-surface-raised hover:border-accent/50 hover:shadow-soft-lg'
                       }`}
                     >
                       {isActivePlan && (
-                        <span className="absolute top-3 right-3 text-2xs font-bold uppercase tracking-wider text-brand-700 bg-brand-100 border border-brand-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="absolute top-3 right-3 text-2xs font-bold uppercase tracking-wider text-accent bg-surface-raised border border-accent/30 px-2 py-0.5 rounded-full flex items-center gap-1">
                           <Check className="w-2.5 h-2.5" /> {isTrialing(workspace) ? 'Trial' : 'Active'}
                         </span>
                       )}
 
-                      <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">{tier}</h3>
-                      <p className="text-xs mt-0.5 mb-4 text-slate-500 dark:text-slate-400">{PLANS[tier].tagline}</p>
+                      <h3 className="font-bold text-lg text-ink-strong">{tier}</h3>
+                      <p className="text-xs mt-0.5 mb-4 text-ink-muted">{PLANS[tier].tagline}</p>
 
                       <div className="mb-6">
-                        <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{displayPrice}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">{billingText}</p>
+                        <p className="text-3xl font-bold text-ink-strong">{displayPrice}</p>
+                        <p className="text-xs text-ink-muted font-medium mt-1">{billingText}</p>
                         {/* SQEM-283 — see VAT_NOTE: the Terms promise consumers a shown price includes VAT. */}
-                        <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1">{VAT_NOTE}</p>
+                        <p className="text-2xs text-ink-subtle mt-1">{VAT_NOTE}</p>
                       </div>
 
-                      <ul className="space-y-2.5 text-sm flex-1 text-slate-600 dark:text-slate-300">
+                      <ul className="space-y-2.5 text-sm flex-1 text-ink">
                         {PLANS[tier].features.map(feature => (
                           <li key={feature} className="flex items-center gap-2.5">
-                            <Check className={`w-3.5 h-3.5 shrink-0 ${isActivePlan ? 'text-brand-500' : 'text-slate-400'}`} />
+                            <Check className={`w-3.5 h-3.5 shrink-0 ${isActivePlan ? 'text-accent' : 'text-ink-subtle'}`} />
                             {feature}
                           </li>
                         ))}
                       </ul>
+                      {/* SQEM-556 — what this workspace uses of the plan's storage, on its own plan's card. */}
+                      {isActivePlan && <div className="mt-5"><PlanStorageUsage workspaceId={workspace.id} /></div>}
 
                       {/* SQEM-207 (A-01) — this used to render a disabled button labelled
                           "Switch via Portal" with no explanation of why it was dead, while the
@@ -1555,10 +1704,10 @@ const Settings = () => {
                         onClick={() => (canSubscribe ? handleUpgrade(tier) : handleManageSubscription())}
                         className={`w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 ${
                           isActivePlan
-                            ? 'bg-brand-600 text-white shadow-lg shadow-brand-200 dark:shadow-none cursor-default'
+                            ? 'bg-accent-strong text-white shadow-lg cursor-default'
                             : canSubscribe
-                              ? 'bg-slate-900 text-white hover:bg-slate-700'
-                              : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600'
+                              ? 'bg-ink-strong text-surface-raised hover:opacity-90'
+                              : 'bg-surface-field border border-line-strong text-ink hover:bg-surface-sunken'
                         }`}
                       >
                         {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -1569,19 +1718,19 @@ const Settings = () => {
                 })}
 
                 {/* SQEM-095 — Enterprise: not a Stripe plan; contact-sales card linking out. */}
-                <div className="relative p-6 rounded-2xl border transition-all flex flex-col border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-brand-300 dark:hover:border-brand-500 hover:shadow-soft-lg">
-                  <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">Enterprise</h3>
-                  <p className="text-xs mt-0.5 mb-4 text-slate-500 dark:text-slate-400">For organisations with custom needs</p>
+                <div className="relative p-6 rounded-2xl border transition-all flex flex-col border-line-strong bg-surface-raised hover:border-accent/50 hover:shadow-soft-lg">
+                  <h3 className="font-bold text-lg text-ink-strong">Enterprise</h3>
+                  <p className="text-xs mt-0.5 mb-4 text-ink-muted">For organisations with custom needs</p>
 
                   <div className="mb-6">
-                    <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">Let&apos;s talk</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Custom pricing for your team</p>
+                    <p className="text-3xl font-bold text-ink-strong">Let&apos;s talk</p>
+                    <p className="text-xs text-ink-muted font-medium mt-1">Custom pricing for your team</p>
                   </div>
 
-                  <ul className="space-y-2.5 text-sm flex-1 text-slate-600 dark:text-slate-300">
+                  <ul className="space-y-2.5 text-sm flex-1 text-ink">
                     {['Everything in Business', '30+ team members', 'Custom AI credit volume', 'Dedicated support & SLA', 'Custom onboarding'].map(feature => (
                       <li key={feature} className="flex items-center gap-2.5">
-                        <Check className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                        <Check className="w-3.5 h-3.5 shrink-0 text-ink-subtle" />
                         {feature}
                       </li>
                     ))}
@@ -1591,7 +1740,7 @@ const Settings = () => {
                     href="https://sqemes.com/enterprise"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 bg-slate-900 text-white hover:bg-slate-700"
+                    className="w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 bg-ink-strong text-surface-raised hover:opacity-90"
                   >
                     Talk to us <ExternalLink className="w-4 h-4" />
                   </a>
@@ -1600,15 +1749,15 @@ const Settings = () => {
 
               {/* Manage Subscription — shown for paid plans */}
               {hasActiveSub && !workspace.isManaged && (
-                <div className="mt-6 p-5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="mt-6 p-5 bg-surface-sunken border border-line-strong rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Manage Subscription</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Change plan, update payment method, cancel, or view invoices via the Stripe billing portal.</p>
+                    <p className="text-sm font-bold text-ink-strong">Manage Subscription</p>
+                    <p className="text-xs text-ink-muted mt-0.5">Change plan, update payment method, cancel, or view invoices via the Stripe billing portal.</p>
                   </div>
                   <button
                     onClick={handleManageSubscription}
                     disabled={isPortalLoading}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-slate-700 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-ink-strong text-surface-raised text-sm font-bold rounded-xl hover:opacity-90 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                   >
                     {isPortalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
                     {isPortalLoading ? 'Opening...' : 'Open Billing Portal'}
@@ -1623,6 +1772,9 @@ const Settings = () => {
           {/* --- Integrations Tab --- */}
           {activeTab === 'api' && can(currentUser, workspace, 'api-keys:own') && (
             <div className="space-y-6 animate-fade-in">
+              {/* SQEM-554 (c) — MCP first: one of the three channels, and the card most people come here for. */}
+              <McpServerCard locked={!hasMcpAccess} onUpgrade={() => setActiveTab('plans')} />
+
               {/* ⛔ SQEM-328 — AI provider keys stay closed to members, and the difference from the
                   cards below is not a matter of degree. A provider key is a workspace-wide
                   credential that costs money on every call and serves everybody; a public API key
@@ -1633,8 +1785,8 @@ const Settings = () => {
               <Card className="p-6 md:p-8">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <Key className="w-5 h-5 text-brand-500" />
+                    <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
+                      <Key className="w-5 h-5 text-accent" />
                       {/* SQEM-287 — was "LLM API Configuration". Two problems in three words: "LLM"
                           is never explained anywhere in the product, and this was the *third* name
                           for one thing — the Dashboard says "Provider keys", the setup wizard says
@@ -1642,11 +1794,11 @@ const Settings = () => {
                           that did not match what sent them. One name now, and it is the plain one. */}
                       AI provider keys
                     </h2>
-                    <p className="text-sm text-slate-500 mt-1">
+                    <p className="text-sm text-ink-muted mt-1">
                       Your own keys for OpenAI, Anthropic, Google and others. Stored encrypted, used only for your requests.
                     </p>
                   </div>
-                  <Button onClick={handleSaveKeys} className="px-5 py-2 shadow-lg shadow-brand-200">
+                  <Button onClick={handleSaveKeys} className="px-5 py-2 shadow-lg">
                     {/* SQEM-301 — "Save", and the label is no longer hidden on small screens. It
                         was `hidden sm:inline` because "Save Changes" did not fit; at four characters
                         it does, and an icon-only button had no accessible name at all. */}
@@ -1660,12 +1812,12 @@ const Settings = () => {
                     const localValue = apiKeys[provider.id as keyof typeof apiKeys] || '';
                     return (
                     <div key={provider.id} className="relative group">
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                      <label htmlFor={`provider-key-${provider.id}`} className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-2 flex items-center gap-2">
                         <ProviderIcon provider={provider.id} className="w-5 h-5" />
                         {provider.name}
                         {hasExistingKey && !localValue && (
                           <>
-                            <span className="text-2xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-bold">Configured</span>
+                            <span className="text-2xs bg-success-soft text-ink-strong px-1.5 py-0.5 rounded-md font-bold">Configured</span>
                             <button
                               type="button"
                               onClick={() => setConfirmDialog({
@@ -1673,7 +1825,7 @@ const Settings = () => {
                                 message: `The saved ${provider.name} key will be deleted. You can re-enter it anytime.`,
                                 onConfirm: () => handleRemoveKey(provider.id),
                               })}
-                              className="ml-auto text-2xs font-bold text-slate-400 hover:text-red-600 normal-case transition-colors"
+                              className="ml-auto text-2xs font-bold text-ink-subtle hover:text-danger normal-case transition-colors"
                             >
                               Remove
                             </button>
@@ -1681,16 +1833,16 @@ const Settings = () => {
                         )}
                       </label>
                       <div className="relative">
-                         <input
+                         <input id={`provider-key-${provider.id}`}
                            type={provider.id === 'ollama' ? "text" : "password"}
                            value={localValue}
                            onChange={(e) => setApiKeys({...apiKeys, [provider.id]: e.target.value})}
                            placeholder={hasExistingKey ? '••••••••  (enter new key to replace)' : provider.placeholder}
-                           className={`w-full p-3 border rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all font-mono text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 ${hasExistingKey && !localValue ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/30 dark:bg-emerald-900/10' : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700'}`}
+                           className={`w-full p-3 border rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all font-mono text-ink-strong placeholder:text-ink-subtle ${hasExistingKey && !localValue ? 'border-success/40 bg-success-soft' : 'border-line-strong bg-surface-field'}`}
                          />
                          {provider.id === 'ollama' && (
                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                               <Server className="w-4 h-4 text-slate-400" />
+                               <Server className="w-4 h-4 text-ink-subtle" />
                             </div>
                          )}
                       </div>
@@ -1700,26 +1852,26 @@ const Settings = () => {
                                 href={provider.link} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="text-3xs text-brand-600 hover:text-brand-700 font-bold hover:underline inline-flex items-center gap-1 group/link"
+                                className="text-2xs text-accent hover:opacity-80 font-bold hover:underline inline-flex items-center gap-1 group/link"
                               >
                                 Get API Key <ExternalLink className="w-3 h-3 transition-transform group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5" />
                               </a>
                           </div>
                       )}
                       {provider.id === 'ollama' && (
-                        <p className="text-3xs text-slate-400 mt-1.5 ml-1">
+                        <p className="text-2xs text-ink-subtle mt-1.5 ml-1">
                            Enter the Base URL (e.g. http://localhost:11434)
                         </p>
                       )}
                       {provider.id === 'openrouter' && (
-                        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-                          <p className="text-2xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Custom model ids</p>
+                        <div className="mt-3 pt-3 border-t border-line">
+                          <p className="text-2xs font-bold text-ink-muted uppercase tracking-wider mb-2">Custom model ids</p>
                           {workspace.openrouterModels.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 mb-2">
                               {workspace.openrouterModels.map(mid => (
-                                <span key={mid} className="inline-flex items-center gap-1 text-2xs font-mono px-2 py-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg">
+                                <span key={mid} className="inline-flex items-center gap-1 text-2xs font-mono px-2 py-1 bg-surface-sunken text-ink rounded-lg">
                                   {mid}
-                                  <button type="button" onClick={() => updateWorkspace({ openrouterModels: workspace.openrouterModels.filter(x => x !== mid) })} className="text-slate-400 hover:text-red-500">
+                                  <button type="button" onClick={() => updateWorkspace({ openrouterModels: workspace.openrouterModels.filter(x => x !== mid) })} className="text-ink-subtle hover:text-danger">
                                     <X className="w-3 h-3" />
                                   </button>
                                 </span>
@@ -1732,13 +1884,13 @@ const Settings = () => {
                               onChange={e => setNewOrModelId(e.target.value)}
                               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addOrModel(); } }}
                               placeholder="vendor/model — e.g. anthropic/claude-3.7-sonnet"
-                              className="flex-1 p-2 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg text-2xs font-mono outline-none focus:border-brand-500 text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
+                              className="flex-1 p-2 border border-line-strong bg-surface-field rounded-lg text-2xs font-mono outline-none focus:border-accent text-ink-strong placeholder:text-ink-subtle"
                             />
-                            <button type="button" onClick={addOrModel} className="px-3 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-lg text-2xs font-bold shrink-0">Add</button>
+                            <button type="button" onClick={addOrModel} className="px-3 py-2 bg-ink-strong text-surface-raised rounded-lg text-2xs font-bold shrink-0">Add</button>
                           </div>
-                          <p className="text-3xs text-slate-400 mt-1.5">
+                          <p className="text-2xs text-ink-subtle mt-1.5">
                             Adds to the model picker (needs the key above).{' '}
-                            <a href="https://openrouter.ai/models" target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline">Browse models</a>
+                            <a href="https://openrouter.ai/models" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Browse models</a>
                           </p>
                         </div>
                       )}
@@ -1753,11 +1905,11 @@ const Settings = () => {
               <Card className="p-6 md:p-8">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <Zap className="w-5 h-5 text-brand-500" />
+                    <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
+                      <Zap className="w-5 h-5 text-accent" />
                       Public API Keys
                     </h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    <p className="text-sm text-ink-muted mt-1">
                       Generate keys to access your playbooks via the API or MCP clients.
                     </p>
                   </div>
@@ -1765,17 +1917,17 @@ const Settings = () => {
                     onClick={() => { setNewKeyName(''); setNewKeyScope(defaultScopeFor(canWriteContent)); setShowGenerateKeyModal(true); }}
                     disabled={!hasMcpAccess}
                     title={!hasMcpAccess ? 'Upgrade to Team or Business to generate MCP keys' : undefined}
-                    className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                    className="flex items-center gap-2 px-4 py-2 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                   >
                     <Plus className="w-4 h-4" /> Generate Key
                   </button>
                 </div>
 
                 {sqemesApiKeys.length === 0 ? (
-                  <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-                    <Zap className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">No API keys yet</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Generate a key to start using the public API.</p>
+                  <div className="text-center py-10 border-2 border-dashed border-line-strong rounded-2xl">
+                    <Zap className="w-8 h-8 text-ink-subtle mx-auto mb-3" />
+                    <p className="text-sm font-semibold text-ink-muted">No API keys yet</p>
+                    <p className="text-xs text-ink-subtle mt-1">Generate a key to start using the public API.</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -1788,42 +1940,42 @@ const Settings = () => {
                       const displayExpiry = mcpKeyExpiry(k);
                       const expired = isMcpKeyExpired(k);
                       return (
-                      <div key={k.id} className="flex items-center justify-between gap-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
+                      <div key={k.id} className="flex items-center justify-between gap-4 p-4 bg-surface-sunken rounded-xl border border-line">
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{k.name}</p>
-                          <p className="text-xs font-mono text-slate-400 dark:text-slate-500 mt-0.5">{k.key_prefix}</p>
+                          <p className="text-sm font-bold text-ink-strong truncate">{k.name}</p>
+                          <p className="text-xs font-mono text-ink-subtle mt-0.5">{k.key_prefix}</p>
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             {k.is_oauth && (
-                              <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">OAuth</span>
+                              <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-accent-soft text-accent">OAuth</span>
                             )}
                             {/* SQEM-143 — which templates this key exposes. */}
                             {k.user_id
                               ? (
-                                <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                                <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-success-soft text-ink-strong">
                                   {k.user_id === currentUser.id ? 'You' : (workspace.members?.find(m => m.id === k.user_id)?.name || 'Member')}
                                 </span>
                               )
                               : (
-                                <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">Workspace-wide</span>
+                                <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-warning-soft text-ink-strong">Workspace-wide</span>
                               )}
-                            <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300">read</span>
+                            <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-line-strong text-ink">read</span>
                             {writeScopes.map(s => (
-                              <span key={s} className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300">{s}</span>
+                              <span key={s} className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-accent-soft text-accent">{s}</span>
                             ))}
                             {displayExpiry && (
-                              <span className={`text-2xs font-bold px-1.5 py-0.5 rounded-md ${expired ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'}`}>
+                              <span className={`text-2xs font-bold px-1.5 py-0.5 rounded-md ${expired ? 'bg-danger-soft text-danger' : 'bg-warning-soft text-ink-strong'}`}>
                                 {expired ? 'Expired' : `Expires ${new Date(displayExpiry).toLocaleDateString()}`}
                               </span>
                             )}
                           </div>
                         </div>
                         <div className="text-right shrink-0 hidden sm:block">
-                          <p className="text-xs text-slate-400 dark:text-slate-500">Created {new Date(k.created_at).toLocaleDateString()}</p>
-                          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                          <p className="text-xs text-ink-subtle">Created {new Date(k.created_at).toLocaleDateString()}</p>
+                          <p className="text-xs text-ink-subtle mt-0.5">
                             {k.last_used_at ? `Last used ${new Date(k.last_used_at).toLocaleDateString()}` : 'Never used'}
                           </p>
                           {idleDays(k) >= 60 && (
-                            <p className={`text-2xs font-bold mt-0.5 ${idleDays(k) >= IDLE_LIMIT_DAYS ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                            <p className={`text-2xs font-bold mt-0.5 ${idleDays(k) >= IDLE_LIMIT_DAYS ? 'text-danger' : 'text-warning'}`}>
                               {idleDays(k) >= IDLE_LIMIT_DAYS
                                 ? 'Idle — stopped working'
                                 : `Idle ${idleDays(k)} days — stops at ${IDLE_LIMIT_DAYS}`}
@@ -1833,7 +1985,7 @@ const Settings = () => {
                         <div className="flex items-center gap-1 shrink-0">
                           <button
                             onClick={() => openEditKeyScope(k)}
-                            className="p-2 text-slate-400 dark:text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors"
+                            className="p-2 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors"
                             title="Edit connection"
                           >
                             <SlidersHorizontal className="w-4 h-4" />
@@ -1841,7 +1993,7 @@ const Settings = () => {
                           <button
                             onClick={() => handleDeleteApiKey(k.id)}
                             disabled={deletingKeyId === k.id}
-                            className="p-2 text-slate-400 dark:text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                            className="p-2 text-ink-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors"
                             title="Revoke key"
                           >
                             {deletingKeyId === k.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
@@ -1853,9 +2005,6 @@ const Settings = () => {
                   </div>
                 )}
               </Card>
-
-              {/* MCP Server */}
-              <McpServerCard locked={!hasMcpAccess} onUpgrade={() => setActiveTab('plans')} />
 
             </div>
           )}
@@ -1871,14 +2020,16 @@ const Settings = () => {
           {activeTab === 'profile' && (
             <div className="space-y-6 animate-fade-in max-w-2xl">
               <Card className="p-6 md:p-8">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">My Profile</h2>
+                <h2 className="font-display text-xl font-semibold text-ink-strong mb-6">My Profile</h2>
                 
-                <div className="flex flex-col sm:flex-row items-start gap-8 mb-8 border-b border-slate-100 dark:border-slate-700 pb-8">
-                   <div className="shrink-0 relative group cursor-pointer mx-auto sm:mx-0" onClick={() => fileInputRef.current?.click()}>
-                     <Avatar src={profileAvatar} name={profileName} className="w-24 h-24 ring-4 ring-slate-50 dark:ring-slate-700" />
-                     <div className="absolute inset-0 bg-slate-900/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex flex-col sm:flex-row items-start gap-8 mb-8 border-b border-line pb-8">
+                   {/* SQEM-538 — a button, so the picture can be changed by keyboard and is announced. */}
+                   <button type="button" aria-label="Change profile picture" className="shrink-0 relative group cursor-pointer mx-auto sm:mx-0 rounded-full" onClick={() => fileInputRef.current?.click()}>
+                     <Avatar src={profileAvatar} name={profileName} className="w-24 h-24 ring-4 ring-surface-sunken" />
+                     <div className="absolute inset-0 bg-ink-strong/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity">
                         <Camera className="w-8 h-8 text-white" />
                      </div>
+                   </button>
                      <input 
                       type="file" 
                       ref={fileInputRef} 
@@ -1886,39 +2037,38 @@ const Settings = () => {
                       accept="image/*"
                       onChange={handleFileUpload}
                      />
-                   </div>
                    <div className="flex-1 space-y-5 w-full">
                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Full Name</label>
-                        <input
-                          className="w-full p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                        <label htmlFor="settings-full-name" className={SETTINGS_FIELD_LABEL}>Full Name</label>
+                        <input id="settings-full-name"
+                          className="w-full p-3 bg-surface-field border border-line-strong text-ink-strong placeholder:text-ink-subtle rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
                           value={profileName}
                           onChange={e => { setProfileName(e.target.value); setProfileDirty(true); }}
                         />
                      </div>
                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Email Address</label>
-                        <input
-                          className="w-full p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                        <label htmlFor="settings-email-address" className={SETTINGS_FIELD_LABEL}>Email Address</label>
+                        <input id="settings-email-address"
+                          className="w-full p-3 bg-surface-field border border-line-strong text-ink-strong placeholder:text-ink-subtle rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
                           type="email"
                           value={profileEmail}
                           onChange={e => { setProfileEmail(e.target.value); setProfileDirty(true); }}
                         />
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">This is your sign-in email. A change is confirmed from both the old and the new address.</p>
+                        <p className="text-xs text-ink-muted mt-1.5">This is your sign-in email. A change is confirmed from both the old and the new address.</p>
                      </div>
 
                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Avatar Actions</label>
+                        <p className={SETTINGS_FIELD_LABEL}>Avatar Actions</p>
                         <div className="flex gap-2">
                           <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="px-4 py-2 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-slate-200 dark:border-slate-600 flex-1 justify-center"
+                            className="px-4 py-2 bg-surface-sunken hover:bg-line-strong text-ink rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-line-strong flex-1 justify-center"
                           >
                             <Upload className="w-3 h-3" /> Upload
                           </button>
                           <button
                             onClick={handleRandomizeAvatar}
-                            className="px-4 py-2 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-slate-200 dark:border-slate-600 flex-1 justify-center"
+                            className="px-4 py-2 bg-surface-sunken hover:bg-line-strong text-ink rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-line-strong flex-1 justify-center"
                           >
                             <RefreshCw className="w-3 h-3" /> Randomize
                           </button>
@@ -1926,9 +2076,9 @@ const Settings = () => {
                      </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Avatar URL (Optional)</label>
-                        <input
-                          className="w-full p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+                        <label htmlFor="settings-avatar-url-optional" className={SETTINGS_FIELD_LABEL}>Avatar URL (Optional)</label>
+                        <input id="settings-avatar-url-optional"
+                          className="w-full p-3 bg-surface-field border border-line-strong text-ink-strong placeholder:text-ink-subtle rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
                           value={profileAvatar}
                           onChange={e => { setProfileAvatar(e.target.value); setProfileDirty(true); }}
                           placeholder="https://..."
@@ -1938,25 +2088,25 @@ const Settings = () => {
                 </div>
 
                 <div className="space-y-5">
-                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                     <Lock className="w-4 h-4 text-slate-400" />
+                   <h3 className="text-sm font-bold text-ink-strong flex items-center gap-2">
+                     <Lock className="w-4 h-4 text-ink-subtle" />
                      Change Password
                    </h3>
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">New Password</label>
-                        <input 
+                        <label htmlFor="settings-new-password" className={SETTINGS_FIELD_LABEL}>New Password</label>
+                        <input id="settings-new-password" autoComplete="new-password" 
                           type="password"
-                          className="w-full p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all" 
+                          className="w-full p-3 bg-surface-field border border-line-strong text-ink-strong placeholder:text-ink-subtle rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all" 
                           value={passwords.new}
                           onChange={e => setPasswords({...passwords, new: e.target.value})}
                         />
                      </div>
                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Confirm Password</label>
-                        <input 
+                        <label htmlFor="settings-confirm-password" className={SETTINGS_FIELD_LABEL}>Confirm Password</label>
+                        <input id="settings-confirm-password" autoComplete="new-password" 
                           type="password"
-                          className="w-full p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all" 
+                          className="w-full p-3 bg-surface-field border border-line-strong text-ink-strong placeholder:text-ink-subtle rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all" 
                           value={passwords.confirm}
                           onChange={e => setPasswords({...passwords, confirm: e.target.value})}
                         />
@@ -1964,11 +2114,11 @@ const Settings = () => {
                    </div>
                 </div>
 
-                <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="mt-8 pt-8 border-t border-line flex flex-col sm:flex-row justify-between items-center gap-4">
                   <div className="flex gap-3 w-full sm:w-auto">
                     <button
                       onClick={handleLogout}
-                      className="px-4 py-2 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2 flex-1 sm:flex-none"
+                      className="px-4 py-2 text-ink bg-surface-sunken border border-line-strong rounded-xl text-sm font-bold hover:bg-line-strong transition-colors flex items-center justify-center gap-2 flex-1 sm:flex-none"
                     >
                       <LogOut className="w-4 h-4" /> Sign Out
                     </button>
@@ -1982,7 +2132,7 @@ const Settings = () => {
                           : `You will lose access to "${workspace.name}". You can be re-invited later.`,
                         onConfirm: leaveWorkspace,
                       })}
-                      className="px-4 py-2 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-bold hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-800/50 transition-colors flex items-center justify-center gap-2 flex-1 sm:flex-none"
+                      className="px-4 py-2 text-ink bg-surface-sunken border border-line-strong rounded-xl text-sm font-bold hover:bg-danger-soft hover:text-danger hover:border-danger/30 transition-colors flex items-center justify-center gap-2 flex-1 sm:flex-none"
                     >
                       <DoorOpen className="w-4 h-4" /> Leave
                     </button>
@@ -1990,7 +2140,7 @@ const Settings = () => {
 
                   <Button
                     onClick={handleUpdateProfile}
-                    className="w-full sm:w-auto px-6 py-3 shadow-lg shadow-brand-200"
+                    className="w-full sm:w-auto px-6 py-3 shadow-lg"
                   >
                     Save Changes
                   </Button>
@@ -2001,8 +2151,8 @@ const Settings = () => {
                   account but not hand the data over first, and deletion is the half of that pair
                   which costs the user something. Whoever is about to leave passes this on the way. */}
               <Card className="p-8">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Your data</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                <h2 className="font-display text-xl font-semibold text-ink-strong mb-2">Your data</h2>
+                <p className="text-sm text-ink-muted mb-6">
                   Download everything in <strong>{workspace.name}</strong> as a ZIP — playbooks, chats, files and your
                   profile. The archive includes a README listing exactly what is and isn&apos;t in it.
                   {(workspace.members?.length ?? 0) > 0 && ' Belong to several workspaces? Switch workspace and export again.'}
@@ -2010,7 +2160,7 @@ const Settings = () => {
                 <button
                   onClick={handleExportAccount}
                   disabled={exporting}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-bold text-sm rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-surface-field border border-line-strong text-ink font-bold text-sm rounded-xl hover:bg-surface-sunken transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {exporting
                     ? <><Loader2 className="w-4 h-4 animate-spin" /> {exportStep || 'Preparing…'}</>
@@ -2018,9 +2168,9 @@ const Settings = () => {
                 </button>
               </Card>
 
-              <div className="bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-100 dark:border-red-800/50 p-8">
-                <h2 className="text-lg font-bold text-red-900 dark:text-red-300 mb-2">Danger Zone</h2>
-                <p className="text-sm text-red-600 dark:text-red-400 mb-6">Permanently delete your account and remove access to all workspaces. This action cannot be undone.</p>
+              <div className="bg-danger-soft rounded-card border border-danger/30 p-6 md:p-8">
+                <h2 className="font-display text-xl font-semibold text-danger mb-2">Danger Zone</h2>
+                <p className="text-sm text-danger mb-6">Permanently delete your account and remove access to all workspaces. This action cannot be undone.</p>
                 <button
                   onClick={() => setConfirmDialog({
                     title: 'Delete your account?',
@@ -2032,7 +2182,7 @@ const Settings = () => {
                     message: 'This will permanently delete your account and all your data. Workspaces where you are the only member are deleted with it. This action cannot be undone.',
                     onConfirm: deleteAccount,
                   })}
-                  className="px-4 py-2 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 font-bold text-sm rounded-xl hover:bg-red-600 dark:hover:bg-red-900/30 hover:text-white dark:hover:text-red-300 hover:border-red-600 dark:hover:border-red-700 transition-all shadow-sm"
+                  className="px-4 py-2 bg-surface-raised border border-danger/40 text-danger font-bold text-sm rounded-xl hover:bg-danger hover:text-surface-raised hover:border-danger transition-all shadow-sm"
                 >
                   Delete Account
                 </button>
@@ -2045,12 +2195,12 @@ const Settings = () => {
       {/* Invite Modal */}
       {/* SQEM-343 — demoting to member, when it would strand something. */}
       <Modal open={!!demoteTarget} onClose={() => !isDemoting && setDemoteTarget(null)} size="md" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">
           Make {demoteTarget?.name} a member?
         </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
+        <p className="text-sm text-ink-muted mb-5">
           Members can use the library but not change it. {demoteTarget?.name} has{' '}
-          <span className="font-semibold text-slate-700 dark:text-slate-200">
+          <span className="font-semibold text-ink">
             {demoteTarget?.templates ?? 0} restricted playbook{(demoteTarget?.templates ?? 0) === 1 ? '' : 's'}
             {(demoteTarget?.personas ?? 0) > 0
               ? ` and ${demoteTarget?.personas} restricted persona${demoteTarget?.personas === 1 ? '' : 's'}`
@@ -2082,10 +2232,10 @@ const Settings = () => {
               key={opt.key}
               type="button"
               onClick={() => setDemoteChoice(opt.key)}
-              className={`w-full px-3 py-2.5 rounded-xl border text-sm text-left transition-all ${demoteChoice === opt.key ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-slate-900 dark:text-slate-100' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+              className={`w-full px-3 py-2.5 rounded-xl border text-sm text-left transition-all ${demoteChoice === opt.key ? 'border-accent bg-accent-soft text-ink-strong' : 'border-line-strong text-ink hover:bg-surface-sunken'}`}
             >
               <span className="font-semibold block">{opt.title}</span>
-              <span className="block text-xs text-slate-400 dark:text-slate-500 mt-0.5">{opt.body}</span>
+              <span className="block text-xs text-ink-subtle mt-0.5">{opt.body}</span>
             </button>
           ))}
         </div>
@@ -2094,7 +2244,7 @@ const Settings = () => {
           <button
             onClick={() => setDemoteTarget(null)}
             disabled={isDemoting}
-            className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50"
+            className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
@@ -2103,7 +2253,7 @@ const Settings = () => {
           <button
             onClick={confirmDemotion}
             disabled={!demoteChoice || isDemoting}
-            className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isDemoting ? 'Applying...' : 'Make member'}
           </button>
@@ -2111,23 +2261,23 @@ const Settings = () => {
       </Modal>
 
       <Modal open={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} size="md" className="p-6 md:p-8">
-        <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6">Invite Team Member</h3>
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-6">Invite Team Member</h3>
         <form onSubmit={handleInvite} className="space-y-5">
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Email Address</label>
-            <input
+            <label htmlFor="settings-invite-email" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Email Address</label>
+            <input id="settings-invite-email"
               type="email"
               required
-              className="w-full p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-sm outline-none focus:border-brand-500 transition-colors"
+              className="w-full p-3 bg-surface-field border border-line-strong text-ink-strong placeholder:text-ink-subtle rounded-xl text-sm outline-none focus:border-accent transition-colors"
               placeholder="colleague@company.com"
               value={inviteEmail}
               onChange={e => setInviteEmail(e.target.value)}
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Role</label>
-            <select
-              className="w-full p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 transition-colors appearance-none"
+            <label htmlFor="settings-role" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Role</label>
+            <select id="settings-role"
+              className="w-full p-3 bg-surface-field border border-line-strong text-ink-strong rounded-xl text-sm outline-none focus:border-accent transition-colors appearance-none"
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as UserRole)}
             >
@@ -2138,8 +2288,8 @@ const Settings = () => {
             </select>
           </div>
           <div className="flex gap-3 mt-8">
-            <button type="button" onClick={() => setIsInviteModalOpen(false)} disabled={isInviteSending} className="flex-1 px-4 py-3 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed">Cancel</button>
-            <Button type="submit" loading={isInviteSending} className="flex-1 px-4 py-3 shadow-lg shadow-brand-200">
+            <button type="button" onClick={() => setIsInviteModalOpen(false)} disabled={isInviteSending} className="flex-1 px-4 py-3 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed">Cancel</button>
+            <Button type="submit" loading={isInviteSending} className="flex-1 px-4 py-3 shadow-lg">
               {!isInviteSending && 'Send Invite'}
             </Button>
           </div>
@@ -2149,15 +2299,15 @@ const Settings = () => {
       {/* Generic Confirm Dialog */}
       {/* Generate API Key Modal */}
       <Modal open={showGenerateKeyModal} onClose={() => setShowGenerateKeyModal(false)} size="sm" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Generate API Key</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Give this key a name so you can identify it later.</p>
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">Generate API Key</h3>
+        <p className="text-sm text-ink-muted mb-5">Give this key a name so you can identify it later.</p>
         <input
           type="text"
           value={newKeyName}
           onChange={e => setNewKeyName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleGenerateKey()}
           placeholder="e.g. Production, Zapier, n8n"
-          className="w-full p-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all mb-5 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+          className="w-full p-3 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all mb-5 placeholder:text-ink-subtle"
           autoFocus
         />
         <div className="mb-5">
@@ -2168,15 +2318,15 @@ const Settings = () => {
             ⚠️ Its own label was already wrong — it promised "every template, ignoring per-template
             restrictions", which stopped being true with SQEM-210 three months before it was removed. */}
         <div className="mb-5">
-          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Playbook access</label>
-          <p className="text-xs text-slate-400 dark:text-slate-500">This key inherits your playbook access — it can only reach playbooks you can access, and it is removed if you leave the workspace.</p>
+          <p className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-2">Playbook access</p>
+          <p className="text-xs text-ink-subtle">This key inherits your playbook access — it can only reach playbooks you can access, and it is removed if you leave the workspace.</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setShowGenerateKeyModal(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
+          <button onClick={() => setShowGenerateKeyModal(false)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">Cancel</button>
           <button
             onClick={handleGenerateKey}
             disabled={!newKeyName.trim() || isGeneratingKey}
-            className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isGeneratingKey ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</> : 'Generate Key'}
           </button>
@@ -2185,23 +2335,23 @@ const Settings = () => {
 
       {/* Edit Connection Permissions Modal (SQEM-064) */}
       <Modal open={!!editingKey} onClose={() => setEditingKey(null)} size="sm" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-1">Edit connection</h3>
-        <p className="text-sm font-mono text-slate-500 dark:text-slate-400 mb-5 truncate">{editingKey?.key_prefix}</p>
-        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Name</label>
-        <input
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-1">Edit connection</h3>
+        <p className="text-sm font-mono text-ink-muted mb-5 truncate">{editingKey?.key_prefix}</p>
+        <label htmlFor="settings-name" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-2">Name</label>
+        <input id="settings-name"
           type="text"
           value={editKeyName}
           onChange={e => setEditKeyName(e.target.value)}
           placeholder="e.g. Production, Zapier, n8n"
-          className="w-full p-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all mb-5 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+          className="w-full p-3 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all mb-5 placeholder:text-ink-subtle"
         />
         <ApiKeyScopeFields value={editKeyScope} onChange={setEditKeyScope} canWrite={canWriteContent} />
         <div className="flex gap-2 mt-6">
-          <button onClick={() => setEditingKey(null)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
+          <button onClick={() => setEditingKey(null)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">Cancel</button>
           <button
             onClick={handleSaveKeyScope}
             disabled={isSavingScope || !editKeyName.trim()}
-            className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isSavingScope ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...</> : 'Save changes'}
           </button>
@@ -2210,45 +2360,48 @@ const Settings = () => {
 
       {/* New Key — Show Once Modal */}
       <Modal open={!!generatedKeyValue} onClose={() => { setGeneratedKeyValue(null); setKeyCopied(false); }} size="sm" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Copy your API key</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">This key will only be shown once. Store it somewhere safe.</p>
-        <div className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl mb-5">
-          <code className="text-xs font-mono text-slate-700 dark:text-slate-200 flex-1 break-all">{generatedKeyValue}</code>
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">Copy your API key</h3>
+        <p className="text-sm text-ink-muted mb-4">This key will only be shown once. Store it somewhere safe.</p>
+        <div className="flex items-center gap-2 p-3 bg-surface-sunken border border-line-strong rounded-xl mb-5">
+          <code className="text-xs font-mono text-ink flex-1 break-all">{generatedKeyValue}</code>
           <button
             onClick={() => { navigator.clipboard.writeText(generatedKeyValue || ''); setKeyCopied(true); }}
-            className="shrink-0 p-1.5 text-slate-400 hover:text-brand-600 transition-colors"
+            className="shrink-0 p-1.5 text-ink-subtle hover:text-accent transition-colors"
             title="Copy"
           >
-            {keyCopied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+            {keyCopied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
           </button>
         </div>
         <button
           onClick={() => { setGeneratedKeyValue(null); setKeyCopied(false); }}
-          className="w-full py-2.5 bg-slate-900 dark:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors hover:bg-slate-800 dark:hover:bg-slate-600"
+          className="w-full py-2.5 bg-ink-strong text-surface-raised rounded-xl text-xs font-bold transition-colors hover:opacity-90"
         >
           I&apos;ve saved my key
         </button>
       </Modal>
 
-      <Modal open={!!confirmDialog} onClose={() => setConfirmDialog(null)} size="sm" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">{confirmDialog?.title}</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">{confirmDialog?.message}</p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setConfirmDialog(null)}
-            className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors"
-          >
-            Cancel
-          </button>
-          <Button
-            variant="danger"
-            onClick={() => { confirmDialog?.onConfirm(); setConfirmDialog(null); }}
-            className="flex-1 py-2.5 text-xs shadow-lg hover:shadow-red-200"
-          >
-            Confirm
-          </Button>
-        </div>
-      </Modal>
+      <ConfirmModal
+        open={!!confirmDialog}
+        title={confirmDialog?.title ?? ''}
+        confirmLabel={confirmDialog?.confirmLabel}
+        confirmText={confirmDialog?.confirmText}
+        onClose={() => setConfirmDialog(null)}
+        onConfirm={() => { confirmDialog?.onConfirm(); setConfirmDialog(null); }}
+      >
+        <p>{confirmDialog?.message}</p>
+      </ConfirmModal>
+
+      {/* SQEM-539 — a tab change with an unsaved card. Same words as the editor's leave guard. */}
+      <ConfirmModal
+        open={pendingTab !== null}
+        title="Unsaved changes"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        onClose={() => setPendingTab(null)}
+        onConfirm={() => { discardDrafts(); if (pendingTab) setActiveTab(pendingTab); setPendingTab(null); }}
+      >
+        <p>A card on this tab has changes that are not saved. Leave without saving them?</p>
+      </ConfirmModal>
     </div>
   );
 };

@@ -31,7 +31,8 @@ const { adaptToBrand } = await import('../../lib/adaptTemplate');
 describe('SQEM-395 — the form and the type', () => {
   it('the shared form has the three fields and the website, and nothing else', () => {
     const form = code(read('components/BrandProfileForm.tsx'));
-    expect(form.match(/<input value=\{value\.\w+\}/g)?.length).toBe(3);
+    // SQEM-538 — each input now carries an id first (bound to its label), so allow attributes before `value`.
+    expect(form.match(/<input (?:id="[^"]*" )?value=\{value\.\w+\}/g)?.length).toBe(3);
     expect(form).toMatch(/type="url"/);
     expect(form).not.toMatch(/tone|useCase|<select/i);
   });

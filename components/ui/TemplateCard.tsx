@@ -62,14 +62,14 @@ export default function TemplateCard({
             the z-10 controls above keep working. */}
         {titleHref ? (
           <Link to={titleHref} className="group-hover:text-brand-600 transition-colors after:absolute after:inset-0 after:content-['']">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2 line-clamp-1">{title}</h3>
+            <h3 className="text-sm font-semibold text-ink-strong mb-2 line-clamp-1">{title}</h3>
           </Link>
         ) : (
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2 line-clamp-1">{title}</h3>
+          <h3 className="text-sm font-semibold text-ink-strong mb-2 line-clamp-1">{title}</h3>
         )}
 
         {description !== undefined && (
-          <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-4 leading-relaxed">{description}</p>
+          <p className="text-sm text-ink-muted line-clamp-2 mb-4 leading-relaxed">{description}</p>
         )}
 
         {/* Above the stretched title link, so anything interactive in here still receives clicks. */}

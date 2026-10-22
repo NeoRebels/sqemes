@@ -67,13 +67,13 @@ class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="min-h-full bg-slate-50 flex items-center justify-center p-8">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-8 max-w-md w-full text-center">
-            <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mx-auto mb-4">
+        <div className="min-h-full bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-8">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-soft p-8 max-w-md w-full text-center">
+            <div className="w-12 h-12 bg-red-50 dark:bg-red-900/20 rounded-xl flex items-center justify-center mx-auto mb-4">
               <AlertTriangle className="w-6 h-6 text-red-500" />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Something went wrong</h2>
-            <p className="text-sm text-slate-500 mb-6 font-mono break-all">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Something went wrong</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 font-mono break-all">
               {this.state.error?.message || 'An unexpected error occurred.'}
             </p>
             <button

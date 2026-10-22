@@ -106,17 +106,21 @@ export const VAT_NOTE = 'Includes VAT. Business customers with a valid VAT ID ar
 // SQEM-057 — `price` is the monthly (billed-monthly) price; `priceYearly` is the
 // per-month price when billed annually (≈20% off, rounded). All tiers are paid;
 // MCP + AI credits ship on every tier (differentiation is seats/credits/team features).
-export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly: number; tagline: string; features: string[]; libraryAccess: boolean; mcpAccess: boolean }> = {
+// SQEM-556 — `storageGb` is display only, like the prices: the limit that is enforced lives in the
+// database (`sqemes_cloud.storage_limit`, SQEM-515). tests/unit/planStorage.test.ts holds the two together.
+export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly: number; tagline: string; storageGb: number; features: string[]; libraryAccess: boolean; mcpAccess: boolean }> = {
   Solo: {
     users: 1,
     price: '€12/mo',
     priceYearly: 9,
     tagline: 'For individuals getting started',
+    storageGb: 1,
     libraryAccess: true,
     mcpAccess: true,
     features: [
       '1 team member',
       '2,000 AI credits / month',
+      '1 GB file storage',
       'MCP server access',
       'Unlimited AI with your own key (BYOK)',
       'Unlimited playbooks',
@@ -128,11 +132,13 @@ export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly
     price: '€99/mo',
     priceYearly: 79,
     tagline: 'For teams that move fast',
+    storageGb: 10,
     libraryAccess: true,
     mcpAccess: true,
     features: [
       'Up to 10 team members',
       '25,000 AI credits / month',
+      '10 GB file storage',
       'MCP server access',
       'Roles & permissions',
       'Unlimited AI with your own key (BYOK)',
@@ -145,11 +151,13 @@ export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly
     price: '€249/mo',
     priceYearly: 199,
     tagline: 'For teams that need more room',
+    storageGb: 50,
     libraryAccess: true,
     mcpAccess: true,
     features: [
       'Up to 30 team members',
       '100,000 AI credits / month',
+      '50 GB file storage',
       'MCP server access',
       'Roles & permissions',
       'Unlimited AI with your own key (BYOK)',
@@ -492,13 +500,5 @@ export const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 // 'General' is kept only as the DB default / uncategorised fallback, not a browse tab.
 export const TEMPLATE_CATEGORIES = ['Marketing & Sales', 'Writing & Content', 'Engineering & Product', 'Data & Research', 'Business & Ops', 'Support & Success', 'Creative & Design'] as const;
 
-export const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
-  'Marketing & Sales': { bg: 'bg-pink-50 dark:bg-pink-900/30', text: 'text-pink-600 dark:text-pink-400' },
-  'Writing & Content': { bg: 'bg-violet-50 dark:bg-violet-900/30', text: 'text-violet-600 dark:text-violet-400' },
-  'Engineering & Product': { bg: 'bg-blue-50 dark:bg-blue-900/30', text: 'text-blue-600 dark:text-blue-400' },
-  'Data & Research': { bg: 'bg-emerald-50 dark:bg-emerald-900/30', text: 'text-emerald-600 dark:text-emerald-400' },
-  'Business & Ops': { bg: 'bg-amber-50 dark:bg-amber-900/30', text: 'text-amber-600 dark:text-amber-400' },
-  'Support & Success': { bg: 'bg-teal-50 dark:bg-teal-900/30', text: 'text-teal-600 dark:text-teal-400' },
-  'Creative & Design': { bg: 'bg-purple-50 dark:bg-purple-900/30', text: 'text-purple-600 dark:text-purple-400' },
-  General: { bg: 'bg-slate-100 dark:bg-slate-700', text: 'text-slate-600 dark:text-slate-300' },
-};
+// SQEM-554 (e2) — CATEGORY_COLORS (one hue per marketplace category) is gone: categories are neutral
+// badges now; colour is for the kind and the accent.

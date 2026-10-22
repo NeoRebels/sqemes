@@ -12,6 +12,9 @@ import { edgeError } from '../lib/edgeError';
 import { Send, Bot, User, Sparkles, AlertTriangle, Loader2, Copy, Check, Pencil, Paperclip, Plug, X, FileText, MessageSquarePlus, Search, MoreHorizontal, Globe, Lock, Trash2, MessageSquare, Wand2, Key, Upload, Files } from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { fetchPersona, fetchPersonas } from '../lib/api/personas';
+import { clearChatHandoff, peekChatHandoff } from '../lib/chatHandoff';
+import { buildPendingRef, finalizeRef, messagePlaybookFields, normalizeLoadedIds, pendingFromSent, usedPlaybooks, type PendingPlaybookRef } from '../lib/playbookRef';
+import { ChatPlaybookCard, UsedPlaybookChips } from '../components/ChatPlaybookCard';
 import { personaInstruction } from '../lib/personaChat';
 import PullToRefreshIndicator from '../components/PullToRefreshIndicator';
 import ReactMarkdown from 'react-markdown';
@@ -20,6 +23,7 @@ import { markdownUrlTransform } from '../lib/markdownUrlTransform';
 import { composeSystemInstruction, resolveAppliedContext } from '../lib/templateContext';
 import { enhancePrompt, enhanceInput } from '../supabase/functions/_shared/authoringPrompts.ts';
 import { shouldSendOnEnter, hasCoarsePointer } from '../lib/chatKeys';
+import { noKeyHint, PROVIDER_KEYS_TAB } from '../lib/chatKeyHint';
 import { useLocation, useNavigate, useParams, Link } from 'react-router';
 import { SUPPORTED_MIME_TYPES, ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, isImageType, fileTypeLabel } from '../lib/uploadTypes';
 import {
@@ -34,7 +38,7 @@ import Button from '../components/ui/Button';
 import { uploadWorkspaceFile, getWorkspaceFileSignedUrl } from '../lib/api/files';
 import { fetchConnectors, type Connector } from '../lib/api/connectors';
 import { WorkspaceFilePickerModal } from '../components/WorkspaceFilePickerModal';
-import type { ChatSession, Persona, Prompt, WorkspaceFile } from '../types';
+import type { ChatSession, Persona, PlaybookRef, Prompt, PromptKind, WorkspaceFile } from '../types';
 import { ModelSelect } from '../components/ModelSelect';
 import { PersonaSelect } from '../components/PersonaSelect';
 import TemplateLaunchModal, { type ContextImage } from '../components/TemplateLaunchModal';
@@ -145,6 +149,8 @@ interface ChatMsg {
   userId?: string;
   userName?: string;
   userAvatar?: string;
+  playbookRef?: PlaybookRef | null;   // SQEM-551 — user message started from a prompt playbook
+  loadedTemplateIds?: string[];       // SQEM-551 — answer: what the model loaded for it
 }
 
 // SQEM-185 — a memoized single message. Extracting this out of the Chat component means composer
@@ -163,18 +169,20 @@ interface MessageItemProps {
   onCopy: (msgId: string, content: string) => void;
   onEdit: (msg: ChatMsg) => void;
   innerRef?: React.Ref<HTMLDivElement>;
+  /** SQEM-551 — the viewer's playbooks by id (stable, memoized): chip titles and card links. */
+  playbookTitles: ReadonlyMap<string, { title: string; kind: PromptKind }>;
 }
 
 const MessageItem = memo(function MessageItem({
   msg, currentUserId, currentUserName, userAvatar, showUserAvatar, onAvatarError,
-  isLastAssistant, isLoading, isCopied, onCopy, onEdit, innerRef,
+  isLastAssistant, isLoading, isCopied, onCopy, onEdit, innerRef, playbookTitles,
 }: MessageItemProps) {
   const isOtherUser = msg.role === 'user' && !!msg.userId && msg.userId !== currentUserId;
   return (
     <div ref={innerRef} className={`flex gap-3 ${msg.role === 'user' && !isOtherUser ? 'justify-end' : 'justify-start'}${isLastAssistant ? ' scroll-mt-5' : ''}`}>
       {msg.role === 'assistant' && (
-        <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center shrink-0 mt-1">
-          <Bot className="w-4 h-4 text-brand-600 dark:text-brand-400" />
+        <div className="w-8 h-8 rounded-control bg-accent-strong flex items-center justify-center shrink-0 mt-1">
+          <Bot className="w-4 h-4 text-white" />
         </div>
       )}
       {/* SQEM-205 — Avatar falls back to initials when the picture is missing *or* fails to load.
@@ -184,11 +192,27 @@ const MessageItem = memo(function MessageItem({
       )}
       <div className={`max-w-[85%] ${msg.role === 'user' && !isOtherUser ? 'order-first' : ''}`}>
         {isOtherUser && (
-          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1 ml-1">{msg.userName || 'Collaborator'}</p>
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 ml-1">{msg.userName || 'Collaborator'}</p>
         )}
         {msg.role === 'user' ? (
           <div>
-            <div className={`px-4 py-3 rounded-2xl shadow-sm ${isOtherUser ? 'bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-tl-md' : 'bg-brand-600 text-white rounded-tr-md'}`}>
+            {msg.playbookRef ? (
+              // SQEM-551 — the card, with the text it produced collapsed inside it.
+              <div className={`flex ${isOtherUser ? 'justify-start' : 'justify-end'}`}>
+                <ChatPlaybookCard playbookRef={msg.playbookRef} content={msg.content} linkable={playbookTitles.has(msg.playbookRef.id)}>
+                  {msg.attachments && msg.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {msg.attachments.map((att, i) =>
+                        isImageType(att.mimeType)
+                          ? <img key={i} src={att.dataUrl} alt="Attachment" className="max-w-[200px] max-h-[150px] rounded-lg object-cover border border-line" />
+                          : <span key={i} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 bg-surface-sunken text-xs font-medium text-ink-muted"><FileText className="w-4 h-4" />{fileTypeLabel(att.mimeType)}</span>
+                      )}
+                    </div>
+                  )}
+                </ChatPlaybookCard>
+              </div>
+            ) : (
+            <div className={`px-4 py-3 rounded-2xl shadow-sm ${isOtherUser ? 'bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-tl-md' : 'bg-accent-strong text-white rounded-tr-md'}`}>
               {msg.attachments && msg.attachments.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
                   {msg.attachments.map((att, i) =>
@@ -205,12 +229,13 @@ const MessageItem = memo(function MessageItem({
               )}
               <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
             </div>
+            )}
             <div className={`mt-2 flex gap-2 ${isOtherUser ? 'ml-1' : 'mr-1 justify-end'}`}>
-              <button onClick={() => onCopy(msg.id, msg.content)} className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+              <button onClick={() => onCopy(msg.id, msg.content)} className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
                 {isCopied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
               </button>
               {!isLoading && !isOtherUser && (
-                <button onClick={() => onEdit(msg)} className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+                <button onClick={() => onEdit(msg)} className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
                   <Pencil className="w-3.5 h-3.5" /> Edit
                 </button>
               )}
@@ -218,7 +243,7 @@ const MessageItem = memo(function MessageItem({
           </div>
         ) : (
           <div>
-            <div className="bg-white dark:bg-slate-800 px-5 py-4 rounded-2xl rounded-tl-md shadow-sm border border-slate-100 dark:border-slate-700">
+            <div className="bg-surface-raised px-5 py-4 rounded-card rounded-tl-md shadow-rest border border-line">
               {msg.pending ? (
                 <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -231,10 +256,11 @@ const MessageItem = memo(function MessageItem({
                   <ReactMarkdown components={MarkdownComponents} remarkPlugins={[remarkGfm]} urlTransform={markdownUrlTransform}>{msg.content}</ReactMarkdown>
                 </div>
               )}
-              {msg.model && !msg.pending && <p className="text-3xs text-slate-400 dark:text-slate-500 mt-2 font-mono">{msg.model}</p>}
+              {msg.model && !msg.pending && <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2 font-mono">{msg.model}</p>}
             </div>
+            {!msg.pending && <UsedPlaybookChips used={usedPlaybooks(msg.loadedTemplateIds, playbookTitles)} />}
             {!msg.pending && (
-              <button onClick={() => onCopy(msg.id, msg.content)} className="mt-2 ml-1 inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+              <button onClick={() => onCopy(msg.id, msg.content)} className="mt-2 ml-1 inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
                 {isCopied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
               </button>
             )}
@@ -273,15 +299,27 @@ const searchShortcutHint =
 // ---------------------------------------------------------------------------
 const Chat = () => {
   const { workspace, currentUser } = useWorkspace();
+  // SQEM-536 — the no-key state differs for whoever may add a provider key and for everybody else.
+  const keyHint = noKeyHint(can(currentUser, workspace, 'api-keys:manage'));
   const { workspaceFiles, addWorkspaceFile } = useData();
   // SQEM-371 — needed to turn the ids stored on a session back into templates on load.
   const { prompts } = usePrompts();
+  // SQEM-551 — the viewer's own playbooks by id: chip titles and card links come from here, so a
+  // shared chat never shows a playbook the viewer cannot open. Memoized — MessageItem is memo'd.
+  const playbookTitles = useMemo(
+    () => new Map(prompts.map(p => [p.id, { title: p.title, kind: p.kind }] as const)),
+    [prompts],
+  );
+  // SQEM-551 — set on "Insert" from a prompt playbook, read once at send. A ref, not state: nothing
+  // renders from it. Emptying the composer drops it (effect below).
+  const pendingPlaybookRef = useRef<PendingPlaybookRef | null>(null);
   const { chatSessions, addChatSession, updateChatSession: storeUpdateSession,
     deleteChatSession: storeDeleteSession } = useChatSessions();
   const { showToast } = useUI();
 
   const location  = useLocation();
   const navigate  = useNavigate();
+  const openProviderKeys = () => navigate('/settings', { state: { initialTab: PROVIDER_KEYS_TAB } });
   const { sessionId: routeSessionId } = useParams<{ sessionId?: string }>();
 
   // ── Conversation state ───────────────────────────────────────────────────
@@ -305,7 +343,10 @@ const Chat = () => {
   const [isLoading, setIsLoading]             = useState(false);
   const [error, setError]                     = useState<string | null>(null);
   const [errorCode, setErrorCode]             = useState<string | null>(null);
-  const [input, setInput]                     = useState('');
+  // SQEM-550 (a) — text handed over from the Start page's composer (lib/chatHandoff.ts). Read once;
+  // the input starts with it, and it is sent automatically as soon as the chat is ready (below).
+  const [handoff]                              = useState(() => peekChatHandoff());
+  const [input, setInput]                     = useState(() => handoff?.draft ?? '');
   const [avatarLoadError, setAvatarLoadError] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [attachments, setAttachments]         = useState<ChatAttachment[]>([]);
@@ -379,6 +420,8 @@ const Chat = () => {
   const showUserAvatar = userAvatar.length > 0 && !avatarLoadError;
   const launchTemplateId  = (location.state as { launchTemplateId?: string } | null)?.launchTemplateId;
   const launchPersonaId   = (location.state as { launchPersonaId?: string } | null)?.launchPersonaId;
+  // SQEM-550 (a) — Start's "Playbook" button and "/" land here with the picker open.
+  const openTemplatePicker = (location.state as { openTemplatePicker?: boolean } | null)?.openTemplatePicker;
 
   // SQEM-185 — memoized so a keystroke in the composer doesn't rebuild the model list or re-sort sessions.
   const enabledModels = useMemo(
@@ -403,6 +446,10 @@ const Chat = () => {
 
   // SQEM-208 — the Escape handler moved into FullScreenExit; the list of "something more local is
   // open" states stays here, where those states live, and is passed down as `escapeReady`.
+
+  useEffect(() => {
+    if (openTemplatePicker) setTemplateModalOpen(true);
+  }, [openTemplatePicker]);
 
   // Open template modal when navigated here with a launchTemplateId
   useEffect(() => {
@@ -457,6 +504,27 @@ const Chat = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per launch id, not on every prompts refresh
   }, [launchPersonaId]);
 
+  /**
+   * SQEM-550 (a) — send what the Start page handed over, exactly once.
+   * ⛔ Once: `handoffSentRef` survives StrictMode's double effect run, the slot is cleared as soon as
+   * the text is in the input, and Back/reload find nothing to send (it never was router state).
+   * ⚠️ Waits for a model (no key → the text simply stays in the composer next to the usual hint,
+   * SQEM-536) and, if a persona was chosen, for that persona to be applied first.
+   */
+  const handoffSentRef = useRef(false);
+  const [handoffPersonaReady, setHandoffPersonaReady] = useState(() => !handoff?.personaId);
+  useEffect(() => {
+    if (!handoff) return;
+    clearChatHandoff();
+    if (!handoff.personaId) return;
+    let cancelled = false;
+    fetchPersona(handoff.personaId)
+      .then(persona => { if (cancelled) return; if (persona) applyPersona(persona); setHandoffPersonaReady(true); })
+      .catch(() => { if (!cancelled) setHandoffPersonaReady(true); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per handoff
+  }, [handoff]);
+
   // Load session from route param
   useEffect(() => {
     if (!routeSessionId) return;
@@ -470,6 +538,7 @@ const Chat = () => {
         setMessages(stored.map(m => ({
           id: m.id, role: m.role, content: inlineImagesToBlobUrls(m.content), model: m.model,
           userId: m.userId, userName: m.userName, userAvatar: m.userAvatar,
+          playbookRef: m.playbookRef, loadedTemplateIds: m.loadedTemplateIds, // SQEM-551
         })));
         setSessionId(routeSessionId);
         setMobileTab('chat');
@@ -544,6 +613,7 @@ const Chat = () => {
               id: row.id, role: row.role, content: inlineImagesToBlobUrls(row.content),
               model: row.model || undefined,
               userId: row.user_id, userName: sender?.name, userAvatar: sender?.avatar,
+              ...messagePlaybookFields(row), // SQEM-551 — same mapping as the history load
             }];
           });
         })
@@ -725,6 +795,7 @@ const Chat = () => {
       setMessages(messages.slice(0, idx));
     }
     setInput(msg.content);
+    pendingPlaybookRef.current = pendingFromSent(msg.playbookRef, msg.content); // SQEM-551 — the card comes back with it
     if (msg.attachments?.length) {
       setAttachments(msg.attachments.map(a => ({ id: crypto.randomUUID(), file: new File([], 'restored'), dataUrl: a.dataUrl, mimeType: a.mimeType })));
     } else {
@@ -827,6 +898,20 @@ const Chat = () => {
     } catch { /* keep the truncated first-message title */ }
   };
 
+  // SQEM-551 — an emptied composer is a new message, not an edit of the inserted playbook.
+  useEffect(() => {
+    if (!input.trim()) pendingPlaybookRef.current = null;
+  }, [input]);
+
+  // SQEM-550 (a) — see `handoffSentRef` above.
+  useEffect(() => {
+    if (!handoff || handoffSentRef.current || !handoffPersonaReady || !selectedModel || isLoading) return;
+    if (input.trim() !== handoff.draft) return; // the person started editing — leave it to them
+    handoffSentRef.current = true;
+    void handleSend();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleSend is recreated every render
+  }, [handoff, handoffPersonaReady, selectedModel, isLoading, input]);
+
   const handleSend = async () => {
     const trimmed = input.trim();
     if (!trimmed || isLoading || !selectedModel) return;
@@ -842,7 +927,9 @@ const Chat = () => {
     abortControllerRef.current = controller;
 
     const currentAttachments = attachments.map(a => ({ mimeType: a.mimeType, dataUrl: a.dataUrl }));
-    const userMsg: ChatMsg = { id: crypto.randomUUID(), role: 'user', content: trimmed, attachments: currentAttachments.length > 0 ? currentAttachments : undefined };
+    const playbookRef = finalizeRef(pendingPlaybookRef.current, trimmed); // SQEM-551
+    pendingPlaybookRef.current = null;
+    const userMsg: ChatMsg = { id: crypto.randomUUID(), role: 'user', content: trimmed, attachments: currentAttachments.length > 0 ? currentAttachments : undefined, playbookRef };
 
     setMessages(prev => [...prev, userMsg]);
     setInput('');
@@ -890,7 +977,7 @@ const Chat = () => {
       }
 
       // Persist the user message with its local id (SQEM-115) so local == DB ids for pruning.
-      addChatMessage(activeSessionId, 'user', userContentForStorage, undefined, currentUser.id, userMsg.id).catch(() => {});
+      addChatMessage(activeSessionId, 'user', userContentForStorage, undefined, currentUser.id, userMsg.id, { playbookRef }).catch(() => {});
 
       const allMessages = [...messages, userMsg].map(m => {
         if (m.attachments?.length) {
@@ -932,11 +1019,14 @@ const Chat = () => {
       // remote tool call runs inside that one request), and the client has to outlast it or the
       // server's honest 504 arrives at nobody. Same module as the server, so the two cannot drift —
       // including the `EDGE_PLAN_IS_PAID` gate, which keeps both at the default pair on a free plan.
+      let loadedTemplateIds: string[] = [];
       const resultPromise = waitForJobResult(jobId, controller.signal, (textSoFar) => {
         setMessages(prev => prev.map(m => (
           m.id === assistantMsgId ? { ...m, content: textSoFar, pending: false } : m
         )));
-      }, clientJobTimeoutMs({ connectors: activeConnectorIds.length > 0, selfHosted: IS_SELF_HOSTED }));
+      }, clientJobTimeoutMs({ connectors: activeConnectorIds.length > 0, selfHosted: IS_SELF_HOSTED }),
+      // SQEM-551 — what the model loaded for this answer ("Used" chips).
+      (meta) => { loadedTemplateIds = normalizeLoadedIds(meta.loadedTemplateIds); });
 
       const res = await fetch(functionCallUrl('chat-message'), {
         method: 'POST',
@@ -959,11 +1049,11 @@ const Chat = () => {
       } else {
         // Text model — wait for Realtime broadcast
         rawResult = await resultPromise;
-        setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: inlineImagesToBlobUrls(rawResult), pending: false } : m));
+        setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: inlineImagesToBlobUrls(rawResult), pending: false, loadedTemplateIds } : m));
       }
 
       // Save original base64 content to DB (use same ID so realtime can deduplicate)
-      if (activeSessionId) addChatMessage(activeSessionId, 'assistant', rawResult, selectedModel, undefined, assistantMsgId).catch(() => {});
+      if (activeSessionId) addChatMessage(activeSessionId, 'assistant', rawResult, selectedModel, undefined, assistantMsgId, { loadedTemplateIds }).catch(() => {});
 
       // First exchange of a new chat → upgrade the truncated title to an AI topic title.
       if (isNewSession && activeSessionId) generateChatTitle(trimmed, rawResult, activeSessionId);
@@ -1065,9 +1155,11 @@ const Chat = () => {
     const ownerLabel  = isOwner ? 'You' : (session.ownerName || 'Teammate');
 
     return (
+      // SQEM-538 — the row is not a click target itself: the title is a real button whose ::after
+      // covers the row (the TemplateCard pattern), so the row works by keyboard and has a name. The
+      // row's own controls sit above that layer with `relative z-10`.
       <div
         key={session.id}
-        onClick={() => handleSelectSession(session)}
         className={`group relative flex items-start gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
           isActive ? 'bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800' : 'hover:bg-slate-50 dark:hover:bg-slate-700 border border-transparent'
         }`}
@@ -1076,7 +1168,7 @@ const Chat = () => {
           {showOwner && session.ownerAvatar ? (
             <Avatar src={session.ownerAvatar} name={ownerLabel} className="w-full h-full" rounded="rounded-lg" />
           ) : showOwner ? (
-            <span className={`text-[11px] font-bold ${isActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-500 dark:text-slate-400'}`}>
+            <span className={`text-xs font-bold ${isActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-500 dark:text-slate-400'}`}>
               {ownerLabel.charAt(0).toUpperCase()}
             </span>
           ) : (
@@ -1096,12 +1188,19 @@ const Chat = () => {
               className="w-full text-xs font-medium text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-700 border border-brand-400 rounded-md px-1.5 py-0.5 outline-none"
             />
           ) : (
-            <p className={`text-xs font-medium truncate leading-snug ${isActive ? 'text-brand-900 dark:text-brand-300' : 'text-slate-700 dark:text-slate-200'}`}>{session.title}</p>
+            <button
+              type="button"
+              onClick={() => handleSelectSession(session)}
+              aria-current={isActive ? 'page' : undefined}
+              className={`block w-full text-left text-xs font-medium truncate leading-snug after:absolute after:inset-0 after:content-[''] after:rounded-xl ${isActive ? 'text-brand-900 dark:text-brand-300' : 'text-slate-700 dark:text-slate-200'}`}
+            >
+              {session.title}
+            </button>
           )}
           <div className="flex items-center gap-1 mt-0.5">
-            <p className="text-3xs text-slate-400 dark:text-slate-500 shrink-0">{formatRelativeTime(session.lastActiveAt)}</p>
+            <p className="text-2xs text-slate-400 dark:text-slate-500 shrink-0">{formatRelativeTime(session.lastActiveAt)}</p>
             {showOwner && (
-              <p className="text-3xs text-slate-400 truncate">· {ownerLabel}</p>
+              <p className="text-2xs text-slate-400 truncate">· {ownerLabel}</p>
             )}
           </div>
         </div>
@@ -1118,7 +1217,7 @@ const Chat = () => {
           <button
             onClick={e => { e.stopPropagation(); handleWithdrawSharing(session); }}
             title="Withdraw sharing — the chat stays with its author"
-            className="p-1 shrink-0 text-slate-300 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 rounded-md transition-all opacity-0 group-hover:opacity-100"
+            className="relative z-10 p-1.5 shrink-0 text-slate-300 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 rounded-md transition-all reveal-on-hover"
           >
             <Lock className="w-3.5 h-3.5" />
           </button>
@@ -1126,10 +1225,10 @@ const Chat = () => {
 
         {/* Context menu (owner only) */}
         {isOwner && (
-          <div className="relative shrink-0" ref={openMenuId === session.id ? menuRef : null}>
+          <div className="relative z-10 shrink-0" ref={openMenuId === session.id ? menuRef : null}>
             <button
               onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === session.id ? null : session.id); }}
-              className="p-1 text-slate-300 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 rounded-md transition-all opacity-0 group-hover:opacity-100"
+              className="p-1.5 text-slate-300 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 rounded-md transition-all reveal-on-hover"
             >
               <MoreHorizontal className="w-3.5 h-3.5" />
             </button>
@@ -1184,10 +1283,10 @@ const Chat = () => {
         {/* ════════════════════════════════════════════════════════════════
             LEFT PANEL — session list
         ════════════════════════════════════════════════════════════════ */}
-        <div className={`w-full md:w-[300px] bg-white dark:bg-slate-800 border-r border-slate-100 dark:border-slate-700 flex-col h-full shrink-0 shadow-soft ${mobileTab === 'sessions' ? 'flex' : 'hidden md:flex'}`}>
+        <div className={`w-full md:w-[300px] bg-surface-sunken dark:bg-surface-raised border-r border-line flex-col h-full shrink-0 ${mobileTab === 'sessions' ? 'flex' : 'hidden md:flex'}`}>
 
           {/* Panel header */}
-          <div className="p-4 border-b border-slate-50 dark:border-slate-700 shrink-0">
+          <div className="p-4 border-b border-line shrink-0">
             {/* SQEM-206/208 — Chat is a full-screen mode, and this is the door out of it. The
                 behaviour now lives in FullScreenExit, shared with the editor and the marketplace
                 detail page; `escapeReady` is what keeps Escape from firing while something more
@@ -1195,7 +1294,7 @@ const Chat = () => {
             <div className="flex items-center gap-2 mb-4">
               <img src="/logo-favicon-V2.png" alt="sqemes" className="w-8 h-8 rounded-lg shrink-0" />
               <FullScreenExit
-                label="Back to Dashboard"
+                label="Back to Start"
                 onExit={() => navigate('/')}
                 escapeEnabled
                 escapeReady={
@@ -1207,7 +1306,7 @@ const Chat = () => {
             </div>
             <button
               onClick={handleNewChat}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 transition-colors shadow-sm dark:shadow-none"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-strong text-white rounded-control text-sm font-semibold hover:opacity-90 transition-opacity"
             >
               <MessageSquarePlus className="w-4 h-4" /> New Chat
             </button>
@@ -1279,16 +1378,16 @@ const Chat = () => {
               )
             )}
           </div>
-          <p className="text-center text-3xs text-slate-400 dark:text-slate-500 px-4 pb-3 shrink-0">Private chats auto-delete after 30 days</p>
+          <p className="text-center text-2xs text-slate-400 dark:text-slate-500 px-4 pb-3 shrink-0">Private chats auto-delete after 30 days</p>
         </div>
 
         {/* ════════════════════════════════════════════════════════════════
             RIGHT PANEL — conversation
         ════════════════════════════════════════════════════════════════ */}
-        <div className={`flex-1 flex-col min-h-0 h-full overflow-hidden bg-slate-50/50 dark:bg-slate-900/50 ${mobileTab === 'chat' ? 'flex' : 'hidden md:flex'}`}>
+        <div className={`flex-1 flex-col min-h-0 h-full overflow-hidden bg-surface ${mobileTab === 'chat' ? 'flex' : 'hidden md:flex'}`}>
 
           {/* Top bar */}
-          <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 flex items-center gap-2 shrink-0 flex-wrap">
+          <div className="border-b border-line bg-surface-raised px-4 py-3 flex items-center gap-2 shrink-0 flex-wrap">
             {/* Model selector */}
             <ModelSelect
               models={enabledModels}
@@ -1298,9 +1397,10 @@ const Chat = () => {
                 if (sessionId) storeUpdateSession(sessionId, { model: id });
               }}
               emptyLabel="No model available"
-              emptyActionLabel="Add API key"
+              // SQEM-536 — only someone who can add a key gets the button; a member's tab has no key card.
+              emptyActionLabel={keyHint.actionLabel ?? undefined}
               emptyActionIcon={<Key className="w-3.5 h-3.5" />}
-              onEmptyAction={() => navigate('/settings', { state: { initialTab: 'api' } })}
+              onEmptyAction={keyHint.actionLabel ? openProviderKeys : undefined}
               /**
                * SQEM-446 — mark the models your connectors actually reach.
                *
@@ -1357,25 +1457,25 @@ const Chat = () => {
                   <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 font-medium">Using:</span>
                   <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0 flex-1">
                     {activePersona && (
-                      <div className="shrink-0 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border text-brand-700 dark:text-brand-300 bg-brand-50 dark:bg-brand-900/20 border-brand-200 dark:border-brand-700">
+                      <div className="shrink-0 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full text-accent bg-accent-soft">
                         <Bot className="w-3.5 h-3.5" />
                         <span className="opacity-60 font-medium">Persona</span>
                         <span className="opacity-30">·</span>
                         <span className="font-semibold">{activePersona.title}</span>
-                        <button onClick={removePersona} className="ml-0.5 transition-colors text-brand-400 hover:text-brand-700 dark:hover:text-brand-200" title="Remove">
+                        <button onClick={removePersona} className="ml-0.5 transition-opacity opacity-70 hover:opacity-100" title="Remove">
                           <X className="w-3 h-3" />
                         </button>
                       </div>
                     )}
                     {activeSkills.map(({ template }) => (
-                        <div key={template.id} className="shrink-0 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700">
+                        <div key={template.id} className="shrink-0 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full text-skill bg-skill-soft">
                           <Wand2 className="w-3.5 h-3.5" />
                           <span className="opacity-60 font-medium">Skill</span>
                           <span className="opacity-30">·</span>
                           <span className="font-semibold">{template.title}</span>
                           <button
                             onClick={() => removeApplied(template)}
-                            className="ml-0.5 transition-colors text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-200"
+                            className="ml-0.5 transition-opacity opacity-70 hover:opacity-100"
                             title="Remove"
                           >
                             <X className="w-3 h-3" />
@@ -1400,15 +1500,20 @@ const Chat = () => {
             <PullToRefreshIndicator {...pull} />
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6">
-                <div className="w-16 h-16 rounded-2xl bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center mb-4">
-                  <Sparkles className="w-8 h-8 text-brand-400 dark:text-brand-500" />
+                <div className="w-14 h-14 rounded-card bg-accent-soft flex items-center justify-center mb-4">
+                  <Sparkles className="w-7 h-7 text-accent" />
                 </div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Start a conversation</h2>
+                <h2 className="font-display text-2xl font-semibold tracking-tight text-ink-strong mb-2">Start a conversation</h2>
                 <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm">
                   {enabledModels.length > 0
                     ? `Chat with ${modelInfo?.name || 'AI'}${activePersona ? ` as ${activePersona.title}` : ''}. Type a message below.`
-                    : 'No API keys configured. Go to Settings › LLM API Keys to get started.'}
+                    : keyHint.text}
                 </p>
+                {enabledModels.length === 0 && keyHint.actionLabel && (
+                  <Button onClick={openProviderKeys} className="mt-4">
+                    <Key className="w-4 h-4" /> {keyHint.actionLabel}
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
@@ -1427,6 +1532,7 @@ const Chat = () => {
                     isCopied={copiedMessageId === msg.id}
                     onCopy={handleCopyMessage}
                     onEdit={handleEditMessage}
+                    playbookTitles={playbookTitles}
                   />
                 ))}
 
@@ -1470,8 +1576,9 @@ const Chat = () => {
                 Someone is waiting for a response…
               </div>
             )}
-            <div className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-4">
-              <div className="max-w-3xl mx-auto">
+            {/* SQEM-550 (e) — redesign C: the composer is a raised card on the page, not a bar. */}
+            <div className="px-4 pt-2 pb-4">
+              <div className="max-w-3xl mx-auto rounded-3xl border border-line bg-surface-raised shadow-raised p-3 md:p-4">
                 {attachments.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-2">
                     {attachments.map(att => (
@@ -1481,10 +1588,10 @@ const Chat = () => {
                         ) : (
                           <div className="w-16 h-16 rounded-lg bg-red-50 border border-red-200 flex flex-col items-center justify-center">
                             <FileText className="w-6 h-6 text-red-500" />
-                            <span className="text-3xs font-bold text-red-500 mt-0.5">{fileTypeLabel(att.mimeType)}</span>
+                            <span className="text-2xs font-bold text-red-500 mt-0.5">{fileTypeLabel(att.mimeType)}</span>
                           </div>
                         )}
-                        <button onClick={() => removeAttachment(att.id)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
+                        <button onClick={() => removeAttachment(att.id)} className="hit-24 absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center reveal-on-hover transition-opacity shadow-sm">
                           <X className="w-3 h-3" />
                         </button>
                       </div>
@@ -1542,7 +1649,7 @@ const Chat = () => {
                     <button
                       onClick={() => { setTemplateModalInitId(null); setTemplateModalOpen(true); }}
                       disabled={enabledModels.length === 0}
-                      title="Use template  (/)"
+                      title="Use playbook  (/)"
                       className="p-3 text-slate-400 dark:text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                     >
                       <FileText className="w-4 h-4" />
@@ -1587,10 +1694,11 @@ const Chat = () => {
                         value={input}
                         onChange={e => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
+                        aria-label="Message"
                         placeholder={dragActive ? 'Drop file here...' : 'Type a message...'}
                         rows={1}
                         disabled={isLoading || enabledModels.length === 0}
-                        className="w-full resize-none bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all disabled:opacity-50 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                        className="w-full resize-none bg-transparent px-2 py-2.5 text-sm md:text-base text-ink-strong outline-none transition-all disabled:opacity-50 placeholder:text-ink-subtle"
                       />
                     </div>
                     <button
@@ -1601,7 +1709,7 @@ const Chat = () => {
                     >
                       {isEnhancing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                     </button>
-                    <button onClick={handleSend} disabled={isLoading || !input.trim() || enabledModels.length === 0} className="p-3 bg-brand-600 text-white rounded-xl hover:bg-brand-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm hover:shadow-md dark:shadow-none dark:hover:shadow-none shrink-0">
+                    <button onClick={handleSend} aria-label="Send message" disabled={isLoading || !input.trim() || enabledModels.length === 0} className="p-3 bg-accent-strong text-white rounded-control hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm hover:shadow-md dark:shadow-none dark:hover:shadow-none shrink-0">
                       <Send className="w-4 h-4" />
                     </button>
                   </div>
@@ -1620,7 +1728,7 @@ const Chat = () => {
                 <Bot className="w-3 h-3 shrink-0" aria-hidden="true" />
                 Responses are generated by an AI system and can be wrong.
               </p>
-              <p className="text-center text-3xs text-slate-400 dark:text-slate-500 mt-1">↵ to send · Shift+↵ for new line · Messages are saved to your chat history</p>
+              <p className="text-center text-2xs text-slate-400 dark:text-slate-500 mt-1">↵ to send · Shift+↵ for new line · Messages are saved to your chat history</p>
             </div>
           </div>
         </div>
@@ -1641,7 +1749,9 @@ const Chat = () => {
         isOpen={templateModalOpen}
         onClose={() => setTemplateModalOpen(false)}
         initialTemplateId={templateModalInitId}
-        onInsert={(text, template, images) => {
+        onInsert={(text, template, images, inputs) => {
+          // SQEM-551 — remembered for the card; attached at send (with `edited` if the text changed).
+          pendingPlaybookRef.current = buildPendingRef(template, template.variables ?? [], inputs, text);
           setInput(text);
           if (images.length) addContextImages(images);
           textareaRef.current?.focus();

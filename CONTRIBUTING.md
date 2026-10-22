@@ -1,11 +1,11 @@
-# Contributing to Sqemes
+# Contributing to sqemes
 
-Thanks for helping improve Sqemes — the open-core, self-hostable codebase.
+Thanks for helping improve sqemes — the open-core, self-hostable codebase.
 
 ## Read this first: how a change actually lands
 
 **This repository is generated.** It is a curated snapshot, exported from the private repository
-where Sqemes is developed. Every release rebuilds it wholesale — the export wipes the tree and
+where sqemes is developed. Every release rebuilds it wholesale — the export wipes the tree and
 writes it out again from upstream.
 
 That has one consequence worth knowing before you spend an evening on a patch:

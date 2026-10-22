@@ -98,25 +98,31 @@ const RecentChatsWidget = () => {
   const recentPage = recentAll.slice(currentPage * recentPageSize, currentPage * recentPageSize + recentPageSize);
 
   const renderItem = (item: Item) => (
+    // SQEM-538 — the title is the button and its ::after covers the row; the pin sits above it.
     <div
       key={item.key}
-      onClick={item.onOpen}
-      className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
+      className="group relative flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
     >
       <div className="shrink-0 w-8 h-8 rounded-lg border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center">
         <ProviderIcon provider={item.icon} className="w-4 h-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{item.title}</p>
+        <button
+          type="button"
+          onClick={item.onOpen}
+          className="block w-full text-left text-sm font-medium text-slate-800 dark:text-slate-200 truncate after:absolute after:inset-0 after:content-[''] after:rounded-xl"
+        >
+          {item.title}
+        </button>
         <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{item.label} · {relTime(new Date(item.ts).toISOString())}</p>
       </div>
       <button
         onClick={e => { e.stopPropagation(); item.onTogglePin(); }}
         title={item.pinned ? 'Unpin' : 'Pin'}
-        className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+        className={`relative z-10 shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
           item.pinned
             ? 'text-brand-600 dark:text-brand-400'
-            : 'text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 hover:text-brand-600'
+            : 'text-slate-300 dark:text-slate-600 reveal-on-hover hover:text-brand-600'
         }`}
       >
         <Pin className="w-4 h-4" fill={item.pinned ? 'currentColor' : 'none'} />

@@ -10,7 +10,9 @@
 // very large workspace is bounded by the browser's memory — acceptable, and stated in the README
 // that ships inside the archive.
 
-import JSZip from 'jszip';
+// SQEM-542 — no import of 'jszip' here: it is loaded on first use (`await import('jszip')` below). A
+// value import put its 28 KB gzip in every page load's modulepreload, because this module is
+// reachable from the start.
 import type { Prompt, WorkspaceFile, Workspace, User } from '../types';
 import { fetchAllTemplates } from './api/prompts';
 import { fetchWorkspaceFiles, getWorkspaceFileSignedUrl } from './api/files';
@@ -33,7 +35,8 @@ export async function buildAccountExport(
   currentUser: User,
   onProgress?: (p: AccountExportProgress) => void,
 ): Promise<Blob> {
-  const zip = new JSZip();
+  const JSZipLib = (await import('jszip')).default;
+  const zip = new JSZipLib();
   const report = (step: string) => onProgress?.({ step });
 
   // ---- Templates -------------------------------------------------------------------------------

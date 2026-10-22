@@ -123,10 +123,10 @@ Deno.serve(async (req) => {
     const workspaceLabel = escapeHtml(safeWorkspaceName || 'their workspace');
 
     const htmlBody = renderBrandedEmail({
-      title: `You've been invited to ${safeWorkspaceName || 'a workspace'} on Sqemes`,
-      preheader: `${safeInviterName || 'A team member'} invited you to join ${safeWorkspaceName || 'their workspace'} on Sqemes.`,
+      title: `You've been invited to ${safeWorkspaceName || 'a workspace'} on sqemes`,
+      preheader: `${safeInviterName || 'A team member'} invited you to join ${safeWorkspaceName || 'their workspace'} on sqemes.`,
       heading: "You've been invited!",
-      bodyHtml: `<p style="margin:0;"><strong style="color:#0f172a;">${inviterLabel}</strong> has invited you to join <strong style="color:#0f172a;">${workspaceLabel}</strong> on Sqemes.</p>`,
+      bodyHtml: `<p style="margin:0;"><strong style="color:#0f172a;">${inviterLabel}</strong> has invited you to join <strong style="color:#0f172a;">${workspaceLabel}</strong> on sqemes.</p>`,
       button: { label: 'Accept invitation', url: inviteLink },
       footerNote: "This invitation expires in 7 days. If you didn't expect this email, you can safely ignore it.",
     });

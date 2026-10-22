@@ -13,6 +13,7 @@
 import { A, USERS } from './ownership';
 
 const A_ONLY_ME = 'aaaaaaaa-0000-4000-8000-00000000a002';
+const A_OPEN = 'aaaaaaaa-0000-4000-8000-00000000a001';
 const A_PERSONA = 'aaaaaaaa-0000-4000-8000-00000000a101';
 const A_FILE = 'aaaaaaaa-0000-4000-8000-00000000a301';
 const A_SHARED_CHAT = 'aaaaaaaa-0000-4000-8000-00000000a402';
@@ -34,6 +35,26 @@ export const DEFINER_ALLOWLIST: Record<string, DefinerEntry> = {
   can_access_file: {
     why: 'RLS helper (storage + workspace_files); evaluates auth.uid()',
     probe: { sql: `select count(*) from (select public.can_access_file('${A_FILE}', '${A}', '${USERS.a1}') v) x where v`, expect: 'zero' },
+  },
+  can_edit_file: {
+    why: 'RLS helper (workspace_files_update, SQEM-473); answers only for auth.uid()',
+    probe: { sql: `select count(*) from (select public.can_edit_file('${A_FILE}', '${A}') v) x where v`, expect: 'zero' },
+  },
+  can_edit_persona: {
+    why: 'RLS helper (personas, persona_access, persona_templates; SQEM-473); answers only for auth.uid()',
+    probe: { sql: `select count(*) from (select public.can_edit_persona('${A_PERSONA}') v) x where v`, expect: 'zero' },
+  },
+  can_edit_template: {
+    why: 'RLS helper (prompts, template_access; SQEM-473); answers only for auth.uid()',
+    probe: { sql: `select count(*) from (select public.can_edit_template('${A_ONLY_ME}') v) x where v`, expect: 'zero' },
+  },
+  can_manage_persona_editors: {
+    why: 'RLS helper (persona_editors write, SQEM-473); owner or admin, for auth.uid()',
+    probe: { sql: `select count(*) from (select public.can_manage_persona_editors('${A_PERSONA}') v) x where v`, expect: 'zero' },
+  },
+  can_manage_template_editors: {
+    why: 'RLS helper (template_editors write, SQEM-473); owner or admin, for auth.uid()',
+    probe: { sql: `select count(*) from (select public.can_manage_template_editors('${A_ONLY_ME}') v) x where v`, expect: 'zero' },
   },
   can_access_persona: {
     why: 'RLS helper (personas); evaluates auth.uid()',
@@ -77,6 +98,10 @@ export const DEFINER_ALLOWLIST: Record<string, DefinerEntry> = {
     why: 'app (Sqemes admin screen); refuses unless the caller is a Sqemes admin (SQEM-488/489)',
     probe: { sql: `select public.set_workspace_managed('${A}', false)`, expect: 'error' },
   },
+  template_version_files_present: {
+    why: 'app (restore a playbook version, SQEM-477); answers only for a version of a playbook auth.uid() can see',
+    probe: { sql: `select count(*) from public.template_version_files_present((select id from public.template_versions where template_id = '${A_OPEN}' order by version desc limit 1))`, expect: 'zero' },
+  },
   unshare_chat_session: {
     why: 'app (admin withdraws a shared chat); refuses unless the caller is admin of the session\'s workspace',
     probe: { sql: `select public.unshare_chat_session('${A_SHARED_CHAT}')`, expect: 'error' },
@@ -84,5 +109,9 @@ export const DEFINER_ALLOWLIST: Record<string, DefinerEntry> = {
   workspace_file_usage: {
     why: 'app (Files page counts); membership-checked (SQEM-234)',
     probe: { sql: `select count(*) from public.workspace_file_usage('${A}')`, expect: 'zeroOrError' },
+  },
+  workspace_usage_summary: {
+    why: 'app (Overview channel cards, SQEM-553); aggregates of usage_daily, admins/editors of that workspace only',
+    probe: { sql: `select count(*) from public.workspace_usage_summary('${A}')`, expect: 'error' },
   },
 };

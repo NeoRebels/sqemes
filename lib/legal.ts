@@ -42,7 +42,16 @@ export interface LegalDocument {
 }
 
 /**
- * **`privacy` is at `1.4` since 2026-10-16 (SQEM-517); `terms` stays at `1.3`.** A new processing:
+ * **`privacy` is at `1.5` since 2026-10-22 (SQEM-553); `terms` stays at `1.3`.** The usage statistics
+ * are now shown to workspace **editors** as well as administrators — the Overview's numbers per channel
+ * over the last seven days and the most-used playbook; still never who. A wider circle of people seeing
+ * data that, in a Solo or two-person workspace, relates to one person is a change of substance, so it
+ * re-gates. Checked on the live page before the bump ("workspace administrators and editors", seven
+ * days, most-used playbook) — ⚠️ the page still read "Last updated: October 16 2026" at that check.
+ */
+
+/**
+ * **`privacy` was at `1.4` from 2026-10-16 (SQEM-517); `terms` stays at `1.3`.** A new processing:
  * the usage statistics for playbooks — counts per workspace, day, channel and playbook, never who, no
  * content; the extension reports an insertion; a pseudonymised per-minute counter against inflation,
  * gone within minutes; Art. 6(1)(f); 25 months. Checked on the live page before the bump (all six
@@ -129,7 +138,7 @@ export interface LegalDocument {
  */
 export const LEGAL_DOCUMENTS: LegalDocument[] = [
   { id: 'terms',   label: 'Terms and Conditions', url: 'https://sqemes.com/terms',   version: '1.3' },
-  { id: 'privacy', label: 'Privacy Policy',       url: 'https://sqemes.com/privacy', version: '1.4' },
+  { id: 'privacy', label: 'Privacy Policy',       url: 'https://sqemes.com/privacy', version: '1.5' },
 ];
 
 /** A row from `legal_acceptances` — only the two columns that decide anything. */

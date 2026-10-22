@@ -64,6 +64,11 @@ insert into public.workspace_groups (id, workspace_id, name, created_by)
   values ('aaaaaaaa-0000-4000-8000-00000000a201', 'aaaaaaaa-0000-4000-8000-0000000000aa', 'A group', 'aaaaaaaa-0000-4000-8000-0000000000a1');
 insert into public.workspace_group_members (group_id, user_id)
   values ('aaaaaaaa-0000-4000-8000-00000000a201', 'aaaaaaaa-0000-4000-8000-0000000000a2');
+-- SQEM-473 — one editor-list row each, so the per-table probes have A's rows to try to read and change.
+insert into public.template_editors (template_id, workspace_id, user_id, created_by)
+  values ('aaaaaaaa-0000-4000-8000-00000000a002', 'aaaaaaaa-0000-4000-8000-0000000000aa', 'aaaaaaaa-0000-4000-8000-0000000000a1', 'aaaaaaaa-0000-4000-8000-0000000000a1');
+insert into public.persona_editors (persona_id, workspace_id, group_id, created_by)
+  values ('aaaaaaaa-0000-4000-8000-00000000a101', 'aaaaaaaa-0000-4000-8000-0000000000aa', 'aaaaaaaa-0000-4000-8000-00000000a201', 'aaaaaaaa-0000-4000-8000-0000000000a1');
 
 insert into public.workspace_files (id, workspace_id, name, mime_type, size_bytes, storage_path, created_by)
   values ('aaaaaaaa-0000-4000-8000-00000000a301', 'aaaaaaaa-0000-4000-8000-0000000000aa', 'a.md', 'text/markdown', 6,

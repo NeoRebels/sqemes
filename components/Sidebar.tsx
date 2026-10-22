@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import {
+  Home,
   LayoutDashboard,
   BookMarked,
   Store,
@@ -20,17 +21,23 @@ import {
   Sun,
   Moon,
   BookOpen,
+  Megaphone,
   Loader2,
   Bot,
+  Briefcase,
+  SlidersHorizontal,
 } from 'lucide-react';
-import { useUI, useWorkspace } from '../store';
+import { useUI, useWorkspace, useChatSessions } from '../store';
+import SegmentedTabs from './ui/SegmentedTabs';
+import { MODE_HOME, canManage, modeForPath, navRoutes, readRememberedMode, resolveMode, writeRememberedMode, type NavMode, type NavRoute } from '../lib/navMode';
 import PersonCard from './ui/PersonCard';
 import { PLANS, VAT_NOTE } from '../constants';
 import type { PlanTier } from '../types';
 import { startCheckout, type BillingCycle } from '../lib/billing';
-import { can } from '../lib/permissions';
 import { CHROME_STORE_URL } from '../lib/links';
 import { IS_SELF_HOSTED, MARKETPLACE_ENABLED } from '../lib/env';
+import { openWhatsNew, gleapConfigured } from '../lib/gleap';
+import { WHATS_NEW_FALLBACK_URL, SELF_HOST_RELEASES_URL } from '../lib/links';
 import { CURRENT_VERSION } from '../lib/version';
 import { useExtensionInstalled } from '../hooks/useExtensionInstalled';
 import { useUpdateStatus } from '../hooks/useUpdateStatus';
@@ -165,8 +172,11 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
    * false with SQEM-373. The mechanism stays: it is one line, it is the one way to label a nav item,
    * and removing it would only invite the next person to add a second one.
    */
-  const navLinks: { to: string; icon: any; label: string; badge?: string; arrow?: boolean }[] = [
-    { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+  // SQEM-548 — the link metadata, by route. WHICH links show, and in which order, is lib/navMode.ts
+  // (Work | Manage, by role); this table only says what each one looks like.
+  const navLinks: { to: NavRoute; icon: any; label: string; badge?: string; arrow?: boolean }[] = [
+    { to: "/", icon: Home, label: "Start" }, // SQEM-550 (a) — was "Dashboard"
+    { to: "/overview", icon: LayoutDashboard, label: "Overview" }, // SQEM-552 — Manage home
     // SQEM-394 — "Playbooks", the word the landing page uses; "Templates" was the app's own word and
     // two UX testers tripped over the mismatch. The route moved with it (/templates redirects).
     { to: "/playbooks", icon: BookMarked, label: "Playbooks" },
@@ -186,14 +196,31 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
     { to: "/chat", icon: MessageSquare, label: "Chat", arrow: true },
   ];
 
-  const visibleNavLinks = navLinks.filter(link => {
-    // SQEM-178 — hide Marketplace if disabled on this instance (self-host with an empty marketplace URL).
-    if (link.to === '/library' && !MARKETPLACE_ENABLED) return false;
-    if (!can(currentUser, workspace, 'settings:general')) {
-      return !['/library', '/files'].includes(link.to);
-    }
-    return true;
-  });
+  // SQEM-548 — Work | Manage (redesign C): every route belongs to one mode;
+  // neutral routes (Settings, /design) keep the last one. Members have no Manage and see one list.
+  const role = currentUser.role;
+  const showModeSwitch = canManage(role);
+  const routeMode = modeForPath(location.pathname);
+  const [rememberedMode, setRememberedMode] = useState<NavMode | null>(readRememberedMode);
+  // Adjust-during-render (React's pattern for state derived from a changing input): landing on a
+  // route of the other mode makes that mode the remembered one, without an effect round-trip.
+  if (showModeSwitch && routeMode && routeMode !== rememberedMode) setRememberedMode(routeMode);
+  useEffect(() => { if (rememberedMode) writeRememberedMode(rememberedMode); }, [rememberedMode]);
+  const mode = resolveMode(location.pathname, role, rememberedMode);
+  const switchMode = (next: NavMode) => {
+    setRememberedMode(next);
+    navigate(MODE_HOME[next]);
+    closeMobileMenu();
+  };
+
+  const visibleRoutes = navRoutes(mode, role, { marketplace: MARKETPLACE_ENABLED });
+  const visibleNavLinks = visibleRoutes.map(to => navLinks.find(l => l.to === to)!).filter(Boolean);
+
+  // SQEM-548 — Work shows the person's three most recent chats (already in the store; no new query).
+  const { chatSessions } = useChatSessions();
+  const recentChats = mode === 'work'
+    ? chatSessions.filter(c => c.isOwner).sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt)).slice(0, 3)
+    : [];
 
   const renderNavItem = (to: string, Icon: any, label: string, badge?: string, arrow?: boolean) => {
     const active = isActive(to);
@@ -210,19 +237,20 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
         title={arrow ? `${label} — opens full screen` : undefined}
         aria-label={arrow ? `${label} — opens full screen` : undefined}
         className={`relative flex items-center gap-3 ${isCollapsed ? 'justify-center px-2' : 'px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
+          // SQEM-548 — redesign C: the active link is a raised card with an edge and an accent icon.
           active
-            ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400'
-            : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100'
+            ? 'bg-surface-raised border border-line text-ink-strong font-semibold shadow-soft'
+            : 'border border-transparent text-ink-muted hover:bg-surface-raised hover:text-ink-strong'
         }`}
       >
-        <Icon className={`w-5 h-5 transition-colors shrink-0 ${active ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'}`} />
+        <Icon className={`w-5 h-5 transition-colors shrink-0 ${active ? 'text-accent' : 'text-ink-subtle group-hover:text-ink'}`} />
         {!isCollapsed && (
           <>
             <span className="truncate">{label}</span>
             {badge && (
               // ⚠️ Neutral, not amber. This states where something works, it does not warn — and the
               // amber the old Beta badge used is the colour this app reserves for caution.
-              <span className="ml-auto text-3xs font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 shrink-0 whitespace-nowrap">
+              <span className="ml-auto text-2xs font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 shrink-0 whitespace-nowrap">
                 {badge}
               </span>
             )}
@@ -238,6 +266,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
   return (
     <>
       <div
+        role="presentation"
         className={`fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 transition-opacity md:hidden ${mobileOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={closeMobileMenu}
       />
@@ -252,13 +281,15 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
         </button>
       )}
       <div className={`
-        fixed inset-y-0 left-0 z-50 bg-white dark:bg-slate-800 border-r border-slate-100 dark:border-slate-700 shadow-soft transition-transform duration-300 transform flex flex-col
+        fixed inset-y-0 left-0 z-50 bg-surface-sunken dark:bg-surface-raised border-r border-line shadow-soft transition-transform duration-300 transform flex flex-col
         md:translate-x-0 md:static md:h-full
         ${mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'}
         ${isCollapsed && !mobileOpen ? 'md:w-20' : 'md:w-64'}
       `}>
         {/* Desktop Collapse Toggle */}
         <button 
+           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+           aria-expanded={!isCollapsed}
            onClick={() => {
              setIsCollapsed(!isCollapsed);
              setIsWorkspaceMenuOpen(false);
@@ -342,9 +373,47 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
         </div>
 
         <div className="flex-1 overflow-y-auto py-2 px-4 space-y-1 overflow-x-hidden scrollbar-thin">
+          {showModeSwitch && (isCollapsed && !mobileOpen ? (
+            // Collapsed: one button that switches to the other mode, named for where it goes.
+            <button
+              type="button"
+              onClick={() => switchMode(mode === 'work' ? 'manage' : 'work')}
+              aria-label={mode === 'work' ? 'Switch to Manage' : 'Switch to Work'}
+              onMouseEnter={(e) => showTooltip(e, mode === 'work' ? 'Switch to Manage' : 'Switch to Work')}
+              onMouseLeave={hideTooltip}
+              className="w-full flex justify-center px-2 py-2.5 mb-3 rounded-xl border border-line bg-surface-raised text-ink-muted hover:text-ink-strong transition-colors"
+            >
+              {mode === 'work' ? <SlidersHorizontal className="w-5 h-5" /> : <Briefcase className="w-5 h-5" />}
+            </button>
+          ) : (
+            <div className="mb-3" role="group" aria-label="Navigation mode">
+              <SegmentedTabs<NavMode>
+                fill
+                value={mode}
+                onChange={switchMode}
+                tabs={[{ value: 'work', label: 'Work' }, { value: 'manage', label: 'Manage' }]}
+              />
+            </div>
+          ))}
           <div className="mb-6 space-y-1">
             {visibleNavLinks.map(link => renderNavItem(link.to, link.icon, link.label, link.badge, link.arrow))}
           </div>
+          {recentChats.length > 0 && !isCollapsed && (
+            <div className="mb-6">
+              <p className="px-3 mb-1 text-2xs font-bold uppercase tracking-wider text-ink-subtle">Recent</p>
+              {recentChats.map(c => (
+                <Link
+                  key={c.id}
+                  to={`/chat/${c.id}`}
+                  onClick={closeMobileMenu}
+                  title={c.title}
+                  className="block px-3 py-1.5 rounded-lg text-sm text-ink-muted hover:text-ink-strong hover:bg-surface-raised truncate transition-colors"
+                >
+                  {c.title || 'Untitled chat'}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className={`p-4 pb-6 border-t border-slate-100 dark:border-slate-700 space-y-2 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
@@ -366,6 +435,29 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
               )}
             </a>
           )}
+
+          {/* SQEM-485 — "What's new". Cloud: the changelog inside the Gleap window; when Gleap is not
+              running (no key in this build, a blocker), the link's own href takes over, so the click is
+              never dead. Self-host: the release notes on GitHub, which is what reaches an operator. */}
+          <a
+            href={IS_SELF_HOSTED ? SELF_HOST_RELEASES_URL : WHATS_NEW_FALLBACK_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => { if (!IS_SELF_HOSTED && openWhatsNew()) e.preventDefault(); }}
+            onMouseEnter={(e) => showTooltip(e, "What's new")}
+            onMouseLeave={hideTooltip}
+            className={`flex items-center gap-3 ${isCollapsed ? 'justify-center px-2' : 'px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100`}
+          >
+            <Megaphone className="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors" />
+            {!isCollapsed && (
+              <>
+                <span className="truncate">{"What's new"}</span>
+                {/* The arrow means "opens a new tab": true on self-host (GitHub) and when this build has no
+                    Gleap key (the help-centre fallback); with Gleap the changelog opens inside the app. */}
+                {(IS_SELF_HOSTED || !gleapConfigured) && <ArrowUpRight className="w-4 h-4 ml-auto shrink-0 transition-colors text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400" />}
+              </>
+            )}
+          </a>
 
           <a
             href="https://help.sqemes.com/"
@@ -418,7 +510,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
               <button
                 onClick={toggleTheme}
                 aria-label="Toggle dark mode"
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 focus:outline-none ${theme === 'dark' ? 'bg-brand-600' : 'bg-slate-300'}`}
+                className={`hit-24 relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 focus:outline-none ${theme === 'dark' ? 'bg-brand-600' : 'bg-slate-300'}`}
               >
                 <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${theme === 'dark' ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
               </button>
@@ -537,8 +629,8 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
             {wsStep === 'name' && (
             <form onSubmit={handleCreateWorkspace} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Workspace Name</label>
-                <input
+                <label htmlFor="sidebar-workspace-name" className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Workspace Name</label>
+                <input id="sidebar-workspace-name"
                   autoFocus
                   className={`w-full p-2.5 bg-white dark:bg-slate-700 border rounded-xl text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500 ${workspaceNameError ? 'border-red-400' : 'border-slate-200 dark:border-slate-600'}`}
                   placeholder="e.g. My New Team"

@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Generated 2026-10-19 from the production dependency tree. **Do not edit by hand** — it is rebuilt
+Generated 2026-10-22 from the production dependency tree. **Do not edit by hand** — it is rebuilt
 by `scripts/build-public-export.sh` on every release, which is what keeps it from going stale.
 
 Sqemes itself is licensed under the Sustainable Use License from v1.11.0 (AGPL-3.0 for v1.10.0 to
@@ -9,7 +9,7 @@ The components below keep their own licences, and those licences are unaffected 
 
 ## Summary
 
-163 production dependencies · 13 container images.
+165 production dependencies · 13 container images.
 
 ## Container images
 
@@ -37,6 +37,8 @@ consult the upstream repository named by the image for its terms.
 | @floating-ui/core | 1.8.0 | MIT |
 | @floating-ui/dom | 1.8.0 | MIT |
 | @floating-ui/utils | 0.2.12 | MIT |
+| @fontsource-variable/bricolage-grotesque | 5.3.0 | OFL-1.1 |
+| @fontsource-variable/figtree | 5.3.0 | OFL-1.1 |
 | @rrweb/packer | 2.1.4 | MIT |
 | @rrweb/record | 2.1.4 | MIT |
 | @rrweb/types | 2.1.4 | MIT |
@@ -227,7 +229,203 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 2. @sentry/browser@10.63.0, @sentry/core@10.63.0, @sentry/react@10.63.0
+### 2. @fontsource-variable/bricolage-grotesque@5.3.0
+
+```
+Copyright 2022 The Bricolage Grotesque Project Authors (https://github.com/ateliertriay/bricolage)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting -- in part or in whole -- any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
+```
+
+### 3. @fontsource-variable/figtree@5.3.0
+
+```
+Copyright 2022 The Figtree Project Authors (https://github.com/erikdkennedy/figtree) Figtree-Italic[wght].ttf: Copyright 2022 The Figtree Project Authors (https://github.com/erikdkennedy/figtree)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting -- in part or in whole -- any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
+```
+
+### 4. @sentry/browser@10.63.0, @sentry/core@10.63.0, @sentry/react@10.63.0
 
 ```
 MIT License
@@ -253,7 +451,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 3. @sentry/browser-utils@10.63.0
+### 5. @sentry/browser-utils@10.63.0
 
 ```
 MIT License
@@ -279,7 +477,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 4. @sentry/feedback@10.63.0
+### 6. @sentry/feedback@10.63.0
 
 ```
 MIT License
@@ -305,7 +503,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 5. @sentry/replay@10.63.0
+### 7. @sentry/replay@10.63.0
 
 ```
 MIT License
@@ -331,7 +529,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 6. @sentry/replay-canvas@10.63.0
+### 8. @sentry/replay-canvas@10.63.0
 
 ```
 MIT License
@@ -357,7 +555,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 7. @supabase/auth-js@2.95.3
+### 9. @supabase/auth-js@2.95.3
 
 ```
 MIT License
@@ -383,7 +581,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 8. @types/css-font-loading-module@0.0.7, @types/debug@4.1.12, @types/estree@1.0.9, @types/estree-jsx@1.0.5, @types/hast@3.0.4, @types/mdast@4.0.4, @types/ms@2.1.0, @types/node@22.19.1, @types/phoenix@1.6.7, @types/react@19.2.18, @types/unist@3.0.3, @types/unist@2.0.11, @types/ws@8.18.1
+### 10. @types/css-font-loading-module@0.0.7, @types/debug@4.1.12, @types/estree@1.0.9, @types/estree-jsx@1.0.5, @types/hast@3.0.4, @types/mdast@4.0.4, @types/ms@2.1.0, @types/node@22.19.1, @types/phoenix@1.6.7, @types/react@19.2.18, @types/unist@3.0.3, @types/unist@2.0.11, @types/ws@8.18.1
 
 ```
 MIT License
@@ -409,7 +607,7 @@ MIT License
     SOFTWARE
 ```
 
-### 9. @ungap/structured-clone@1.3.0
+### 11. @ungap/structured-clone@1.3.0
 
 ```
 ISC License
@@ -429,7 +627,7 @@ OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### 10. @vercel/speed-insights@2.0.0
+### 12. @vercel/speed-insights@2.0.0
 
 ```
 Apache License
@@ -624,7 +822,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-### 11. @xstate/fsm@1.6.5
+### 13. @xstate/fsm@1.6.5
 
 ```
 The MIT License (MIT)
@@ -650,7 +848,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 12. bail@2.0.2, ccount@2.0.1, character-entities@2.0.2, character-entities-html4@2.1.0, character-entities-legacy@3.0.0, character-reference-invalid@2.0.1, mdast-util-to-string@4.0.0, unist-util-position@5.0.0, unist-util-visit@5.0.0
+### 14. bail@2.0.2, ccount@2.0.1, character-entities@2.0.2, character-entities-html4@2.1.0, character-entities-legacy@3.0.0, character-reference-invalid@2.0.1, mdast-util-to-string@4.0.0, unist-util-position@5.0.0, unist-util-visit@5.0.0
 
 ```
 (The MIT License)
@@ -677,7 +875,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 13. base64-arraybuffer@1.0.2
+### 15. base64-arraybuffer@1.0.2
 
 ```
 Copyright (c) 2012 Niklas von Hertzen
@@ -704,7 +902,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 14. comma-separated-tokens@2.0.3, hast-util-whitespace@3.0.0, is-alphabetical@2.0.1, is-alphanumerical@2.0.1, is-decimal@2.0.1, is-hexadecimal@2.0.1, mdast-util-to-hast@13.2.1, space-separated-tokens@2.0.2, unist-util-stringify-position@4.0.0, unist-util-visit-parents@6.0.2, zwitch@2.0.4
+### 16. comma-separated-tokens@2.0.3, hast-util-whitespace@3.0.0, is-alphabetical@2.0.1, is-alphanumerical@2.0.1, is-decimal@2.0.1, is-hexadecimal@2.0.1, mdast-util-to-hast@13.2.1, space-separated-tokens@2.0.2, unist-util-stringify-position@4.0.0, unist-util-visit-parents@6.0.2, zwitch@2.0.4
 
 ```
 (The MIT License)
@@ -731,7 +929,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 15. cookie-es@3.1.1
+### 17. cookie-es@3.1.1
 
 ```
 MIT License
@@ -764,7 +962,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 16. core-util-is@1.0.3
+### 18. core-util-is@1.0.3
 
 ```
 Copyright Node.js contributors. All rights reserved.
@@ -788,7 +986,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 IN THE SOFTWARE.
 ```
 
-### 17. csstype@3.2.3
+### 19. csstype@3.2.3
 
 ```
 Copyright (c) 2017-2018 Fredrik Nicol
@@ -812,7 +1010,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 18. debug@4.4.3
+### 20. debug@4.4.3
 
 ```
 (The MIT License)
@@ -836,7 +1034,7 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 19. decode-named-character-reference@1.2.0, hast-util-to-jsx-runtime@2.3.6, markdown-table@3.0.4, mdast-util-find-and-replace@3.0.2, mdast-util-from-markdown@2.0.2, mdast-util-gfm@3.1.0, mdast-util-gfm-footnote@2.1.0, mdast-util-to-markdown@2.1.2, micromark@4.0.2, micromark-core-commonmark@2.0.3, micromark-extension-gfm-table@2.1.1, micromark-factory-destination@2.0.1, micromark-factory-label@2.0.1, micromark-factory-space@2.0.1, micromark-factory-title@2.0.1, micromark-factory-whitespace@2.0.1, micromark-util-character@2.1.1, micromark-util-chunked@2.0.1, micromark-util-classify-character@2.0.1, micromark-util-combine-extensions@2.0.1, micromark-util-decode-numeric-character-reference@2.0.2, micromark-util-decode-string@2.0.1, micromark-util-encode@2.0.1, micromark-util-html-tag-name@2.0.1, micromark-util-normalize-identifier@2.0.1, micromark-util-resolve-all@2.0.1, micromark-util-sanitize-uri@2.0.1, micromark-util-subtokenize@2.1.0, micromark-util-symbol@2.0.1, micromark-util-types@2.0.2, remark-gfm@4.0.1, remark-rehype@11.1.2, vfile-message@4.0.3
+### 21. decode-named-character-reference@1.2.0, hast-util-to-jsx-runtime@2.3.6, markdown-table@3.0.4, mdast-util-find-and-replace@3.0.2, mdast-util-from-markdown@2.0.2, mdast-util-gfm@3.1.0, mdast-util-gfm-footnote@2.1.0, mdast-util-to-markdown@2.1.2, micromark@4.0.2, micromark-core-commonmark@2.0.3, micromark-extension-gfm-table@2.1.1, micromark-factory-destination@2.0.1, micromark-factory-label@2.0.1, micromark-factory-space@2.0.1, micromark-factory-title@2.0.1, micromark-factory-whitespace@2.0.1, micromark-util-character@2.1.1, micromark-util-chunked@2.0.1, micromark-util-classify-character@2.0.1, micromark-util-combine-extensions@2.0.1, micromark-util-decode-numeric-character-reference@2.0.2, micromark-util-decode-string@2.0.1, micromark-util-encode@2.0.1, micromark-util-html-tag-name@2.0.1, micromark-util-normalize-identifier@2.0.1, micromark-util-resolve-all@2.0.1, micromark-util-sanitize-uri@2.0.1, micromark-util-subtokenize@2.1.0, micromark-util-symbol@2.0.1, micromark-util-types@2.0.2, remark-gfm@4.0.1, remark-rehype@11.1.2, vfile-message@4.0.3
 
 ```
 (The MIT License)
@@ -863,7 +1061,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 20. dequal@2.0.3
+### 22. dequal@2.0.3
 
 ```
 The MIT License (MIT)
@@ -889,7 +1087,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### 21. devlop@1.1.0
+### 23. devlop@1.1.0
 
 ```
 (The MIT License)
@@ -916,7 +1114,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 22. escape-string-regexp@5.0.0, is-plain-obj@4.1.0
+### 24. escape-string-regexp@5.0.0, is-plain-obj@4.1.0
 
 ```
 MIT License
@@ -930,7 +1128,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 23. estree-util-is-identifier-name@3.0.0, mdast-util-gfm-autolink-literal@2.0.1, mdast-util-gfm-strikethrough@2.0.0, mdast-util-gfm-table@2.0.0, mdast-util-gfm-task-list-item@2.0.0, mdast-util-mdx-expression@2.0.1, mdast-util-mdx-jsx@3.2.0, mdast-util-mdxjs-esm@2.0.1, micromark-extension-gfm@3.0.0, micromark-extension-gfm-autolink-literal@2.1.0, micromark-extension-gfm-strikethrough@2.1.0, micromark-extension-gfm-tagfilter@2.0.0, micromark-extension-gfm-task-list-item@2.1.0
+### 25. estree-util-is-identifier-name@3.0.0, mdast-util-gfm-autolink-literal@2.0.1, mdast-util-gfm-strikethrough@2.0.0, mdast-util-gfm-table@2.0.0, mdast-util-gfm-task-list-item@2.0.0, mdast-util-mdx-expression@2.0.1, mdast-util-mdx-jsx@3.2.0, mdast-util-mdxjs-esm@2.0.1, micromark-extension-gfm@3.0.0, micromark-extension-gfm-autolink-literal@2.1.0, micromark-extension-gfm-strikethrough@2.1.0, micromark-extension-gfm-tagfilter@2.0.0, micromark-extension-gfm-task-list-item@2.1.0
 
 ```
 (The MIT License)
@@ -957,7 +1155,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 24. extend@3.0.2
+### 26. extend@3.0.2
 
 ```
 The MIT License (MIT)
@@ -984,7 +1182,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 25. fflate@0.4.9
+### 27. fflate@0.4.9
 
 ```
 MIT License
@@ -1010,7 +1208,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 26. gleap@17.0.3
+### 28. gleap@17.0.3
 
 ```
 Copyright 2024 Gleap GmbH
@@ -1022,7 +1220,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 27. html-url-attributes@3.0.1
+### 29. html-url-attributes@3.0.1
 
 ```
 (The MIT License)
@@ -1048,7 +1246,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### 28. iceberg-js@0.8.1
+### 30. iceberg-js@0.8.1
 
 ```
 MIT License
@@ -1074,7 +1272,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 29. immediate@3.0.6
+### 31. immediate@3.0.6
 
 ```
 Copyright (c) 2012 Barnesandnoble.com, llc, Donavon West, Domenic Denicola, Brian Cavalier
@@ -1099,7 +1297,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 30. inherits@2.0.4
+### 32. inherits@2.0.4
 
 ```
 The ISC License
@@ -1119,7 +1317,7 @@ OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### 31. inline-style-parser@0.2.7
+### 33. inline-style-parser@0.2.7
 
 ```
 (The MIT License)
@@ -1133,7 +1331,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 32. isarray@1.0.0
+### 34. isarray@1.0.0
 
 ```
 MIT License
@@ -1159,7 +1357,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 33. lie@3.3.0
+### 35. lie@3.3.0
 
 ```
 #Copyright (c) 2014-2018 Calvin Metcalf, Jordan Harband
@@ -1171,7 +1369,7 @@ The above copyright notice and this permission notice shall be included in all c
 **THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.**
 ```
 
-### 34. longest-streak@3.1.0, stringify-entities@4.0.4, trim-lines@3.0.1
+### 36. longest-streak@3.1.0, stringify-entities@4.0.4, trim-lines@3.0.1
 
 ```
 (The MIT License)
@@ -1198,7 +1396,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 35. lucide-react@0.554.0
+### 37. lucide-react@0.554.0
 
 ```
 ISC License
@@ -1242,7 +1440,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 36. mdast-util-phrasing@4.1.0
+### 38. mdast-util-phrasing@4.1.0
 
 ```
 (The MIT License)
@@ -1270,7 +1468,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 37. micromark-extension-gfm-footnote@2.1.0
+### 39. micromark-extension-gfm-footnote@2.1.0
 
 ```
 (The MIT License)
@@ -1297,7 +1495,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 38. mitt@3.0.1
+### 40. mitt@3.0.1
 
 ```
 MIT License
@@ -1323,7 +1521,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 39. ms@2.1.3
+### 41. ms@2.1.3
 
 ```
 The MIT License (MIT)
@@ -1349,7 +1547,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 40. nanoid@3.3.18
+### 42. nanoid@3.3.18
 
 ```
 The MIT License (MIT)
@@ -1374,7 +1572,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 41. pako@1.0.11
+### 43. pako@1.0.11
 
 ```
 (The MIT License)
@@ -1400,7 +1598,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### 42. parse-entities@4.0.2, property-information@7.1.0
+### 44. parse-entities@4.0.2, property-information@7.1.0
 
 ```
 (The MIT License)
@@ -1427,7 +1625,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 43. picocolors@1.1.1
+### 45. picocolors@1.1.1
 
 ```
 ISC License
@@ -1447,7 +1645,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### 44. postcss@8.5.26
+### 46. postcss@8.5.26
 
 ```
 The MIT License (MIT)
@@ -1472,7 +1670,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 45. process-nextick-args@2.0.1
+### 47. process-nextick-args@2.0.1
 
 ```
 # Copyright (c) 2015 Calvin Metcalf
@@ -1496,7 +1694,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.**
 ```
 
-### 46. react@19.2.8, react-dom@19.2.8, scheduler@0.27.0
+### 48. react@19.2.8, react-dom@19.2.8, scheduler@0.27.0
 
 ```
 MIT License
@@ -1522,7 +1720,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 47. react-markdown@10.1.0
+### 49. react-markdown@10.1.0
 
 ```
 The MIT License (MIT)
@@ -1548,7 +1746,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 48. react-router@8.3.0
+### 50. react-router@8.3.0
 
 ```
 MIT License
@@ -1576,7 +1774,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 49. readable-stream@2.3.8, string_decoder@1.1.1
+### 51. readable-stream@2.3.8, string_decoder@1.1.1
 
 ```
 Node.js is licensed for use as follows:
@@ -1628,7 +1826,7 @@ IN THE SOFTWARE.
 """
 ```
 
-### 50. remark-parse@11.0.0, remark-stringify@11.0.0
+### 52. remark-parse@11.0.0, remark-stringify@11.0.0
 
 ```
 (The MIT License)
@@ -1654,7 +1852,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### 51. safe-buffer@5.1.2
+### 53. safe-buffer@5.1.2
 
 ```
 The MIT License (MIT)
@@ -1680,7 +1878,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### 52. setimmediate@1.0.5
+### 54. setimmediate@1.0.5
 
 ```
 Copyright (c) 2012 Barnesandnoble.com, llc, Donavon West, and Domenic Denicola
@@ -1705,7 +1903,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 53. source-map-js@1.2.2
+### 55. source-map-js@1.2.2
 
 ```
 Copyright (c) 2009-2011, Mozilla Foundation and contributors
@@ -1737,7 +1935,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### 54. style-to-js@1.1.21
+### 56. style-to-js@1.1.21
 
 ```
 The MIT License (MIT)
@@ -1764,7 +1962,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 55. style-to-object@1.0.14
+### 57. style-to-object@1.0.14
 
 ```
 The MIT License (MIT)
@@ -1791,7 +1989,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 56. trough@2.2.0
+### 58. trough@2.2.0
 
 ```
 (The MIT License)
@@ -1817,7 +2015,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### 57. tslib@2.8.1
+### 59. tslib@2.8.1
 
 ```
 Copyright (c) Microsoft Corporation.
@@ -1834,7 +2032,7 @@ OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### 58. undici-types@6.21.0
+### 60. undici-types@6.21.0
 
 ```
 MIT License
@@ -1860,7 +2058,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 59. unified@11.0.5, vfile@6.0.3
+### 61. unified@11.0.5, vfile@6.0.3
 
 ```
 (The MIT License)
@@ -1886,7 +2084,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### 60. unique-selector@0.5.0
+### 62. unique-selector@0.5.0
 
 ```
 MIT License
@@ -1912,7 +2110,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### 61. unist-util-is@6.0.1
+### 63. unist-util-is@6.0.1
 
 ```
 (The MIT license)
@@ -1939,7 +2137,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 62. util-deprecate@1.0.2
+### 64. util-deprecate@1.0.2
 
 ```
 (The MIT License)
@@ -1968,7 +2166,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### 63. ws@8.21.0
+### 65. ws@8.21.0
 
 ```
 Copyright (c) 2011 Einar Otto Stangvik <einaros@gmail.com>

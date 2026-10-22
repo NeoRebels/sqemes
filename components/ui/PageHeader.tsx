@@ -34,8 +34,9 @@ export default function PageHeader({
   return (
     <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 md:mb-10 gap-4">
       <div className="sm:w-1/2 min-w-0">
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">{title}</h1>
-        {subtitle && <p className="text-slate-500 dark:text-slate-400 mt-2">{subtitle}</p>}
+        {/* SQEM-547 — the one heading primitive gets the display face (Bricolage, semibold — its bold is heavy at 30px). */}
+        <h1 className="font-display text-2xl md:text-3xl font-semibold text-ink-strong tracking-tight">{title}</h1>
+        {subtitle && <p className="text-ink-muted mt-2">{subtitle}</p>}
       </div>
       {actions && (
         <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-1/2 sm:justify-end whitespace-nowrap">

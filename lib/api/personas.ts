@@ -162,8 +162,10 @@ export async function updatePersona(
   if (patch.content !== undefined) row.content = patch.content;
   if (patch.tags !== undefined) row.tags = patch.tags;
 
-  const { error } = await supabase.from('personas').update(row).eq('id', id);
+  // SQEM-473 — `.select('id')` so a write RLS filtered (no edit right) is noticed: no error, zero rows.
+  const { data, error } = await supabase.from('personas').update(row).eq('id', id).select('id');
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error('You may use this persona but not change it.');
 }
 
 /**

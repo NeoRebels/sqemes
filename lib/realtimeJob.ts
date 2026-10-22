@@ -28,6 +28,11 @@ export function waitForJobResult(
    * free-plan number; production is paid, 400 s.)
    */
   timeoutMs: number = CLIENT_JOB_TIMEOUT_MS.default,
+  /**
+   * SQEM-551 — called once, just before resolving, with the extra fields the result carried (Chat:
+   * `loadedTemplateIds`). Unvalidated — the caller normalizes. Other callers leave it out.
+   */
+  onResultMeta?: (meta: { loadedTemplateIds?: unknown }) => void,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const channel = supabase.channel(`job:${jobId}`);
@@ -44,12 +49,13 @@ export function waitForJobResult(
         // indefinitely, which is worse than an honest timeout because nothing ever reports it.
         if (typeof payload.delta === 'string') onDelta?.(payload.delta);
       })
-      .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string } }) => {
+      .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string; loadedTemplateIds?: unknown } }) => {
         clearTimeout(timeout);
         supabase.removeChannel(channel);
         if (payload.error) {
           reject(new Error(payload.error));
         } else {
+          onResultMeta?.({ loadedTemplateIds: payload.loadedTemplateIds });
           resolve(payload.result ?? '');
         }
       })

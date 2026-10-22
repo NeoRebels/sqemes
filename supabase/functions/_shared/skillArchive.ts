@@ -69,7 +69,7 @@ export function resolveArchiveUrl(input: string): ResolvedArchive {
   if (!isAllowedArchiveHost(url.hostname)) {
     throw new Error(
       `Refusing to download from ${url.hostname}. Accepted hosts: ${ALLOWED_ARCHIVE_HOSTS.join(', ')}. ` +
-      `To import from elsewhere, download the folder and use the Sqemes app's skill import.`,
+      `To import from elsewhere, download the folder and use the sqemes app's skill import.`,
     );
   }
 

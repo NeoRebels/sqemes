@@ -11,7 +11,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={[
-          'bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-700',
+          'bg-surface-raised rounded-2xl shadow-soft border border-line',
           hover ? 'hover:shadow-soft-lg transition-shadow duration-300 cursor-pointer' : '',
           overflow ? 'overflow-hidden' : '',
           className,

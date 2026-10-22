@@ -9,11 +9,14 @@ export default function SearchInput({
   value,
   onChange,
   placeholder,
+  ariaLabel,
   containerClassName = 'flex-1 min-w-[200px]',
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  /** SQEM-538 — the field has no visible label; without this the placeholder is its name. */
+  ariaLabel?: string;
   containerClassName?: string;
 }) {
   return (
@@ -21,10 +24,11 @@ export default function SearchInput({
       <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
       <input
         type="text"
+        aria-label={ariaLabel ?? placeholder ?? 'Search'}
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full pl-12 pr-4 py-2.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none shadow-sm transition-all"
+        className="w-full pl-12 pr-4 py-2.5 border border-slate-200 dark:border-slate-700 bg-surface-raised text-ink-strong placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none shadow-sm transition-all"
       />
     </div>
   );

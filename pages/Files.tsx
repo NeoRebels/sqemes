@@ -184,38 +184,39 @@ const FileRow = ({
   }, [nameVal, file.id, file.name, patchWorkspaceFile, showToast]);
 
   return (
-    <Card className={`group p-3 sm:p-4 flex items-start gap-3 transition-shadow ${selected ? 'ring-2 ring-brand-500' : ''}`}>
+    <Card className={`group p-3 sm:p-4 flex items-start gap-3 transition-shadow ${selected ? 'ring-2 ring-accent' : ''}`}>
       {/* Icon / thumbnail + selection checkbox */}
       <div className="relative w-10 h-10 shrink-0">
         {isImage && thumbUrl ? (
           <button
             onClick={handleOpen}
-            className="w-10 h-10 rounded-xl overflow-hidden ring-1 ring-slate-200 dark:ring-slate-700 hover:ring-brand-300 dark:hover:ring-brand-500 transition-all"
+            className="w-10 h-10 rounded-xl overflow-hidden ring-1 ring-line-strong hover:ring-accent/50 transition-all"
             title="Preview image"
           >
             <img src={thumbUrl} alt={file.name} loading="lazy" className="w-10 h-10 object-cover" />
           </button>
         ) : (
-          <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-700">
-            <FileIcon mimeType={file.mimeType} className="w-5 h-5 text-brand-500" />
+          <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-sunken">
+            <FileIcon mimeType={file.mimeType} className="w-5 h-5 text-accent" />
           </div>
         )}
         {/* SQEM-294 — the wrapper carries the click guard the raw input used to have. Without it a
             tick would bubble to the card and open the file, which is the opposite of selecting it.
             The primitive takes no `onClick` on purpose: a checkbox that swallows clicks is a
             behaviour of *this* list, not of every checkbox. */}
-        <span
+        {/* SQEM-540 — a label with padding, so the 16 px box has a 24 px target (as on the playbook cards). */}
+        <label
           onClick={e => e.stopPropagation()}
-          className={`absolute -top-1.5 -left-1.5 transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'}`}
+          className={`absolute -top-2.5 -left-2.5 p-1 cursor-pointer transition-opacity ${selected ? 'opacity-100' : 'reveal-on-hover'}`}
         >
           <Checkbox
             checked={selected}
             onChange={() => onToggleSelect(file.id)}
             align="center"
             aria-label={`Select ${file.name}`}
-            className="bg-white dark:bg-slate-800 shadow"
+            className="bg-surface-raised shadow"
           />
-        </span>
+        </label>
       </div>
 
       {/* Main */}
@@ -230,16 +231,16 @@ const FileRow = ({
             }}
             onBlur={commitRename}
             autoFocus
-            className="w-full text-sm font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-700 border border-brand-300 focus:border-brand-500 rounded-lg px-2 py-0.5 outline-none"
+            className="w-full text-sm font-semibold text-ink-strong bg-surface-field border border-accent/40 focus:border-accent rounded-lg px-2 py-0.5 outline-none"
           />
         ) : (
           <div className="flex items-center gap-1.5 group/name">
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate" title={file.name}>
+            <p className="text-sm font-semibold text-ink-strong truncate" title={file.name}>
               {file.name}
             </p>
             <button
               onClick={() => { setNameVal(file.name); setEditingName(true); }}
-              className="opacity-0 group-hover/name:opacity-100 transition-opacity text-slate-300 hover:text-brand-500 shrink-0"
+              className="relative hit-24 reveal-on-hover transition-opacity text-ink-subtle hover:text-accent shrink-0"
               title="Rename file"
             >
               <Pencil className="w-3.5 h-3.5" />
@@ -248,11 +249,11 @@ const FileRow = ({
         )}
 
         {/* Meta line */}
-        <div className="flex items-center gap-x-2 gap-y-1 mt-1 flex-wrap text-xs text-slate-400">
+        <div className="flex items-center gap-x-2 gap-y-1 mt-1 flex-wrap text-xs text-ink-subtle">
           <span className="font-medium uppercase tracking-wide">{fileTypeLabel(file.mimeType, file.name)}</span>
-          <span className="text-slate-300 dark:text-slate-600">·</span>
+          <span className="text-ink-subtle">·</span>
           <span>{formatBytes(file.sizeBytes)}</span>
-          <span className="text-slate-300 dark:text-slate-600">·</span>
+          <span className="text-ink-subtle">·</span>
           <span>{formatDate(file.createdAt)}</span>
           <span className="relative inline-flex" ref={usageRef}>
             <button
@@ -260,17 +261,17 @@ const FileRow = ({
               onClick={() => usageCount > 0 && setShowUsage(v => !v)}
               className={`px-1.5 py-0.5 rounded-md font-semibold transition-colors ${
                 usageCount > 0
-                  ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-900/40 cursor-pointer'
-                  : 'bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-default'
+                  ? 'bg-accent-soft text-accent hover:bg-accent/15 cursor-pointer'
+                  : 'bg-surface-sunken text-ink-subtle cursor-default'
               }`}
               title={usageCount > 0 ? `Referenced by ${usageCount} playbook${usageCount === 1 ? '' : 's'} — click to see which` : 'Not used by any playbook'}
             >
               {usageCount > 0 ? `Used in ${usageCount}` : 'Unused'}
             </button>
             {showUsage && usageCount > 0 && (
-              <div className="absolute left-0 top-full mt-1 z-20 w-56 max-h-64 overflow-y-auto bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-1 animate-scale-up origin-top-left">
-                <div className="px-3 py-1.5 border-b border-slate-50 dark:border-slate-700">
-                  <p className="text-2xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              <div className="absolute left-0 top-full mt-1 z-20 w-56 max-h-64 overflow-y-auto bg-surface-raised rounded-xl shadow-xl border border-line py-1 animate-scale-up origin-top-left">
+                <div className="px-3 py-1.5 border-b border-line">
+                  <p className="text-2xs font-bold text-ink-subtle uppercase tracking-wider">
                     Used in {usageCount} playbook{usageCount === 1 ? '' : 's'}
                   </p>
                 </div>
@@ -282,16 +283,16 @@ const FileRow = ({
                     // that is the context-file list in the editor, the only place they can remove it.
                     to={`/playbooks/${t.id}/edit`}
                     onClick={() => setShowUsage(false)}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs text-ink hover:bg-surface-sunken hover:text-accent transition-colors"
                   >
-                    <KindIcon kind={t.kind} className="w-3.5 h-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
+                    <KindIcon kind={t.kind} className="w-3.5 h-3.5 shrink-0 text-ink-subtle" />
                     <span className="truncate font-medium">{t.title}</span>
                   </Link>
                 ))}
                 {/* SQEM-234 — templates this viewer may not see: counted, never named. Without this
                     line the file read as "Unused" and was the first thing anyone would delete. */}
                 {restrictedCount > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-400 dark:text-slate-500">
+                  <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-ink-subtle">
                     <Lock className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate italic">
                       {restrictedCount} restricted playbook{restrictedCount === 1 ? '' : 's'}
@@ -303,7 +304,7 @@ const FileRow = ({
           </span>
 
           {(tags.length > 0 || availableTags.length > 0) && (
-            <span className="text-slate-300 dark:text-slate-600">·</span>
+            <span className="text-ink-subtle">·</span>
           )}
           <TagEditor tags={tags} available={availableTags} onAdd={addTag} onRemove={handleRemoveTag} />
         </div>
@@ -315,13 +316,13 @@ const FileRow = ({
           <>
             <button
               onClick={() => onDelete(file.id)}
-              className="text-xs font-bold text-red-600 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              className="text-xs font-bold text-danger hover:opacity-80 px-2 py-1 rounded-lg hover:bg-danger-soft transition-colors"
             >
               Delete
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
-              className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              className="text-xs text-ink-muted hover:text-ink-strong px-2 py-1 rounded-lg hover:bg-surface-sunken transition-colors"
             >
               Cancel
             </button>
@@ -331,7 +332,7 @@ const FileRow = ({
             <button
               onClick={handleOpen}
               disabled={opening}
-              className="p-1.5 text-slate-300 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors disabled:opacity-50"
+              className="p-1.5 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors disabled:opacity-50"
               title="Open in new tab"
             >
               {opening ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
@@ -356,8 +357,8 @@ const FileRow = ({
                 disabled={usageCount > 0}
                 className={`p-1.5 rounded-lg transition-colors ${
                   usageCount > 0
-                    ? 'text-slate-200 dark:text-slate-700 cursor-not-allowed'
-                    : 'text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
+                    ? 'text-ink-subtle opacity-40 cursor-not-allowed'
+                    : 'text-ink-subtle hover:text-danger hover:bg-danger-soft'
                 }`}
                 aria-label={usageCount > 0 ? 'Delete file (unavailable — file is in use)' : 'Delete file'}
               >
@@ -574,7 +575,7 @@ export default function Files() {
 
   return (
     <div
-      className={`p-4 md:p-8 pb-16 md:pb-20 max-w-7xl mx-auto transition-colors ${dragOver ? 'bg-brand-50/60 dark:bg-brand-900/10' : ''}`}
+      className={`p-4 md:p-8 pb-16 md:pb-20 max-w-7xl mx-auto transition-colors ${dragOver ? 'bg-accent-soft' : ''}`}
       onDragOver={e => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
@@ -587,7 +588,7 @@ export default function Files() {
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-brand-200 dark:shadow-none"
+          className="flex items-center gap-2 px-4 py-2.5 bg-accent-strong hover:opacity-90 disabled:opacity-50 text-white rounded-xl text-sm font-bold transition-all shadow-lg"
         >
           {uploading
             ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -627,13 +628,13 @@ export default function Files() {
             onChange={setUsedIn}
           />
         )}
-        <div className="relative flex items-center self-stretch rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
-          <ArrowUpDown className="absolute left-3 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+        <div className="relative flex items-center self-stretch rounded-xl border border-line-strong bg-surface-raised shadow-sm">
+          <ArrowUpDown className="absolute left-3 w-3.5 h-3.5 text-ink-subtle pointer-events-none" />
           <select
             value={sort}
             onChange={e => setSort(e.target.value as SortKey)}
             aria-label="Sort files"
-            className="pl-8 pr-7 h-full text-sm font-medium outline-none appearance-none bg-transparent cursor-pointer text-slate-600 dark:text-slate-300"
+            className="pl-8 pr-7 h-full text-sm font-medium outline-none appearance-none bg-transparent cursor-pointer text-ink"
           >
             <option value="newest">Newest</option>
             <option value="name">Name</option>
@@ -641,15 +642,15 @@ export default function Files() {
             <option value="mostused">Most used</option>
             <option value="leastused">Least used</option>
           </select>
-          <ChevronDown className="absolute right-2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+          <ChevronDown className="absolute right-2 w-3.5 h-3.5 text-ink-subtle pointer-events-none" />
         </div>
       </div>
 
       {/* Drag-and-drop hint */}
       {dragOver && (
-        <div className="border-2 border-dashed border-brand-400 rounded-2xl p-12 text-center mb-6">
-          <Upload className="w-10 h-10 text-brand-400 mx-auto mb-3" />
-          <p className="text-brand-600 dark:text-brand-400 font-semibold">Drop files to upload</p>
+        <div className="border-2 border-dashed border-accent rounded-2xl p-12 text-center mb-6">
+          <Upload className="w-10 h-10 text-accent mx-auto mb-3" />
+          <p className="text-accent font-semibold">Drop files to upload</p>
         </div>
       )}
 
@@ -675,14 +676,14 @@ export default function Files() {
       {filtered.length === 0 ? (
         workspaceFiles.length === 0 ? (
           <EmptyState
-            icon={<Upload className="w-8 h-8 text-brand-400" />}
-            iconWrapClassName="bg-brand-50 dark:bg-brand-900/20"
+            icon={<Upload className="w-8 h-8" />}
+            tone="brand"
             title="No files yet"
             description="Upload PDFs, documents, and images to use as context in your playbooks."
             action={
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-brand-200 dark:shadow-none"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-strong hover:opacity-90 text-white text-sm font-bold rounded-xl transition-all shadow-lg"
               >
                 <Upload className="w-4 h-4" />
                 Upload your first file
@@ -691,7 +692,7 @@ export default function Files() {
           />
         ) : (
           <EmptyState
-            icon={<Search className="w-8 h-8 text-slate-300 dark:text-slate-500" />}
+            icon={<Search className="w-8 h-8" />}
             title="No files match"
             description="Try adjusting your search or filter."
           />
@@ -714,17 +715,19 @@ export default function Files() {
       )}
 
       <Modal open={bulkConfirm} onClose={() => !bulkDeleting && setBulkConfirm(false)} size="sm" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">
           Delete {selectedDeletable.length} file{selectedDeletable.length === 1 ? '' : 's'}?
         </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+        <p className="text-sm text-ink-muted mb-2">
           This permanently removes {selectedDeletable.length === 1 ? 'it' : 'them'}. This action cannot be undone.
         </p>
         {/* SQEM-234 — say which of the selection is being kept and why, before the click rather than
-            as a failure count afterwards. Some of those templates may not be visible to this user. */}
+            as a failure count afterwards. Some of those templates may not be visible to this user.
+            SQEM-554 (e1): the warning hue sits on the icon, the sentence stays readable (amber text on
+            white misses AA). */}
         {selectedInUse.length > 0 && (
-          <p className="text-sm text-amber-600 dark:text-amber-400 mb-2 flex items-start gap-2">
-            <Lock className="w-4 h-4 shrink-0 mt-0.5" />
+          <p className="text-sm text-ink mb-2 flex items-start gap-2">
+            <Lock className="w-4 h-4 shrink-0 mt-0.5 text-warning" />
             <span>
               {selectedInUse.length} of the selected file{selectedInUse.length === 1 ? ' is' : 's are'} still
               used by a playbook and will be kept. Detach {selectedInUse.length === 1 ? 'it' : 'them'} there first.
@@ -736,14 +739,14 @@ export default function Files() {
           <button
             onClick={() => setBulkConfirm(false)}
             disabled={bulkDeleting}
-            className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50"
+            className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleBulkDelete}
             disabled={bulkDeleting}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-danger hover:opacity-90 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
           >
             {bulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
             {bulkDeleting ? 'Deleting…' : 'Delete'}

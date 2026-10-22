@@ -1,0 +1,29 @@
+{
+  "_why": "SQEM-545 \u2014 classes outside the design system that existed when it was introduced. Counts may only go DOWN (G removes them); a new file, a new family or a higher count fails tests/unit/designTokens.test.ts.",
+  "components/ContextFilePicker.tsx": {
+    "sky": 8
+  },
+  "components/PlanBadge.tsx": {
+    "violet": 4
+  },
+  "components/marketplace/ListingView.tsx": {
+    "sky": 5
+  },
+  "components/ui/Avatar.tsx": {
+    "sky": 4,
+    "violet": 4,
+    "rose": 4
+  },
+  "components/ui/Checkbox.tsx": {
+    "violet": 2
+  },
+  "pages/Chat.tsx": {
+    "green": 1
+  },
+  "pages/Library.tsx": {
+    "sky": 4
+  },
+  "pages/Settings.tsx": {
+    "blue": 4
+  }
+}

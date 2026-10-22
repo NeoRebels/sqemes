@@ -33,6 +33,7 @@ import { FUNDED_MODEL } from '../_shared/funded.ts';
 import { isLoadtestRequest, runLoadtestMock, LOADTEST_HEADER } from '../_shared/loadtestMock.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
 import { countUsage } from '../_shared/usageCounts.ts';
+import { MAX_LOADED_IDS } from '../_shared/chatPlaybooks.ts';
 
 // SQEM-082 — keyless chat + editor test-run route through the Sqemes-funded model
 // (direct Mistral, EU/GDPR), metered against the workspace's monthly AI credits.
@@ -465,13 +466,19 @@ async function runAndBroadcast({
   // here, the tools are sent below, and the two must agree. A model told to search a library whose
   // tools were never sent invents the answer (SQEM-326, unreachable persona routes). `tools` is the
   // single source for both — keep it that way.
+  // SQEM-551 — what the model loaded for THIS answer, in order, sent back with the result so the
+  // client can store it with the message ("Used" chips). Ids only; titles are resolved per viewer.
+  const loadedTemplateIds: string[] = [];
   const tools: ToolRuntime | null = workspaceId
     ? createLibraryToolRuntime(
         () => createLibraryReader({ client: createAdminClient(), workspaceId, userId }),
         {
           maxRounds: funded ? TOOL_ROUNDS_FUNDED : TOOL_ROUNDS_BYOK, budgetMs: TOOL_BUDGET_MS,
           // SQEM-517 — counted per workspace and day, never per person; fire-and-forget.
-          onTemplateLoaded: (templateId) => countUsage(createAdminClient(), workspaceId, 'chat', 'playbook_loaded', templateId),
+          onTemplateLoaded: (templateId) => {
+            if (!loadedTemplateIds.includes(templateId) && loadedTemplateIds.length < MAX_LOADED_IDS) loadedTemplateIds.push(templateId);
+            countUsage(createAdminClient(), workspaceId, 'chat', 'playbook_loaded', templateId);
+          },
         },
       )
     : null;
@@ -554,7 +561,9 @@ async function runAndBroadcast({
     // ⚠️ Flush BEFORE the result. A delta arriving after it would overwrite the finished answer with
     // an earlier, shorter version of itself — the one ordering bug this design can produce.
     await broadcaster?.flush();
-    await broadcastJobResult(jobId, { result });
+    // SQEM-551 — `loadedTemplateIds` rides on the same message as the text, so the two cannot be
+    // separated by a dropped broadcast. A client from before 551 ignores the extra key.
+    await broadcastJobResult(jobId, loadedTemplateIds.length ? { result, loadedTemplateIds } : { result });
   } catch (err: any) {
     // No flush here on purpose: a partial answer followed by an error reads as if the fragment were
     // the reply. The client drops what it has when an error arrives.

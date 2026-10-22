@@ -325,7 +325,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
             </div>
           </div>
 
-          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">What do you want to build?</label>
+          <p className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">What do you want to build?</p>
           <SegmentedTabs<PromptKind> tabs={KINDS} value={kind} onChange={setKind} className="mb-5" />
 
           <label htmlFor="wizard-goal" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
@@ -342,7 +342,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
 
           {/* SQEM-396 — a question, like the two above it, and the attach/upload difference BEFORE
               the click: SQEM-315 explains it under the lists, i.e. after the choice was made. */}
-          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mt-5 mb-1">Which context should it draw on?</label>
+          <label htmlFor="template-wizard-modal-which-context-should-it-draw" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mt-5 mb-1">Which context should it draw on?</label>
           <p className="text-2xs text-slate-400 dark:text-slate-500 mb-2">Optional. Attach keeps a file on the playbook · Upload reads a document once and throws it away.</p>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => setPicking(true)} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
@@ -351,7 +351,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
             <button type="button" onClick={() => uploadRef.current?.click()} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
               <Upload className="w-3.5 h-3.5" /> Upload
             </button>
-            <input ref={uploadRef} type="file" multiple onChange={onUpload} className="hidden" />
+            <input id="template-wizard-modal-which-context-should-it-draw" ref={uploadRef} type="file" multiple onChange={onUpload} className="hidden" />
           </div>
 
           {/* ⛔ SQEM-315 — the two lists are shown apart because they now *do* different things, and

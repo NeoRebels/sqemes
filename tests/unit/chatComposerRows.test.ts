@@ -44,7 +44,7 @@ describe('SQEM-401 — two rows on a phone, one row on a desktop', () => {
     const toolsEnd = src.indexOf('order-1 md:order-2');
     const toolsBody = src.slice(toolsStart, toolsEnd);
     expect(toolsBody).toMatch(/<Paperclip /);
-    expect(toolsBody).toMatch(/title="Use template {2}\(\/\)"/);
+    expect(toolsBody).toMatch(/title="Use playbook {2}\(\/\)"/); // SQEM-544 — was "Use template"
     expect(toolsBody).toMatch(/<Plug /);
     expect(toolsBody).not.toMatch(/<textarea/);
   });

@@ -36,3 +36,5 @@ resolves to `https://app.sqemes.com` on prod — confirm the project's Site URL 
 
 Logo is served from `https://app.sqemes.com/logo-primary-V2.png` (hard-coded, since emails
 render outside the app).
+
+*SQEM-558 (2026-10-22): the brand is lowercase mid-sentence in all five templates ("sqemes"). Staging picks that up on deploy; production needs the manual paste into the dashboard (see **Production** above).*
