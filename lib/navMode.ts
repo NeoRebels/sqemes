@@ -8,13 +8,13 @@ import type { UserRole } from '../types';
  * ⛔ A mode is a navigation filter, not a permission. It only decides which links the sidebar shows;
  * what someone may do is still `can()` and RLS. Hiding a link here protects nothing.
  *
- * Members never get Manage: they see one list (Start, Chat, Playbooks, Personas) — the same pages they
+ * Members never get Manage: they see one list (Start, Chat, History, Playbooks, Personas) — the same pages they
  * reach today, so for them nothing moves.
  *
  * Pure on purpose (no store, no Supabase import), so it is unit-testable without env vars.
  */
 export type NavMode = 'work' | 'manage';
-export type NavRoute = '/' | '/chat' | '/overview' | '/playbooks' | '/personas' | '/files' | '/library';
+export type NavRoute = '/' | '/chat' | '/history' | '/overview' | '/playbooks' | '/personas' | '/files' | '/library';
 
 /** Where a click on the mode switch lands. SQEM-552 — Manage lands on its Overview. */
 export const MODE_HOME: Record<NavMode, NavRoute> = { work: '/', manage: '/overview' };
@@ -33,7 +33,7 @@ const startsWithSegment = (path: string, base: string) => path === base || path.
  * that keeps whichever mode was last in use.
  */
 export function modeForPath(path: string): NavMode | null {
-  if (path === '/' || startsWithSegment(path, '/chat')) return 'work';
+  if (path === '/' || startsWithSegment(path, '/chat') || startsWithSegment(path, '/history')) return 'work'; // SQEM-563
   if (['/overview', '/playbooks', '/personas', '/files', '/library'].some(base => startsWithSegment(path, base))) return 'manage';
   return null;
 }
@@ -46,8 +46,9 @@ export function resolveMode(path: string, role: UserRole, remembered: NavMode | 
 
 /** The main links, in order. `marketplace` is false on a self-host instance without one (SQEM-178). */
 export function navRoutes(mode: NavMode, role: UserRole, opts: { marketplace: boolean }): NavRoute[] {
-  if (!canManage(role)) return ['/', '/chat', '/playbooks', '/personas'];
-  if (mode === 'work') return ['/', '/chat'];
+  // SQEM-563 — History sits under Chat: it is the list of the chats (and the extension's).
+  if (!canManage(role)) return ['/', '/chat', '/history', '/playbooks', '/personas'];
+  if (mode === 'work') return ['/', '/chat', '/history'];
   return ['/overview', '/playbooks', '/personas', '/files', ...(opts.marketplace ? (['/library'] as const) : [])];
 }
 

@@ -16,7 +16,7 @@ const code = (src: string) => src
   .replace(/\/\*[\s\S]*?\*\//g, '');
 
 const CHAT_FN = code(readFileSync(root('supabase/functions/chat-message/index.ts'), 'utf8'));
-const MCP_FN  = code(readFileSync(root('supabase/functions/mcp-server/index.ts'), 'utf8'));
+const MCP_FN  = code((readFileSync(root('supabase/functions/mcp-server/index.ts'), 'utf8') + '\n' + readFileSync(root('supabase/functions/_shared/libraryActions.ts'), 'utf8') + '\n' + readFileSync(root('supabase/functions/_shared/libraryToolDefs.ts'), 'utf8')));
 
 /** A reader that records what it was asked, so the adapter can be tested without a database. */
 function fakeReader(overrides: Record<string, any> = {}) {
@@ -57,10 +57,10 @@ describe('the tool schemas — what all three providers accept', () => {
     expect(toClaudeTools(LIBRARY_TOOLS)[0]).toHaveProperty('input_schema');
   });
 
-  it('⭐ list_templates is deliberately NOT offered in Chat', () => {
-    // It is the one call whose response grows with the workspace. `search_templates` answers the
-    // same question for the price of the matches; MCP keeps the listing, where the client decides
-    // when to spend it.
+  it('⭐ Chat\'s own five reads stay its own (the rest arrives by role, SQEM-561)', () => {
+    // SQEM-373 kept list_templates out of Chat; SQEM-561 adds it, with every other MCP tool, through
+    // `chatActionDefinitions` (tests/unit/chatLibraryActions.test.ts). These five keep Chat's own
+    // conventions — a binary file refused rather than linked, every result bounded.
     expect(LIBRARY_TOOLS.map(t => t.name)).toEqual([
       'search_templates', 'get_template', 'read_context_file', 'list_personas', 'get_persona',
     ]);

@@ -15,6 +15,8 @@ import { fetchPersonas, duplicatePersona, deletePersona, setPersonaFavorite, upd
 import { collectWorkspaceTags } from '../lib/workspaceTags';
 import TagFilter from '../components/ui/TagFilter';
 import { fetchRestrictedPersonaIds } from '../lib/api/personaAccess';
+import { fetchCanEditMany } from '../lib/api/editors';
+import { applyToEditable, bulkSummary } from '../lib/bulkApply';
 import AccessBadge from '../components/ui/AccessBadge';
 import type { AccessBadgeMode } from '../lib/accessBadge';
 import { buildBundle, downloadBlob, readBundle, importBundle } from '../lib/templateBundle';
@@ -112,6 +114,7 @@ export default function Personas() {
   const [exporting, setExporting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Persona[] | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [tagBusy, setTagBusy] = useState(false); // SQEM-564 — bulk tag
   const [wizardOpen, setWizardOpen] = useState(false);
   const [restrictedIds, setRestrictedIds] = useState<Map<string, AccessBadgeMode>>(new Map()); // SQEM-400 — the word per persona
   const [importData, setImportData] = useState<{ zip: any; manifest: BundleManifest } | null>(null);
@@ -197,6 +200,24 @@ export default function Personas() {
     } catch (err: any) {
       setPersonas(prev => (prev ?? []).map(p => p.id === persona.id ? { ...p, tags: persona.tags } : p));
       showToast(err?.message || 'Failed to update tag', 'error');
+    }
+  };
+
+  // SQEM-564 — one tag for several personas at once (one tag per persona in the UI, as `setTag` above).
+  // Checks the edit right per persona first; one summary instead of a toast per item.
+  const bulkSetTag = async (tag: string | null, ids: string[]) => {
+    setTagBusy(true);
+    try {
+      const tags = tag ? [tag] : [];
+      const outcome = await applyToEditable(ids, list => fetchCanEditMany('persona', list), id => updatePersona(id, { tags }));
+      if (outcome.changed.length) {
+        const changed = new Set(outcome.changed);
+        setPersonas(prev => (prev ?? []).map(p => changed.has(p.id) ? { ...p, tags } : p));
+      }
+      const { message, type } = bulkSummary(outcome, 'persona', tag ? `Tag “${tag}” set` : 'Tag removed');
+      showToast(message, type);
+    } finally {
+      setTagBusy(false);
     }
   };
 
@@ -400,6 +421,12 @@ export default function Personas() {
           noun="persona"
           onExport={() => void handleExport((personas ?? []).filter(p => selectedIds.has(p.id)))}
           exporting={exporting}
+          addableTags={allTags}
+          removableTags={[...new Set((personas ?? []).filter(p => selectedIds.has(p.id)).map(p => p.tags[0]).filter((t): t is string => !!t))].sort()}
+          addTagLabel="Set tag"
+          onAddTag={tag => void bulkSetTag(tag, [...selectedIds])}
+          onRemoveTag={tag => void bulkSetTag(null, (personas ?? []).filter(p => selectedIds.has(p.id) && p.tags[0] === tag).map(p => p.id))}
+          tagBusy={tagBusy}
         />
       )}
 

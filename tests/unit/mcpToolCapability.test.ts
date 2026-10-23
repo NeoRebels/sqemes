@@ -23,7 +23,11 @@ import { resolve } from 'node:path';
 // ⚠️ Resolved from the working directory, not from `import.meta.url`: under the jsdom environment
 // vitest hands this file a non-`file:` URL, and `fileURLToPath` throws before a single test runs.
 // Vitest always runs from the repository root.
-const SRC = readFileSync(resolve(process.cwd(), 'supabase/functions/mcp-server/index.ts'), 'utf8');
+// SQEM-561 — the tool definitions, the capability map and the handlers live in `_shared/libraryActions.ts`
+// (shared with Chat); the dispatch and its gates stay in the server. Both are read.
+const SRC = readFileSync(resolve(process.cwd(), 'supabase/functions/mcp-server/index.ts'), 'utf8')
+  + '\n' + readFileSync(resolve(process.cwd(), 'supabase/functions/_shared/libraryActions.ts'), 'utf8')
+  + '\n' + readFileSync(resolve(process.cwd(), 'supabase/functions/_shared/libraryToolDefs.ts'), 'utf8');
 
 /**
  * The same source with comments removed.
@@ -58,13 +62,14 @@ function capabilityNames(): string[] {
  * `name` properties inside an `inputSchema` cannot be mistaken for tools.
  */
 function advertisedNames(): string[] {
-  const start = SRC.indexOf("if (method === 'tools/list')");
-  // SQEM-523 — anchored on the filter that follows the array, not on the return, whose shape changed.
-  const end = SRC.indexOf('const visibleTools = tools.filter');
-  expect(start, 'tools/list branch not found').toBeGreaterThan(-1);
-  expect(end, 'tools/list return not found').toBeGreaterThan(start);
+  // SQEM-561 — the array is `LIBRARY_TOOL_DEFS` now, and `tools/list` advertises exactly it.
+  expect(SRC).toContain('const tools = LIBRARY_TOOL_DEFS;');
+  const start = SRC.indexOf('export const LIBRARY_TOOL_DEFS = [');
+  const end = SRC.indexOf('\n];', start);
+  expect(start, 'LIBRARY_TOOL_DEFS not found').toBeGreaterThan(-1);
+  expect(end, 'end of LIBRARY_TOOL_DEFS not found').toBeGreaterThan(start);
   const block = SRC.slice(start, end);
-  return [...block.matchAll(/^ {8}name: '([a-z_]+)',$/gm)].map(m => m[1]);
+  return [...block.matchAll(/^ {4}name: '([a-z_]+)',$/gm)].map(m => m[1]);
 }
 
 describe('MCP tool surface', () => {
@@ -145,7 +150,7 @@ describe('MCP write authorisation (SQEM-336)', () => {
   function helperBody(name: string): string {
     const start = SRC.indexOf(`const ${name} = async (`);
     expect(start, `no write helper found: ${name}`).toBeGreaterThan(-1);
-    const next = SRC.indexOf("\n    if (toolName === '", start);
+    const next = SRC.indexOf("\n  if (toolName === '", start);
     return code(SRC.slice(start, next === -1 ? SRC.length : next));
   }
 

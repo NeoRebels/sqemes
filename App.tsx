@@ -55,6 +55,7 @@ import GleapBoot from './components/GleapBoot';
 const Chat = React.lazy(() => import('./pages/Chat'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Files = React.lazy(() => import('./pages/Files'));
+const History = React.lazy(() => import('./pages/History')); // SQEM-563
 const InviteAccept = React.lazy(() => import('./pages/InviteAccept'));
 const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
 const Auth = React.lazy(() => import('./pages/Auth'));
@@ -318,7 +319,8 @@ const AppRoutes = () => {
         <Route path="/files" element={<LayoutPage><Files /></LayoutPage>} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/chat/:sessionId" element={<Chat />} />
-        <Route path="/chat-history" element={<Navigate to="/chat" replace />} />
+        <Route path="/chat-history" element={<Navigate to="/history" replace />} />
+        <Route path="/history" element={<LayoutPage><History /></LayoutPage>} />
         <Route path="/library" element={<LayoutPage><Library /></LayoutPage>} />
         <Route path="/settings" element={<LayoutPage><Settings /></LayoutPage>} />
         <Route path="/design" element={<LayoutPage><DesignSystem /></LayoutPage>} />

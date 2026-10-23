@@ -67,7 +67,7 @@ describe('SQEM-530 — readJsonCapped', () => {
 
 describe('SQEM-530 — mcp-server uses the ceiling', async () => {
   const { readFileSync } = await import('node:fs');
-  const src = readFileSync('supabase/functions/mcp-server/index.ts', 'utf8');
+  const src = (readFileSync('supabase/functions/mcp-server/index.ts', 'utf8') + '\n' + readFileSync('supabase/functions/_shared/libraryActions.ts', 'utf8') + '\n' + readFileSync('supabase/functions/_shared/libraryToolDefs.ts', 'utf8'));
   it('the body is read through readJsonCapped, never req.json()', () => {
     expect(src).toContain('readJsonCapped(req)');
     expect(src).not.toMatch(/\breq\.json\(\)/);

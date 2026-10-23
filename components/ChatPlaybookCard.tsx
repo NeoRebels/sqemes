@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import KindBadge from './ui/KindBadge';
 import type { PlaybookRef, PromptKind } from '../types';
+import { changeLabel, type LibraryChange } from '../supabase/functions/_shared/libraryChanges.ts';
 
 /**
  * SQEM-551 — a user message that started from a prompt playbook (redesign C, Figma C5).
@@ -67,6 +68,51 @@ export function UsedPlaybookChips({ used }: { used: { id: string; title: string;
           {p.title}
         </Link>
       ))}
+    </div>
+  );
+}
+
+/**
+ * SQEM-561 — under an answer: what the model created, changed or deleted in the library for it. Each
+ * line links to the object while the viewer can open it; the wording per line comes from
+ * `changeLabel` (supabase/functions/_shared/libraryChanges.ts), so a shared chat never names an
+ * object the viewer cannot see.
+ */
+const CHANGE_VERB: Record<LibraryChange['action'], string> = { created: 'Created', updated: 'Updated', deleted: 'Deleted' };
+const CHANGE_NOUN: Record<LibraryChange['kind'], string> = { prompt: 'prompt', skill: 'skill', persona: 'persona', file: 'file' };
+
+function changeHref(c: LibraryChange): string {
+  if (c.kind === 'persona') return `/personas?id=${encodeURIComponent(c.id)}`;
+  if (c.kind === 'file') return '/files';
+  return `/playbooks?id=${encodeURIComponent(c.id)}`;
+}
+
+export function LibraryChangesCard({
+  changes, currentTitle,
+}: {
+  changes: LibraryChange[] | undefined;
+  /** The viewer's own current title for an object, or undefined when they cannot see it. */
+  currentTitle: (c: LibraryChange) => string | undefined;
+}) {
+  if (!changes?.length) return null;
+  return (
+    <div className="mt-2 ml-1 w-full max-w-md rounded-card border border-line bg-surface-raised shadow-rest px-4 py-3 text-left">
+      <p className="text-xs font-medium text-ink-subtle">Changed in your library</p>
+      <ul className="mt-1.5 space-y-1">
+        {changes.map(c => {
+          const { title, linked } = changeLabel(c, currentTitle(c));
+          return (
+            <li key={`${c.kind}:${c.id}`} className="flex items-baseline gap-2 text-sm">
+              <span className={`shrink-0 text-xs font-medium ${c.action === 'deleted' ? 'text-danger' : 'text-ink-muted'}`}>
+                {CHANGE_VERB[c.action]} {CHANGE_NOUN[c.kind]}
+              </span>
+              {linked
+                ? <Link to={changeHref(c)} className="text-ink hover:underline break-words">{title}</Link>
+                : <span className={`break-words ${c.action === 'deleted' ? 'text-ink-muted line-through' : 'text-ink-muted'}`}>{title}</span>}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

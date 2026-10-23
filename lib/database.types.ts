@@ -458,6 +458,7 @@ export type Database = {
           created_at: string;
           playbook_ref: Json | null;
           loaded_template_ids: string[] | null;
+          library_changes: Json | null;
         };
         Insert: {
           id?: string;
@@ -469,6 +470,7 @@ export type Database = {
           created_at?: string;
           playbook_ref?: Json | null;
           loaded_template_ids?: string[] | null;
+          library_changes?: Json | null;
         };
         Update: {
           id?: string;
@@ -480,6 +482,7 @@ export type Database = {
           created_at?: string;
           playbook_ref?: Json | null;
           loaded_template_ids?: string[] | null;
+          library_changes?: Json | null;
         };
         Relationships: [];
       };

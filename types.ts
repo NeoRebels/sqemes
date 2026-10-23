@@ -1,3 +1,4 @@
+import type { LibraryChange } from './supabase/functions/_shared/libraryChanges.ts';
 
 export type UserRole = 'admin' | 'editor' | 'member';
 
@@ -277,6 +278,8 @@ export interface StoredChatMessage {
   playbookRef?: PlaybookRef | null;
   /** SQEM-551 — assistant message: what the model loaded for this answer. */
   loadedTemplateIds?: string[];
+  /** SQEM-561 — assistant message: what the model changed in the library for this answer. */
+  libraryChanges?: LibraryChange[];
 }
 
 export interface Invitation {

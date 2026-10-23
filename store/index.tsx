@@ -350,7 +350,8 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
     prompts: pr.prompts,
     addPrompt: pr.addPrompt, updatePrompt: pr.updatePrompt, toggleFavorite: pr.toggleFavorite,
     deletePrompt: pr.deletePrompt, deletePrompts: pr.deletePrompts, duplicatePrompt: pr.duplicatePrompt,
-  }), [pr.prompts, pr.addPrompt, pr.updatePrompt, pr.toggleFavorite, pr.deletePrompt, pr.deletePrompts, pr.duplicatePrompt]);
+    setTagMany: pr.setTagMany,
+  }), [pr.prompts, pr.addPrompt, pr.updatePrompt, pr.toggleFavorite, pr.deletePrompt, pr.deletePrompts, pr.duplicatePrompt, pr.setTagMany]);
 
   const dataValue = useMemo(() => ({
     libraryTemplates: da.libraryTemplates, fetchLibraryTemplates: da.fetchLibraryTemplates,
@@ -358,13 +359,13 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
     deleteLibraryTemplate: da.deleteLibraryTemplate, copyTemplateToWorkspace: da.copyTemplateToWorkspace,
     workspaceFiles: da.workspaceFiles, addWorkspaceFile: da.addWorkspaceFile,
     patchWorkspaceFile: da.patchWorkspaceFile, removeWorkspaceFile: da.removeWorkspaceFile,
-    removeWorkspaceFiles: da.removeWorkspaceFiles,
+    removeWorkspaceFiles: da.removeWorkspaceFiles, setWorkspaceFiles: da.setWorkspaceFiles,
     skills: da.skills,
   }), [
     da.libraryTemplates, da.fetchLibraryTemplates, da.addLibraryTemplate,
     da.updateLibraryTemplate, da.deleteLibraryTemplate, da.copyTemplateToWorkspace,
     da.workspaceFiles, da.addWorkspaceFile, da.patchWorkspaceFile, da.removeWorkspaceFile,
-    da.removeWorkspaceFiles,
+    da.removeWorkspaceFiles, da.setWorkspaceFiles,
     da.skills,
   ]);
 

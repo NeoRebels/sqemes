@@ -66,7 +66,8 @@ describe('SQEM-390 — nowhere in the product is "assistant" still a kind', () =
     'lib/templateBundle.ts': /const legacyAssistant = b\.kind === 'assistant';/,
     // SQEM-493 — the submission reader moved here from marketplace-submit; both submit functions use it.
     'supabase/functions/_shared/submissionManifest.ts': /raw\.kind === 'assistant'/,
-    'supabase/functions/mcp-server/index.ts': /if \(kind === 'assistant'\)\s*\n\s*return rpcError/,
+    // SQEM-561 — the MCP tool handlers moved to the shared module; the refusal moved with them.
+    'supabase/functions/_shared/libraryActions.ts': /if \(kind === 'assistant'\)\s*\n\s*return rpcError/,
   };
 
   it('⛔ the sweep', () => {
@@ -104,11 +105,11 @@ describe('SQEM-390 — nowhere in the product is "assistant" still a kind', () =
     // SQEM-493 — the submission reader lives in `_shared/submissionManifest.ts` (ships to the export,
     // unlike the pruned `marketplace-submit`, so no existsSync guard is needed any more).
     expect(read('supabase/functions/_shared/submissionManifest.ts')).toMatch(/kind: 'skill', content: raw\.systemInstruction \|\| raw\.content/);
-    expect(read('supabase/functions/mcp-server/index.ts')).toMatch(/kind "assistant" no longer exists/);
+    expect((read('supabase/functions/mcp-server/index.ts') + '\n' + read('supabase/functions/_shared/libraryActions.ts') + '\n' + read('supabase/functions/_shared/libraryToolDefs.ts'))).toMatch(/kind "assistant" no longer exists/);
   });
 
   it('the MCP tools offer two kinds, and the library instruction describes two', () => {
-    const mcp = code(read('supabase/functions/mcp-server/index.ts'));
+    const mcp = code((read('supabase/functions/mcp-server/index.ts') + '\n' + read('supabase/functions/_shared/libraryActions.ts') + '\n' + read('supabase/functions/_shared/libraryToolDefs.ts')));
     expect(mcp).toMatch(/enum: \['prompt', 'skill', 'all'\]/);
     expect(mcp.match(/enum: \['prompt', 'skill'\]/g)?.length).toBeGreaterThanOrEqual(2);
     expect(code(read('supabase/functions/_shared/libraryTools.ts'))).toMatch(/enum: \['prompt', 'skill'\]/);

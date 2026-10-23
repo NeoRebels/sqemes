@@ -54,7 +54,7 @@ import { resolve } from 'node:path';
  * guidelines leave us, because a person puts it there on purpose.
  */
 const ROOT = resolve(__dirname, '../../');
-const src = readFileSync(resolve(ROOT, 'supabase/functions/mcp-server/index.ts'), 'utf8');
+const src = (readFileSync(resolve(ROOT, 'supabase/functions/mcp-server/index.ts'), 'utf8') + '\n' + readFileSync(resolve(ROOT, 'supabase/functions/_shared/libraryActions.ts'), 'utf8') + '\n' + readFileSync(resolve(ROOT, 'supabase/functions/_shared/libraryToolDefs.ts'), 'utf8'));
 
 function description(tool: string): string {
   const at = src.indexOf(`name: '${tool}'`);
@@ -76,7 +76,7 @@ describe('SQEM-526 — descriptions say when a tool fits; nothing tells Claude t
 
   it('⛔ the MCP server hands out no session instruction; Settings still offers the text to paste', () => {
     const prompt = readFileSync(resolve(ROOT, 'supabase/functions/_shared/libraryPrompt.ts'), 'utf8');
-    const mcp = readFileSync(resolve(ROOT, 'supabase/functions/mcp-server/index.ts'), 'utf8');
+    const mcp = (readFileSync(resolve(ROOT, 'supabase/functions/mcp-server/index.ts'), 'utf8') + '\n' + readFileSync(resolve(ROOT, 'supabase/functions/_shared/libraryActions.ts'), 'utf8') + '\n' + readFileSync(resolve(ROOT, 'supabase/functions/_shared/libraryToolDefs.ts'), 'utf8'));
     const settings = readFileSync(resolve(ROOT, 'pages/Settings.tsx'), 'utf8');
     const init = mcp.slice(mcp.indexOf('function initializeResult()'), mcp.indexOf('serverInfo:', mcp.indexOf('function initializeResult()')));
     expect(prompt).toMatch(/export const LIBRARY_SYSTEM_PROMPT/);

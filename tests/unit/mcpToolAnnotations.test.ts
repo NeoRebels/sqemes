@@ -9,11 +9,14 @@ import { toolAnnotations, type ToolCapability } from '../../supabase/functions/_
  * `mcp-server/index.ts` cannot be imported (Deno.serve at load), so the tool list is read as text,
  * the same way `mcpToolCapability.test.ts` does it.
  */
-const SRC = readFileSync(resolve(process.cwd(), 'supabase/functions/mcp-server/index.ts'), 'utf8');
-const LIST = SRC.slice(SRC.indexOf("if (method === 'tools/list') {"), SRC.indexOf('const visibleTools = tools.filter'));
+// SQEM-561 — the definitions and the capability map moved to `_shared/libraryActions.ts`, shared with Chat.
+const SRC = readFileSync(resolve(process.cwd(), 'supabase/functions/mcp-server/index.ts'), 'utf8')
+  + '\n' + readFileSync(resolve(process.cwd(), 'supabase/functions/_shared/libraryActions.ts'), 'utf8')
+  + '\n' + readFileSync(resolve(process.cwd(), 'supabase/functions/_shared/libraryToolDefs.ts'), 'utf8');
+const LIST = SRC.slice(SRC.indexOf('export const LIBRARY_TOOL_DEFS = ['), SRC.indexOf('\n];', SRC.indexOf('export const LIBRARY_TOOL_DEFS = [')));
 const capMap = SRC.slice(SRC.indexOf('const TOOL_CAPABILITY'), SRC.indexOf('};', SRC.indexOf('const TOOL_CAPABILITY')));
 const CAPS = Object.fromEntries([...capMap.matchAll(/^\s+(\w+):\s+'(read|create|update|delete)'/gm)].map(m => [m[1], m[2] as ToolCapability]));
-const TOOLS = [...LIST.matchAll(/^ {8}name: '(\w+)',\n {8}(title: '([^']+)',)?/gm)].map(m => ({ name: m[1], title: m[3] }));
+const TOOLS = [...LIST.matchAll(/^ {4}name: '(\w+)',\n {4}(title: '([^']+)',)?/gm)].map(m => ({ name: m[1], title: m[3] }));
 
 describe('SQEM-523 — every tool has a title', () => {
   it('all tools in tools/list, none without one', () => {

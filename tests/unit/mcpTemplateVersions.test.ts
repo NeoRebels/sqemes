@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
  * whoever wrote before. Each path is pinned by name. The trigger itself is proven against a database in
  * tests/isolation/templateVersions.test.ts.
  */
-const src = readFileSync('supabase/functions/mcp-server/index.ts', 'utf8');
+const src = (readFileSync('supabase/functions/mcp-server/index.ts', 'utf8') + '\n' + readFileSync('supabase/functions/_shared/libraryActions.ts', 'utf8') + '\n' + readFileSync('supabase/functions/_shared/libraryToolDefs.ts', 'utf8'));
 const mig = readFileSync('supabase/migrations/20261020060000_sqem477_template_versions.sql', 'utf8');
 const handler = (tool: string) => {
   const i = src.indexOf(`if (toolName === '${tool}') {`);

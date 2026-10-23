@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { Prompt } from '../types';
 import * as promptsApi from '../lib/api/prompts';
+import { fetchCanEditMany } from '../lib/api/editors';
+import { applyToEditable, type BulkOutcome } from '../lib/bulkApply';
 
 export interface PromptsState {
   prompts: Prompt[];
@@ -10,6 +12,8 @@ export interface PromptsState {
   deletePrompt: (id: string) => void;
   deletePrompts: (ids: string[]) => Promise<void>;
   duplicatePrompt: (prompt: Prompt) => void;
+  /** SQEM-564 — set or clear one tag on many playbooks; only those the person may change. */
+  setTagMany: (ids: string[], tag: string | null) => Promise<BulkOutcome>;
 }
 
 export const PromptsContext = createContext<PromptsState | undefined>(undefined);
@@ -74,6 +78,17 @@ export function usePromptsState(
     else showToast(`Deleted ${okIds.size} of ${results.length} — ${failed} failed`, 'error');
   }, [showToast]);
 
+  // SQEM-564 — one tag for many playbooks (or none). Checks the edit right per playbook first, writes
+  // only those, and returns the outcome instead of toasting per item: the page shows one summary.
+  const setTagMany = useCallback(async (ids: string[], tag: string | null): Promise<BulkOutcome> => {
+    const outcome = await applyToEditable(ids, list => fetchCanEditMany('template', list), id => promptsApi.setPromptTag(id, tag));
+    if (outcome.changed.length) {
+      const changed = new Set(outcome.changed);
+      setPrompts(prev => prev.map(p => changed.has(p.id) ? { ...p, tag } : p));
+    }
+    return outcome;
+  }, []);
+
   const duplicatePrompt = useCallback(async (prompt: Prompt) => {
     if (!activeWorkspaceId) return;
     try {
@@ -88,7 +103,7 @@ export function usePromptsState(
 
   return {
     prompts, setPrompts,
-    addPrompt, updatePrompt, toggleFavorite, deletePrompt, deletePrompts, duplicatePrompt,
+    addPrompt, updatePrompt, toggleFavorite, deletePrompt, deletePrompts, duplicatePrompt, setTagMany,
   };
 }
 

@@ -19,7 +19,7 @@ import { useData, useWorkspace, useUI, usePrompts } from '../store';
 import { uploadWorkspaceFile, updateWorkspaceFile, getWorkspaceFileSignedUrl, getWorkspaceFileUsage } from '../lib/api/files';
 import { planTagChange, tagChangeSummary, tagsOnSelection } from '../lib/fileTags';
 import { collectWorkspaceTags } from '../lib/workspaceTags';
-import { FILE_ACCEPT_STRING, isImageType, fileTypeLabel, MAX_FILE_SIZE_MB } from '../lib/uploadTypes';
+import { FILE_ACCEPT_STRING, isImageType, isMediaFile, fileTypeLabel, MAX_FILE_SIZE_MB } from '../lib/uploadTypes';
 import type { WorkspaceFile } from '../types';
 import Checkbox from '../components/ui/Checkbox';
 
@@ -48,7 +48,7 @@ function FileIcon({ mimeType, className }: { mimeType: string; className?: strin
   return <File className={className} />;
 }
 
-type TypeFilter = 'all' | 'images' | 'documents';
+type TypeFilter = 'all' | 'media' | 'documents'; // SQEM-562 — "Media" = images, video, audio
 type SortKey = 'newest' | 'name' | 'largest' | 'mostused' | 'leastused';
 
 // A template that references a file — surfaced in the usage popover (SQEM-175).
@@ -455,8 +455,8 @@ export default function Files() {
       || f.tags.some(t => t.toLowerCase().includes(search.toLowerCase()));
     const matchesType =
       typeFilter === 'all'
-      || (typeFilter === 'images' && isImageType(f.mimeType))
-      || (typeFilter === 'documents' && !isImageType(f.mimeType));
+      || (typeFilter === 'media' && isMediaFile(f.name, f.mimeType))
+      || (typeFilter === 'documents' && !isMediaFile(f.name, f.mimeType));
     const matchesTag = selectedTag ? f.tags.includes(selectedTag) : true;
     const usedByHere = templatesByFile.get(f.id) || [];
     const matchesUsage = !usedIn
@@ -569,7 +569,7 @@ export default function Files() {
 
   const tabs: SegmentedTab<TypeFilter>[] = [
     { value: 'all', label: 'All' },
-    { value: 'images', label: 'Images' },
+    { value: 'media', label: 'Media' },
     { value: 'documents', label: 'Documents' },
   ];
 

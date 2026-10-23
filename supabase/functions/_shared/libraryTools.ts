@@ -17,6 +17,8 @@ import {
   LibraryBadRequest,
   LibraryNotFound,
 } from './libraryQueries.ts';
+import { LIBRARY_TOOL_DEFS, TOOL_CAPABILITY } from './libraryToolDefs.ts';
+import { describeChange, type LibraryChange } from './libraryChanges.ts';
 
 // ── Provider-neutral definitions ────────────────────────────────────────────
 
@@ -34,11 +36,10 @@ export interface ToolDefinition {
 }
 
 /**
- * ⭐ **Five tools, not six.** `list_templates` is deliberately absent from Chat even though
- * `mcp-server` offers it: it is the one call whose response grows with the workspace (78 templates
- * on production today), and `search_templates` answers the same question for the price of the
- * matches. In MCP the listing is cheap because the client decides when to spend it; here it would
- * land in a conversation the user is paying tokens for.
+ * ⭐ **Chat's own five** — the reads Chat has answered since SQEM-373, with Chat's conventions (a
+ * binary file is refused rather than linked, every result bounded). Everything else MCP offers is
+ * added by role from the shared handlers (`chatActionDefinitions`, SQEM-561) — including
+ * `list_templates`, which SQEM-373 had kept out because its answer grows with the workspace.
  *
  * Every description is written for a model that has never seen Sqemes, and each one names the tool
  * it should call next — a model that knows a template exists but not how to open it invents the
@@ -117,6 +118,77 @@ export const LIBRARY_TOOLS: ToolDefinition[] = [
     },
   },
 ];
+
+/**
+ * SQEM-561 — every other MCP tool, offered in Chat by role: reading to everyone, changing only to an
+ * editor or admin — every tool, bounded by access and "Who can edit" as on MCP. The descriptions are
+ * MCP's own (`LIBRARY_TOOL_DEFS`), written once.
+ *
+ * ⛔ Two are left out because they cannot work here: `create_upload_url` hands out a URL to PUT bytes
+ * to, and `finalize_upload` registers what was PUT. A model in Chat holds no bytes and has no way to
+ * PUT them — offered, they would only invite a call that cannot succeed. Text files go through
+ * `upload_file`; anything binary is uploaded on the Files page.
+ *
+ * ⚠️ `list_templates` was deliberately absent from Chat since SQEM-373 (its answer grows with the
+ * workspace, and `search_templates` answers the same question for the price of the matches). It is
+ * offered now because Chat carries every tool; the result is still bounded like any other.
+ */
+export const CHAT_EXCLUDED_TOOLS = ['create_upload_url', 'finalize_upload'];
+
+const CHAT_OWN_TOOLS = new Set(LIBRARY_TOOLS.map(t => t.name));
+
+/**
+ * ⚠️ Gemini rejects an object schema without `properties` ("should be non-empty for OBJECT type"), and
+ * MCP's `variables` items are exactly that. Chat gets the item shape spelled out; MCP keeps its own.
+ */
+const VARIABLE_ITEM = {
+  type: 'object',
+  properties: {
+    name:  { type: 'string', description: 'Variable name as used in {{name}}' },
+    label: { type: 'string', description: 'Optional label shown to the user' },
+    type:  { type: 'string', enum: ['text', 'textarea'], description: 'Optional; defaults to text' },
+  },
+  required: ['name'],
+};
+
+function forChat(schema: Record<string, unknown>): ToolDefinition['parameters'] {
+  const props = { ...((schema.properties as Record<string, unknown>) ?? {}) };
+  if (props.variables) props.variables = { ...(props.variables as object), items: VARIABLE_ITEM };
+  const out: ToolDefinition['parameters'] = { type: 'object', properties: props };
+  if (Array.isArray(schema.required)) out.required = schema.required as string[];
+  return out;
+}
+
+/** The tools Chat adds to its own five, for a person holding `role`. */
+export function chatActionDefinitions(role: string | null): ToolDefinition[] {
+  const managesContent = role === 'admin' || role === 'editor';
+  return LIBRARY_TOOL_DEFS
+    .filter(d => !CHAT_OWN_TOOLS.has(d.name) && !CHAT_EXCLUDED_TOOLS.includes(d.name))
+    .filter(d => TOOL_CAPABILITY[d.name] === 'read' || managesContent)
+    .map(d => ({ name: d.name, description: d.description, parameters: forChat(d.inputSchema as Record<string, unknown>) }));
+}
+
+/** What a shared handler answered — `LibraryToolOutcome` from `_shared/libraryActions.ts`, structurally. */
+export type ActionOutcome =
+  | { ok: true; result: { content: unknown[] } }
+  | { ok: false; code: number; message: string };
+
+export interface ChatActions {
+  definitions: ToolDefinition[];
+  /** Runs one shared handler as the chat user, with the reader the runtime holds. */
+  run(name: string, args: Record<string, unknown>, lib: LibraryReader): Promise<ActionOutcome>;
+}
+
+/** The text a model reads back from an outcome. Images (MCP-only content) are left out. */
+export function outcomeText(outcome: ActionOutcome): string {
+  // `'message' in` rather than `!outcome.ok`: this tsconfig is not strict, and a boolean
+  // discriminant does not narrow without strictNullChecks.
+  if ('message' in outcome) return JSON.stringify({ error: outcome.message });
+  return outcome.result.content
+    .filter((c): c is { type: 'text'; text: string } => !!c && (c as { type?: string }).type === 'text' && typeof (c as { text?: unknown }).text === 'string')
+    .map(c => c.text)
+    .join('\n');
+}
 
 // ── Per-provider shape ──────────────────────────────────────────────────────
 
@@ -267,20 +339,25 @@ export function toolsWereRefused(status: number, body: string): boolean {
 
 export function createLibraryToolRuntime(
   getReader: () => Promise<LibraryReader>,
-  { maxRounds = 6, budgetMs = 90_000, now = () => Date.now(), onTemplateLoaded }:
+  { maxRounds = 6, budgetMs = 90_000, now = () => Date.now(), onTemplateLoaded, actions, onChange }:
     {
       maxRounds?: number; budgetMs?: number; now?: () => number;
       /** SQEM-517 — told after a playbook was loaded, so the caller can count it. Never awaited. */
       onTemplateLoaded?: (templateId: string) => void;
+      /** SQEM-561 — the shared MCP handlers, injected so this module stays importable by tests. */
+      actions?: ChatActions;
+      /** SQEM-561 — told after every successful change, for the card under the answer. */
+      onChange?: (change: LibraryChange) => void;
     } = {},
 ): ToolRuntime {
   const stats: ToolStats = { rounds: 0, calls: 0, byTool: {}, cappedAt: null, cappedBy: null, toolsRefused: false };
 
   let readerPromise: Promise<LibraryReader> | null = null;
   const reader = () => (readerPromise ??= getReader());
+  const actionNames = new Set((actions?.definitions ?? []).map(d => d.name));
 
   return {
-    definitions: LIBRARY_TOOLS,
+    definitions: [...LIBRARY_TOOLS, ...(actions?.definitions ?? [])],
     maxRounds,
     deadline: now() + budgetMs,
     stats,
@@ -344,16 +421,35 @@ export function createLibraryToolRuntime(
             return bound(text);
           }
 
-          default:
-            return JSON.stringify({ error: `Unknown tool: ${name}` });
+          default: {
+            // ⛔ Only a tool that was OFFERED runs — a member is never offered a write, so a write name
+            // a model invents is "unknown" here, before the handler's own role gate is even reached.
+            if (!actions || !actionNames.has(name)) return JSON.stringify({ error: `Unknown tool: ${name}` });
+            const outcome = await actions.run(name, args, lib);
+            const text = outcomeText(outcome);
+            if (outcome.ok && TOOL_CAPABILITY[name] !== 'read') {
+              /**
+               * ⛔ The access sets were resolved before this write. A playbook created a moment ago is
+               * not in them, so the next call in the same answer — attach it, fix a typo — would say
+               * "not found". Every write therefore drops the reader; the next call builds a fresh one.
+               */
+              readerPromise = null;
+              const change = describeChange(name, args, text);
+              if (change) { try { onChange?.(change); } catch { /* the card never costs the answer */ } }
+            }
+            return bound(text);
+          }
         }
       } catch (err) {
         // ⛔ Never thrown onward. A failed lookup is something the model can recover from — try
         // another name, or answer without it — and an exception here would surface to the user as a
         // failed message instead.
+        // SQEM-561 — a write that throws is not a lookup; say which, so the model does not report a
+        // change as made (or as merely not found) when it does not know.
+        const failed = TOOL_CAPABILITY[name] && TOOL_CAPABILITY[name] !== 'read' ? 'The change failed' : 'Lookup failed';
         const message = (err instanceof LibraryNotFound || err instanceof LibraryBadRequest)
           ? err.message
-          : `Lookup failed: ${(err as Error)?.message ?? 'unknown error'}`;
+          : `${failed}: ${(err as Error)?.message ?? 'unknown error'}`;
         return JSON.stringify({ error: message });
       }
     },

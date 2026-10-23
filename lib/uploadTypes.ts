@@ -30,6 +30,22 @@ export const MAX_FILE_SIZE_MB = 15;
 export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 export const isImageType = (mimeType: string) => mimeType.startsWith('image/');
+
+/**
+ * SQEM-562 — what the Files page counts as "Media": images, video and audio.
+ *
+ * ⚠️ By type OR extension, because the type alone misses most of them. The Files page uploads only
+ * images, PDF and text, so video, audio and SVG arrive through a skill import or MCP — and there the
+ * row type is decided from the bytes (`classifySkillFile`): an .mp4 is stored as
+ * `application/octet-stream`, an .svg as text. Filtering by `image/*` alone filed both under
+ * "Documents". The preview thumbnail and the icon stay on `isImageType`: only a real image has one.
+ */
+export const MEDIA_EXTENSIONS = new Set(['svg', 'mp4', 'mov', 'webm', 'mp3', 'wav', 'm4a', 'ogg']);
+
+export function isMediaFile(name: string, mimeType: string): boolean {
+  return mimeType.startsWith('image/') || mimeType.startsWith('video/') || mimeType.startsWith('audio/')
+    || MEDIA_EXTENSIONS.has(extensionOf(name));
+}
 export const isTextType  = (mimeType: string) => mimeType.startsWith('text/');
 
 /** Specific mime for a text/code file by extension, or null if it's not a known text type. */

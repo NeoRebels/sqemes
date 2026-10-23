@@ -3,7 +3,12 @@ import { useUI, useWorkspace, usePrompts, useData } from '../store';
 import { collectWorkspaceTags } from '../lib/workspaceTags';
 import { can } from '../lib/permissions';
 import { IS_SELF_HOSTED } from '../lib/env';
-import { fetchRestrictedTemplateIds } from '../lib/api/templateAccess';
+import { fetchRestrictedTemplateIds, setTemplateAccess } from '../lib/api/templateAccess';
+import { fetchCanEditMany } from '../lib/api/editors';
+import { fetchGroups } from '../lib/api/groups';
+import { applyToEditable, bulkSummary, wouldLoseSight } from '../lib/bulkApply';
+import { isMultiSeat } from '../lib/templateAccessScope';
+import { TemplateAccessControl, accessValueToAccess, type TemplateAccessValue } from '../components/TemplateAccessControl';
 import AccessBadge from '../components/ui/AccessBadge';
 import type { AccessBadgeMode } from '../lib/accessBadge';
 import { exportTemplatesToZip, downloadBlob, readBundle, importBundle, type BundleManifest } from '../lib/templateBundle';
@@ -104,7 +109,7 @@ const PlaybookRow = memo(function PlaybookRow({
 });
 
 const Templates = () => {
-  const { prompts, deletePrompt, deletePrompts, duplicatePrompt, toggleFavorite: storeFavorite, updatePrompt } = usePrompts();
+  const { prompts, deletePrompt, deletePrompts, duplicatePrompt, toggleFavorite: storeFavorite, updatePrompt, setTagMany } = usePrompts();
   const { workspaceFiles, addWorkspaceFile } = useData();
   const { currentUser, workspace } = useWorkspace();
   const { showToast, isLoading } = useUI();
@@ -135,6 +140,11 @@ const Templates = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  // SQEM-564 — bulk tag and bulk access. One busy flag: both write to the same selection.
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkAccessOpen, setBulkAccessOpen] = useState(false);
+  const [bulkAccess, setBulkAccess] = useState<TemplateAccessValue>({ mode: 'restricted', userIds: [], groupIds: [] });
+  const [accessGroups, setAccessGroups] = useState<{ id: string; name: string; memberIds: string[] }[]>([]);
   // SQEM-161 — export / import (.sqemes.zip bundle)
   const [exporting, setExporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -262,6 +272,55 @@ const Templates = () => {
       else visibleIds.forEach(id => next.add(id));
       return next;
     });
+  };
+
+  // --- SQEM-564 — bulk tag and bulk access ---
+  const selectedPrompts = prompts.filter(p => selectedIds.has(p.id));
+  // One tag per playbook: "Set tag" replaces it, "Remove tag" lists only tags the selection carries.
+  const removableTags = [...new Set(selectedPrompts.map(p => p.tag).filter((t): t is string => !!t))].sort();
+  const handleBulkTag = async (tag: string | null, ids: string[]) => {
+    setBulkBusy(true);
+    try {
+      const outcome = await setTagMany(ids, tag);
+      const { message, type } = bulkSummary(outcome, 'playbook', tag ? `Tag “${tag}” set` : 'Tag removed');
+      showToast(message, type);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  // Cloud only and multi-seat only — the same condition under which the editor offers access at all.
+  const canBulkAccess = canEdit && !IS_SELF_HOSTED && isMultiSeat(workspace);
+  const openBulkAccess = () => {
+    setBulkAccess({ mode: 'restricted', userIds: [], groupIds: [] });
+    setBulkAccessOpen(true);
+    if (workspace?.id) fetchGroups(workspace.id).then(setAccessGroups).catch(() => setAccessGroups([]));
+  };
+  // ⛔ "Restricted" with nobody named would be stored as the principal-less row — "Only me", which bulk
+  // deliberately does not offer (SQEM-564). So Apply waits for a name.
+  const bulkAccessIncomplete = bulkAccess.mode === 'restricted'
+    && bulkAccess.userIds.length === 0 && (bulkAccess.groupIds ?? []).length === 0;
+  const loseSight = bulkAccess.mode === 'restricted' && currentUser
+    ? wouldLoseSight(selectedPrompts, currentUser.id, { userIds: bulkAccess.userIds, groupIds: bulkAccess.groupIds ?? [] }, accessGroups)
+    : 0;
+  const handleBulkAccess = async () => {
+    if (!workspace?.id || bulkAccessIncomplete) return;
+    setBulkBusy(true);
+    try {
+      const byId = new Map(selectedPrompts.map(p => [p.id, p]));
+      const outcome = await applyToEditable(
+        [...byId.keys()],
+        ids => fetchCanEditMany('template', ids),
+        // Each playbook's own owner is stripped from its rows (SQEM-300) — the owner always has access.
+        id => setTemplateAccess(id, workspace.id, accessValueToAccess(bulkAccess, byId.get(id)?.createdBy || null)),
+      );
+      fetchRestrictedTemplateIds(workspace.id).then(setRestrictedIds).catch(() => {});
+      const { message, type } = bulkSummary(outcome, 'playbook', 'Access changed');
+      showToast(message, type);
+      setBulkAccessOpen(false);
+    } finally {
+      setBulkBusy(false);
+    }
   };
 
   const handleBulkDelete = async () => {
@@ -488,6 +547,13 @@ const Templates = () => {
           noun="playbook"
           onExport={handleBulkExport}
           exporting={exporting}
+          addableTags={allTags}
+          removableTags={removableTags}
+          addTagLabel="Set tag"
+          onAddTag={tag => void handleBulkTag(tag, selectedPrompts.map(p => p.id))}
+          onRemoveTag={tag => void handleBulkTag(null, selectedPrompts.filter(p => p.tag === tag).map(p => p.id))}
+          tagBusy={bulkBusy}
+          onAccess={canBulkAccess ? openBulkAccess : undefined}
         />
       )}
 
@@ -617,6 +683,39 @@ const Templates = () => {
             {bulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
             {bulkDeleting ? 'Deleting…' : 'Delete'}
           </button>
+        </div>
+      </Modal>
+
+      {/* SQEM-564 — access for several playbooks at once. Replaces what each of them had; no "Only me". */}
+      <Modal open={bulkAccessOpen} onClose={() => !bulkBusy && setBulkAccessOpen(false)} size="md" className="p-6">
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-1">
+          Set access for {selectedIds.size} playbook{selectedIds.size === 1 ? '' : 's'}
+        </h3>
+        <p className="text-sm text-ink-muted mb-5">
+          This replaces the current access of every selected playbook you may change. Personas that use
+          these playbooks load them only for people who can see them.
+        </p>
+        <TemplateAccessControl
+          value={bulkAccess}
+          onChange={setBulkAccess}
+          hint="Who can see & use these playbooks"
+          members={workspace?.members}
+          groups={accessGroups}
+          multiSeat={isMultiSeat(workspace)}
+        />
+        {bulkAccessIncomplete && (
+          <p className="mt-3 text-xs text-ink-muted">Pick at least one person or group.</p>
+        )}
+        {!bulkAccessIncomplete && loseSight > 0 && (
+          <p className="mt-3 text-xs text-ink">
+            You are not named, so you will no longer see {loseSight} of these playbook{loseSight === 1 ? '' : 's'} — the ones you did not create.
+          </p>
+        )}
+        <div className="flex gap-2 mt-6">
+          <Button variant="secondary" className="flex-1" onClick={() => setBulkAccessOpen(false)} disabled={bulkBusy}>Cancel</Button>
+          <Button className="flex-1" onClick={() => void handleBulkAccess()} disabled={bulkAccessIncomplete} loading={bulkBusy}>
+            {bulkBusy ? 'Applying…' : 'Apply'}
+          </Button>
         </div>
       </Modal>
 

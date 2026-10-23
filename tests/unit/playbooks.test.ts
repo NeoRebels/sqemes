@@ -155,7 +155,7 @@ describe('SQEM-394 — the model hears the same word, and the tools keep their n
   });
 
   it('⛔ the MCP tool names did not move — they are a public contract', () => {
-    const mcp = read('supabase/functions/mcp-server/index.ts');
+    const mcp = (read('supabase/functions/mcp-server/index.ts') + '\n' + read('supabase/functions/_shared/libraryActions.ts') + '\n' + read('supabase/functions/_shared/libraryToolDefs.ts'));
     for (const tool of ['list_templates', 'search_templates', 'get_template', 'create_template', 'update_template', 'delete_template']) {
       expect(mcp, tool).toContain(`name: '${tool}'`);
     }

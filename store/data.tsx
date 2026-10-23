@@ -18,6 +18,8 @@ export interface DataState {
   patchWorkspaceFile: (id: string, patch: Partial<WorkspaceFile>) => void;
   removeWorkspaceFile: (id: string) => Promise<void>;
   removeWorkspaceFiles: (ids: string[]) => Promise<void>;
+  /** SQEM-561 — replace the list after a change made elsewhere (Chat's library tools); no API call. */
+  setWorkspaceFiles: (files: WorkspaceFile[]) => void;
   skills: Prompt[];
 }
 

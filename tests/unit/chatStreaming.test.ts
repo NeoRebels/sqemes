@@ -57,8 +57,10 @@ describe('SQEM-372 — ordering, where the one real race lives', () => {
     // A delta arriving after the result would overwrite the finished answer with an earlier,
     // shorter version of itself. Order is the whole guard.
     const flush = CHAT_FN.indexOf('broadcaster?.flush()');
-    // SQEM-551 — the terminal call may also carry `loadedTemplateIds`; it is still the one after the flush.
-    const result = CHAT_FN.indexOf('broadcastJobResult(jobId, loadedTemplateIds.length ? { result, loadedTemplateIds } : { result })');
+    // SQEM-551/561 — the terminal call may also carry `loadedTemplateIds` and `libraryChanges`; it is
+    // still the one after the flush.
+    const result = CHAT_FN.indexOf('await broadcastJobResult(jobId, {\n      result,');
+    expect(result).toBeGreaterThan(-1);
     expect(flush).toBeGreaterThan(-1);
     expect(flush).toBeLessThan(result);
   });

@@ -13,7 +13,7 @@ import { relativeSkillPaths } from '../../supabase/functions/_shared/skillPaths'
 const ROOT = resolve(__dirname, '../..');
 // Line comments first, then block comments (comment-stripper-order lesson).
 const code = (s: string) => s.replace(/(^|[^:])\/\/[^\n]*/g, '$1').replace(/\/\*[\s\S]*?\*\//g, '');
-const MCP = code(readFileSync(resolve(ROOT, 'supabase/functions/mcp-server/index.ts'), 'utf8'));
+const MCP = code((readFileSync(resolve(ROOT, 'supabase/functions/mcp-server/index.ts'), 'utf8') + '\n' + readFileSync(resolve(ROOT, 'supabase/functions/_shared/libraryActions.ts'), 'utf8') + '\n' + readFileSync(resolve(ROOT, 'supabase/functions/_shared/libraryToolDefs.ts'), 'utf8')));
 
 describe('deliveryOf — read vs use', () => {
   it('text outside assets/ and scripts/ is read as text', () => {

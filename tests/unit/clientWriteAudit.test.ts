@@ -61,7 +61,7 @@ describe('SQEM-492 — workspace_files', () => {
     expect((lq.match(/isPathInWorkspace\(/g) ?? []).length).toBe(4);
     expect(fnBody(lq, 'async contextFileMeta')).toMatch(/isPathInWorkspace\(file\.storage_path, workspaceId\)/);
     expect(fnBody(lq, 'async skillFolder')).toMatch(/isPathInWorkspace\(r\.storage_path, workspaceId\)/);
-    const mcp = code(read('supabase/functions/mcp-server/index.ts'));
+    const mcp = code((read('supabase/functions/mcp-server/index.ts') + '\n' + read('supabase/functions/_shared/libraryActions.ts') + '\n' + read('supabase/functions/_shared/libraryToolDefs.ts')));
     expect(mcp).toMatch(/if \(isPathInWorkspace\(file\.storage_path, workspaceId\)\) \{\s*await adminClient\.storage\.from\('workspace-files'\)\.remove/);
   });
 });

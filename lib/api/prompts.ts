@@ -219,6 +219,21 @@ export async function updatePrompt(prompt: Prompt, workspaceId: string) {
   return rowToPrompt(data[0] as unknown as PromptRow);
 }
 
+/**
+ * SQEM-564 — set (or clear) just the tag. Narrower than `updatePrompt`: a bulk action must not rewrite
+ * every other field from a list row that may be older than the database. `tag` is a versioned field
+ * (SQEM-477), so each playbook gets a version — the change belongs in its history.
+ */
+export async function setPromptTag(id: string, tag: string | null): Promise<void> {
+  const { data, error } = await supabase
+    .from('prompts')
+    .update({ tag, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error('You may use this playbook but not change it.');
+}
+
 export async function deletePrompt(id: string) {
   const { error } = await supabase
     .from('prompts')

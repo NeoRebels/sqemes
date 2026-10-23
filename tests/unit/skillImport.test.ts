@@ -220,7 +220,7 @@ describe('what the importer sends to storage is what the bucket accepts', () => 
   });
 
   it('the MCP importers upload with the type the shared rule decides, not their own', () => {
-    const src = read('supabase/functions/mcp-server/index.ts');
+    const src = (read('supabase/functions/mcp-server/index.ts') + '\n' + read('supabase/functions/_shared/libraryActions.ts') + '\n' + read('supabase/functions/_shared/libraryToolDefs.ts'));
     expect(src).not.toMatch(/const TEXT_MIME\b|const BINARY_MIME\b|const BINARY_EXT_MIME\b/);
     expect(src).toMatch(/\.upload\(storagePath, bytes, \{ contentType: t\.storageMime \}\)/);
   });

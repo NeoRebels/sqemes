@@ -15,9 +15,13 @@ import { resolve } from 'node:path';
  * ⚠️ Read as TEXT, not imported: `mcp-server/index.ts` calls `Deno.serve` at module load and cannot
  * be imported into vitest. Same approach as `mcpToolCapability.test.ts`.
  */
-const SERVER = readFileSync(
+const SERVER = (readFileSync(
   resolve(__dirname, '../../supabase/functions/mcp-server/index.ts'), 'utf8',
-);
+) + '\n' + readFileSync(
+  resolve(__dirname, '../../supabase/functions/_shared/libraryActions.ts'), 'utf8',
+) + '\n' + readFileSync(
+  resolve(__dirname, '../../supabase/functions/_shared/libraryToolDefs.ts'), 'utf8',
+));
 const FIELDS = readFileSync(
   resolve(__dirname, '../../components/ApiKeyScopeFields.tsx'), 'utf8',
 );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, X, Download, Loader2, Tag as TagIcon } from 'lucide-react';
+import { Trash2, X, Download, Loader2, Tag as TagIcon, Lock } from 'lucide-react';
 
 // SQEM-077 — sticky bar shown when ≥1 item is selected on a list/grid page.
 // Shared by Files and Templates. The parent owns the selection state.
@@ -7,6 +7,8 @@ import { Trash2, X, Download, Loader2, Tag as TagIcon } from 'lucide-react';
 // SQEM-253 — optional tag actions (Files). **Add and remove are separate controls on purpose:** one
 // control that adds for some of the selection and removes for the rest is the kind of thing a person
 // gets wrong once and then avoids. Each lists only what it can act on, so neither ever no-ops.
+// SQEM-564 — Playbooks and Personas use the tag actions too. They carry ONE tag, so there the first
+// control is "Set tag" (it replaces) — `addTagLabel`. And an optional "Access…" (Playbooks only).
 
 export default function BulkActionBar({
   count,
@@ -23,6 +25,8 @@ export default function BulkActionBar({
   onAddTag,
   onRemoveTag,
   tagBusy,
+  addTagLabel = 'Add tag',
+  onAccess,
 }: {
   count: number;
   total: number;
@@ -40,6 +44,10 @@ export default function BulkActionBar({
   onAddTag?: (tag: string) => void;
   onRemoveTag?: (tag: string) => void;
   tagBusy?: boolean;
+  /** "Add tag" where items carry several tags (Files); "Set tag" where they carry one. */
+  addTagLabel?: string;
+  /** SQEM-564 — opens the bulk access dialog. Absent = no button. */
+  onAccess?: () => void;
 }) {
   // A select that fires and resets: its value is an action, not a state, so it must not appear to
   // remember a choice that has already been applied.
@@ -79,8 +87,18 @@ export default function BulkActionBar({
       </button>
       <div className="flex-1" />
       {tagBusy && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-300" />}
-      {onAddTag && tagSelect('Add tag', addableTags ?? [], onAddTag)}
+      {onAddTag && tagSelect(addTagLabel, addableTags ?? [], onAddTag)}
       {onRemoveTag && (removableTags?.length ?? 0) > 0 && tagSelect('Remove tag', removableTags ?? [], onRemoveTag)}
+      {onAccess && (
+        <button
+          type="button"
+          onClick={onAccess}
+          disabled={tagBusy}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
+        >
+          <Lock className="w-3.5 h-3.5" /> Access…
+        </button>
+      )}
       {onExport && (
         <button
           type="button"

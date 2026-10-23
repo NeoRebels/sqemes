@@ -8,6 +8,7 @@ import { broadcastJobResult } from '../_shared/broadcast.ts';
 import { ensureCreditPeriod, hasCredits, debitCredits } from '../_shared/credits.ts';
 import { FUNDED_MODEL } from '../_shared/funded.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
+import { imageGenEndpoint } from '../_shared/imageModels.ts';
 
 // SQEM-082 — Sqemes-funded authoring. Keyless Enhance/Generate route through a
 // server-side Mistral credential (GDPR/EU: direct api.mistral.ai, no US hop) on a
@@ -190,20 +191,16 @@ Deno.serve(async (req) => {
     // It is corrected rather than deleted because it cost real time: streaming was scoped on the
     // assumption that "the provider side already streams and only the client delta is missing".
     // It does not. Building it means `stream: true` plus SSE parsing in four provider shapes.
-    const imageGenModels: Record<string, string> = {
-      'gpt-image-1': 'https://api.openai.com/v1/images/generations',
-      'gpt-image-1-mini': 'https://api.openai.com/v1/images/generations',
-      'dall-e-3': 'https://api.openai.com/v1/images/generations',
-      'grok-imagine-image': 'https://api.x.ai/v1/images/generations',
-    };
+    // SQEM-560 — by prefix, shared with chat-message (`_shared/imageModels.ts`).
+    const imageEndpoint = imageGenEndpoint(modelLower);
 
     const isGeminiImageModel = provider === 'gemini' && modelLower.includes('image');
 
-    if (imageGenModels[modelLower]) {
+    if (imageEndpoint) {
       const textPrompt = Array.isArray(promptContent)
         ? promptContent.map((p: any) => p.text || '').filter(Boolean).join('\n')
         : promptContent;
-      const result = await callImageGeneration(apiKey, effectiveModelId, imageGenModels[modelLower], textPrompt);
+      const result = await callImageGeneration(apiKey, effectiveModelId, imageEndpoint, textPrompt);
       return new Response(JSON.stringify({ result }), {
         headers: { ...cors, 'Content-Type': 'application/json' },
       });

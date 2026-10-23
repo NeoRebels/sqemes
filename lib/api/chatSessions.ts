@@ -2,6 +2,7 @@ import { supabase } from '../supabase';
 import type { Database, Json } from '../database.types';
 import type { ChatSession, PlaybookRef, StoredChatMessage } from '../../types';
 import { messagePlaybookFields } from '../playbookRef';
+import type { LibraryChange } from '../../supabase/functions/_shared/libraryChanges.ts';
 
 // SQEM-390 — `assistant_id` is optional here because the explicit column lists no longer select it;
 // the column itself stays on the table (legacy, unread) and `select('*')` still returns it.
@@ -131,7 +132,7 @@ export async function addChatMessage(
   userId?: string,
   id?: string,
   // SQEM-551 — the playbook card (user message) or the "Used" ids (answer); see lib/playbookRef.ts.
-  extra?: { playbookRef?: PlaybookRef | null; loadedTemplateIds?: string[] },
+  extra?: { playbookRef?: PlaybookRef | null; loadedTemplateIds?: string[]; libraryChanges?: LibraryChange[] },
 ): Promise<StoredChatMessage> {
   const { data, error } = await supabase
     .from('chat_messages')
@@ -139,6 +140,8 @@ export async function addChatMessage(
       ...(id ? { id } : {}), session_id: sessionId, role, content, model: model || null, user_id: userId || null,
       ...(extra?.playbookRef ? { playbook_ref: extra.playbookRef as unknown as Json } : {}),
       ...(extra?.loadedTemplateIds?.length ? { loaded_template_ids: extra.loadedTemplateIds } : {}),
+      // SQEM-561 — the card under the answer; capped and shaped by normalizeLibraryChanges before here.
+      ...(extra?.libraryChanges?.length ? { library_changes: extra.libraryChanges as unknown as Json } : {}),
     })
     .select()
     .single();

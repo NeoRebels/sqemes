@@ -19,6 +19,7 @@
  */
 import type { PlaybookRef, PlaybookRefField, PromptKind, Variable } from '../types';
 import { MAX_LOADED_IDS } from '../supabase/functions/_shared/chatPlaybooks.ts';
+import { normalizeLibraryChanges, type LibraryChange } from '../supabase/functions/_shared/libraryChanges.ts';
 
 export { MAX_LOADED_IDS };
 
@@ -114,11 +115,16 @@ export function normalizeLoadedIds(raw: unknown): string[] {
  * (lib/api/chatSessions.ts) AND Chat's Realtime insert handler. Two hand-written copies would let
  * the card appear for the sender and silently not for a collaborator.
  */
-export function messagePlaybookFields(row: { playbook_ref?: unknown; loaded_template_ids?: unknown }): {
+export function messagePlaybookFields(row: { playbook_ref?: unknown; loaded_template_ids?: unknown; library_changes?: unknown }): {
   playbookRef: PlaybookRef | null;
   loadedTemplateIds: string[];
+  libraryChanges: LibraryChange[];
 } {
-  return { playbookRef: parsePlaybookRef(row.playbook_ref), loadedTemplateIds: normalizeLoadedIds(row.loaded_template_ids) };
+  return {
+    playbookRef: parsePlaybookRef(row.playbook_ref),
+    loadedTemplateIds: normalizeLoadedIds(row.loaded_template_ids),
+    libraryChanges: normalizeLibraryChanges(row.library_changes), // SQEM-561 — the card under an answer
+  };
 }
 
 /** The chips: loaded ids the viewer can see, with their title; the rest is left out silently. */

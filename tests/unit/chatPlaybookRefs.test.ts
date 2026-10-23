@@ -91,8 +91,11 @@ describe('SQEM-551 — "Used" chips (pure)', () => {
 
   it('one row mapping for both read paths', () => {
     expect(messagePlaybookFields({ playbook_ref: { id: A, title: 'T', kind: 'prompt', fields: [], edited: true }, loaded_template_ids: [B] }))
-      .toEqual({ playbookRef: { id: A, title: 'T', kind: 'prompt', fields: [], edited: true }, loadedTemplateIds: [B] });
-    expect(messagePlaybookFields({})).toEqual({ playbookRef: null, loadedTemplateIds: [] });
+      .toEqual({ playbookRef: { id: A, title: 'T', kind: 'prompt', fields: [], edited: true }, loadedTemplateIds: [B], libraryChanges: [] });
+    // SQEM-561 — the same mapping carries the change card, so a collaborator sees it too.
+    expect(messagePlaybookFields({ library_changes: [{ action: 'deleted', kind: 'skill', id: A, title: 'Old' }] }).libraryChanges)
+      .toEqual([{ action: 'deleted', kind: 'skill', id: A, title: 'Old' }]);
+    expect(messagePlaybookFields({})).toEqual({ playbookRef: null, loadedTemplateIds: [], libraryChanges: [] });
   });
 });
 
@@ -100,13 +103,15 @@ describe('SQEM-551 — wiring', () => {
   it('the chat function collects what get_template loaded and sends it with the result, as a result', () => {
     const fn = read('supabase/functions/chat-message/index.ts');
     expect(fn).toMatch(/onTemplateLoaded: \(templateId\) => \{\s*if \(!loadedTemplateIds\.includes\(templateId\) && loadedTemplateIds\.length < MAX_LOADED_IDS\) loadedTemplateIds\.push\(templateId\);\s*countUsage\(/);
-    expect(fn).toMatch(/broadcastJobResult\(jobId, loadedTemplateIds\.length \? \{ result, loadedTemplateIds \} : \{ result \}\)/);
+    // SQEM-561 widened the payload; the ids still ride only when there are any.
+    expect(fn).toMatch(/broadcastJobResult\(jobId, \{\s*result,\s*\.\.\.\(loadedTemplateIds\.length \? \{ loadedTemplateIds \} : \{\}\),/);
+    expect(jobEventFor({ result: 'x', libraryChanges: [] })).toBe('result');
     // ⛔ SQEM-374: the event name is decided by the payload's keys — the extra key must not turn a result into a delta.
     expect(jobEventFor({ result: 'x', loadedTemplateIds: [A] })).toBe('result');
   });
 
   it('the client hands the extra field to Chat and stores both kinds', () => {
-    expect(read('lib/realtimeJob.ts')).toMatch(/onResultMeta\?\.\(\{ loadedTemplateIds: payload\.loadedTemplateIds \}\);\s*resolve\(/);
+    expect(read('lib/realtimeJob.ts')).toMatch(/onResultMeta\?\.\(\{ loadedTemplateIds: payload\.loadedTemplateIds, libraryChanges: payload\.libraryChanges \}\);\s*resolve\(/);
     const api = read('lib/api/chatSessions.ts');
     expect(api).toMatch(/\.\.\.messagePlaybookFields\(row\)/);
     expect(api).toMatch(/playbook_ref: extra\.playbookRef/);
@@ -118,7 +123,7 @@ describe('SQEM-551 — wiring', () => {
     expect(chat).toMatch(/pendingPlaybookRef\.current = buildPendingRef\(template, template\.variables \?\? \[\], inputs, text\)/);
     expect(chat).toMatch(/const playbookRef = finalizeRef\(pendingPlaybookRef\.current, trimmed\)/);
     expect(chat).toMatch(/userMsg\.id, \{ playbookRef \}\)/);
-    expect(chat).toMatch(/assistantMsgId, \{ loadedTemplateIds \}\)/);
+    expect(chat).toMatch(/assistantMsgId, \{ loadedTemplateIds, libraryChanges \}\)/);
     expect(chat).toMatch(/playbookRef: m\.playbookRef, loadedTemplateIds: m\.loadedTemplateIds/);
     expect(chat).toMatch(/\.\.\.messagePlaybookFields\(row\), \/\/ SQEM-551/);
     expect(chat).toMatch(/if \(!input\.trim\(\)\) pendingPlaybookRef\.current = null;/);

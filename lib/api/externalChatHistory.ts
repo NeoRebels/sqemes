@@ -28,3 +28,15 @@ export async function setExternalChatPinned(id: string, pinned: boolean): Promis
   const { error } = await supabase.from('external_chat_history').update({ pinned }).eq('id', id);
   if (error) throw error;
 }
+
+/**
+ * SQEM-563 — remove one entry from the person's History. RLS (`external_chat_history_delete_own`)
+ * limits it to their own rows; zero rows deleted is an error, not a silent success. The chat at the
+ * provider is untouched, and the extension records it again on the next visit (upsert on
+ * user_id + platform + chat_key).
+ */
+export async function deleteExternalChat(id: string): Promise<void> {
+  const { data, error } = await supabase.from('external_chat_history').delete().eq('id', id).select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('This entry could not be deleted.');
+}

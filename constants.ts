@@ -173,14 +173,16 @@ export const AVAILABLE_MODELS = [
   //
   // SQEM-275 — one entry per JOB, not per version. The list had grown to nine Gemini entries across
   // three generations, several of them near-identical, which asks a person to choose between things
-  // they cannot tell apart. Checked against ai.google.dev on 2026-08-26.
+  // they cannot tell apart. Checked against ai.google.dev on 2026-08-26, and again on 2026-10-22
+  // (SQEM-560): 3.7 Flash is deprecated and already served by 3.8; the Pro preview has a stable
+  // successor, Gemini 4 Argon.
   {
-    id: 'gemini-3.7-flash',
-    name: 'Gemini 3.7 Flash',
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash',
     description: 'Latest Gemini, fast and capable',
     provider: 'gemini',
     specs: {
-      description: 'Newest-generation Flash model — frontier-class quality at Flash speed. The default choice for chat, summarisation and extraction. 1M context window.',
+      description: 'Google\'s most intelligent Flash model — frontier-class quality at Flash speed. The default choice for chat, summarisation and extraction.',
       cost: 3,
       speed: 9,
       thinking: 8
@@ -199,12 +201,12 @@ export const AVAILABLE_MODELS = [
     }
   },
   {
-    id: 'gemini-3.1-pro-preview',
-    name: 'Gemini 3.1 Pro',
-    description: 'Best Gemini for complex reasoning (Preview)',
+    id: 'gemini-4-argon',
+    name: 'Gemini 4 Argon',
+    description: 'Best Gemini for complex reasoning',
     provider: 'gemini',
     specs: {
-      description: 'Deep reasoning and coding. Still preview at Google — no stable id exists yet, which is why this one keeps the suffix. 1M context window.',
+      description: 'Google\'s flagship reasoning model — deep reasoning and coding, stable. 1M context window.',
       cost: 5,
       speed: 6,
       thinking: 10
@@ -239,12 +241,13 @@ export const AVAILABLE_MODELS = [
 
   // ── OpenAI ─────────────────────────────────────────────────────
   //
-  // SQEM-275 — the GPT-5.6 family, all three variants (owner's decision 2026-08-26). They differ by
-  // intent rather than by generation, so all three earn a place; `gpt-5.6` is an alias for Sol and is
-  // deliberately NOT listed as a fourth entry pointing at the same model.
+  // SQEM-275 — one entry per job, by intent rather than by generation. SQEM-560 (checked against
+  // developers.openai.com on 2026-10-22): the GPT-6 family — Astra (flagship), 6.1 Sol, Luna. There
+  // is no GPT-6 Terra, so the "balance" slot is Sol. The gpt-5.6 models still run but are no longer
+  // the current ones.
   {
-    id: 'gpt-5.6-sol',
-    name: 'GPT-5.6 Sol',
+    id: 'gpt-6-astra',
+    name: 'GPT-6 Astra',
     description: 'OpenAI Most Capable',
     provider: 'openai',
     specs: {
@@ -255,8 +258,8 @@ export const AVAILABLE_MODELS = [
     }
   },
   {
-    id: 'gpt-5.6-terra',
-    name: 'GPT-5.6 Terra',
+    id: 'gpt-6.1-sol',
+    name: 'GPT-6.1 Sol',
     description: 'OpenAI Best Balance',
     provider: 'openai',
     specs: {
@@ -267,8 +270,8 @@ export const AVAILABLE_MODELS = [
     }
   },
   {
-    id: 'gpt-5.6-luna',
-    name: 'GPT-5.6 Luna',
+    id: 'gpt-6-luna',
+    name: 'GPT-6 Luna',
     description: 'OpenAI Cost-Optimised',
     provider: 'openai',
     specs: {
@@ -279,8 +282,8 @@ export const AVAILABLE_MODELS = [
     }
   },
   {
-    id: 'gpt-image-2',
-    name: 'GPT Image 2',
+    id: 'gpt-image-2.5-sunburst',
+    name: 'GPT Image 2.5',
     description: 'OpenAI image generation',
     provider: 'openai',
     specs: {
@@ -291,49 +294,53 @@ export const AVAILABLE_MODELS = [
     }
   },
   // ── Anthropic Claude ───────────────────────────────────────────
+  //
+  // SQEM-560 — checked against platform.claude.com (models overview) on 2026-10-22: Fable 5.1, Opus
+  // 5.5, Sonnet 5.5 and Haiku 5.5 are current, all with a 1M context window. Fable 5, Opus 5, Sonnet 5
+  // and Haiku 4.5 are listed as legacy. No thinking parameters are sent, so none are rejected.
   {
-    id: 'claude-fable-5',
-    name: 'Claude Fable 5',
-    description: 'Anthropic Latest',
+    id: 'claude-fable-5-1',
+    name: 'Claude Fable 5.1',
+    description: 'Anthropic Deepest Reasoning',
     provider: 'claude',
     specs: {
-      description: 'Newest-generation Anthropic model — top-tier reasoning, coding, and analysis.',
+      description: 'For demanding reasoning and long-horizon agentic work. 1M context.',
       cost: 10,
       speed: 5,
       thinking: 10
     }
   },
   {
-    id: 'claude-opus-5',
-    name: 'Claude Opus 5',
-    description: 'Anthropic Most Powerful',
+    id: 'claude-opus-5-5',
+    name: 'Claude Opus 5.5',
+    description: 'Anthropic Recommended',
     provider: 'claude',
     specs: {
-      description: 'Maximum intelligence for the hardest tasks. Exceptional at coding, analysis, and complex reasoning. 200K context.',
+      description: 'Anthropic\'s recommended starting point — long-running coding and knowledge work. 1M context.',
       cost: 10,
       speed: 4,
       thinking: 10
     }
   },
   {
-    id: 'claude-sonnet-5',
-    name: 'Claude Sonnet 5',
+    id: 'claude-sonnet-5-5',
+    name: 'Claude Sonnet 5.5',
     description: 'Anthropic Best Balance',
     provider: 'claude',
     specs: {
-      description: 'High performance for coding and reasoning with excellent speed-to-quality ratio. 200K context.',
+      description: 'The best combination of speed and intelligence. 1M context.',
       cost: 5,
       speed: 7,
       thinking: 9
     }
   },
   {
-    id: 'claude-haiku-4-5-20251001',
-    name: 'Claude Haiku 4.5',
+    id: 'claude-haiku-5-5',
+    name: 'Claude Haiku 5.5',
     description: 'Anthropic Fast & Affordable',
     provider: 'claude',
     specs: {
-      description: 'Near-frontier performance at low cost. Ideal for real-time applications and high-volume processing. 200K context.',
+      description: 'For high-volume, latency-sensitive work such as classification, extraction and routing. 1M context.',
       cost: 2,
       speed: 10,
       thinking: 7
@@ -343,10 +350,10 @@ export const AVAILABLE_MODELS = [
   // ── xAI Grok ───────────────────────────────────────────────────
   //
   // ⚠️ SQEM-275 — `grok-4.6` supersedes `grok-4.20`, and the numbering is a trap: 4.20 READS higher
-  // than 4.6 and is older. xAI's own docs name 4.6 'the most intelligent and fastest model'.
+  // than 4.6 and is older. SQEM-560 (docs.x.ai, 2026-10-22): 4.7 is the newest.
   {
-    id: 'grok-4.6',
-    name: 'Grok 4.6',
+    id: 'grok-4.7',
+    name: 'Grok 4.7',
     description: 'xAI Latest',
     provider: 'grok',
     specs: {
@@ -372,11 +379,13 @@ export const AVAILABLE_MODELS = [
   //
   // SQEM-275 — the V4 family. The old `deepseek-chat` / `deepseek-reasoner` aliases named the V3.2
   // generation; DeepSeek's own docs now list v4-flash and v4-pro, both with thinking mode by default.
+  // SQEM-560 (api-docs.deepseek.com, 2026-10-22): `deepseek-v4-flash` is retired and silently served
+  // by V4.1 Flash; the current name is `deepseek-flash`.
   // Note these two also appear in the OpenRouter shortlist below — same models, different key. That
   // is not duplication: a customer holds one key or the other, rarely both.
   {
-    id: 'deepseek-v4-flash',
-    name: 'DeepSeek V4 Flash',
+    id: 'deepseek-flash',
+    name: 'DeepSeek Flash',
     description: 'DeepSeek Fast',
     provider: 'deepseek',
     specs: {
@@ -402,14 +411,15 @@ export const AVAILABLE_MODELS = [
   // ── Mistral AI ─────────────────────────────────────────────────
   //
   // SQEM-275 — the `-latest` aliases are kept deliberately (owner's decision 2026-08-26). They track
-  // the current generation on their own, which is what someone picking "Mistral Large" means. Only
-  // the labels were stale: they now resolve to Large 3, Small 4 and Codestral 25.08.
+  // the current generation on their own, which is what someone picking "Mistral Large" means.
+  // SQEM-560 — the labels carry no version any more: Mistral's docs (2026-10-22) do not say which
+  // version each alias resolves to, so a number in the name would be a guess.
   //
   // ⚠️ The same alias in `_shared/funded.ts` is a different matter — there **we** pay, so a moving
   // target is a moving cost. Kept as well, knowingly; see SQEM-276.
   {
     id: 'mistral-large-latest',
-    name: 'Mistral Large 3',
+    name: 'Mistral Large',
     description: 'Mistral Flagship',
     provider: 'mistral',
     specs: {
@@ -421,7 +431,7 @@ export const AVAILABLE_MODELS = [
   },
   {
     id: 'mistral-small-latest',
-    name: 'Mistral Small 4',
+    name: 'Mistral Small',
     description: 'Mistral Fast & Capable',
     provider: 'mistral',
     specs: {
@@ -433,7 +443,7 @@ export const AVAILABLE_MODELS = [
   },
   {
     id: 'codestral-latest',
-    name: 'Codestral 25.08',
+    name: 'Codestral',
     description: 'Mistral Code Specialist',
     provider: 'mistral',
     specs: {

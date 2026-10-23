@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
  * template lists any more is visible to nobody (`can_access_file`), so nobody can delete it. A new
  * insert path must not reopen that.
  */
-const SRC = readFileSync('supabase/functions/mcp-server/index.ts', 'utf8');
+const SRC = (readFileSync('supabase/functions/mcp-server/index.ts', 'utf8') + '\n' + readFileSync('supabase/functions/_shared/libraryActions.ts', 'utf8') + '\n' + readFileSync('supabase/functions/_shared/libraryToolDefs.ts', 'utf8'));
 
 describe('mcp-server writes workspace_files WITH created_by', () => {
   const inserts = [...SRC.matchAll(/\.from\('workspace_files'\)\s*\.insert\(/g)].map(m => {

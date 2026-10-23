@@ -67,7 +67,7 @@ describe('chat counts a loaded playbook, without risking the answer', () => {
 
 describe('where the server counts', () => {
   it('MCP counts get_template after it succeeded', () => {
-    expect(code('supabase/functions/mcp-server/index.ts')).toMatch(/lib\.getTemplate\([\s\S]{0,200}\)\.then\(t => \{[\s\S]{0,200}countUsage\(adminClient, workspaceId, 'mcp', 'playbook_loaded', t\.id\)/);
+    expect((code('supabase/functions/mcp-server/index.ts') + '\n' + code('supabase/functions/_shared/libraryActions.ts') + '\n' + code('supabase/functions/_shared/libraryToolDefs.ts'))).toMatch(/lib\.getTemplate\([\s\S]{0,200}\)\.then\(t => \{[\s\S]{0,200}countUsage\(adminClient, workspaceId, ctx\.surface, 'playbook_loaded', t\.id\)/);
   });
   it('chat passes the counter to its tools', () => {
     // SQEM-551 — the same callback also records the id for the "Used" chips; the count must stay in it.

@@ -15,12 +15,15 @@ import { createDeltaBroadcaster } from '../_shared/deltaBroadcast.ts';
 import { createLibraryReader } from '../_shared/libraryQueries.ts';
 import {
   createLibraryToolRuntime, toolCapNotice, toolsWereRefused, type ToolRuntime,
-  toOpenAiTools, toClaudeTools, toGeminiTools, toResponsesTools,
+  toOpenAiTools, toClaudeTools, toGeminiTools, toResponsesTools, chatActionDefinitions,
 } from '../_shared/libraryTools.ts';
+import { runLibraryTool } from '../_shared/libraryActions.ts';
+import { addChange, type LibraryChange } from '../_shared/libraryChanges.ts';
 import {
   toResponsesInput, connectorResponsesTools, responsesDelta,
   createResponsesItemCollector, readResponsesText, readResponsesToolCalls, responsesToolResults,
 } from '../_shared/openaiResponses.ts';
+import { imageGenEndpoint, canEditPreviousImage } from '../_shared/imageModels.ts';
 import {
   createOpenAiToolAccumulator, createClaudeToolAccumulator, createGeminiToolAccumulator,
   readOpenAiToolCalls, openAiAssistantTurn,
@@ -210,12 +213,9 @@ Deno.serve(async (req) => {
     const modelLower = effectiveModelId.toLowerCase();
 
     // ── Image generation model endpoints ────────────────────────────────────
-    const imageGenEndpoints: Record<string, string> = {
-      'gpt-image-1': 'https://api.openai.com/v1/images/generations',
-      'gpt-image-1-mini': 'https://api.openai.com/v1/images/generations',
-      'dall-e-3': 'https://api.openai.com/v1/images/generations',
-      'grok-imagine-image': 'https://api.x.ai/v1/images/generations',
-    };
+    // SQEM-560 — by prefix (`_shared/imageModels.ts`): the exact-id map here missed `gpt-image-2` and
+    // `grok-imagine-image-2.0` from SQEM-275 on, and those went to the text API.
+    const imageEndpoint = imageGenEndpoint(modelLower);
 
     // Gemini image models handle multi-turn image context natively via inlineData.
     // All other providers receive sanitized history with base64 stripped to placeholders.
@@ -247,22 +247,21 @@ Deno.serve(async (req) => {
     // It is corrected rather than deleted because it cost real time: streaming was scoped on the
     // assumption that "the provider side already streams and only the client delta is missing".
     // It does not. Building it means `stream: true` plus SSE parsing in four provider shapes.
-    if (imageGenEndpoints[modelLower]) {
+    if (imageEndpoint) {
       const lastUserMsg = [...sanitizedMessages].reverse().find((m: any) => m.role === 'user');
       const textPrompt = typeof lastUserMsg?.content === 'string'
         ? lastUserMsg.content
         : Array.isArray(lastUserMsg?.content)
           ? lastUserMsg.content.map((p: any) => p.text || '').filter(Boolean).join('\n')
           : '';
-      const gptEditableModels = ['gpt-image-1', 'gpt-image-1-mini'];
       let result: string;
-      if (gptEditableModels.includes(modelLower)) {
+      if (canEditPreviousImage(modelLower)) {
         const prevImage = findLastGeneratedImage(messages);
         result = prevImage
           ? await callGptImageEdit(apiKey, effectiveModelId, textPrompt, prevImage.data, prevImage.mimeType)
-          : await callImageGeneration(apiKey, effectiveModelId, imageGenEndpoints[modelLower], textPrompt);
+          : await callImageGeneration(apiKey, effectiveModelId, imageEndpoint, textPrompt);
       } else {
-        result = await callImageGeneration(apiKey, effectiveModelId, imageGenEndpoints[modelLower], textPrompt);
+        result = await callImageGeneration(apiKey, effectiveModelId, imageEndpoint, textPrompt);
       }
       return new Response(JSON.stringify({ result }), {
         headers: { ...cors, 'Content-Type': 'application/json' },
@@ -301,6 +300,7 @@ Deno.serve(async (req) => {
       // No API key is read on this path and none may be introduced: a key belongs to a person, so a
       // workspace-shared one would let anybody act as its owner (SQEM-346).
       userId: user.id,
+      role: (membership as { role?: string }).role ?? null, // SQEM-561
     }));
     return new Response(JSON.stringify({ jobId }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
@@ -373,6 +373,12 @@ interface JobRequest {
   connectors: ResolvedConnector[] | null;
   /** SQEM-373 — the signed-in chat user. Library tools run as this person and nobody else. */
   userId: string;
+  /**
+   * SQEM-561 — their role in the workspace, read with the membership check above. It decides which
+   * tools are OFFERED (writes to editors and admins); the shared handlers check it again, and the
+   * edit right per object (`can_edit_*`) on top.
+   */
+  role: string | null;
 }
 
 /**
@@ -409,7 +415,7 @@ const TOOL_BUDGET_MS = 90_000;
 
 async function runAndBroadcast({
   jobId, provider, apiKey, modelId, systemInstruction, messages,
-  funded, workspaceId, creditLimit, connectors, userId,
+  funded, workspaceId, creditLimit, connectors, userId, role,
 }: JobRequest): Promise<void> {
   /**
    * SQEM-372 — the streaming decision, made ONCE and in one place rather than inside each provider.
@@ -469,11 +475,24 @@ async function runAndBroadcast({
   // SQEM-551 — what the model loaded for THIS answer, in order, sent back with the result so the
   // client can store it with the message ("Used" chips). Ids only; titles are resolved per viewer.
   const loadedTemplateIds: string[] = [];
+  // SQEM-561 — what the model changed for THIS answer, for the card under it. Same ride as the ids.
+  const libraryChanges: LibraryChange[] = [];
   const tools: ToolRuntime | null = workspaceId
     ? createLibraryToolRuntime(
         () => createLibraryReader({ client: createAdminClient(), workspaceId, userId }),
         {
           maxRounds: funded ? TOOL_ROUNDS_FUNDED : TOOL_ROUNDS_BYOK, budgetMs: TOOL_BUDGET_MS,
+          /**
+           * SQEM-561 — every MCP tool, by role, through the SAME handlers MCP runs
+           * (`_shared/libraryActions.ts`): one implementation of "may this person change this".
+           * ⛔ Still the chat user's own id — never a key (SQEM-346).
+           */
+          actions: {
+            definitions: chatActionDefinitions(role),
+            run: (name, args, lib) => runLibraryTool(
+              { adminClient: createAdminClient(), workspaceId, userId, role, lib, surface: 'chat' }, name, args),
+          },
+          onChange: (change) => addChange(libraryChanges, change),
           // SQEM-517 — counted per workspace and day, never per person; fire-and-forget.
           onTemplateLoaded: (templateId) => {
             if (!loadedTemplateIds.includes(templateId) && loadedTemplateIds.length < MAX_LOADED_IDS) loadedTemplateIds.push(templateId);
@@ -563,7 +582,12 @@ async function runAndBroadcast({
     await broadcaster?.flush();
     // SQEM-551 — `loadedTemplateIds` rides on the same message as the text, so the two cannot be
     // separated by a dropped broadcast. A client from before 551 ignores the extra key.
-    await broadcastJobResult(jobId, loadedTemplateIds.length ? { result, loadedTemplateIds } : { result });
+    // SQEM-561 — `libraryChanges` the same way; an older client ignores the key.
+    await broadcastJobResult(jobId, {
+      result,
+      ...(loadedTemplateIds.length ? { loadedTemplateIds } : {}),
+      ...(libraryChanges.length ? { libraryChanges } : {}),
+    });
   } catch (err: any) {
     // No flush here on purpose: a partial answer followed by an error reads as if the fragment were
     // the reply. The client drops what it has when an error arrives.

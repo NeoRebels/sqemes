@@ -5,6 +5,7 @@
 // (`can_edit_*`, `can_manage_*_editors`) and RLS enforces them; this module only reads and writes the
 // lists and asks the rules, so the editor can show the truth instead of guessing it.
 import { supabase } from '../supabase';
+import { runLimited } from '../bulkApply';
 
 // Not in the generated database.types (same as template_access); a thin cast keeps call sites typed.
 type Client = {
@@ -57,4 +58,20 @@ export async function fetchEditRights(kind: EditorKind, id: string): Promise<{ c
   // Fails OPEN here on purpose: this only decides what the editor SHOWS. RLS refuses the write anyway,
   // and a read error must not lock somebody out of a playbook they may edit.
   return { canEdit: edit.error ? true : edit.data !== false, canManage: manage.error ? false : manage.data === true };
+}
+
+/**
+ * SQEM-564 — which of these the person may change, asked of the database one id at a time (at most four
+ * in flight). ⛔ Fails CLOSED, the opposite of `fetchEditRights`: this decides what a bulk action WRITES
+ * and reports, and an id that could not be checked is skipped rather than announced as changed.
+ */
+export async function fetchCanEditMany(kind: EditorKind, ids: string[]): Promise<Set<string>> {
+  const results = await runLimited(ids, 4, async id => {
+    const { data, error } = await client.rpc(
+      kind === 'template' ? 'can_edit_template' : 'can_edit_persona',
+      kind === 'template' ? { p_template_id: id } : { p_persona_id: id },
+    );
+    return !error && data === true;
+  });
+  return new Set(ids.filter((_, i) => results[i].status === 'fulfilled' && (results[i] as PromiseFulfilledResult<boolean>).value));
 }

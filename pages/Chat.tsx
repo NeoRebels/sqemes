@@ -14,7 +14,9 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { fetchPersona, fetchPersonas } from '../lib/api/personas';
 import { clearChatHandoff, peekChatHandoff } from '../lib/chatHandoff';
 import { buildPendingRef, finalizeRef, messagePlaybookFields, normalizeLoadedIds, pendingFromSent, usedPlaybooks, type PendingPlaybookRef } from '../lib/playbookRef';
-import { ChatPlaybookCard, UsedPlaybookChips } from '../components/ChatPlaybookCard';
+import { ChatPlaybookCard, UsedPlaybookChips, LibraryChangesCard } from '../components/ChatPlaybookCard';
+import { normalizeLibraryChanges, type LibraryChange } from '../supabase/functions/_shared/libraryChanges.ts';
+import { fetchWorkspaceFiles } from '../lib/api/files';
 import { personaInstruction } from '../lib/personaChat';
 import PullToRefreshIndicator from '../components/PullToRefreshIndicator';
 import ReactMarkdown from 'react-markdown';
@@ -151,6 +153,7 @@ interface ChatMsg {
   userAvatar?: string;
   playbookRef?: PlaybookRef | null;   // SQEM-551 — user message started from a prompt playbook
   loadedTemplateIds?: string[];       // SQEM-551 — answer: what the model loaded for it
+  libraryChanges?: LibraryChange[];   // SQEM-561 — answer: what the model changed in the library
 }
 
 // SQEM-185 — a memoized single message. Extracting this out of the Chat component means composer
@@ -171,11 +174,13 @@ interface MessageItemProps {
   innerRef?: React.Ref<HTMLDivElement>;
   /** SQEM-551 — the viewer's playbooks by id (stable, memoized): chip titles and card links. */
   playbookTitles: ReadonlyMap<string, { title: string; kind: PromptKind }>;
+  /** SQEM-561 — the viewer's own current title for a changed object; undefined when not theirs to see. */
+  libraryTitle: (c: LibraryChange) => string | undefined;
 }
 
 const MessageItem = memo(function MessageItem({
   msg, currentUserId, currentUserName, userAvatar, showUserAvatar, onAvatarError,
-  isLastAssistant, isLoading, isCopied, onCopy, onEdit, innerRef, playbookTitles,
+  isLastAssistant, isLoading, isCopied, onCopy, onEdit, innerRef, playbookTitles, libraryTitle,
 }: MessageItemProps) {
   const isOtherUser = msg.role === 'user' && !!msg.userId && msg.userId !== currentUserId;
   return (
@@ -259,6 +264,7 @@ const MessageItem = memo(function MessageItem({
               {msg.model && !msg.pending && <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2 font-mono">{msg.model}</p>}
             </div>
             {!msg.pending && <UsedPlaybookChips used={usedPlaybooks(msg.loadedTemplateIds, playbookTitles)} />}
+            {!msg.pending && <LibraryChangesCard changes={msg.libraryChanges} currentTitle={libraryTitle} />}
             {!msg.pending && (
               <button onClick={() => onCopy(msg.id, msg.content)} className="mt-2 ml-1 inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
                 {isCopied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
@@ -301,7 +307,7 @@ const Chat = () => {
   const { workspace, currentUser } = useWorkspace();
   // SQEM-536 — the no-key state differs for whoever may add a provider key and for everybody else.
   const keyHint = noKeyHint(can(currentUser, workspace, 'api-keys:manage'));
-  const { workspaceFiles, addWorkspaceFile } = useData();
+  const { workspaceFiles, addWorkspaceFile, setWorkspaceFiles } = useData();
   // SQEM-371 — needed to turn the ids stored on a session back into templates on load.
   const { prompts } = usePrompts();
   // SQEM-551 — the viewer's own playbooks by id: chip titles and card links come from here, so a
@@ -489,6 +495,15 @@ const Chat = () => {
   }, [workspace.id]);
   useEffect(() => { loadPersonas(); }, [loadPersonas]);
 
+  // SQEM-561 — the card under an answer shows the viewer's own CURRENT title, read from the lists
+  // they can see: playbooks (store, realtime), personas (above), files (store). Nothing found means
+  // the viewer cannot open it, or it is gone — `changeLabel` decides what to show then.
+  const libraryTitle = useCallback((c: LibraryChange): string | undefined => {
+    if (c.kind === 'persona') return personas.find(p => p.id === c.id)?.title;
+    if (c.kind === 'file') return workspaceFiles.find(f => f.id === c.id)?.name;
+    return playbookTitles.get(c.id)?.title;
+  }, [personas, workspaceFiles, playbookTitles]);
+
   // Navigated here from a persona card: load it with its routes and apply it.
   useEffect(() => {
     if (!launchPersonaId) return;
@@ -539,6 +554,7 @@ const Chat = () => {
           id: m.id, role: m.role, content: inlineImagesToBlobUrls(m.content), model: m.model,
           userId: m.userId, userName: m.userName, userAvatar: m.userAvatar,
           playbookRef: m.playbookRef, loadedTemplateIds: m.loadedTemplateIds, // SQEM-551
+          libraryChanges: m.libraryChanges, // SQEM-561
         })));
         setSessionId(routeSessionId);
         setMobileTab('chat');
@@ -1020,13 +1036,17 @@ const Chat = () => {
       // server's honest 504 arrives at nobody. Same module as the server, so the two cannot drift —
       // including the `EDGE_PLAN_IS_PAID` gate, which keeps both at the default pair on a free plan.
       let loadedTemplateIds: string[] = [];
+      let libraryChanges: LibraryChange[] = []; // SQEM-561
       const resultPromise = waitForJobResult(jobId, controller.signal, (textSoFar) => {
         setMessages(prev => prev.map(m => (
           m.id === assistantMsgId ? { ...m, content: textSoFar, pending: false } : m
         )));
       }, clientJobTimeoutMs({ connectors: activeConnectorIds.length > 0, selfHosted: IS_SELF_HOSTED }),
       // SQEM-551 — what the model loaded for this answer ("Used" chips).
-      (meta) => { loadedTemplateIds = normalizeLoadedIds(meta.loadedTemplateIds); });
+      (meta) => {
+        loadedTemplateIds = normalizeLoadedIds(meta.loadedTemplateIds);
+        libraryChanges = normalizeLibraryChanges(meta.libraryChanges);
+      });
 
       const res = await fetch(functionCallUrl('chat-message'), {
         method: 'POST',
@@ -1049,11 +1069,19 @@ const Chat = () => {
       } else {
         // Text model — wait for Realtime broadcast
         rawResult = await resultPromise;
-        setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: inlineImagesToBlobUrls(rawResult), pending: false, loadedTemplateIds } : m));
+        setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: inlineImagesToBlobUrls(rawResult), pending: false, loadedTemplateIds, libraryChanges } : m));
+        // SQEM-561 — playbooks arrive through the store's realtime channel; personas and files do not,
+        // so the lists the card and the pickers read from are fetched again when either changed.
+        if (libraryChanges.some(c => c.kind === 'persona')) {
+          loadPersonas();
+        }
+        if (libraryChanges.some(c => c.kind === 'file')) {
+          fetchWorkspaceFiles(workspace.id).then(setWorkspaceFiles).catch(() => { /* reloaded with the next page load */ });
+        }
       }
 
       // Save original base64 content to DB (use same ID so realtime can deduplicate)
-      if (activeSessionId) addChatMessage(activeSessionId, 'assistant', rawResult, selectedModel, undefined, assistantMsgId, { loadedTemplateIds }).catch(() => {});
+      if (activeSessionId) addChatMessage(activeSessionId, 'assistant', rawResult, selectedModel, undefined, assistantMsgId, { loadedTemplateIds, libraryChanges }).catch(() => {});
 
       // First exchange of a new chat → upgrade the truncated title to an AI topic title.
       if (isNewSession && activeSessionId) generateChatTitle(trimmed, rawResult, activeSessionId);
@@ -1533,6 +1561,7 @@ const Chat = () => {
                     onCopy={handleCopyMessage}
                     onEdit={handleEditMessage}
                     playbookTitles={playbookTitles}
+                    libraryTitle={libraryTitle}
                   />
                 ))}
 

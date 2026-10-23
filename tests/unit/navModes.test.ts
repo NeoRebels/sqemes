@@ -19,7 +19,7 @@ const read = (f: string) => readFileSync(join(ROOT, f), 'utf8');
 
 describe('SQEM-548 — which mode a route belongs to', () => {
   it.each([
-    ['/', 'work'], ['/chat', 'work'], ['/chat/abc', 'work'],
+    ['/', 'work'], ['/chat', 'work'], ['/chat/abc', 'work'], ['/history', 'work'], // SQEM-563
     ['/overview', 'manage'], ['/playbooks', 'manage'], ['/playbooks/new', 'manage'], ['/personas', 'manage'], ['/personas/x/edit', 'manage'],
     ['/files', 'manage'], ['/library', 'manage'], ['/library/42', 'manage'],
   ])('%s → %s', (path, mode) => {
@@ -51,8 +51,8 @@ describe('SQEM-548 — the mode in effect', () => {
 });
 
 describe('SQEM-548 — the links per mode and role (Variante 1)', () => {
-  it('Work: Start and Chat; Manage: Overview, Playbooks, Personas, Files, Marketplace', () => {
-    expect(navRoutes('work', 'admin', { marketplace: true })).toEqual(['/', '/chat']);
+  it('Work: Start, Chat, History (SQEM-563); Manage: Overview, Playbooks, Personas, Files, Marketplace', () => {
+    expect(navRoutes('work', 'admin', { marketplace: true })).toEqual(['/', '/chat', '/history']);
     expect(navRoutes('manage', 'editor', { marketplace: true })).toEqual(['/overview', '/playbooks', '/personas', '/files', '/library']);
   });
 
@@ -64,7 +64,7 @@ describe('SQEM-548 — the links per mode and role (Variante 1)', () => {
 
   it('members get one list, whatever the mode', () => {
     for (const mode of ['work', 'manage'] as const) {
-      expect(navRoutes(mode, 'member', { marketplace: true })).toEqual(['/', '/chat', '/playbooks', '/personas']);
+      expect(navRoutes(mode, 'member', { marketplace: true })).toEqual(['/', '/chat', '/history', '/playbooks', '/personas']);
     }
   });
 

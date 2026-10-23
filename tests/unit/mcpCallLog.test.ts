@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
  * where a customer's content or file names end up. `mcp-server/index.ts` cannot be imported (Deno.serve
  * at load), so it is read as text.
  */
-const src = readFileSync('supabase/functions/mcp-server/index.ts', 'utf8');
+const src = (readFileSync('supabase/functions/mcp-server/index.ts', 'utf8') + '\n' + readFileSync('supabase/functions/_shared/libraryActions.ts', 'utf8') + '\n' + readFileSync('supabase/functions/_shared/libraryToolDefs.ts', 'utf8'));
 const calls = [...src.matchAll(/logCall\(([^;]*)\);/g)].map(m => m[1]);
 
 describe('SQEM-530 — [mcp-call] log line', () => {

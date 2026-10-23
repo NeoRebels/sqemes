@@ -25,8 +25,7 @@ import {
   Loader2,
   Bot,
   Briefcase,
-  SlidersHorizontal,
-} from 'lucide-react';
+  SlidersHorizontal, History as HistoryIcon } from 'lucide-react';
 import { useUI, useWorkspace, useChatSessions } from '../store';
 import SegmentedTabs from './ui/SegmentedTabs';
 import { MODE_HOME, canManage, modeForPath, navRoutes, readRememberedMode, resolveMode, writeRememberedMode, type NavMode, type NavRoute } from '../lib/navMode';
@@ -194,6 +193,8 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
     { to: "/library", icon: Store, label: "Marketplace" },
     { to: "/files", icon: Paperclip, label: "Files" },
     { to: "/chat", icon: MessageSquare, label: "Chat", arrow: true },
+    // SQEM-563 — the chat list (sqemes + extension). Not the History VISION removed (PromptRunner's log).
+    { to: "/history", icon: HistoryIcon, label: "History" },
   ];
 
   // SQEM-548 — Work | Manage (redesign C): every route belongs to one mode;
@@ -399,8 +400,12 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
             {visibleNavLinks.map(link => renderNavItem(link.to, link.icon, link.label, link.badge, link.arrow))}
           </div>
           {recentChats.length > 0 && !isCollapsed && (
-            <div className="mb-6">
-              <p className="px-3 mb-1 text-2xs font-bold uppercase tracking-wider text-ink-subtle">Recent</p>
+            // SQEM-563 — more air above "Recent Chats". ⛔ PADDING, not margin: the
+            // parent's `space-y-1` sets margin-top AND margin-bottom on every child after the first, and
+            // its selector outranks `mt-*`/`mb-*` — an `mt-4` here rendered as 4 px (and the nav block's
+            // `mb-6` above as 0), which is how the first attempt changed nothing.
+            <div className="pt-5 pb-6">
+              <p className="px-3 mb-1 text-2xs font-bold uppercase tracking-wider text-ink-subtle">Recent Chats</p>
               {recentChats.map(c => (
                 <Link
                   key={c.id}

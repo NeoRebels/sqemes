@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
  * each path is pinned by name. The rule itself is proven against a database in
  * tests/isolation/restrictEdit.test.ts.
  */
-const src = readFileSync('supabase/functions/mcp-server/index.ts', 'utf8');
+const src = (readFileSync('supabase/functions/mcp-server/index.ts', 'utf8') + '\n' + readFileSync('supabase/functions/_shared/libraryActions.ts', 'utf8') + '\n' + readFileSync('supabase/functions/_shared/libraryToolDefs.ts', 'utf8'));
 const mig = readFileSync('supabase/migrations/20261019210000_sqem473_restrict_edit.sql', 'utf8');
 const handler = (tool: string) => {
   const i = src.indexOf(`if (toolName === '${tool}') {`);

@@ -30,9 +30,10 @@ export function waitForJobResult(
   timeoutMs: number = CLIENT_JOB_TIMEOUT_MS.default,
   /**
    * SQEM-551 — called once, just before resolving, with the extra fields the result carried (Chat:
-   * `loadedTemplateIds`). Unvalidated — the caller normalizes. Other callers leave it out.
+   * `loadedTemplateIds`, and since SQEM-561 `libraryChanges`). Unvalidated — the caller normalizes.
+   * Other callers leave it out.
    */
-  onResultMeta?: (meta: { loadedTemplateIds?: unknown }) => void,
+  onResultMeta?: (meta: { loadedTemplateIds?: unknown; libraryChanges?: unknown }) => void,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const channel = supabase.channel(`job:${jobId}`);
@@ -49,13 +50,13 @@ export function waitForJobResult(
         // indefinitely, which is worse than an honest timeout because nothing ever reports it.
         if (typeof payload.delta === 'string') onDelta?.(payload.delta);
       })
-      .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string; loadedTemplateIds?: unknown } }) => {
+      .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string; loadedTemplateIds?: unknown; libraryChanges?: unknown } }) => {
         clearTimeout(timeout);
         supabase.removeChannel(channel);
         if (payload.error) {
           reject(new Error(payload.error));
         } else {
-          onResultMeta?.({ loadedTemplateIds: payload.loadedTemplateIds });
+          onResultMeta?.({ loadedTemplateIds: payload.loadedTemplateIds, libraryChanges: payload.libraryChanges });
           resolve(payload.result ?? '');
         }
       })
