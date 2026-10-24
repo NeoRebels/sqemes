@@ -10,11 +10,12 @@ import { Pin, Loader2, MessageSquare } from 'lucide-react';
 // SQEM-085 — "History" on Start: the user's sqemes chats + the extension's external_chat_history,
 // source-badged, pinnable (pins persist to the same rows the extension uses).
 //
-// SQEM-563 — shortened to a preview once History got its own page:
-// the PREVIEW_COUNT first entries (pinned first, then newest — `buildHistory`), no paging, no delete;
-// "View all" leads to /history, where search, the source filter and delete live. Same list logic as
-// the page, so the two cannot disagree about order or about whose chats they show.
-export const PREVIEW_COUNT = 5;
+// SQEM-563 — "View all" leads to /history, where search, the source filter and delete live. Same list
+// logic as the page, so the two cannot disagree about order or about whose chats they show.
+//
+// SQEM-575 — the card shows ALL pinned entries and nothing else. It was the five
+// newest (pinned first), which made Start a second, shorter History; pinning is now how a chat gets
+// onto Start. No cap: a person who pins forty chats asked for forty.
 
 const RecentChatsWidget = () => {
   const { chatSessions, updateChatSession } = useChatSessions();
@@ -27,7 +28,7 @@ const RecentChatsWidget = () => {
   }, []);
 
   const all = useMemo(() => buildHistory(chatSessions, external), [chatSessions, external]);
-  const preview = all.slice(0, PREVIEW_COUNT);
+  const pinned = useMemo(() => all.filter(e => e.pinned), [all]);
 
   const open = (e: HistoryEntry) => {
     if (e.kind === 'sqemes') navigate(`/chat/${e.id}`);
@@ -78,7 +79,7 @@ const RecentChatsWidget = () => {
         <h2 className="font-semibold text-ink-strong">History</h2>
         {all.length > 0 && (
           <Link to="/history" className="text-xs font-medium text-accent hover:underline">
-            View all{all.length > PREVIEW_COUNT ? ` (${all.length})` : ''} →
+            View all ({all.length}) →
           </Link>
         )}
       </div>
@@ -89,8 +90,13 @@ const RecentChatsWidget = () => {
           <MessageSquare className="w-6 h-6 text-ink-subtle" />
           <p className="text-sm text-ink-muted">No chats yet.</p>
         </div>
+      ) : pinned.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
+          <Pin className="w-6 h-6 text-ink-subtle" />
+          <p className="text-sm text-ink-muted">Pin a chat in History to keep it here.</p>
+        </div>
       ) : (
-        <div className="space-y-1">{preview.map(renderItem)}</div>
+        <div className="space-y-1">{pinned.map(renderItem)}</div>
       )}
     </Card>
   );

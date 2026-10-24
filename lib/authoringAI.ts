@@ -1,7 +1,6 @@
 import { supabase } from './supabase';
 import { functionCallUrl } from './env';
 import { waitForJobResult } from './realtimeJob';
-import { AVAILABLE_MODELS } from '../constants';
 import { isImageModel, buildEnabledModels } from './enabledModels';
 import type { Workspace } from '../types';
 
@@ -15,13 +14,21 @@ import type { Workspace } from '../types';
  * writes. Use `authoringModelId()` at call sites; this one exists so that function has something to
  * fall back to.
  */
-export function firstTextModelId(apiKeys: Record<string, string | undefined>): string | null {
-  const enabled = AVAILABLE_MODELS.filter(m => {
-    const key = apiKeys[m.provider];
-    return key && key.length > 0;
-  });
-  return enabled.find(m => !isImageModel(m.id))?.id ?? null;
+export function firstTextModelId(apiKeys: Workspace['apiKeys'], openrouterModels: string[] = []): string | null {
+  // SQEM-573 — from the same list the pickers show. With OpenRouter's built-in shortlist gone, an
+  // OpenRouter-only workspace has exactly the ids it added; reading the catalogue alone would leave it
+  // without AI authoring although its chat works.
+  return buildEnabledModels(apiKeys, openrouterModels).find(m => !isImageModel(m.id))?.id ?? null;
 }
+
+/** SQEM-573 — the provider of a model id the workspace can use: the catalogue's, or OpenRouter for an added id. */
+export function providerOfModel(workspace: AuthoringWorkspace, id: string | null): string | null {
+  if (!id) return null;
+  return buildEnabledModels(workspace.apiKeys, workspace.openrouterModels ?? []).find(m => m.id === id)?.provider ?? null;
+}
+
+/** What the authoring helpers read. `openrouterModels` is optional so partial fixtures stay valid. */
+type AuthoringWorkspace = Pick<Workspace, 'apiKeys' | 'authoringModelId'> & Partial<Pick<Workspace, 'openrouterModels'>>;
 
 /** Why the workspace's authoring model is what it is — the UI needs the reason, not just the id. */
 export type AuthoringModelState = {
@@ -55,15 +62,16 @@ export type AuthoringModelState = {
  * Falling back silently would reproduce the very problem this ticket exists to fix — a model chosen
  * by accident with nothing saying so. Hence `status`: the caller can show it.
  */
-export function authoringModelState(workspace: Pick<Workspace, 'apiKeys' | 'authoringModelId'>): AuthoringModelState {
+export function authoringModelState(workspace: AuthoringWorkspace): AuthoringModelState {
   const chosenId = workspace.authoringModelId ?? null;
-  const auto = firstTextModelId(workspace.apiKeys);
+  const auto = firstTextModelId(workspace.apiKeys, workspace.openrouterModels ?? []);
   if (!auto) return { chosenId, effectiveId: null, status: 'none' };
   if (!chosenId) return { chosenId: null, effectiveId: auto, status: 'auto' };
 
-  const model = AVAILABLE_MODELS.find(m => m.id === chosenId);
-  const keyed = !!model && !!workspace.apiKeys[model.provider as keyof Workspace['apiKeys']];
-  if (!model || !keyed || isImageModel(chosenId)) return { chosenId, effectiveId: auto, status: 'unavailable' };
+  // SQEM-573 — "usable" is the picker's own list (catalogue with a key + added OpenRouter ids). Before,
+  // only the catalogue counted, so an added OpenRouter id chosen in the card read as "unavailable".
+  const usable = buildEnabledModels(workspace.apiKeys, workspace.openrouterModels ?? []).some(m => m.id === chosenId);
+  if (!usable || isImageModel(chosenId)) return { chosenId, effectiveId: auto, status: 'unavailable' };
   return { chosenId, effectiveId: chosenId, status: 'chosen' };
 }
 
@@ -86,7 +94,7 @@ export function hasAuthoringAlternatives(workspace: Pick<Workspace, 'apiKeys' | 
 }
 
 /** The id to send. Shorthand for `authoringModelState(...).effectiveId`. */
-export function authoringModelId(workspace: Pick<Workspace, 'apiKeys' | 'authoringModelId'>): string | null {
+export function authoringModelId(workspace: AuthoringWorkspace): string | null {
   return authoringModelState(workspace).effectiveId;
 }
 

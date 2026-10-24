@@ -17,7 +17,8 @@ const src = code(readFileSync(resolve(ROOT, 'supabase/functions/chat-message/ind
 
 /** `callClaude`'s body: from its connector list to the end of the file's next function. */
 function claude(): string {
-  const start = src.indexOf('let activeConnectors = connectors;');
+  // SQEM-572 — anchored to the function: callOpenAIResponses keeps a list of the same name now.
+  const start = src.indexOf('let activeConnectors = connectors;', src.indexOf('async function callClaude('));
   expect(start, 'callClaude no longer keeps a shrinkable connector list').toBeGreaterThan(-1);
   return src.slice(start, src.indexOf('\nasync function', start + 1));
 }
@@ -56,5 +57,43 @@ describe('SQEM-466 — a refused connector does not kill the message', () => {
     // The label the provider echoes is `c_<id>`; the real name only exists on the row.
     expect(src).toMatch(/displayName: r\.name/);
     expect(src).toMatch(/\.select\('id, name, mcp_url/);
+  });
+});
+
+/** `callOpenAIResponses`'s body (SQEM-572). */
+function openai(): string {
+  const start = src.indexOf('async function callOpenAIResponses(');
+  expect(start, 'callOpenAIResponses is gone').toBeGreaterThan(-1);
+  return src.slice(start, src.indexOf('\nasync function', start + 1));
+}
+
+describe('SQEM-572 — the same on OpenAI Responses', () => {
+  it('⛔ both failure shapes drop the connector: an HTTP error AND a failed stream', () => {
+    const b = openai();
+    expect(b).toMatch(/if \(dropRefused\(errText\)\) continue;/);
+    expect(b).toMatch(/if \(problem && dropRefused\(problem\)\) continue;/);
+  });
+
+  it('⛔ the connector check runs BEFORE the function-tools check and before the throw', () => {
+    const b = openai();
+    expect(b.indexOf('dropRefused(errText)')).toBeLessThan(b.indexOf('toolsWereRefused('));
+    expect(b.indexOf('dropRefused(problem)')).toBeLessThan(b.indexOf('throw new Error(problem)'));
+  });
+
+  it('⛔ the retry cannot loop — only a label we actually sent counts', () => {
+    expect(openai()).toMatch(/if \(keep\.length === activeConnectors\.length\) return false;/);
+  });
+
+  it('the request and its timeout are built from the shrunken list', () => {
+    const b = openai();
+    expect(b).toMatch(/connectorResponsesTools\(activeConnectors\)/);
+    expect(b).not.toMatch(/connectorResponsesTools\(connectors\)/);
+    expect(b).not.toMatch(/connectors: !!connectors\?\.length/);
+  });
+
+  it('⛔ the person is told, by real name', () => {
+    const b = openai();
+    expect(b).toMatch(/droppedConnectors\.push\(c\.displayName\)/);
+    expect(b).toMatch(/connectorRefusedNotice\(droppedConnectors\)/);
   });
 });

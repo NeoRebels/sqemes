@@ -16,14 +16,8 @@ const ALLOWLIST = new Map([
   // with rationale + a tracking ticket. Prefer a package.json override whenever a patched version
   // exists (SQEM-494/495/496). (The prior react-router RSC-CSRF entry was removed in SQEM-136.)
   //
-  // ── SQEM-498 (2026-10-07) ──────────────────────────────────────────────────────────────────
-  // braces ≤ 3.0.3 has NO patched version. It reaches us only through Tailwind 3's build chain
-  // (tailwindcss → micromatch / fast-glob / chokidar): it runs at build and dev time, never in the
-  // shipped bundle and never in an edge function (Deno, no node_modules), and the patterns it
-  // expands are the content globs in our own tailwind.config — no untrusted input reaches it.
-  // Revisit when: braces ships a fix (the nightly audit runs with AUDIT_STRICT_ALLOWLIST=1 and turns
-  // red the morning this entry stops matching), or with a move to Tailwind 4, which drops the chain.
-  ['GHSA-vfj7-8cjw-p6xm', 'braces (high, no fix) — Tailwind 3 build chain only; repo-owned globs; SQEM-498'],
+  // SQEM-569 (2026-10-23) — the SQEM-498 braces entry (GHSA-vfj7-8cjw-p6xm) is gone: GitHub withdrew that
+  // advisory on 2026-10-23, so it matched nothing and the strict nightly run would have turned red.
 ]);
 
 let report;

@@ -27,12 +27,16 @@ export default function McpClientGuide({ url, compact = false }: { url: string; 
 
   return (
     <div>
-      <SegmentedTabs
-        tabs={MCP_CLIENTS.map(c => ({ value: c.id, label: c.label, icon: clientIcon(c) }))}
-        value={active}
-        onChange={(v) => { setActive(v); setCopied(false); }}
-        className="flex-wrap"
-      />
+      {/* SQEM-568 — on a phone one row that scrolls sideways, like the Files page's tabs;
+          from sm up it wraps as before, where all six fit. */}
+      <div className="overflow-x-auto -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:overflow-visible">
+        <SegmentedTabs
+          tabs={MCP_CLIENTS.map(c => ({ value: c.id, label: c.label, icon: clientIcon(c) }))}
+          value={active}
+          onChange={(v) => { setActive(v); setCopied(false); }}
+          className="w-max sm:w-auto sm:flex-wrap [&>button]:whitespace-nowrap"
+        />
+      </div>
       <div className="mt-3 space-y-3">
         <ol className="list-decimal pl-5 space-y-1 text-xs text-ink leading-relaxed">
           {client.steps.map((step) => <li key={step}>{step}</li>)}

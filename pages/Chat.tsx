@@ -8,6 +8,7 @@ import { waitForJobResult } from '../lib/realtimeJob';
 import { clientJobTimeoutMs } from '../supabase/functions/_shared/chatTimeouts.ts';
 import { AVAILABLE_MODELS } from '../constants';
 import { buildEnabledModels, isFundedModel } from '../lib/enabledModels';
+import { authoringModelId } from '../lib/authoringAI';
 import { edgeError } from '../lib/edgeError';
 import { Send, Bot, User, Sparkles, AlertTriangle, Loader2, Copy, Check, Pencil, Paperclip, Plug, X, FileText, MessageSquarePlus, Search, MoreHorizontal, Globe, Lock, Trash2, MessageSquare, Wand2, Key, Upload, Files } from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
@@ -435,6 +436,13 @@ const Chat = () => {
     [workspace.apiKeys, workspace.openrouterModels, workspace.fundedAvailable],
   );
 
+  // SQEM-577 — the workspace's default model (Settings → General → Default AI model) is where a chat
+  // starts; the first usable model only when there is none or it cannot be used here.
+  const defaultModelId = useMemo(() => {
+    const preferred = authoringModelId(workspace);
+    return preferred && enabledModels.some(m => m.id === preferred) ? preferred : (enabledModels[0]?.id ?? '');
+  }, [workspace, enabledModels]);
+
   const mySessions = useMemo(
     () => [...chatSessions]
       .filter(s => s.userId === currentUser.id)
@@ -445,8 +453,8 @@ const Chat = () => {
   // ── Effects ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!selectedModel && enabledModels.length > 0) setSelectedModel(enabledModels[0].id);
-  }, [enabledModels, selectedModel]);
+    if (!selectedModel && defaultModelId) setSelectedModel(defaultModelId);
+  }, [defaultModelId, selectedModel]);
 
   useEffect(() => { setAvatarLoadError(false); }, [userAvatar]);
 
@@ -642,9 +650,9 @@ const Chat = () => {
     const active = chatSessions.find(s => s.id === sessionId);
     if (active && active.model && active.model !== selectedModel) {
       const isValid = enabledModels.some(m => m.id === active.model);
-      setSelectedModel(isValid ? active.model : (enabledModels[0]?.id ?? ''));
+      setSelectedModel(isValid ? active.model : defaultModelId);
     }
-  }, [chatSessions, sessionId, enabledModels]);
+  }, [chatSessions, sessionId, enabledModels, defaultModelId]);
 
   useEffect(() => {
     const container = messagesScrollRef.current;

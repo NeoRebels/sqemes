@@ -82,7 +82,7 @@ describe('classifyUpload', () => {
     for (const p of ['grok', 'deepseek']) {
       const v = classifyUpload(pdf, p);
       expect(v.ok, p).toBe(false);
-      if (v.ok === false) expect(v.reason).toContain('AI for authoring');
+      if (v.ok === false) expect(v.reason).toContain('Default AI model');
     }
   });
 

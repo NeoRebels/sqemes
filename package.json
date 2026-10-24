@@ -1,7 +1,7 @@
 {
   "name": "sqemes",
   "private": true,
-  "version": "1.11.29",
+  "version": "1.11.30",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
@@ -71,8 +71,9 @@
     "js-yaml": "^4.3.2",
     "brace-expansion": "^5.0.11",
     "minimatch": "^10.0.3",
-    "undici": "^7.29.1",
+    "undici": "^7.30.1",
     "browserslist": "^4.28.8",
-    "source-map-js": "^1.2.2"
+    "source-map-js": "^1.2.2",
+    "zod": "^4.6.6"
   }
 }

@@ -74,11 +74,13 @@ describe('wiring', () => {
     expect(api).toMatch(/if \(!data\?\.length\) throw/);
   });
 
-  it('the Start widget is a short preview of the same list', () => {
+  it('SQEM-575 — the Start widget shows ALL pinned entries of the same list, nothing else', () => {
     const w = read('components/RecentChatsWidget.tsx');
-    expect(w).toMatch(/export const PREVIEW_COUNT = 5;/);
     expect(w).toMatch(/buildHistory\(chatSessions, external\)/);
-    expect(w).toMatch(/all\.slice\(0, PREVIEW_COUNT\)/);
+    expect(w).toMatch(/all\.filter\(e => e\.pinned\)/);
+    expect(w).toMatch(/pinned\.map\(renderItem\)/);
+    expect(w).not.toMatch(/PREVIEW_COUNT|\.slice\(0,/); // no cap
+    expect(w).toMatch(/Pin a chat in History to keep it here\./);
     expect(w).toMatch(/<Link to="\/history"/);
     expect(w).not.toMatch(/ChevronLeft|setPage|Trash2|deleteExternalChat/); // no paging, no delete
   });

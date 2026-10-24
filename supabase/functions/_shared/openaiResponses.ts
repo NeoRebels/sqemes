@@ -153,3 +153,65 @@ export function readResponsesToolCalls(output: any[] | undefined) {
 export function responsesToolResults(results: { id: string; output: string }[]): any[] {
   return results.map(r => ({ type: 'function_call_output', call_id: r.id, output: r.output }));
 }
+
+/**
+ * SQEM-572 — the state of a Responses round, read from the same chunks as the text and the items.
+ *
+ * ⛔ **A Responses stream can fail AFTER a 200.** The HTTP status only says the stream started; a
+ * `response.failed` or an `error` event inside it, or a `response.incomplete`, is how OpenAI says the
+ * answer did not come. Read only for text deltas and completed items, such a stream ends with empty text,
+ * and Chat showed "No content generated." — for every message, with nothing in the logs to say why.
+ */
+export interface ResponsesRoundState {
+  /** The last event type seen — what the log line reports when nothing else explains an empty answer. */
+  lastType: string;
+  status: 'completed' | 'failed' | 'incomplete' | null;
+  /** OpenAI's own message from `response.failed` or `error`. */
+  failure: string | null;
+  /** `incomplete_details.reason` from `response.incomplete` (e.g. max_output_tokens, content_filter). */
+  incomplete: string | null;
+}
+
+export function createResponsesStreamWatcher() {
+  const s: ResponsesRoundState = { lastType: '', status: null, failure: null, incomplete: null };
+  return {
+    onChunk(chunk: unknown) {
+      const c = chunk as { type?: string; message?: string; code?: string; error?: { message?: string; code?: string }; response?: any };
+      if (!c?.type) return;
+      s.lastType = c.type;
+      if (c.type === 'error') {
+        s.failure = c.message || c.error?.message || c.code || c.error?.code || 'unknown error';
+      } else if (c.type === 'response.failed') {
+        s.status = 'failed';
+        s.failure = c.response?.error?.message || c.response?.error?.code || s.failure || 'the response failed';
+      } else if (c.type === 'response.incomplete') {
+        s.status = 'incomplete';
+        s.incomplete = c.response?.incomplete_details?.reason || 'unknown reason';
+      } else if (c.type === 'response.completed') {
+        s.status = 'completed';
+      }
+    },
+    state: (): ResponsesRoundState => ({ ...s }),
+  };
+}
+
+/** The same state for a non-streamed round, from the response body. */
+export function responsesBodyState(data: any): ResponsesRoundState {
+  const status = data?.status === 'failed' || data?.status === 'incomplete' || data?.status === 'completed' ? data.status : null;
+  return {
+    lastType: '',
+    status,
+    failure: status === 'failed' ? (data?.error?.message || data?.error?.code || 'the response failed') : null,
+    incomplete: status === 'incomplete' ? (data?.incomplete_details?.reason || 'unknown reason') : null,
+  };
+}
+
+/**
+ * Whether a round must be reported as an error, and with which words. `null` = carry on.
+ * ⚠️ `incomplete` WITH text is not an error: the text the user got stays, the caller logs the reason.
+ */
+export function responsesRoundProblem(s: ResponsesRoundState, text: string): string | null {
+  if (s.failure) return `OpenAI API error (stream): ${s.failure}`;
+  if (s.incomplete && !text) return `OpenAI API error (stream): the answer was cut off before any text (${s.incomplete})`;
+  return null;
+}

@@ -6,7 +6,7 @@ import { getFreshConnectorToken } from '../_shared/connectorToken.ts';
 import { checkChatBudget, budgetMessage } from '../_shared/rateLimit.ts';
 import { fetchWithTimeout } from '../_shared/fetchWithTimeout.ts';
 import { broadcastJobResult } from '../_shared/broadcast.ts';
-import { refusedConnectorLabels, connectorRefusedNotice } from '../_shared/connectorRefusal.ts';
+import { refusedConnectorLabels, openaiRefusedConnectorLabels, connectorRefusedNotice } from '../_shared/connectorRefusal.ts';
 import { withTimeContext } from '../_shared/timeContext.ts';
 import { withLibraryPrompt } from '../_shared/libraryPrompt.ts';
 import { providerTimeoutMs } from '../_shared/chatTimeouts.ts';
@@ -22,8 +22,10 @@ import { addChange, type LibraryChange } from '../_shared/libraryChanges.ts';
 import {
   toResponsesInput, connectorResponsesTools, responsesDelta,
   createResponsesItemCollector, readResponsesText, readResponsesToolCalls, responsesToolResults,
+  createResponsesStreamWatcher, responsesBodyState, responsesRoundProblem, type ResponsesRoundState,
 } from '../_shared/openaiResponses.ts';
 import { imageGenEndpoint, canEditPreviousImage } from '../_shared/imageModels.ts';
+import { openRouterImageModel, callOpenRouterImage } from '../_shared/openrouterImage.ts';
 import {
   createOpenAiToolAccumulator, createClaudeToolAccumulator, createGeminiToolAccumulator,
   readOpenAiToolCalls, openAiAssistantTurn,
@@ -270,6 +272,27 @@ Deno.serve(async (req) => {
 
     if (isGeminiImageModel) {
       const result = await callGemini(apiKey, effectiveModelId, effectiveSystemInstruction, messages, true);
+      return new Response(JSON.stringify({ result }), {
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // SQEM-574 — an OpenRouter image model answers through chat completions with `modalities`; on the
+    // text path its picture was dropped and Chat showed nothing. Same synchronous `{ result }` as above.
+    const orImage = provider === 'openrouter' ? await openRouterImageModel(effectiveModelId) : null;
+    if (orImage) {
+      const lastUser = [...messages].reverse().find((m: any) => m.role === 'user');
+      const parts: any[] = Array.isArray(lastUser?.content) ? lastUser.content : [];
+      const prompt = typeof lastUser?.content === 'string'
+        ? stripBase64ImagesFromText(lastUser.content)
+        : parts.map((p: any) => p.text || '').filter(Boolean).join('\n');
+      // An image the person attached wins; otherwise the last picture in the chat, so "make it blue" edits it.
+      const uploaded = parts
+        .filter((p: any) => p.inlineData?.mimeType?.startsWith('image/'))
+        .map((p: any) => `data:${p.inlineData.mimeType};base64,${p.inlineData.data}`);
+      const prev = uploaded.length ? null : findLastGeneratedImage(messages);
+      const images = uploaded.length ? uploaded : prev ? [`data:${prev.mimeType};base64,${prev.data}`] : [];
+      const result = await callOpenRouterImage(apiKey, effectiveModelId, orImage, prompt, images);
       return new Response(JSON.stringify({ result }), {
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -792,6 +815,21 @@ async function callOpenAIResponses(
 
   let activeTools = tools ?? null;
   let answer = '';
+  // SQEM-572 — as on Claude (SQEM-466): a connector OpenAI cannot reach is left out and the request
+  // retried, never the whole answer lost. Each retry removes one, so this cannot loop.
+  let activeConnectors = connectors;
+  const droppedConnectors: string[] = [];
+  /** Drop the connectors a provider message names; true when something was actually removed. */
+  const dropRefused = (message: string): boolean => {
+    if (!activeConnectors?.length) return false;
+    const refused = openaiRefusedConnectorLabels(message);
+    const keep = activeConnectors.filter(c => !refused.includes(c.name));
+    if (keep.length === activeConnectors.length) return false;
+    for (const c of activeConnectors) if (refused.includes(c.name)) droppedConnectors.push(c.displayName);
+    console.warn('[chat-connectors] OpenAI could not reach connectors, retrying without:', droppedConnectors.join(', '));
+    activeConnectors = keep.length ? keep : null;
+    return true;
+  };
 
   for (;;) {
     const body: Record<string, unknown> = { model: modelId, input };
@@ -803,7 +841,7 @@ async function callOpenAIResponses(
     // whenever a connector was active. OpenAI runs the `mcp` entries itself and hands the `function`
     // ones back to us, so the restriction has no cause left on this path.
     const toolList = [
-      ...(connectors?.length ? connectorResponsesTools(connectors) : []),
+      ...(activeConnectors?.length ? connectorResponsesTools(activeConnectors) : []),
       ...(activeTools ? toResponsesTools(activeTools.definitions) : []),
     ];
     if (toolList.length) body.tools = toolList;
@@ -812,10 +850,12 @@ async function callOpenAIResponses(
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify(body),
-    }, providerTimeoutMs({ connectors: !!connectors?.length, selfHosted: SELF_HOSTED })); // SQEM-381
+    }, providerTimeoutMs({ connectors: !!activeConnectors?.length, selfHosted: SELF_HOSTED })); // SQEM-381
 
     if (!response.ok) {
       const errText = await response.text();
+      // SQEM-572 — the narrow connector match goes first, as in callClaude (SQEM-466).
+      if (dropRefused(errText)) continue;
       // SQEM-375 — kept even here. Responses fixes OpenAI's reasoning models, not every model a
       // workspace might point at.
       if (activeTools && toolsWereRefused(response.status, errText)) {
@@ -829,20 +869,41 @@ async function callOpenAIResponses(
 
     let text = '';
     let items: any[] = [];
+    let round: ResponsesRoundState;
     if (onDelta) {
       const collector = createResponsesItemCollector();
-      const r = await readSSE(response.body, responsesDelta, onDelta, (chunk) => collector.onChunk(chunk));
+      // SQEM-572 — the round's own status rides the same chunks: a stream can fail after the 200.
+      const watcher = createResponsesStreamWatcher();
+      const r = await readSSE(response.body, responsesDelta, onDelta, (chunk) => { collector.onChunk(chunk); watcher.onChunk(chunk); });
       text = r.text;
       items = collector.items();
+      round = watcher.state();
     } else {
       const data = await response.json();
       items = data.output || [];
       text = readResponsesText(items) || data.output_text || '';
+      round = responsesBodyState(data);
     }
+    // ⛔ SQEM-572 — a failed or empty-incomplete round is an ERROR with OpenAI's own words, not an empty
+    // answer: "No content generated." told nobody why.
+    const problem = responsesRoundProblem(round, text);
+    // SQEM-572 — the usual way a dead connector shows up on Responses: a failed stream naming it.
+    if (problem && dropRefused(problem)) continue;
+    if (problem) {
+      console.error('[chat-openai]', JSON.stringify({ model: modelId, ...round, itemTypes: items.map((i: any) => i?.type) }));
+      throw new Error(problem);
+    }
+    if (round.incomplete) console.warn('[chat-openai] incomplete answer kept', JSON.stringify({ model: modelId, reason: round.incomplete }));
     answer += text;
 
     const toolCalls = activeTools ? readResponsesToolCalls(items) : [];
-    if (!activeTools || !toolCalls.length) return answer || 'No content generated.';
+    if (!activeTools || !toolCalls.length) {
+      // SQEM-572 — if it is still empty, say in the log what the round looked like; the user still gets
+      // the old sentence, but the next case is no longer a guess.
+      if (!answer) console.warn('[chat-openai] empty answer', JSON.stringify({ model: modelId, ...round, itemTypes: items.map((i: any) => i?.type) }));
+      // SQEM-572 — say which connector was left out, as Claude does (a degraded answer must look degraded).
+      return (answer || 'No content generated.') + connectorRefusedNotice(droppedConnectors);
+    }
 
     // ⛔ EVERY item goes back, verbatim — reasoning items included, not just the calls. A reasoning
     // model that does not get its own reasoning back loses the thinking it already charged for, and

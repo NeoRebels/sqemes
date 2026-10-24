@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { refusedConnectorLabels, connectorRefusedNotice } from '../../supabase/functions/_shared/connectorRefusal';
+import { refusedConnectorLabels, openaiRefusedConnectorLabels, connectorRefusedNotice } from '../../supabase/functions/_shared/connectorRefusal';
 
 /**
  * SQEM-466 — parsed against the real thing, not an invented shape.
@@ -40,5 +40,23 @@ describe('SQEM-466 — which connector did the provider turn away', () => {
 
   it('says nothing when nothing was dropped', () => {
     expect(connectorRefusedNotice([])).toBe('');
+  });
+});
+
+describe('SQEM-572 — openaiRefusedConnectorLabels', () => {
+  it('⭐ reads the label from the message OpenAI really sends', () => {
+    const msg = "OpenAI API error (stream): Error retrieving tool list from MCP server: 'c_e6db0f67f1624eeeaceb5387ba20'. Http status code: 424 (Failed Dependency)";
+    expect(openaiRefusedConnectorLabels(msg)).toEqual(['c_e6db0f67f1624eeeaceb5387ba20']);
+  });
+
+  it('several servers, each once', () => {
+    const msg = "MCP server: 'c_a' failed; MCP server: 'c_b' failed; MCP server: 'c_a' again";
+    expect(openaiRefusedConnectorLabels(msg)).toEqual(['c_a', 'c_b']);
+  });
+
+  it('⛔ an unrelated error names nothing', () => {
+    expect(openaiRefusedConnectorLabels('OpenAI API error (stream): Rate limit reached for gpt-6')).toEqual([]);
+    expect(openaiRefusedConnectorLabels('')).toEqual([]);
+    expect(openaiRefusedConnectorLabels(undefined as unknown as string)).toEqual([]);
   });
 });

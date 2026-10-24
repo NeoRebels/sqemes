@@ -375,7 +375,8 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
   const chatSessionsValue = useMemo(() => ({
     chatSessions: da.chatSessions, addChatSession: da.addChatSession,
     updateChatSession: da.updateChatSession, deleteChatSession: da.deleteChatSession,
-  }), [da.chatSessions, da.addChatSession, da.updateChatSession, da.deleteChatSession]);
+    deleteChatSessions: da.deleteChatSessions,
+  }), [da.chatSessions, da.addChatSession, da.updateChatSession, da.deleteChatSession, da.deleteChatSessions]);
 
   return (
     <UIContext.Provider value={uiValue}>

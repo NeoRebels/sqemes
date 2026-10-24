@@ -61,6 +61,7 @@ describe('SQEM-435 — streaming with connectors', () => {
   });
 
   it('⚠️ the longer connector timeout stays — streaming does not make the calls faster', () => {
-    expect(CHAT).toMatch(/providerTimeoutMs\(\{ connectors: !!connectors\?\.length/);
+    // SQEM-572 — OpenAI, like Claude, now reads the list that is left after a refused connector is dropped.
+    expect(CHAT).toMatch(/providerTimeoutMs\(\{ connectors: !!(activeC|c)onnectors\?\.length/);
   });
 });

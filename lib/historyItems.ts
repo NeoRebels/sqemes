@@ -85,6 +85,21 @@ export function deleteWarning(e: HistoryEntry): string {
     : 'This deletes the chat and all its messages. This cannot be undone.';
 }
 
+/** SQEM-576 — the warning for a bulk delete: what happens to each kind in the selection. */
+export function bulkDeleteWarning(entries: HistoryEntry[]): string {
+  const own = entries.filter(e => e.kind === 'sqemes');
+  const ext = entries.length - own.length;
+  const lines: string[] = [];
+  if (own.length) {
+    const shared = own.filter(e => e.shared).length;
+    lines.push(`${own.length} sqemes chat${own.length === 1 ? '' : 's'} and all ${own.length === 1 ? 'its' : 'their'} messages will be deleted${shared ? ` — ${shared} ${shared === 1 ? 'is' : 'are'} shared with your workspace and disappear${shared === 1 ? 's' : ''} for everyone` : ''}. This cannot be undone.`);
+  }
+  if (ext) {
+    lines.push(`${ext} extension entr${ext === 1 ? 'y is' : 'ies are'} removed from your sqemes history only — the chats stay where they were held, and are recorded again if you open them with the extension active.`);
+  }
+  return lines.join(' ');
+}
+
 export function relTime(ts: number, now = Date.now()): string {
   const mins = Math.floor((now - ts) / 60000);
   if (mins < 1) return 'just now';

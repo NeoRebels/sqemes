@@ -146,6 +146,15 @@ export function useDataState(
     }
   }, [showToast]);
 
+  // SQEM-576 — bulk delete from History. In parallel, every result counted; only what was really
+  // deleted leaves the list, and the page shows ONE toast instead of one per chat.
+  const deleteChatSessions = useCallback(async (ids: string[]) => {
+    const results = await Promise.allSettled(ids.map(id => chatSessionsApi.deleteChatSession(id)));
+    const done = new Set(ids.filter((_, i) => results[i].status === 'fulfilled'));
+    setChatSessions(prev => prev.filter(s => !done.has(s.id)));
+    return { deleted: done.size, failed: ids.length - done.size };
+  }, []);
+
   return {
     libraryTemplates, setLibraryTemplates,
     chatSessions, setChatSessions,
@@ -156,7 +165,7 @@ export function useDataState(
     updateLibraryTemplate: updateLibraryTemplateAction,
     deleteLibraryTemplate: deleteLibraryTemplateAction,
     copyTemplateToWorkspace: copyTemplateToWorkspaceAction,
-    addChatSession, updateChatSession, deleteChatSession,
+    addChatSession, updateChatSession, deleteChatSession, deleteChatSessions,
     addWorkspaceFile, patchWorkspaceFile, removeWorkspaceFile, removeWorkspaceFiles,
   };
 }

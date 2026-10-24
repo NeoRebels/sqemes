@@ -381,8 +381,6 @@ export const AVAILABLE_MODELS = [
   // generation; DeepSeek's own docs now list v4-flash and v4-pro, both with thinking mode by default.
   // SQEM-560 (api-docs.deepseek.com, 2026-10-22): `deepseek-v4-flash` is retired and silently served
   // by V4.1 Flash; the current name is `deepseek-flash`.
-  // Note these two also appear in the OpenRouter shortlist below — same models, different key. That
-  // is not duplication: a customer holds one key or the other, rarely both.
   {
     id: 'deepseek-flash',
     name: 'DeepSeek Flash',
@@ -454,51 +452,11 @@ export const AVAILABLE_MODELS = [
     }
   },
 
-  // ⚠️ SQEM-275 — `inclusionai/ling-2.6-flash` and `ibm-granite/granite-4.1-8b` were NOT verified on
-  // 2026-08-26: they do not appear among OpenRouter's newest models, which proves nothing either way.
-  // They are left as they are rather than removed on a hunch — OpenRouter answers an unknown slug with
-  // a clear error, so the cost of a stale entry here is one confused attempt, not silent breakage.
-  //
-  // ── OpenRouter (BYOK) — curated shortlist. Users can add more model ids in
-  //    Settings → Integrations → OpenRouter. Model ids are `vendor/model`.
-  {
-    id: 'inclusionai/ling-2.6-flash',
-    name: 'Ling 2.6 Flash',
-    description: 'Ultra-cheap, fast workhorse',
-    provider: 'openrouter',
-    specs: { description: 'Very low cost and fast — good default for high-frequency, low-stakes tasks. 256K context.', cost: 1, speed: 9, thinking: 5 }
-  },
-  {
-    id: 'ibm-granite/granite-4.1-8b',
-    name: 'Granite 4.1 8B',
-    description: 'Cheap, small, reliable',
-    provider: 'openrouter',
-    specs: { description: 'Small IBM Granite instruct model — cheap and dependable for everyday assistance. 131K context.', cost: 1, speed: 9, thinking: 4 }
-  },
-  {
-    id: 'deepseek/deepseek-v4-flash',
-    name: 'DeepSeek V4 Flash',
-    description: 'Cheap with a 1M context',
-    provider: 'openrouter',
-    specs: { description: 'Fast DeepSeek model with a 1M-token context — strong value for long inputs. ', cost: 2, speed: 8, thinking: 6 }
-  },
-  {
-    id: 'deepseek/deepseek-v4-pro',
-    name: 'DeepSeek V4 Pro',
-    description: 'Stronger reasoning, 1M context',
-    provider: 'openrouter',
-    specs: { description: 'Higher-capability DeepSeek model for harder reasoning tasks. 1M-token context.', cost: 4, speed: 6, thinking: 9 }
-  },
-  {
-    id: 'qwen/qwen3.8-27b',
-    name: 'Qwen3.8 27B',
-    description: 'Strong general-purpose open model',
-    provider: 'openrouter',
-    // SQEM-275 — the context window is deliberately not claimed here. The predecessor's entry said
-    // "1M context"; that was about a different model, and repeating it for this one would be a
-    // number carried across a rename rather than a fact about what ships.
-    specs: { description: 'Capable general-purpose Qwen model, current generation on OpenRouter.', cost: 4, speed: 7, thinking: 8 }
-  },
+  // SQEM-573 — no OpenRouter models here any more. OpenRouter is a router to hundreds of models, and a
+  // shortlist of five we picked showed up in every picker the moment a key was saved — ahead of the ones
+  // the workspace actually added. Only the ids added in Settings → Integrations → OpenRouter appear
+  // (`buildEnabledModels`). The removed five (Ling 2.6 Flash, Granite 4.1 8B, DeepSeek V4 Flash/Pro,
+  // Qwen3.8 27B) can simply be added there by id.
 ];
 
 // Mock assistants removed — assistants are now stored in the database

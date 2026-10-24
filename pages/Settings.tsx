@@ -247,6 +247,13 @@ const Settings = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [activeTab, setActiveTab] = useState<TabId>(!can(currentUser, workspace, 'settings:general') ? 'profile' : 'general');
+  // SQEM-568 — the phone tab row scrolls sideways; the active tab is kept in view so it can never be the
+  // one that is cut off (the reason SQEM-540 once made the row wrap instead).
+  const mobileTabsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const active = mobileTabsRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    active?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }, [activeTab]);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(workspace.billingCycle ?? 'yearly');
   const [checkoutLoadingTier, setCheckoutLoadingTier] = useState<string | null>(null);
   const [isPortalLoading, setIsPortalLoading] = useState(false);
@@ -986,15 +993,37 @@ const Settings = () => {
         {/* Sidebar Navigation — sticky on md+ (SQEM-147). Sticky must live on this wrapper flex-item,
             which stretches with the content column, not on the Card (whose parent is Card-height). */}
         <div className="lg:w-64 shrink-0 md:sticky md:top-4 lg:self-start z-10">
-          {/* SQEM-540 — below lg the tabs wrap instead of scrolling sideways: at 390 px the scrolling row
-              cut "Team Members" in half and hid Security and everything after it, with nothing to say
-              there was more. Wrapped, every tab is visible at once. */}
-          <Card overflow className="p-2 flex flex-wrap gap-1 lg:block">
+          {/* SQEM-568 — below lg: one horizontally scrollable row in the look of the Files page's tabs
+              ⚠️ This reverses SQEM-540, which had made the row WRAP because the
+              scrolling row cut "Team Members" in half and hid Security and everything after it with nothing
+              to say there was more. Two things answer that now: the active tab is always scrolled into
+              view, and the row ends in a half-visible tab, which says there is more. */}
+          <div ref={mobileTabsRef} className="lg:hidden overflow-x-auto -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div role="group" aria-label="Settings sections" className="flex gap-1 w-max bg-surface-sunken rounded-xl p-1">
+              {visibleTabs.map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  aria-pressed={activeTab === tab.id}
+                  onClick={() => requestTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-surface-raised text-ink-strong shadow-soft'
+                      : 'text-ink-muted hover:text-ink-strong'
+                  }`}
+                >
+                  <tab.icon className="w-3.5 h-3.5" />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Card overflow className="hidden lg:block p-2">
             {visibleTabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => requestTab(tab.id)}
-                className={`flex-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 lg:px-4 py-2.5 lg:py-3 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'bg-accent-soft text-accent shadow-sm'
                     : 'text-ink-muted hover:bg-surface-sunken hover:text-ink-strong'
@@ -1865,7 +1894,7 @@ const Settings = () => {
                       )}
                       {provider.id === 'openrouter' && (
                         <div className="mt-3 pt-3 border-t border-line">
-                          <p className="text-2xs font-bold text-ink-muted uppercase tracking-wider mb-2">Custom model ids</p>
+                          <p className="text-2xs font-bold text-ink-muted uppercase tracking-wider mb-2">Models</p>
                           {workspace.openrouterModels.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 mb-2">
                               {workspace.openrouterModels.map(mid => (
@@ -1889,7 +1918,8 @@ const Settings = () => {
                             <button type="button" onClick={addOrModel} className="px-3 py-2 bg-ink-strong text-surface-raised rounded-lg text-2xs font-bold shrink-0">Add</button>
                           </div>
                           <p className="text-2xs text-ink-subtle mt-1.5">
-                            Adds to the model picker (needs the key above).{' '}
+                            {/* SQEM-573 — no built-in OpenRouter models: only what is added here appears in the picker. */}
+                            Only the models you add here appear in the model picker (needs the key above).{' '}
                             <a href="https://openrouter.ai/models" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Browse models</a>
                           </p>
                         </div>

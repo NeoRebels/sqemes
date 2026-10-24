@@ -81,14 +81,14 @@ describe('transient errors say it once', () => {
   // having a choice: a workspace with one provider key would be sent to a section offering nothing.
   it('offers the model switch only when there is something to switch to', () => {
     const without = describeAIError(gemini503, 'f', { alternativesAvailable: false });
-    expect(without).not.toContain('AI for authoring');
+    expect(without).not.toContain('Default AI model');
 
     const with_ = describeAIError(gemini503, 'f', { alternativesAvailable: true });
-    expect(with_).toContain('AI for authoring');
+    expect(with_).toContain('Default AI model');
   });
 
   it('never offers it for a key problem — a second model would fail the same way', () => {
     const out = describeAIError(new Error('Claude API error (401): {"error":{"message":"bad key"}}'), 'f', { alternativesAvailable: true });
-    expect(out).not.toContain('AI for authoring');
+    expect(out).not.toContain('Default AI model');
   });
 });

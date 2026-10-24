@@ -11,6 +11,8 @@ export interface ChatSessionsState {
   addChatSession: (session: ChatSession) => void;
   updateChatSession: (id: string, updates: { title?: string; visibility?: 'private' | 'workspace'; model?: string; isGenerating?: boolean; pinned?: boolean }) => Promise<void>;
   deleteChatSession: (id: string) => Promise<void>;
+  /** SQEM-576 — several at once, no toast: the caller reports one result for the whole selection. */
+  deleteChatSessions: (ids: string[]) => Promise<{ deleted: number; failed: number }>;
 }
 
 export const ChatSessionsContext = createContext<ChatSessionsState | undefined>(undefined);

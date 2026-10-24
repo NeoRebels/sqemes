@@ -167,7 +167,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
   /** Same URL the Settings card shows — one source for the endpoint a person copies. */
   const MCP_URL = functionsUrl('mcp-server');
   const creditsIncluded = includedCredits(workspace);
-  const hasByokText = firstTextModelId(workspace.apiKeys) !== null;
+  const hasByokText = firstTextModelId(workspace.apiKeys, workspace.openrouterModels) !== null;
   const showCredits = !IS_SELF_HOSTED && !!workspace.fundedAvailable && creditsIncluded > 0;
   /**
    * SQEM-386 — the key step in three variants, because "optional" is only true in two of them.

@@ -10,13 +10,12 @@ import Modal from './ui/Modal';
 import SegmentedTabs, { type SegmentedTab } from './ui/SegmentedTabs';
 import { WorkspaceFilePickerModal } from './WorkspaceFilePickerModal';
 import { useWorkspace, useUI, usePrompts, useData } from '../store';
-import { authoringModelId, hasAuthoringAlternatives } from '../lib/authoringAI';
+import { authoringModelId, hasAuthoringAlternatives, providerOfModel } from '../lib/authoringAI';
 import { generateSingleTemplate, pickHelpfulFiles } from '../lib/wizardGeneration';
 import { classifyUpload, readFileAsText, readFileAsBase64, resolveVisibleFiles, generatedFileName } from '../lib/wizardUploads';
 import { seedFromWorkspaceDefault, accessValueToAccess } from './TemplateAccessControl';
 import { setTemplateAccess } from '../lib/api/templateAccess';
 import { deletePrompt as deletePromptApi } from '../lib/api/prompts';
-import { AVAILABLE_MODELS } from '../constants';
 import { describeAIError } from '../lib/aiErrors';
 import { getWorkspaceFileSignedUrl, uploadWorkspaceFile } from '../lib/api/files';
 import sqemesIcon from '../assets/sqemes-icon.svg';
@@ -85,7 +84,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
     // SQEM-316 — what is possible depends on which model will read it, so the provider is part of
     // the question. ⛔ Asked *here*, at pick time: finding out after a minute of generation that the
     // document was never usable is the expensive way to learn it.
-    const provider = AVAILABLE_MODELS.find(m => m.id === authoringModelId(workspace ?? null))?.provider
+    const provider = (workspace ? providerOfModel(workspace, authoringModelId(workspace)) : null)
       ?? (workspace && !authoringModelId(workspace) ? 'sqemes' : null);
 
     for (const f of picked) {
@@ -148,7 +147,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
     if (!workspace?.brandProfile || !currentUser || !goal.trim()) return;
     setBusy(true); setError(null);
     setStage(files.length ? 'Reading your documents' : 'Reading your brand');
-    const provider = AVAILABLE_MODELS.find(m => m.id === authoringModelId(workspace))?.provider
+    const provider = providerOfModel(workspace, authoringModelId(workspace))
       ?? (authoringModelId(workspace) ? null : 'sqemes');
     try {
       const attachments = await readAttachments(provider);
@@ -326,7 +325,9 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
           </div>
 
           <p className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">What do you want to build?</p>
-          <SegmentedTabs<PromptKind> tabs={KINDS} value={kind} onChange={setKind} className="mb-5" />
+          {/* SQEM-568 — `w-fit`: standing alone, the pill group stretched to the full width (a wide grey bar
+              behind two short tabs). In the Persona wizard it sits in a row and shrinks to its tabs. */}
+          <SegmentedTabs<PromptKind> tabs={KINDS} value={kind} onChange={setKind} className="mb-5 w-fit" />
 
           <label htmlFor="wizard-goal" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
             What do you want to achieve with your playbook?

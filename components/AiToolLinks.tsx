@@ -12,7 +12,8 @@ import { AI_TOOLS } from '../lib/aiTools';
 export default function AiToolLinks() {
   return (
     <nav aria-labelledby="start-ai-tools" className="w-full max-w-4xl">
-      <h2 id="start-ai-tools" className="sr-only">Open an AI tool</h2>
+      {/* SQEM-578 — visible and centred; still the nav's accessible name. */}
+      <h2 id="start-ai-tools" className="mb-2 text-center text-xs font-semibold text-ink-subtle uppercase tracking-wider">Work in</h2>
       <ul className="flex flex-wrap justify-center gap-1.5">
         {AI_TOOLS.map(tool => (
           <li key={tool.id}>

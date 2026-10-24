@@ -9,6 +9,7 @@ import { ensureCreditPeriod, hasCredits, debitCredits } from '../_shared/credits
 import { FUNDED_MODEL } from '../_shared/funded.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
 import { imageGenEndpoint } from '../_shared/imageModels.ts';
+import { openRouterImageModel, callOpenRouterImage } from '../_shared/openrouterImage.ts';
 
 // SQEM-082 — Sqemes-funded authoring. Keyless Enhance/Generate route through a
 // server-side Mistral credential (GDPR/EU: direct api.mistral.ai, no US hop) on a
@@ -208,6 +209,22 @@ Deno.serve(async (req) => {
 
     if (isGeminiImageModel) {
       const result = await callGemini(apiKey, effectiveModelId, systemInstruction, promptContent);
+      return new Response(JSON.stringify({ result }), {
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // SQEM-574 — OpenRouter image models, as in chat-message.
+    const orImage = provider === 'openrouter' ? await openRouterImageModel(effectiveModelId) : null;
+    if (orImage) {
+      const parts: any[] = Array.isArray(promptContent) ? promptContent : [];
+      const prompt = Array.isArray(promptContent)
+        ? parts.map((p: any) => p.text || '').filter(Boolean).join('\n')
+        : promptContent;
+      const images = parts
+        .filter((p: any) => p.inlineData?.mimeType?.startsWith('image/'))
+        .map((p: any) => `data:${p.inlineData.mimeType};base64,${p.inlineData.data}`);
+      const result = await callOpenRouterImage(apiKey, effectiveModelId, orImage, prompt, images);
       return new Response(JSON.stringify({ result }), {
         headers: { ...cors, 'Content-Type': 'application/json' },
       });

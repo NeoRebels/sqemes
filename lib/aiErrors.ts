@@ -120,7 +120,7 @@ export function describeAIError(
   // Only for the transient cases, and only when there is genuinely something else to run on.
   const transient = parsed.status === 429 || parsed.status === 503;
   const alternative = transient && opts?.alternativesAvailable
-    ? ' You can switch the model under Settings → General → AI for authoring.'
+    ? ' You can switch the model under Settings → General → Default AI model.'
     : '';
   return `${head}${quoted}${next}${alternative}`;
 }

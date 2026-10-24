@@ -6,7 +6,8 @@ import { IS_SELF_HOSTED } from '../lib/env';
 import { Prompt, Variable, VariableType, PromptKind, WorkspaceFile, TemplateCategory, LibraryTemplate, Step, UserRole } from '../types';
 import { fetchPromptDetail } from '../lib/api/prompts';
 import { fetchLibraryTemplateDetail } from '../lib/api/library';
-import { AVAILABLE_MODELS, TEMPLATE_CATEGORIES, KIND_HELP } from '../constants';
+import { TEMPLATE_CATEGORIES, KIND_HELP } from '../constants';
+import { buildEnabledModels } from '../lib/enabledModels';
 import { runAuthoringAI, authoringModelId } from '../lib/authoringAI';
 import { enhancePrompt, enhanceInput, describePrompt } from '../supabase/functions/_shared/authoringPrompts.ts';
 import { Save, Plus, Trash2, Settings, Edit, ChevronDown, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Wand2, FlaskConical, History, UserRound, Users, Lock } from 'lucide-react';
@@ -135,10 +136,8 @@ const TemplateEditor = () => {
     if (isLibrary && !isSqemesAdmin) navigate('/library');
   }, [isLibrary, isSqemesAdmin, navigate]);
 
-  const enabledModels = AVAILABLE_MODELS.filter(m => {
-    const key = workspace.apiKeys[m.provider as keyof typeof workspace.apiKeys];
-    return key && key.length > 0;
-  });
+  // SQEM-573 — the picker's list, so an added OpenRouter id counts (no built-in OpenRouter models any more).
+  const enabledModels = buildEnabledModels(workspace.apiKeys, workspace.openrouterModels);
   // SQEM-082 — AI authoring is usable with a BYOK model OR Sqemes-funded credits (keyless).
   const canUseAI = enabledModels.length > 0 || !!workspace.fundedAvailable;
 

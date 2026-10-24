@@ -169,7 +169,7 @@ const Overview = () => {
       : null;
   const seatsUsed = workspace.members.length;
   const seatsLimit = workspace.isManaged ? null : currentPlan.users;
-  const hasByokText = useMemo(() => firstTextModelId(workspace.apiKeys) !== null, [workspace.apiKeys]);
+  const hasByokText = useMemo(() => firstTextModelId(workspace.apiKeys, workspace.openrouterModels) !== null, [workspace.apiKeys, workspace.openrouterModels]);
   const effectiveCreditsLimit = includedCredits(workspace);
   const showAiCredits = !!workspace.fundedAvailable && (hasByokText || effectiveCreditsLimit > 0);
 
@@ -351,7 +351,9 @@ const Overview = () => {
       {showWizard && <SetupWizard onClose={handleWizardClose} />}
 
       {/* Channels — the state, and since SQEM-553 the use of the last 7 days. */}
-      <section aria-label="Channels" className="grid gap-4 md:grid-cols-3 mb-6">
+      {/* SQEM-568 — `grid-cols-1` is `minmax(0, 1fr)`: without it the one phone column sized itself to the
+          longest unbreakable content (a truncated title is nowrap) and ran past the screen. */}
+      <section aria-label="Channels" className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
         {channel(<Chrome className="w-4 h-4" />, 'Browser extension',
           extensionInstalled ? 'Installed in this browser.' : 'Not found in this browser.',
           extensionInstalled,
@@ -374,8 +376,8 @@ const Overview = () => {
         )}
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-1 order-2 lg:order-1">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="min-w-0 space-y-6 lg:col-span-1 order-2 lg:order-1">
           <section aria-labelledby="overview-attention" className="rounded-card border border-line bg-surface-raised p-5">
             <div className="flex items-center justify-between mb-3">
               <h2 id="overview-attention" className="font-display text-lg font-semibold text-ink-strong">Needs attention</h2>
@@ -479,7 +481,7 @@ const Overview = () => {
           ))}
         </div>
 
-        <section aria-labelledby="overview-recent" className="lg:col-span-2 rounded-card border border-line bg-surface-raised p-5 order-1 lg:order-2">
+        <section aria-labelledby="overview-recent" className="min-w-0 lg:col-span-2 rounded-card border border-line bg-surface-raised p-5 order-1 lg:order-2">
           <div className="flex items-center justify-between mb-3">
             <h2 id="overview-recent" className="font-display text-lg font-semibold text-ink-strong">Recently changed</h2>
             <Link to="/playbooks" className="text-sm font-semibold text-accent inline-flex items-center gap-1">All playbooks <ArrowRight className="w-3.5 h-3.5" /></Link>

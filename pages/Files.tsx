@@ -628,13 +628,14 @@ export default function Files() {
             onChange={setUsedIn}
           />
         )}
-        <div className="relative flex items-center self-stretch rounded-xl border border-line-strong bg-surface-raised shadow-sm">
+        {/* SQEM-568 — the same own height as SelectFilter (42 px); borrowed from the row, it collapsed on a phone. */}
+        <div className="relative flex items-center self-stretch min-h-[2.625rem] rounded-xl border border-line-strong bg-surface-raised shadow-sm">
           <ArrowUpDown className="absolute left-3 w-3.5 h-3.5 text-ink-subtle pointer-events-none" />
           <select
             value={sort}
             onChange={e => setSort(e.target.value as SortKey)}
             aria-label="Sort files"
-            className="pl-8 pr-7 h-full text-sm font-medium outline-none appearance-none bg-transparent cursor-pointer text-ink"
+            className="pl-8 pr-7 self-stretch w-full sm:w-auto text-sm font-medium outline-none appearance-none bg-transparent cursor-pointer text-ink"
           >
             <option value="newest">Newest</option>
             <option value="name">Name</option>

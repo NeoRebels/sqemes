@@ -7,7 +7,8 @@ import { authoringModelState } from '../lib/authoringAI';
 import type { Workspace } from '../types';
 
 /**
- * SQEM-311 — choose the model that does AI *authoring*.
+ * SQEM-311 — choose the model that does AI *authoring*. SQEM-577 — and the default model of a new chat;
+ * the card is titled "Default AI model" since then. The field is still `authoringModelId`.
  *
  * Before this existed the model was whichever entry in `AVAILABLE_MODELS` came first and had a key.
  * That is list order — the list is sorted by provider (SQEM-278), not by how well a model writes —
@@ -55,12 +56,14 @@ export default function AuthoringModelCard({
     <Card className="p-6 md:p-8">
       <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2 mb-2">
         <Sparkles className="w-5 h-5 text-accent" />
-        AI for authoring
+        Default AI model
       </h2>
+      {/* SQEM-577 — one default for both: new chats start with it (switchable per chat), and every
+          place where sqemes writes for you uses it. Before, the card was about authoring only and left Chat alone. */}
       <p className="text-sm text-ink-muted mb-6">
-        Used when sqemes writes for you — enhancing a prompt, generating a description, the setup and
-        playbook wizards, and adapting a playbook to your brand. It does not affect Chat, where you pick
-        the model each time.
+        New chats start with this model — you can still switch it in any chat. sqemes also uses it when
+        it writes for you: enhancing a prompt, generating a description, the setup and playbook wizards,
+        and adapting a playbook to your brand.
       </p>
 
       {models.length === 0 ? (

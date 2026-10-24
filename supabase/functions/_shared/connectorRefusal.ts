@@ -49,3 +49,27 @@ export function connectorRefusedNotice(names: string[]): string {
   const which = names.length === 1 ? 'connector' : 'connectors';
   return `\n\n---\n_Answered without ${list}: the ${which} refused the connection. Reconnect ${names.length === 1 ? 'it' : 'them'} in Settings → Connectors._`;
 }
+
+/**
+ * SQEM-572 — the OpenAI twin of `refusedConnectorLabels`.
+ *
+ * ⛔ OpenAI fails the WHOLE answer over one MCP server whose tool list it cannot fetch, just as Anthropic
+ * does (SQEM-466) — and on `/v1/responses` it usually says so INSIDE the stream, after a 200:
+ *
+ *     Error retrieving tool list from MCP server: 'c_e6db0f67f1624eeeaceb5387ba20'.
+ *     Http status code: 424 (Failed Dependency)
+ *
+ * (One connector whose token had expired made every ChatGPT message fail, while Claude, with SQEM-466,
+ * answered without it.)
+ *
+ * ⚠️ Matched on the `MCP server: '<label>'` shape only, and only labels we actually sent count (the
+ * caller filters): dropping a connector changes what the model can see, so this must not fire on an
+ * unrelated error.
+ */
+const OPENAI_REFUSED = /MCP server:?\s*'([^']+)'/g;
+
+export function openaiRefusedConnectorLabels(text: string): string[] {
+  const out = new Set<string>();
+  for (const m of String(text ?? '').matchAll(OPENAI_REFUSED)) out.add(m[1]);
+  return [...out];
+}

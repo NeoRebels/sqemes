@@ -5,6 +5,10 @@ import { ChevronDown } from 'lucide-react';
 // needed rather than copied. The part worth sharing is not the markup, it is the **active styling**:
 // an engaged filter has to be visible at a glance, or people forget it is on and conclude their
 // files are gone. Two copies of that rule would drift, and the drift would be invisible.
+//
+// SQEM-568 — the height is the component's own: `min-h-[2.625rem]`, the 42 px of `SearchInput`. It used
+// to borrow it from its row (`self-stretch` + `h-full`), which works beside a search field on desktop
+// and collapses to the text height wherever the filter sits alone in a line — every phone layout.
 
 export default function SelectFilter({
   icon: Icon,
@@ -23,13 +27,13 @@ export default function SelectFilter({
 }) {
   const active = !!value;
   return (
-    <div className={`relative flex items-center self-stretch rounded-xl border shadow-sm transition-all ${active ? 'bg-slate-900 dark:bg-slate-100 border-slate-900 dark:border-slate-100' : 'bg-surface-raised border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+    <div className={`relative flex items-center self-stretch min-h-[2.625rem] rounded-xl border shadow-sm transition-all ${active ? 'bg-slate-900 dark:bg-slate-100 border-slate-900 dark:border-slate-100' : 'bg-surface-raised border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
       <Icon className={`absolute left-3 w-3.5 h-3.5 pointer-events-none ${active ? 'text-white dark:text-slate-900' : 'text-slate-400'}`} />
       <select
         value={value ?? ''}
         onChange={e => onChange(e.target.value || null)}
         aria-label={ariaLabel}
-        className={`pl-8 pr-7 h-full text-sm font-medium outline-none appearance-none bg-transparent cursor-pointer max-w-[12rem] truncate ${active ? 'text-white dark:text-slate-900' : 'text-slate-600 dark:text-slate-300'}`}
+        className={`pl-8 pr-7 self-stretch w-full sm:w-auto sm:max-w-[12rem] text-sm font-medium outline-none appearance-none bg-transparent cursor-pointer truncate ${active ? 'text-white dark:text-slate-900' : 'text-slate-600 dark:text-slate-300'}`}
       >
         <option value="">{allLabel}</option>
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
