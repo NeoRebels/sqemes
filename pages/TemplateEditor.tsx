@@ -89,13 +89,13 @@ const TemplateEditor = () => {
   const [draggedVarId, setDraggedVarId] = useState<string | null>(null);
   const [dragOverVarId, setDragOverVarId] = useState<string | null>(null);
   const [testResetKey, setTestResetKey] = useState(0);
-  // SQEM-477 — the right panel: the version history of a saved workspace playbook, and the test chat.
-  // History first when there is one; a new playbook or a marketplace template has none to show.
+  // SQEM-477 — the right panel: the test chat and the version history of a saved workspace playbook.
+  // SQEM-581 — Test first and the default: testing is what one does while editing;
+  // History is looked up. A new playbook or a marketplace template has no history to show.
   const hasHistory = !!id && !isLibrary;
   const saveLabel = isLibrary ? 'Save playbook' : id ? 'Save changes' : 'Create playbook';
-  const [rightTab, setRightTab] = useState<'history' | 'test'>(hasHistory ? 'history' : 'test');
+  const [rightTab, setRightTab] = useState<'history' | 'test'>('test');
   const [historyKey, setHistoryKey] = useState(0);
-  useEffect(() => { if (!hasHistory) setRightTab('test'); }, [hasHistory]);
   // SQEM-142 — per-template role access. New templates inherit the workspace default; existing
   // ones load their rules below. Empty roles = open to everyone.
   // SQEM-211 — "restricted by default" seeds "Only me": nobody else has been picked yet, and that
@@ -1048,7 +1048,7 @@ const TemplateEditor = () => {
         <div className={`w-full xl:w-[420px] flex-1 min-h-0 xl:flex-none overflow-hidden ${mobileTab === 'test' ? 'flex flex-col' : 'hidden xl:flex xl:flex-col'}`}>
           {hasHistory && (
             <div role="tablist" className="flex border-b border-line bg-surface-raised shrink-0">
-              {([['history', 'History', History], ['test', 'Test', FlaskConical]] as const).map(([key, label, Icon]) => (
+              {([['test', 'Test', FlaskConical], ['history', 'History', History]] as const).map(([key, label, Icon]) => (
                 <button
                   key={key}
                   role="tab"

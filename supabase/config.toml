@@ -436,6 +436,10 @@ verify_jwt = false
 [functions.get-marketplace-bundle]
 verify_jwt = false
 
+# SQEM-590 — custom-connector logos; public because an <img> cannot sign in (raster favicons only).
+[functions.connector-icon]
+verify_jwt = false
+
 # SQEM-177 — public marketplace read endpoint (unauthenticated; like stripe-webhook). Self-host + anyone
 # can browse/copy the global marketplace with no Cloud account. The function itself enforces published-only.
 [functions.marketplace-public]

@@ -42,9 +42,10 @@ describe('lineDiff', () => {
 describe('SQEM-477 — the editor\'s right panel', () => {
   const editor = readFileSync('pages/TemplateEditor.tsx', 'utf8');
   const panel = readFileSync('components/VersionHistoryPanel.tsx', 'utf8');
-  it('has History and Test tabs for a saved workspace playbook, History first', () => {
+  // SQEM-581 — Test first and the default since then; History is the second tab.
+  it('has Test and History tabs for a saved workspace playbook, Test first', () => {
     expect(editor).toContain("const hasHistory = !!id && !isLibrary;");
-    expect(editor).toContain("useState<'history' | 'test'>(hasHistory ? 'history' : 'test')");
+    expect(editor).toContain("useState<'history' | 'test'>('test')");
     expect(editor).toMatch(/hasHistory && rightTab === 'history' \? \(\s*<VersionHistoryPanel/);
   });
   it('refreshes the history after every save', () => {

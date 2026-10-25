@@ -60,23 +60,51 @@ export const EDGE_WALL_CLOCK_MS = {
  */
 export const EDGE_PLAN_IS_PAID = true;
 
-/** How long one provider request may take before `fetchWithTimeout` aborts it with a 504. */
+/**
+ * How long one provider request may take before `fetchWithTimeout` aborts it with a 504.
+ *
+ * ⭐ **SQEM-582 — on a paid Cloud wall clock EVERY chat turn gets `long`, not only turns with
+ * connectors.** Reasoning models think for minutes before the first byte; with 120 s a hard question
+ * ended in "did not respond within 120 seconds" although nothing was wrong. The budget still fits:
+ * the tool budget (90 s, no new round after it) plus one provider call (≤ 300 s) is 390 s, under the
+ * 400 s wall clock — the same arithmetic connector turns have run on since SQEM-381.
+ */
 export const PROVIDER_TIMEOUT_MS = {
-  /** A plain chat turn, an authoring call, an image. The original number, still right for these. */
+  /** Self-host (a possible 150 s wall clock), authoring, images. The original number. */
   default: 120_000,
-  /** A turn with connectors, on a paid plan: room for several server-side tool round trips. */
-  connectors: 300_000,
+  /** Every chat turn on a paid Cloud wall clock. */
+  long: 300_000,
 } as const;
 
 /** How long the browser waits for the job's terminal broadcast. Always > the provider timeout. */
 export const CLIENT_JOB_TIMEOUT_MS = {
   default: 180_000,
-  connectors: 330_000,
+  long: 330_000,
 } as const;
 
+/**
+ * SQEM-582 — a streaming answer is not a stalled one. Each delta moves the client's deadline to
+ * `now + DELTA_GRACE_MS`, never past `hardCap`. A stream that stalls still ends — at most this long
+ * after its last delta — which is the case the old "deltas never touch the timeout" rule guarded.
+ */
+export const DELTA_GRACE_MS = 60_000;
+
+/** The latest moment the client may still be waiting: just under the wall clock where it applies. */
+export function clientHardCapMs(ctx: TimeoutContext): number {
+  return longPair(ctx) ? EDGE_WALL_CLOCK_MS.paid - 10_000 : clientJobTimeoutMs(ctx);
+}
+
+/** The client's deadline after a delta arrives at `now` (all values are absolute ms timestamps). */
+export function nextJobDeadline(current: number, now: number, startedAt: number, hardCapMs: number): number {
+  return Math.min(Math.max(current, now + DELTA_GRACE_MS), startedAt + hardCapMs);
+}
+
 export interface TimeoutContext {
-  /** Remote MCP connectors are attached to this turn. */
-  connectors: boolean;
+  /**
+   * Remote MCP connectors are attached to this turn. Since SQEM-582 it no longer decides the pair —
+   * every Cloud chat turn gets the long one; kept so callers can still say it.
+   */
+  connectors?: boolean;
   /**
    * Running on a self-hosted instance. ⛔ Keeps the default pair even with connectors and even if
    * `EDGE_PLAN_IS_PAID` is flipped for Cloud: that flag is a statement about OUR plan, and a
@@ -90,15 +118,15 @@ export interface TimeoutContext {
   paidPlan?: boolean;
 }
 
-/** The long pair is earned, not assumed: connectors AND a paid wall clock AND not a self-host. */
-function longPair({ connectors, selfHosted, paidPlan = EDGE_PLAN_IS_PAID }: TimeoutContext): boolean {
-  return connectors && paidPlan && !selfHosted;
+/** The long pair: a paid wall clock AND not a self-host (SQEM-582 — connectors no longer required). */
+function longPair({ selfHosted, paidPlan = EDGE_PLAN_IS_PAID }: TimeoutContext): boolean {
+  return paidPlan && !selfHosted;
 }
 
 export function providerTimeoutMs(ctx: TimeoutContext): number {
-  return longPair(ctx) ? PROVIDER_TIMEOUT_MS.connectors : PROVIDER_TIMEOUT_MS.default;
+  return longPair(ctx) ? PROVIDER_TIMEOUT_MS.long : PROVIDER_TIMEOUT_MS.default;
 }
 
 export function clientJobTimeoutMs(ctx: TimeoutContext): number {
-  return longPair(ctx) ? CLIENT_JOB_TIMEOUT_MS.connectors : CLIENT_JOB_TIMEOUT_MS.default;
+  return longPair(ctx) ? CLIENT_JOB_TIMEOUT_MS.long : CLIENT_JOB_TIMEOUT_MS.default;
 }

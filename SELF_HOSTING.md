@@ -39,7 +39,8 @@ only** and simply stay off when their secret is absent — nothing breaks.
 | Multi-user workspaces, invites, roles | Transactional email delivery (Resend) |
 | BYOK AI providers (OpenAI, Anthropic, Gemini, Mistral, …) | Error monitoring (Sentry) |
 | Workspace file library + signed-URL delivery | Priority support / SLA, Enterprise SSO, audit logs |
-| Connectors — Notion, Shopify, Outlook, MS Graph (your own OAuth apps) | Marketplace **submission review** + the super-admin review surface |
+| Connectors — any MCP server via **Add connector** (OAuth, token or open) | Marketplace **submission review** + the super-admin review surface |
+| — | **One-click connector apps** (Google Workspace, Microsoft 365, Atlassian, Linear, Notion, …) |
 | Marketplace **reading** — browse, vote, copy a published playbook | — |
 
 Every Cloud-only feature is gated on a secret — **absent secret → feature disabled, no crash**
@@ -347,29 +348,19 @@ below) — without them, submit and the token field fail.
 
 ## Connectors — external MCP tools
 
-Connectors let a workspace attach third-party MCP tools and expose them inside sqemes. They ship with
-self-host in full: `manage-connectors` plus the OAuth pair `connector-oauth-start` /
-`connector-oauth-callback`, and an edge function for each vendor that has no MCP server of its own
-(`mcp-shopify`, `mcp-outlook`, `mcp-msgraph`).
+Connectors let a workspace attach third-party MCP tools and use them in sqemes Chat — with every text
+model, not only Claude and ChatGPT. Self-host ships `manage-connectors` plus the OAuth pair
+`connector-oauth-start` / `connector-oauth-callback`.
 
 **Add connector** takes any hosted MCP endpoint: it asks the server how it wants to be connected and
 shows only the fields that server actually needs — a plain redirect, a client id you registered
-yourself, a pasted token, or nothing at all. You are not limited to what we built a tile for.
+yourself, a pasted token, or nothing at all. Many vendors run their own MCP server (Notion, Linear,
+Atlassian, monday.com, Airtable, Sentry and others); add it by its URL.
 
-### Which one-click tiles work here
-
-| Tile | Works on your instance |
-|---|---|
-| Plaud, Notion, Noota | **yes** — the server issues a client on request; nothing to configure |
-| Nifty | **yes** — you register a client in their App Center against *your* redirect URI |
-| GitHub | **yes** — paste a token |
-| Shopify | **yes** — paste a Client ID and Client secret. ⚠️ Since Shopify removed legacy custom apps on 2026-01-01 there is no durable token to paste: create the app in the Shopify **Dev Dashboard**, set the scopes `read_products`, `read_orders`, `read_customers` on its version, **publish** it, **then install** it on your store — in that order. Sqemes mints the access token from your credentials and renews it; it expires every 24 hours |
-| Shopify Storefront | **yes** — no sign-in of any kind, for any Shopify store |
-| Gmail, Google Calendar/Drive/Docs/Sheets, Outlook, Microsoft Calendar, OneDrive | **no** — these use an OAuth app we host |
-
-⚠️ **Before v1.11.19 the whole Apps section was replaced by a Cloud advert**, so the seven that do
-work here were invisible. If you are on an older version, reach them through **Add connector** with
-the server's own URL — the result is the same connector.
+**One-click apps are part of sqemes Cloud** (since v1.11.31). The tiles for Google Workspace,
+Microsoft 365, Atlassian, Linear, Notion and the rest — and the edge functions behind the Microsoft
+and Shopify ones — are not in this distribution; Settings → Connectors says so in one line. A
+connector you add yourself by URL is the same connector a tile would have created.
 
 Each connector is configured **per workspace in the UI**. Where a provider needs OAuth credentials you
 register them yourself, so the redirect URI points at *your* instance; the dialog shows you the exact
@@ -388,11 +379,6 @@ A failed connection reports the provider's own error, for example
 | **`invalid_grant`** | The `redirect_uri` differs between the two calls, or the authorization code was already used (reloading the callback page does this). |
 | **`unauthorized_client`** | The app registration does not permit this flow. |
 
-**A note on Google specifically.** A newly created Google OAuth app starts in **Testing**, where only
-the test users you list may authorise — everyone else gets `Error 403: access_denied` with a warning
-page carrying *your* name. Publishing it requires Google's verification, and the Gmail and Drive
-scopes are **restricted**, which additionally requires an annual paid security assessment. **Plan for
-that before promising your users those two connectors**; Calendar, Docs and Sheets do not need it.
 
 ---
 
@@ -477,7 +463,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.11.30       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.11.31       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### ⛔ 3a. Before v1.11.9: count your workspace-wide MCP keys
@@ -681,7 +667,7 @@ If you would rather it did not, block `/#/library/` at your reverse proxy — bu
 reaches the server, so the block has to happen in the browser or not at all. Removing the route in a
 fork is the reliable way.
 
-*Last updated: 2026-10-24 (SQEM-580: version pin v1.11.30 — OpenRouter shows only the models you add and its image models work; a connector OpenAI cannot reach is left out instead of failing the answer, and errors inside an OpenAI stream are reported; the Start card shows your pinned chats; History deletes several chats at once; one default AI model for chats and writing; mobile polish. Before that, SQEM-566: version pin v1.11.29 — every MCP tool in sqemes Chat by role, with a card for what an answer changed; a History page with delete; bulk tag and access actions; the Files filter Media/Documents; a refreshed model list with image models routed again. Before that, SQEM-559: version pin v1.11.28 — a new design (new typefaces served from the image, Work | Manage navigation, an Overview page), playbook versions with restore, “Who can edit” with a workspace default, a Security tab, and the playbook card in Chat. Before that, SQEM-531: v1.11.27 — the file list checks access once per query, an MCP call carries at most 5 MB (larger files go through create_upload_url), a failed import removes what it created, and sqemes is described as the AI Management OS.)*
+*Last updated: 2026-10-25 (SQEM-591: version pin v1.11.31 — connectors work with every text model, a Stop button that really stops an answer, no two-minute cut-off for models that think long, custom connectors show their logo, the playbook editor opens on Test. SQEM-589: one-click connector apps are part of sqemes Cloud — the Connectors section now describes custom connectors only. Before that, SQEM-580: version pin v1.11.30 — OpenRouter shows only the models you add and its image models work; a connector OpenAI cannot reach is left out instead of failing the answer, and errors inside an OpenAI stream are reported; the Start card shows your pinned chats; History deletes several chats at once; one default AI model for chats and writing; mobile polish. Before that, SQEM-566: version pin v1.11.29 — every MCP tool in sqemes Chat by role, with a card for what an answer changed; a History page with delete; bulk tag and access actions; the Files filter Media/Documents; a refreshed model list with image models routed again. Before that, SQEM-559: version pin v1.11.28 — a new design (new typefaces served from the image, Work | Manage navigation, an Overview page), playbook versions with restore, “Who can edit” with a workspace default, a Security tab, and the playbook card in Chat. Before that, SQEM-531: v1.11.27 — the file list checks access once per query, an MCP call carries at most 5 MB (larger files go through create_upload_url), a failed import removes what it created, and sqemes is described as the AI Management OS.)*
 `/playbooks` and every old link redirects. Nothing changes for an operator. Earlier the same day
 (SQEM-390) — the assistant template kind is gone: on upgrade the migration
 turns every assistant into a skill with the same text, and a role is a persona. Earlier: 2026-08-19

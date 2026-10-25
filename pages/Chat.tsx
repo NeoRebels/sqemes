@@ -5,12 +5,12 @@ import { checkContentViolation } from '../lib/contentGuard';
 import { IS_SELF_HOSTED, functionCallUrl } from '../lib/env';
 import { supabase } from '../lib/supabase';
 import { waitForJobResult } from '../lib/realtimeJob';
-import { clientJobTimeoutMs } from '../supabase/functions/_shared/chatTimeouts.ts';
+import { clientJobTimeoutMs, clientHardCapMs } from '../supabase/functions/_shared/chatTimeouts.ts';
 import { AVAILABLE_MODELS } from '../constants';
-import { buildEnabledModels, isFundedModel } from '../lib/enabledModels';
+import { buildEnabledModels, isFundedModel, isImageModel } from '../lib/enabledModels';
 import { authoringModelId } from '../lib/authoringAI';
 import { edgeError } from '../lib/edgeError';
-import { Send, Bot, User, Sparkles, AlertTriangle, Loader2, Copy, Check, Pencil, Paperclip, Plug, X, FileText, MessageSquarePlus, Search, MoreHorizontal, Globe, Lock, Trash2, MessageSquare, Wand2, Key, Upload, Files } from 'lucide-react';
+import { Send, Square, Bot, User, Sparkles, AlertTriangle, Loader2, Copy, Check, Pencil, Paperclip, Plug, X, FileText, MessageSquarePlus, Search, MoreHorizontal, Globe, Lock, Trash2, MessageSquare, Wand2, Key, Upload, Files } from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { fetchPersona, fetchPersonas } from '../lib/api/personas';
 import { clearChatHandoff, peekChatHandoff } from '../lib/chatHandoff';
@@ -35,7 +35,9 @@ import {
   unshareChatSession,
   fetchAppliedContext,
   updateAppliedContext,
+  requestChatJobCancel,
 } from '../lib/api/chatSessions';
+import { stoppedContent } from '../lib/chatStop';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import { uploadWorkspaceFile, getWorkspaceFileSignedUrl } from '../lib/api/files';
@@ -420,6 +422,9 @@ const Chat = () => {
   const menuRef             = useRef<HTMLDivElement>(null);
   const renameInputRef      = useRef<HTMLInputElement>(null);
   const abortControllerRef  = useRef<AbortController | null>(null);
+  // SQEM-583 — the answer running now (for Stop) and the text it has written so far (kept on Stop).
+  const runningJobRef = useRef<{ jobId: string; stopped: boolean } | null>(null);
+  const streamedTextRef = useRef('');
   const membersRef          = useRef(workspace.members);
   useEffect(() => { membersRef.current = workspace.members; }, [workspace.members]);
 
@@ -689,7 +694,19 @@ const Chat = () => {
 
   // ── Conversation handlers ─────────────────────────────────────────────────
 
+  // SQEM-583 — Stop: the server is asked to abort (that is what ends the cost), then the client stops
+  // waiting. What was written so far is kept by the send handler's AbortError branch.
+  const handleStop = () => {
+    const job = runningJobRef.current;
+    if (!job || job.stopped) return;
+    job.stopped = true;
+    requestChatJobCancel(job.jobId).catch(() => { /* a finished job needs no stop */ });
+    abortControllerRef.current?.abort();
+  };
+
   const handleNewChat = () => {
+    // SQEM-583 — leaving a running answer stops it on the server too; before, it ran on unseen.
+    if (runningJobRef.current) requestChatJobCancel(runningJobRef.current.jobId).catch(() => {});
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     setIsLoading(false);
@@ -794,14 +811,14 @@ const Chat = () => {
    * latter, which answered a different question: a workspace with a Claude key could be chatting on
    * Gemini and still be offered connectors that would never be sent.
    *
-   * ⛔ Connector ids are withheld when the answer is no, even though `chat-message` resolves them for
-   * Claude and OpenAI only. It is not belt-and-braces: the CLIENT timeout is raised to 300 s when
-   * connectors are in the payload (SQEM-381), so sending them on a Gemini turn would make the user
-   * wait five minutes for something that was never going to happen.
+   * Connector ids are withheld when the answer is no; `chat-message` would ignore them anyway. (They
+   * used to raise the client timeout too — since SQEM-582 every Cloud turn gets the long pair.)
    */
+  // SQEM-584 — every TEXT model: Claude and OpenAI run connectors themselves, all others through
+  // sqemes' own MCP client. Only image models cannot use them.
   const connectorsSupported = useMemo(() => {
     const m = AVAILABLE_MODELS.find(x => x.id === selectedModel) ?? enabledModels.find(x => x.id === selectedModel);
-    return m?.provider === 'claude' || m?.provider === 'openai';
+    return !!m && !isImageModel(m.id);
   }, [selectedModel, enabledModels]);
   const activeConnectorIds = useMemo(
     () => (connectorsSupported ? connectors.map(c => c.id) : []),
@@ -965,6 +982,7 @@ const Chat = () => {
 
     const isNewSession = !sessionId;
     let activeSessionId: string | null = sessionId;
+    let started: { jobId: string; assistantMsgId: string } | null = null; // SQEM-583
 
     try {
       if (!activeSessionId) {
@@ -1018,6 +1036,9 @@ const Chat = () => {
       const modelInfo = AVAILABLE_MODELS.find(m => m.id === selectedModel) ?? enabledModels.find(m => m.id === selectedModel);
       const assistantMsgId = crypto.randomUUID();
       const jobId = crypto.randomUUID();
+      started = { jobId, assistantMsgId };
+      runningJobRef.current = { jobId, stopped: false };
+      streamedTextRef.current = '';
       // Funded (keyless) → send `funded` and omit modelId; the server picks the funded model.
       const funded = isFundedModel(selectedModel);
       // SQEM-370 — the zone is the only part of the time context the client knows; the server
@@ -1046,15 +1067,16 @@ const Chat = () => {
       let loadedTemplateIds: string[] = [];
       let libraryChanges: LibraryChange[] = []; // SQEM-561
       const resultPromise = waitForJobResult(jobId, controller.signal, (textSoFar) => {
+        streamedTextRef.current = textSoFar;
         setMessages(prev => prev.map(m => (
           m.id === assistantMsgId ? { ...m, content: textSoFar, pending: false } : m
         )));
-      }, clientJobTimeoutMs({ connectors: activeConnectorIds.length > 0, selfHosted: IS_SELF_HOSTED }),
+      }, clientJobTimeoutMs({ selfHosted: IS_SELF_HOSTED }),
       // SQEM-551 — what the model loaded for this answer ("Used" chips).
       (meta) => {
         loadedTemplateIds = normalizeLoadedIds(meta.loadedTemplateIds);
         libraryChanges = normalizeLibraryChanges(meta.libraryChanges);
-      });
+      }, clientHardCapMs({ selfHosted: IS_SELF_HOSTED })); // SQEM-582 — deltas may extend up to this
 
       const res = await fetch(functionCallUrl('chat-message'), {
         method: 'POST',
@@ -1094,8 +1116,16 @@ const Chat = () => {
       // First exchange of a new chat → upgrade the truncated title to an AI topic title.
       if (isNewSession && activeSessionId) generateChatTitle(trimmed, rawResult, activeSessionId);
     } catch (err: any) {
-      if (err.name !== 'AbortError') { setError(err.message); setErrorCode(err.code ?? null); }
+      const job = runningJobRef.current;
+      if (err.name === 'AbortError' && started && job?.jobId === started.jobId && job.stopped) {
+        // SQEM-583 — stopped on purpose: keep what was written, say that it ends here, and store it.
+        const content = stoppedContent(streamedTextRef.current);
+        const { assistantMsgId } = started;
+        setMessages(prev => prev.map(m => (m.id === assistantMsgId ? { ...m, content, pending: false } : m)));
+        if (activeSessionId) addChatMessage(activeSessionId, 'assistant', content, selectedModel, undefined, assistantMsgId).catch(() => {});
+      } else if (err.name !== 'AbortError') { setError(err.message); setErrorCode(err.code ?? null); }
     } finally {
+      if (started && runningJobRef.current?.jobId === started.jobId) runningJobRef.current = null;
       setIsLoading(false);
       if (activeSessionId) storeUpdateSession(activeSessionId, { isGenerating: false }).catch(() => {});
     }
@@ -1445,7 +1475,6 @@ const Chat = () => {
                * under the same condition. (The other reading — a pure capability hint, always shown —
                * is one line away if that turns out to be the more useful one.)
                */
-              connectorProviders={connectors.length > 0 ? ['claude', 'openai'] : undefined}
             />
 
             {/* SQEM-390 (PR C) — the role, chosen where the model is chosen. A persona applied
@@ -1692,32 +1721,31 @@ const Chat = () => {
                       <FileText className="w-4 h-4" />
                     </button>
                     {/* SQEM-436 — a STATUS, not a menu. The connectors are always sent; this says
-                        whether the chosen model can use them. Shown whenever the workspace has any,
-                        including when no Claude/OpenAI key exists at all — "inactive" is the honest
-                        answer there too, and hiding it would leave the connectors looking broken. */}
+                        whether the chosen model can use them. Shown whenever the workspace has any.
+                        SQEM-584 — every text model can; only an image model shows "inactive". */}
                     {connectors.length > 0 && (
                       <div className="relative shrink-0 group">
                         <div
                           role="status"
                           aria-label={connectorsSupported
                             ? 'Your MCP Connectors are active'
-                            : 'Your MCP Connectors are inactive — only works with Claude and ChatGPT'}
-                          className={`p-3 rounded-xl transition-all ${connectorsSupported
-                            ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
-                            : 'text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20'}`}
+                            : 'Your MCP Connectors are inactive — image models cannot use them'}
+                          className={`p-3 rounded-control transition-all ${connectorsSupported
+                            ? 'text-success bg-success-soft'
+                            : 'text-danger bg-danger-soft'}`}
                         >
                           <Plug className="w-4 h-4" />
                         </div>
                         <div
                           role="tooltip"
-                          className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[15rem] px-3 py-2 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-xl z-30 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[15rem] px-3 py-2 bg-surface-raised border border-line rounded-control shadow-xl z-30 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           {connectorsSupported ? (
-                            <p className="text-2xs font-bold text-emerald-600 dark:text-emerald-400">Your MCP Connectors are active</p>
+                            <p className="text-2xs font-bold text-success">Your MCP Connectors are active</p>
                           ) : (
                             <>
-                              <p className="text-2xs font-bold text-red-500 dark:text-red-400">Your MCP Connectors are inactive</p>
-                              <p className="text-2xs text-slate-500 dark:text-slate-400 mt-0.5">only works with Claude and ChatGPT</p>
+                              <p className="text-2xs font-bold text-danger">Your MCP Connectors are inactive</p>
+                              <p className="text-2xs text-ink-muted mt-0.5">image models cannot use them</p>
                             </>
                           )}
                         </div>
@@ -1746,9 +1774,16 @@ const Chat = () => {
                     >
                       {isEnhancing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                     </button>
-                    <button onClick={handleSend} aria-label="Send message" disabled={isLoading || !input.trim() || enabledModels.length === 0} className="p-3 bg-accent-strong text-white rounded-control hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm hover:shadow-md dark:shadow-none dark:hover:shadow-none shrink-0">
-                      <Send className="w-4 h-4" />
-                    </button>
+                    {/* SQEM-583 — while an answer runs, Send becomes Stop (as in ChatGPT and Claude). */}
+                    {isLoading ? (
+                      <button onClick={handleStop} aria-label="Stop generating" title="Stop" className="p-3 bg-ink-strong text-surface-raised rounded-control hover:opacity-90 transition-all shadow-sm dark:shadow-none shrink-0">
+                        <Square className="w-4 h-4" fill="currentColor" />
+                      </button>
+                    ) : (
+                      <button onClick={handleSend} aria-label="Send message" disabled={!input.trim() || enabledModels.length === 0} className="p-3 bg-accent-strong text-white rounded-control hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm hover:shadow-md dark:shadow-none dark:hover:shadow-none shrink-0">
+                        <Send className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

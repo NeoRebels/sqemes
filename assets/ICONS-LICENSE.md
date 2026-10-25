@@ -10,6 +10,14 @@ that package (not verified). That package is published under the MIT licence rep
 in that package, so its tab shows a neutral icon instead. `openrouter.svg` is **not** from that package — it is OpenRouter's own icon
 (SQEM-031).
 
+**Connector tiles (SQEM-588, replacing SQEM-585's single-colour marks) — sqemes Cloud only:** one-click
+connector apps are not part of the self-host distribution, so neither `assets/connectors/` nor these logos
+ship with it. In the Cloud build, `assets/connectors/` holds the vendors' logos, downloaded 2026-10-24:
+- `atlassian`, `linear`, `monday`, `airtable`, `miro`, `zapier`, `sentry`, `teams` — [SVG Logos](https://github.com/gilbarbara/logos)
+  by Gil Barbara (via Iconify `logos:*`), published under **CC0 1.0**.
+- `canva`, `sharepoint`, `webflow` — from [svgl](https://svgl.app) (MIT-licensed collection of the vendors' own marks).
+Only the root `width`/`height` attributes were removed; the drawings are otherwise unchanged.
+
 The licence covers the drawings as files. The logos themselves remain trademarks of their owners;
 Sqemes uses them only to name and link to those products, never to suggest endorsement.
 

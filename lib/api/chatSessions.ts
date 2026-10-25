@@ -265,3 +265,12 @@ export async function updateAppliedContext(
   const { error } = await supabase.from('chat_sessions').update(patch).eq('id', sessionId);
   if (error) throw error;
 }
+
+/**
+ * SQEM-583 — ask the running chat job to stop. Insert-only table, own rows only; the job polls for
+ * it and aborts its provider requests. Fire-and-forget: a second press (primary-key conflict) or a
+ * job that already finished are both fine to ignore.
+ */
+export async function requestChatJobCancel(jobId: string): Promise<void> {
+  await supabase.from('chat_job_cancellations').insert({ job_id: jobId });
+}

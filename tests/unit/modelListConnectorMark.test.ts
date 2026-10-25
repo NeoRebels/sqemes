@@ -23,8 +23,10 @@ describe('SQEM-446 — connector mark in the model list', () => {
     expect(SELECT).not.toMatch(/'claude'|'openai'/);
   });
 
-  it('only the chat passes it, and only with connectors present', () => {
-    expect(CHAT).toMatch(/connectorProviders=\{connectors\.length > 0 \? \['claude', 'openai'\] : undefined\}/);
+  it('SQEM-584 — the chat no longer passes it: every text model reaches the connectors now', () => {
+    // A mark on every row distinguishes nothing. The prop stays in ModelSelect for a future
+    // distinction; the image-model case is said by the composer's status instead.
+    expect(CHAT).not.toMatch(/connectorProviders=/);
     for (const f of ['components/PersonaSelect.tsx', 'components/EditorTestPanel.tsx', 'components/ui/Modal.tsx']) {
       expect(read(f), f).not.toMatch(/connectorProviders/);
     }

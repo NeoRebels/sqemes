@@ -746,6 +746,25 @@ export type Database = {
         };
         Relationships: [];
       };
+      // SQEM-583 — Stop requests; clients may insert job_id only (user_id defaults to auth.uid()).
+      chat_job_cancellations: {
+        Row: {
+          job_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          job_id: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Update: {
+          job_id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

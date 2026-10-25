@@ -6,7 +6,7 @@
  * This client helper subscribes before the fetch and resolves when the broadcast arrives.
  */
 import { supabase } from './supabase';
-import { CLIENT_JOB_TIMEOUT_MS } from '../supabase/functions/_shared/chatTimeouts.ts';
+import { CLIENT_JOB_TIMEOUT_MS, nextJobDeadline } from '../supabase/functions/_shared/chatTimeouts.ts';
 
 /**
  * SQEM-372 — `onDelta` receives the answer as it is written.
@@ -34,21 +34,37 @@ export function waitForJobResult(
    * Other callers leave it out.
    */
   onResultMeta?: (meta: { loadedTemplateIds?: unknown; libraryChanges?: unknown }) => void,
+  /**
+   * SQEM-582 — how far deltas may push the deadline (from the start). Defaults to `timeoutMs`, i.e.
+   * deltas extend nothing — callers that do not stream keep the old behaviour exactly.
+   */
+  hardCapMs: number = timeoutMs,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const channel = supabase.channel(`job:${jobId}`);
-
-    const timeout = setTimeout(() => {
-      supabase.removeChannel(channel);
-      reject(new Error('The model took too long to respond. Try a shorter prompt.'));
-    }, timeoutMs);
+    const startedAt = Date.now();
+    let deadline = startedAt + timeoutMs;
+    let timeout: ReturnType<typeof setTimeout>;
+    const arm = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        supabase.removeChannel(channel);
+        reject(new Error('The model took too long to respond. Try a shorter prompt.'));
+      }, Math.max(0, deadline - Date.now()));
+    };
+    arm();
 
     channel
       .on('broadcast', { event: 'delta' }, ({ payload }: { payload: { delta?: string } }) => {
-        // ⚠️ Deliberately does NOT touch the timeout. A stream that starts and then stalls must
-        // still time out — refreshing on every delta would let a wedged provider hold the UI open
-        // indefinitely, which is worse than an honest timeout because nothing ever reports it.
-        if (typeof payload.delta === 'string') onDelta?.(payload.delta);
+        // SQEM-582 — a delta moves the deadline to "a minute from now", never past the hard cap. A
+        // stream that is writing is not cut off at a fixed mark any more; one that starts and then
+        // stalls still ends — a minute after its last delta at most — which is what the old rule
+        // ("deltas never touch the timeout") protected: a wedged provider must not hold the UI open.
+        if (typeof payload.delta === 'string') {
+          const next = nextJobDeadline(deadline, Date.now(), startedAt, hardCapMs);
+          if (next !== deadline) { deadline = next; arm(); }
+          onDelta?.(payload.delta);
+        }
       })
       .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string; loadedTemplateIds?: unknown; libraryChanges?: unknown } }) => {
         clearTimeout(timeout);

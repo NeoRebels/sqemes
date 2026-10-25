@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseWwwAuthenticate } from '../../supabase/functions/_shared/wwwAuthenticate';
 
@@ -16,7 +16,7 @@ const WWWAUTH = read('supabase/functions/_shared/wwwAuthenticate.ts');
 const START = read('supabase/functions/connector-oauth-start/index.ts');
 const CALLBACK = read('supabase/functions/connector-oauth-callback/index.ts');
 const TOKEN = read('supabase/functions/_shared/connectorToken.ts');
-const APPS = read('supabase/functions/_shared/connectorApps.ts');
+const APPS = (read('supabase/functions/_shared/connectorApps.ts') + read('supabase/functions/_shared/connectorAppRegistry.ts')) /* SQEM-589 — registries moved */;
 
 /**
  * SQEM-429 — the header the server sends, parsed from the three real ones. These strings are
@@ -180,8 +180,10 @@ describe('SQEM-426 — MCP OAuth', () => {
     expect(APPS).toMatch(/function mcpClientIdSource\(app: McpOauthApp\): \{ configuredClientId\?: string; configuredClientIdEnv\?: string \}/);
   });
 
+  // SQEM-589 — the export ships an EMPTY registry (no apps on self-host), so the Plaud half is private-only.
   it('the providers that refresh this way come from the registry, not a second list', () => {
     expect(TOKEN).toMatch(/Object\.values\(MCP_OAUTH_APPS\)\.map\(\(a\) => a\.provider\)/);
+    if (!existsSync(resolve(__dirname, '../../scripts/build-public-export.sh'))) return;
     expect(APPS).toMatch(/plaud: \{ provider: 'plaud', name: 'Plaud', mcpUrl: 'https:\/\/mcp\.plaud\.ai\/mcp' \}/);
   });
 

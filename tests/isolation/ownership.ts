@@ -65,6 +65,8 @@ export const OWNERSHIP: Record<string, Ownership> = {
   chat_messages: { ownedByA: `t.session_id in (select id from public.chat_sessions where workspace_id = '${A}')` },
   persona_templates: { ownedByA: `t.persona_id in (select id from public.personas where workspace_id = '${A}')` },
   workspace_group_members: { ownedByA: `t.group_id in (select id from public.workspace_groups where workspace_id = '${A}')` },
+  // SQEM-583 — Stop requests; insert-only for clients, rows live seconds (the job deletes them).
+  chat_job_cancellations: { ...byUser('user_id'), mayBeEmpty: 'rows exist only between Stop and the next poll of the running job' },
   mcp_call_counters: { ownedByA: `t.key_id in (select id from public.sqemes_api_keys where workspace_id = '${A}')` },
   mcp_rate_counters: { ownedByA: `t.key_id in (select id from public.sqemes_api_keys where workspace_id = '${A}')` },
 

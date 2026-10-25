@@ -25,21 +25,20 @@ describe('SQEM-436 — connectors always active', () => {
     // different question: a workspace with a Claude key could be chatting on Gemini and still be
     // offered connectors that would never be sent.
     expect(CHAT).toMatch(/const m = AVAILABLE_MODELS\.find\(x => x\.id === selectedModel\)/);
-    expect(CHAT).toMatch(/return m\?\.provider === 'claude' \|\| m\?\.provider === 'openai';/);
+    // SQEM-584 — every text model (own MCP client for non-Claude/OpenAI); only image models cannot.
+    expect(CHAT).toMatch(/return !!m && !isImageModel\(m\.id\);/);
   });
 
-  it('⛔ nothing is sent when the model cannot use them — the 300 s client timeout is why', () => {
-    // `chat-message` already ignores connectors for other providers, so this is not belt-and-braces:
-    // ids in the payload raise the CLIENT timeout to 300 s (SQEM-381), and a Gemini turn would wait
-    // five minutes for something that was never going to happen.
+  it('nothing is sent when the model cannot use them', () => {
+    // Since SQEM-582 the timeout no longer depends on connectors, so this is only about not sending
+    // ids the server would ignore.
     expect(CHAT).toMatch(/connectorsSupported \? connectors\.map\(c => c\.id\) : \[\]/);
-    expect(CHAT).toMatch(/connectors: activeConnectorIds\.length > 0/);
     expect(CHAT).toMatch(/connectorIds: activeConnectorIds/);
   });
 
   it('both hover texts are present, in the owner’s wording', () => {
     expect(CHAT).toContain('Your MCP Connectors are active');
-    expect(CHAT).toContain('only works with Claude and ChatGPT');
+    expect(CHAT).toContain('image models cannot use them'); // SQEM-584 — was "only works with Claude and ChatGPT"
     // ⚠️ Both states name the thing. "inactive" alone made the reader supply the subject, and next to
     // a red dot the likeliest guess is "something is broken" rather than "the model you picked cannot".
     expect(CHAT).toContain('Your MCP Connectors are inactive');
@@ -49,8 +48,9 @@ describe('SQEM-436 — connectors always active', () => {
     // Red reads as an error everywhere else in this app, and "this model cannot do it" is not an
     // error — it is a consequence of the model choice. The owner chose red knowing that; recorded
     // here so it is not later "fixed" to amber by someone who assumes it was an accident.
-    expect(CHAT).toMatch(/connectorsSupported\s*\n?\s*\? 'text-emerald-600/);
-    expect(CHAT).toMatch(/: 'text-red-500/);
+    // SQEM-584 — the same two states, on the design tokens.
+    expect(CHAT).toMatch(/connectorsSupported\s*\n?\s*\? 'text-success bg-success-soft'/);
+    expect(CHAT).toMatch(/: 'text-danger bg-danger-soft'/);
   });
 
   it('the indicator shows whenever the workspace has connectors', () => {

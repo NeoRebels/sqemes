@@ -26,5 +26,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "exclude": ["supabase/functions", "selfhost"]
+  "exclude": ["supabase/functions", "selfhost", "publish/supabase"]
 }

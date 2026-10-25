@@ -15,8 +15,9 @@ A **persona** is a separate object: a role over your playbooks, with a condition
 when to load it.
 
 Your instance also reads the **community marketplace** (browse, vote, copy a published playbook —
-no setup needed) and can attach **connectors** for external tools such as Notion, Shopify and
-Outlook. Both are covered in [SELF_HOSTING.md](./SELF_HOSTING.md).
+no setup needed) and can attach **connectors** — any MCP server you add by its URL, usable with every
+text model. (One-click apps such as Google Workspace or Microsoft 365 are part of sqemes Cloud.) Both
+are covered in [SELF_HOSTING.md](./SELF_HOSTING.md).
 
 This repository is the **open core**: the full app + backend you can run on your own
 infrastructure. Sqemes Cloud adds hosted convenience and a few proprietary pieces — none of

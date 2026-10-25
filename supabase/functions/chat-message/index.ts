@@ -10,6 +10,8 @@ import { refusedConnectorLabels, openaiRefusedConnectorLabels, connectorRefusedN
 import { withTimeContext } from '../_shared/timeContext.ts';
 import { withLibraryPrompt } from '../_shared/libraryPrompt.ts';
 import { providerTimeoutMs } from '../_shared/chatTimeouts.ts';
+import { watchForCancel } from '../_shared/chatCancel.ts';
+import { loadConnectorTools, withConnectorTools } from '../_shared/mcpClient.ts';
 import { readSSE, geminiDelta, openAiDelta, claudeDelta } from '../_shared/sseStream.ts';
 import { createDeltaBroadcaster } from '../_shared/deltaBroadcast.ts';
 import { createLibraryReader } from '../_shared/libraryQueries.ts';
@@ -306,8 +308,9 @@ Deno.serve(async (req) => {
       });
     }
     // SQEM-149 — connectors: Claude (Messages API) and OpenAI (Responses API) call remote MCP
-    // servers themselves. Resolve the enabled connectors for those providers; others ignore them.
-    const connectors = ((provider === 'claude' || provider === 'openai') && Array.isArray(connectorIds) && connectorIds.length > 0)
+    // servers themselves. SQEM-584 — every other text provider gets them too, through our own MCP
+    // client (`_shared/mcpClient.ts`), so they are resolved for every provider now.
+    const connectors = (Array.isArray(connectorIds) && connectorIds.length > 0)
       ? await resolveConnectors(adminClient, workspaceId, user.id, connectorIds)
       : null;
     EdgeRuntime.waitUntil(runAndBroadcast({
@@ -544,23 +547,45 @@ async function runAndBroadcast({
   // turns; the plain path has never been the problem.
   const startedAt = Date.now();
 
+  // SQEM-583 — Stop. The browser writes a row; this job looks for it and aborts every provider request.
+  const cancel = new AbortController();
+  const cancelWatch = watchForCancel(jobId, userId, async (j, u) => {
+    const admin = createAdminClient();
+    const { data } = await admin.from('chat_job_cancellations').select('job_id').eq('job_id', j).eq('user_id', u).maybeSingle();
+    if (!data) return false;
+    await admin.from('chat_job_cancellations').delete().eq('job_id', j);
+    return true;
+  }, cancel);
+
   try {
     let result: string;
     let totalTokens = 0;
+    // SQEM-584 — providers without their own MCP support get the connectors' tools as functions in the
+    // same loop as the library. A connector whose tool list cannot be fetched is left out and named
+    // under the answer, as Claude and OpenAI do (SQEM-466/572) — never the whole answer lost.
+    let runtime = tools;
+    let unreachable: string[] = [];
+    if (tools && connectors?.length && provider !== 'claude' && provider !== 'openai') {
+      const loaded = await loadConnectorTools(connectors.map(c => ({
+        url: c.url, token: c.token, displayName: c.displayName, allowedTools: c.allowedTools,
+      })), { signal: cancel.signal });
+      runtime = withConnectorTools(tools, loaded, cancel.signal);
+      unreachable = loaded.failed;
+    }
     if (provider === 'gemini') {
-      result = await callGemini(apiKey, modelId, instruction, messages, false, onDelta, tools);
+      result = await callGemini(apiKey, modelId, instruction, messages, false, onDelta, runtime, cancel.signal);
     } else if (provider === 'openai') {
-      result = await callOpenAIResponses(apiKey, modelId, instruction, messages, connectors, onDelta, tools);
+      result = await callOpenAIResponses(apiKey, modelId, instruction, messages, connectors, onDelta, tools, cancel.signal);
     } else if (provider === 'claude') {
-      result = await callClaude(apiKey, modelId, instruction, messages, connectors, onDelta, tools);
+      result = await callClaude(apiKey, modelId, instruction, messages, connectors, onDelta, tools, cancel.signal);
     } else if (provider === 'deepseek') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.deepseek.com/v1/chat/completions', instruction, messages, 'deepseek', onDelta, tools));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.deepseek.com/v1/chat/completions', instruction, messages, 'deepseek', onDelta, runtime, cancel.signal));
     } else if (provider === 'mistral') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.mistral.ai/v1/chat/completions', instruction, messages, 'mistral', onDelta, tools));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.mistral.ai/v1/chat/completions', instruction, messages, 'mistral', onDelta, runtime, cancel.signal));
     } else if (provider === 'grok') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.x.ai/v1/chat/completions', instruction, messages, 'grok', onDelta, tools));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.x.ai/v1/chat/completions', instruction, messages, 'grok', onDelta, runtime, cancel.signal));
     } else if (provider === 'openrouter') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://openrouter.ai/api/v1/chat/completions', instruction, messages, 'openrouter', onDelta, tools));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://openrouter.ai/api/v1/chat/completions', instruction, messages, 'openrouter', onDelta, runtime, cancel.signal));
     } else if (provider === 'loadtest') {
       result = await runLoadtestMock(onDelta, tools);
     } else {
@@ -579,7 +604,7 @@ async function runAndBroadcast({
     if (connectors?.length) {
       console.log('[chat-connectors]', JSON.stringify({
         jobId, provider, connectors: connectors.length, durationMs: Date.now() - startedAt,
-        timeoutMs: providerTimeoutMs({ connectors: true, selfHosted: SELF_HOSTED }),
+        timeoutMs: providerTimeoutMs({ selfHosted: SELF_HOSTED }),
       }));
     }
     if (tools && (tools.stats.calls > 0 || tools.stats.toolsRefused)) {
@@ -590,6 +615,7 @@ async function runAndBroadcast({
     // ⛔ The cap must be VISIBLE. A model cut off mid-investigation answers confidently from half the
     // material, and nothing in the reply would say so.
     if (tools?.stats.cappedAt) result += toolCapNotice(tools.stats.cappedAt, tools.stats.cappedBy ?? 'rounds');
+    if (unreachable.length) result += connectorRefusedNotice(unreachable); // SQEM-584
 
     // Funded (Sqemes-credit) calls debit the workspace allowance by tokens used. A
     // metering failure must not fail the user's result — log and move on (COGS is bounded).
@@ -612,9 +638,16 @@ async function runAndBroadcast({
       ...(libraryChanges.length ? { libraryChanges } : {}),
     });
   } catch (err: any) {
+    // SQEM-583 — stopped by the person: nobody is listening any more, and an error would be a lie.
+    if (cancel.signal.aborted) {
+      console.log('[chat-cancel]', JSON.stringify({ jobId, provider, funded, durationMs: Date.now() - startedAt }));
+      return;
+    }
     // No flush here on purpose: a partial answer followed by an error reads as if the fragment were
     // the reply. The client drops what it has when an error arrives.
     await broadcastJobResult(jobId, { error: err?.message ?? 'Unknown error' });
+  } finally {
+    cancelWatch.stop();
   }
 }
 
@@ -683,6 +716,8 @@ async function callGemini(
   onDelta?: (increment: string) => void,
   /** SQEM-373 — present ⇒ the model may call the workspace library. Never set for image models. */
   tools?: ToolRuntime | null,
+  /** SQEM-583 — aborted when the person presses Stop; reaches every provider request below. */
+  signal?: AbortSignal,
 ): Promise<string> {
   // SQEM-111 — modelId is interpolated into the request path; allow only id-shaped values.
   if (!/^[A-Za-z0-9._-]+$/.test(modelId)) throw new Error('Invalid model id');
@@ -739,7 +774,8 @@ async function callGemini(
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify(body),
-    });
+      signal,
+    }, providerTimeoutMs({ selfHosted: SELF_HOSTED })); // SQEM-582 — was the 120 s image default
 
     if (!response.ok) {
       const errText = await response.text();
@@ -810,6 +846,8 @@ async function callOpenAIResponses(
   connectors: ResolvedConnector[] | null = null,
   onDelta?: (increment: string) => void,
   tools?: ToolRuntime | null,
+  /** SQEM-583 — aborted when the person presses Stop; reaches every provider request below. */
+  signal?: AbortSignal,
 ): Promise<string> {
   const input = toResponsesInput(messages, (d) => decodeTextFile(d).text);
 
@@ -850,6 +888,7 @@ async function callOpenAIResponses(
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify(body),
+      signal,
     }, providerTimeoutMs({ connectors: !!activeConnectors?.length, selfHosted: SELF_HOSTED })); // SQEM-381
 
     if (!response.ok) {
@@ -988,6 +1027,8 @@ async function callClaude(
   onDelta?: (increment: string) => void,
   /** SQEM-373 — present ⇒ the model may call the workspace library. SQEM-428: valid alongside connectors. */
   tools?: ToolRuntime | null,
+  /** SQEM-583 — aborted when the person presses Stop; reaches every provider request below. */
+  signal?: AbortSignal,
 ): Promise<string> {
   const apiMessages = messages.map(msg => {
     if (typeof msg.content === 'string') {
@@ -1074,6 +1115,7 @@ async function callClaude(
       method: 'POST',
       headers,
       body: JSON.stringify(body),
+      signal,
     }, providerTimeoutMs({ connectors: !!activeConnectors?.length, selfHosted: SELF_HOSTED })); // SQEM-381
 
     if (!response.ok) {
@@ -1188,6 +1230,8 @@ async function callOpenAICompatible(
   onDelta?: (increment: string) => void,
   /** SQEM-373 — present ⇒ the model may call the workspace library. */
   tools?: ToolRuntime | null,
+  /** SQEM-583 — aborted when the person presses Stop; reaches every provider request below. */
+  signal?: AbortSignal,
 ): Promise<{ content: string; totalTokens: number }> {
   const apiMessages: any[] = [];
 
@@ -1244,7 +1288,8 @@ async function callOpenAICompatible(
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify(body),
-    });
+      signal,
+    }, providerTimeoutMs({ selfHosted: SELF_HOSTED })); // SQEM-582 — was the 120 s image default
 
     if (!response.ok) {
       const errText = await response.text();

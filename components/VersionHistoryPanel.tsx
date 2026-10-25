@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { History, RotateCcw, Trash2, Loader2, FileX } from 'lucide-react';
-import Modal from './ui/Modal';
+import ConfirmModal from './ui/ConfirmModal';
 import Button from './ui/Button';
 import { fetchVersions, fetchVersionStates, fetchPresentFiles, restoreVersion, deleteVersion, type TemplateVersion, type TemplateVersionSummary } from '../lib/api/versions';
 import { lineDiff, diffCounts, withContext } from '../lib/lineDiff';
@@ -117,13 +117,15 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
     }
   };
 
+  // SQEM-581 — design-system tokens throughout (was slate/brand/emerald/red/amber), lists and states as
+  // in redesign C, confirmations through ConfirmModal so the title has the display face.
   if (versions === null) {
-    return <div className="flex-1 flex items-center justify-center text-slate-400"><Loader2 className="w-5 h-5 animate-spin" /></div>;
+    return <div className="flex-1 flex items-center justify-center text-ink-subtle"><Loader2 className="w-5 h-5 animate-spin" /></div>;
   }
   if (versions.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-2 p-6 text-center text-sm text-slate-500 dark:text-slate-400">
-        <History className="w-6 h-6" />
+      <div className="flex-1 flex flex-col items-center justify-center gap-2 p-6 text-center text-sm text-ink-muted">
+        <History className="w-6 h-6 text-ink-subtle" />
         No versions yet. Every save keeps one.
       </div>
     );
@@ -134,20 +136,21 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       {/* Version list */}
-      <ul className="max-h-[40%] overflow-y-auto border-b border-slate-100 dark:border-slate-700 shrink-0">
+      <ul className="max-h-[40%] overflow-y-auto border-b border-line p-2 space-y-0.5 shrink-0">
         {versions.map(v => (
           <li key={v.id}>
             <button
               onClick={() => setSelectedId(v.id)}
-              className={`w-full text-left px-4 py-2.5 text-sm border-l-2 transition-colors ${v.id === selectedId ? 'border-brand-600 bg-brand-50 dark:bg-brand-900/20' : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+              aria-current={v.id === selectedId ? 'true' : undefined}
+              className={`w-full text-left px-3 py-2 rounded-control text-sm transition-colors ${v.id === selectedId ? 'bg-accent-soft' : 'hover:bg-surface-sunken'}`}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-slate-800 dark:text-slate-100">
-                  Version {v.version}{v.id === latest?.id && <span className="ml-2 text-xs font-medium text-brand-600 dark:text-brand-400">current</span>}
+                <span className="font-semibold text-ink-strong">
+                  Version {v.version}{v.id === latest?.id && <span className="ml-2 text-xs font-medium text-accent">current</span>}
                 </span>
-                <span className="text-xs text-slate-400 shrink-0">{when(v.createdAt)}</span>
+                <span className="text-xs text-ink-subtle shrink-0">{when(v.createdAt)}</span>
               </div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+              <div className="text-xs text-ink-muted truncate">
                 {author(v.createdBy)}{v.note && <> · {v.note}</>}
               </div>
             </button>
@@ -158,10 +161,10 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
       {/* The selected version against the one before it */}
       {selected && (
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-slate-100 dark:border-slate-700 shrink-0">
-            <span className="text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-line shrink-0">
+            <span className="text-xs text-ink-muted">
               {previous ? `Changes since version ${previous.version}` : 'First version'}
-              {counts && previous && <> · <span className="text-emerald-600">+{counts.added}</span> <span className="text-red-600">−{counts.removed}</span></>}
+              {counts && previous && <> · <span className="text-success">+{counts.added}</span> <span className="text-danger">−{counts.removed}</span></>}
             </span>
             {canEdit && selected.id !== latest?.id && (
               <div className="flex gap-1">
@@ -176,21 +179,21 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
           </div>
           <div className="flex-1 min-h-0 overflow-auto">
             {!now ? (
-              <div className="p-6 flex justify-center text-slate-400"><Loader2 className="w-5 h-5 animate-spin" /></div>
+              <div className="p-6 flex justify-center text-ink-subtle"><Loader2 className="w-5 h-5 animate-spin" /></div>
             ) : (
               <>
                 {fieldChanges.length > 0 && (
-                  <ul className="px-4 py-2 text-xs text-slate-600 dark:text-slate-300 space-y-0.5 border-b border-slate-100 dark:border-slate-700">
+                  <ul className="px-4 py-2 text-xs text-ink space-y-0.5 border-b border-line">
                     {fieldChanges.map(c => <li key={c}>{c}</li>)}
                   </ul>
                 )}
                 {now.contextFiles.length > 0 && (
-                  <p className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-700">
+                  <p className="px-4 py-2 text-xs text-ink-muted border-b border-line">
                     Files:{' '}
                     {now.contextFiles.map((f, k) => {
                       const gone = present[now.id] ? !present[now.id].has(f.id) : false;
                       return (
-                        <span key={f.id} className={gone ? 'text-amber-700 dark:text-amber-400' : ''}>
+                        <span key={f.id} className={gone ? 'text-warning' : ''}>
                           {k > 0 && ', '}{gone && <FileX className="inline w-3 h-3 mr-0.5 -mt-0.5" />}{f.name || 'Unnamed file'}{gone && ' (deleted)'}
                         </span>
                       );
@@ -199,12 +202,12 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
                 )}
                 <pre className="text-xs font-mono leading-relaxed whitespace-pre-wrap break-words">
                   {withContext(contentDiff ?? [], previous ? 3 : Number.MAX_SAFE_INTEGER).map((row, k) => row.type === 'gap' ? (
-                    <div key={k} className="px-4 py-1 text-slate-400 bg-slate-50 dark:bg-slate-800/60 select-none">⋯ {row.count} unchanged line{row.count === 1 ? '' : 's'}</div>
+                    <div key={k} className="px-4 py-1 text-ink-subtle bg-surface-sunken select-none">⋯ {row.count} unchanged line{row.count === 1 ? '' : 's'}</div>
                   ) : (
-                    <div key={k} className={`px-4 ${row.type === 'added' && previous ? 'bg-emerald-50 text-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-200' : row.type === 'removed' ? 'bg-red-50 text-red-900 line-through decoration-red-300 dark:bg-red-900/20 dark:text-red-200' : 'text-slate-700 dark:text-slate-300'}`}>
-                      <span className="select-none text-slate-400 mr-2">{row.type === 'added' && previous ? '+' : row.type === 'removed' ? '−' : ' '}</span>
+                    <div key={k} className={`px-4 ${row.type === 'added' && previous ? 'bg-success-soft text-ink-strong' : row.type === 'removed' ? 'bg-danger-soft text-ink-strong line-through decoration-danger/40' : 'text-ink'}`}>
+                      <span className="select-none text-ink-subtle mr-2">{row.type === 'added' && previous ? '+' : row.type === 'removed' ? '−' : ' '}</span>
                       {/* SQEM-544 — a blank line that was added or removed is named, not shown as a bare sign. */}
-                      {row.text || ((row.type === 'removed' || (row.type === 'added' && previous)) ? <span className="select-none italic text-slate-400 no-underline">(empty line)</span> : ' ')}
+                      {row.text || ((row.type === 'removed' || (row.type === 'added' && previous)) ? <span className="select-none italic text-ink-subtle no-underline">(empty line)</span> : ' ')}
                     </div>
                   ))}
                 </pre>
@@ -214,26 +217,24 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
         </div>
       )}
 
-      <Modal open={!!confirm} onClose={() => !busy && setConfirm(null)} size="sm" className="p-6">
+      <ConfirmModal
+        open={!!confirm}
+        title={confirm ? `${confirm.kind === 'restore' ? 'Restore' : 'Delete'} version ${confirm.version.version}?` : ''}
+        confirmLabel={confirm?.kind === 'delete' ? 'Delete' : 'Restore'}
+        variant={confirm?.kind === 'delete' ? 'danger' : 'primary'}
+        busy={busy}
+        onConfirm={run}
+        onClose={() => !busy && setConfirm(null)}
+      >
         {confirm?.kind === 'restore' ? (
           <>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Restore version {confirm.version.version}?</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">Its title, description, content and files become the current playbook, saved as a new version. Nothing is lost — the current state stays in the history. Files deleted since cannot come back and are left out.</p>
-            {isDirty && <p className="text-sm text-amber-700 dark:text-amber-400 mb-1">Your unsaved changes in the editor will be discarded.</p>}
+            <p>Its title, description, content and files become the current playbook, saved as a new version. Nothing is lost — the current state stays in the history. Files deleted since cannot come back and are left out.</p>
+            {isDirty && <p className="text-warning">Your unsaved changes in the editor will be discarded.</p>}
           </>
-        ) : confirm ? (
-          <>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Delete version {confirm.version.version}?</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">It disappears from the history for everyone and cannot be restored afterwards.</p>
-          </>
-        ) : null}
-        <div className="flex justify-end gap-2 mt-5">
-          <Button variant="secondary" onClick={() => setConfirm(null)} disabled={busy}>Cancel</Button>
-          <Button variant={confirm?.kind === 'delete' ? 'danger' : 'primary'} onClick={run} loading={busy}>
-            {confirm?.kind === 'delete' ? 'Delete' : 'Restore'}
-          </Button>
-        </div>
-      </Modal>
+        ) : (
+          <p>It disappears from the history for everyone and cannot be restored afterwards.</p>
+        )}
+      </ConfirmModal>
     </div>
   );
 }

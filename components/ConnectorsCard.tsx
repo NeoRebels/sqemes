@@ -1,181 +1,27 @@
 // SQEM-149 — Settings → Integrations "Connectors" card. Lists a workspace's external MCP connectors
 // and lets a user add one (name + hosted MCP URL + optional bearer token), test it (probe → tool
 // list), or remove it. Workspace-shared connectors are admin/editor only; anyone can add a personal one.
-import { useEffect, useState, type ComponentType } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { Plug, Plus, Trash2, Check, Loader2, Wand2, Users, User as UserIcon, AlertCircle, AlertTriangle, LayoutGrid, ArrowUpRight, Settings2 } from 'lucide-react';
 import Card from './ui/Card';
 import Modal from './ui/Modal';
 import { IS_SELF_HOSTED } from '../lib/env';
-import GmailIcon from './icons/GmailIcon';
-import OutlookIcon from './icons/OutlookIcon';
-import GoogleCalendarIcon from './icons/GoogleCalendarIcon';
-import GoogleDriveIcon from './icons/GoogleDriveIcon';
-import GoogleDocsIcon from './icons/GoogleDocsIcon';
-import GoogleSheetsIcon from './icons/GoogleSheetsIcon';
-import ShopifyIcon from './icons/ShopifyIcon';
-import OutlookCalendarIcon from './icons/OutlookCalendarIcon';
-import OneDriveIcon from './icons/OneDriveIcon';
-import GitHubIcon from './icons/GitHubIcon';
-import NotionIcon from './icons/NotionIcon';
-import PlaudIcon from './icons/PlaudIcon';
-import NiftyIcon from './icons/NiftyIcon';
-import NootaIcon from './icons/NootaIcon';
+import { useWorkspace } from '../store';
 import type { User } from '../types';
+import ConnectorLogo from './ConnectorLogo';
+import { OAUTH_APPS, GOOGLE_TESTING_NOTE, type TokenAppUI, type OAuthIdAppUI, type PublicAppUI } from './connectorAppTiles';
 import {
   fetchConnectors, createConnector, deleteConnector, probeConnector, startOAuthConnect, createTokenConnector, setConnectorTools, connectorRedirectUri, inspectConnector,
   type Connector, type ProbeResult, type InspectResult,
 } from '../lib/api/connectors';
 
-// SQEM-150/153/154/157/159 — one-click "apps". `id` matches the backend app registry; `provider`+`name`
-// is the connected/dedup key. `auth: 'oauth'` (redirect) or 'token' (paste a static token). Token apps
-// carry `tokenLabel`/`help`, `needsShop` (Shopify), and a `placeholder`.
-type OAuthApp = { id: string; provider: string; name: string; description: string; auth: 'oauth'; Icon: ComponentType<{ className?: string }>; unavailable?: string };
 /**
- * SQEM-437 — an OAuth app that needs one value from the PERSON before the redirect.
- *
- * ⭐ It reuses the token dialog wholesale, because the dialog is the right shape already: a label, a
- * placeholder, a help line. Only what happens on submit differs — a token app stores the value AS the
- * credential, this one hands it to the consent flow and never stores it as one.
- *
- * ⚠️ No `shared` option, and that is not an omission: `connector-oauth-callback` writes MCP
- * connectors with `user_id` set, i.e. always personal. Offering a checkbox the backend ignores would
- * be worse than not offering one.
+ * SQEM-589 — no app tiles on self-host. The export already ships an EMPTY `OAUTH_APPS`; the flag here
+ * is the second lock, so a self-host build from this repo (VITE_SELF_HOSTED=true) cannot show them
+ * either. Custom connectors are not affected.
  */
-/**
- * SQEM-441 — an app that needs no credentials at all, only the host it lives on.
- *
- * Every Shopify store runs a public MCP server at `https://<shop>/api/mcp` — measured against
- * allbirds.com on 2026-09-17: HTTP 200 on `tools/list`, no auth header of any kind. So the dialog asks
- * for a domain and nothing else, and the connector is created through the ordinary `create` action,
- * which has always treated the token as optional.
- */
-type PublicAppUI = { id: string; provider: string; name: string; description: string; auth: 'public'; Icon: ComponentType<{ className?: string }>; hostLabel: string; placeholder: string; help: string; path: string; unavailable?: string };
-
-type OAuthIdAppUI = { id: string; provider: string; name: string; description: string; auth: 'oauth-id'; Icon: ComponentType<{ className?: string }>; tokenLabel: string; placeholder: string; help: string; unavailable?: string; needsRedirectUri?: boolean; secretLabel?: string; secretOptional?: boolean };
-// SQEM-469 — `needsSecret` tiles ask for a client id + secret and mint the token themselves.
-type TokenAppUI = { id: string; provider: string; name: string; description: string; auth: 'token'; Icon: ComponentType<{ className?: string }>; tokenLabel: string; placeholder: string; help: string; needsShop?: boolean; needsSecret?: boolean; secretLabel?: string; secretOptional?: boolean; unavailable?: string };
-
-/**
- * SQEM-274 — why the five Google tiles cannot be connected yet.
- *
- * Our Google OAuth app sits at publishing status **Testing**, where only registered test users may
- * authorise — at most a hundred. That is the delivery state of an app that was never published, not
- * a defect in our code: `connector-oauth-start`, the callback and the scopes were all checked on
- * 2026-08-25 and are correct.
- *
- * ⛔ **Until this ticket, the tiles were connectable and led straight into a Google warning page
- * carrying our name.** That is the worst of the three options: the customer experiences a failure
- * that looks like ours. Hiding the tiles was the other candidate and was rejected — it also hides
- * that the feature is coming. **Saying so is better than either failing or pretending.**
- *
- * Removing this line is the whole of the UI work once Google approves the app. Gmail and Drive need
- * more than approval — their scopes are *restricted*, which additionally requires the annual, paid
- * CASA audit; Calendar, Docs and Sheets are *sensitive* and need only the review. `drive.file`, which
- * Docs and Sheets use, is deliberately not restricted.
- */
-const GOOGLE_PENDING_REVIEW = 'Awaiting Google’s review — not connectable yet';
-
-/**
- * SQEM-452 — which tiles a self-hosted instance cannot use, and why it is only these.
- *
- * ⛔ **The gate below used to replace the WHOLE card with a Cloud advert.** It was written (SQEM-150)
- * when this list held Google and Microsoft and nothing else, and its reason — *"the managed one-click
- * apps need Cloud OAuth infra"* — was true of every tile it covered. The list then grew to fifteen and
- * the gate did not: **seven tiles that need nothing from us at all were hidden behind a sales pitch.**
- * Shopify Storefront is the plainest case — `auth: 'public'`, no credentials of any kind, and it works
- * against shops nobody here owns.
- *
- * Google and Microsoft genuinely differ: their client ids come from OUR environment variables
- * (`GOOGLE_OAUTH_CLIENT_ID`, `MICROSOFT_OAUTH_CLIENT_ID`), which a self-hoster does not have. Every
- * other shape is self-sufficient — dynamic registration (Plaud, Notion, Noota), a client id the person
- * registers themselves (Nifty), a pasted token (GitHub, Shopify), or no sign-in (Shopify Storefront).
- *
- * ⚠️ **A new provider defaults to AVAILABLE, and that direction is deliberate.** Get it wrong this way
- * and the operator meets *"This connector is not configured on this instance (…)"* — the message
- * `connector-oauth-start` already returns, visible and self-explanatory. Get it wrong the other way
- * and the tile silently vanishes for every self-hoster, which is precisely the bug being fixed here
- * and took months to notice. A loud wrong beats a quiet one.
- *
- * ⚠️ The ticket proposed deriving this from `clientIdEnv`. That field lives in the edge functions'
- * `CONNECTOR_APPS`, not in these UI definitions — so the provider is what is actually available here.
- * `tests/unit/selfHostConnectorTiles.test.ts` pins which tile lands on which side.
- */
-const CLOUD_ONLY_PROVIDERS = ['google', 'microsoft'];
-const needsCloudOAuth = (app: { provider: string }) => CLOUD_ONLY_PROVIDERS.includes(app.provider);
-
-const OAUTH_APPS: (OAuthApp | TokenAppUI | OAuthIdAppUI | PublicAppUI)[] = [
-  { id: 'google-gmail', provider: 'google', name: 'Gmail', description: 'Read & draft your email', auth: 'oauth', Icon: GmailIcon, unavailable: GOOGLE_PENDING_REVIEW },
-  { id: 'google-calendar', provider: 'google', name: 'Google Calendar', description: 'Read your events & schedule', auth: 'oauth', Icon: GoogleCalendarIcon, unavailable: GOOGLE_PENDING_REVIEW },
-  { id: 'google-drive', provider: 'google', name: 'Google Drive', description: 'Search & read your files', auth: 'oauth', Icon: GoogleDriveIcon, unavailable: GOOGLE_PENDING_REVIEW },
-  { id: 'google-docs', provider: 'google', name: 'Google Docs', description: 'Read your documents', auth: 'oauth', Icon: GoogleDocsIcon, unavailable: GOOGLE_PENDING_REVIEW },
-  { id: 'google-sheets', provider: 'google', name: 'Google Sheets', description: 'Read your spreadsheets', auth: 'oauth', Icon: GoogleSheetsIcon, unavailable: GOOGLE_PENDING_REVIEW },
-  { id: 'microsoft-outlook', provider: 'microsoft', name: 'Outlook', description: 'Read & draft your email', auth: 'oauth', Icon: OutlookIcon },
-  /**
-   * SQEM-426 — the first connector whose OAuth client did not exist until we asked for one. Nothing
-   * about this tile says so, and that is the point: for the person connecting it, an MCP server with
-   * dynamic registration looks exactly like Gmail.
-   */
-  { id: 'plaud', provider: 'plaud', name: 'Plaud', description: 'Search your recordings & transcripts', auth: 'oauth', Icon: PlaudIcon },
-  /**
-   * SQEM-440 — Notion moved from a pasted integration token to its own MCP server, which registers a
-   * client on request. Nothing to create at notion.so, nothing to paste; the tile is a plain redirect
-   * like Plaud's. ⚠️ The tools are Notion's own now, not the ones our `mcp-notion` shim offered.
-   */
-  { id: 'notion', provider: 'notion', name: 'Notion', description: 'Search pages & databases', auth: 'oauth', Icon: NotionIcon },
-  // SQEM-442 — dynamic registration again: nothing to paste, nothing to configure.
-  { id: 'noota', provider: 'noota', name: 'Noota', description: 'Search your meetings & transcripts', auth: 'oauth', Icon: NootaIcon },
-  /**
-   * SQEM-437 — the same protocol as Plaud with one difference the person has to supply: Nifty hands
-   * out a client id per user rather than registering one on request.
-   */
-  {
-    id: 'nifty', provider: 'nifty', name: 'Nifty', description: 'Search your tasks, projects & docs', auth: 'oauth-id', Icon: NiftyIcon,
-    tokenLabel: 'Client ID', placeholder: 'from the app you created in Nifty',
-    // ⛔ SQEM-439 — NOT the id from Nifty's MCP settings tab: that one is registered for Claude
-    // Desktop's redirect URI and Nifty rejects the exchange for anyone else. An app of our own has to
-    // be registered in their App Center against OUR redirect URI, which the dialog shows.
-    help: 'In Nifty, open the App Center and create an OAuth app using the redirect URI shown above. Paste the Client ID it gives you — and the Client Secret too, if it issues one. You will then be sent to Nifty to approve the connection.',
-    needsRedirectUri: true, secretLabel: 'Client Secret', secretOptional: true,
-  },
-  { id: 'microsoft-calendar', provider: 'microsoft', name: 'Outlook Calendar', description: 'Read your events & schedule', auth: 'oauth', Icon: OutlookCalendarIcon },
-  { id: 'microsoft-onedrive', provider: 'microsoft', name: 'OneDrive', description: 'Search & read your files', auth: 'oauth', Icon: OneDriveIcon },
-  {
-    id: 'github', provider: 'github', name: 'GitHub', description: 'Read repos, issues & PRs', auth: 'token', Icon: GitHubIcon,
-    tokenLabel: 'Personal access token', placeholder: 'ghp_… / github_pat_…',
-    help: 'Create a GitHub Personal Access Token (Settings → Developer settings → Personal access tokens) with read access to the repositories you want to use, and paste it.',
-  },
-
-  {
-    id: 'shopify', provider: 'shopify', name: 'Shopify', description: 'Read products, orders & customers', auth: 'token', Icon: ShopifyIcon, needsShop: true,
-    // ⛔ SQEM-469 — Shopify removed legacy custom apps on 2026-01-01. A new app hands out a client
-    // id and secret, never a durable token, and the token minted from them dies after 24 hours.
-    // The old help text sent people to "Settings → Apps → Develop apps", a path that no longer
-    // exists — it cost a customer call to find that out.
-    needsSecret: true,
-    tokenLabel: 'Client ID', placeholder: 'e.g. 91819eb1611d92e6717dc3add883540c',
-    secretLabel: 'Client secret',
-    help: 'In the Shopify Dev Dashboard, create an app. On its version set the access scopes read_products, read_orders and read_customers, publish the version, THEN install the app on your store — in that order, or the token will be valid but allowed to read nothing. Copy the Client ID and Client secret from the app\'s settings.',
-  },
-  /**
-   * SQEM-441 — the storefront side of a shop: catalogue, policies, cart. A different capability from
-   * the admin connector above, not a replacement for it — and it needs no credentials, so it works for
-   * ANY shop, including ones you do not own.
-   */
-  {
-    id: 'shopify-storefront', provider: 'shopify-storefront', name: 'Shopify Storefront', description: "Browse any store's catalogue & policies", auth: 'public', Icon: ShopifyIcon,
-    hostLabel: 'Store domain', placeholder: 'example.com', path: '/api/mcp',
-    help: "Enter the store's own domain — the one customers visit. No login, no token: a Shopify storefront answers publicly. It works for any Shopify store, including ones you do not run.",
-  },
-];
-
-/**
- * SQEM-452 — derived from the one list, never maintained beside it. A second list is how the gate
- * this replaces went stale in the first place: `OAUTH_APPS` grew from two entries to fifteen and the
- * rule about them did not move.
- */
-const CLOUD_ONLY_APPS = OAUTH_APPS.filter(needsCloudOAuth);
-const VISIBLE_APPS = IS_SELF_HOSTED ? OAUTH_APPS.filter(a => !needsCloudOAuth(a)) : OAUTH_APPS;
+const VISIBLE_APPS = IS_SELF_HOSTED ? [] : OAUTH_APPS;
 
 export default function ConnectorsCard({
   workspaceId,
@@ -186,6 +32,7 @@ export default function ConnectorsCard({
   currentUser: User;
   showToast: (msg: string, type?: 'success' | 'error') => void;
 }) {
+  const { isSqemesAdmin } = useWorkspace(); // SQEM-587 — Google tiles unlocked for testing
   const canShare = currentUser.role === 'admin' || currentUser.role === 'editor';
   const [searchParams, setSearchParams] = useSearchParams();
   const [connectingApp, setConnectingProvider] = useState<string | null>(null);
@@ -531,7 +378,11 @@ export default function ConnectorsCard({
         <div className="space-y-3">
           {manualConnectors.map(c => (
             <div key={c.id} className="flex items-center justify-between gap-4 p-4 bg-surface-sunken rounded-xl border border-line">
-              <div className="min-w-0">
+              {/* SQEM-590 — custom connectors carry a logo too, in the same frame as the app tiles. */}
+              <div className="w-10 h-10 shrink-0 self-start rounded-xl bg-surface-raised border border-line flex items-center justify-center">
+                <ConnectorLogo mcpUrl={c.mcp_url} />
+              </div>
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold text-ink-strong truncate">{c.name}</p>
                 <p className="text-xs font-mono text-ink-subtle mt-0.5 truncate">{c.mcp_url}</p>
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -571,30 +422,21 @@ export default function ConnectorsCard({
           One-click connectors — sign in once, then use them in Chat.
         </p>
       </div>
-      {/* SQEM-452 — the advert covers the tiles it is actually about, and nothing else. It used to
-          replace the whole card; see `needsCloudOAuth`. The names come from the list, so this text
-          cannot go stale the way the hard-coded one did.
-          SQEM-554 (d5): a plain accent surface instead of the brand gradient (C uses no gradients). */}
+      {/* SQEM-589 — on self-host the apps are a sqemes Cloud feature: ONE line saying so, in the design
+          system (a sunken row like the tiles it stands in for, the link in accent), not a banner. The
+          names are written out because the export ships no tile list to derive them from. */}
       {IS_SELF_HOSTED && (
-        <div className="rounded-card border border-accent/20 bg-accent-soft p-6 text-center mb-6">
-          <div className="flex items-center justify-center gap-1.5 mb-4">
-            {CLOUD_ONLY_APPS.map(app => (
-              <div key={app.id} className="w-9 h-9 rounded-xl bg-surface-raised border border-line flex items-center justify-center shadow-sm">
-                <app.Icon className="w-5 h-5" />
-              </div>
-            ))}
-          </div>
-          <h3 className="text-base font-bold text-ink-strong">One-click sign-in connectors</h3>
-          <p className="text-sm text-ink-muted mt-1.5 max-w-md mx-auto">
-            {CLOUD_ONLY_APPS.map(a => a.name).join(', ')} need an OAuth app we host, so they are available on sqemes Cloud. Everything below works on this instance.
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 rounded-control bg-surface-sunken border border-line">
+          <p className="text-sm text-ink-muted">
+            One-click apps — Google Workspace, Microsoft 365, Atlassian, Linear, Notion and more — are available on sqemes Cloud.
           </p>
           <a
             href="https://sqemes.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-lg"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-accent hover:underline shrink-0"
           >
-            Explore sqemes Cloud <ArrowUpRight className="w-4 h-4" />
+            sqemes Cloud <ArrowUpRight className="w-4 h-4" />
           </a>
         </div>
       )}
@@ -608,7 +450,8 @@ export default function ConnectorsCard({
           // ⚠️ **Disconnect keeps working.** An existing connection still functions — the token is
           // already issued — so someone who connected while the app was in Testing must remain able
           // to remove it. Blocking every button would trap a connector nobody could get rid of.
-          const blocked = !!app.unavailable;
+          const testingUnlock = !!app.unavailable && app.provider === 'google' && isSqemesAdmin; // SQEM-587
+          const blocked = !!app.unavailable && !testingUnlock;
           return (
             <div key={app.id} className="flex items-center justify-between gap-4 p-4 bg-surface-sunken rounded-xl border border-line">
               <div className={`flex items-center gap-3 min-w-0 ${blocked && !connected ? 'opacity-60' : ''}`}>
@@ -634,7 +477,7 @@ export default function ConnectorsCard({
                       : blocked ? 'text-ink font-semibold'
                       : 'text-ink-subtle'}`}>
                     {blocked && !connected && <AlertTriangle aria-hidden className="inline w-3 h-3 mr-1 -mt-0.5 text-warning" />}
-                    {connected ? 'Connected' : blocked ? app.unavailable : app.description}
+                    {connected ? 'Connected' : blocked ? app.unavailable : testingUnlock ? GOOGLE_TESTING_NOTE : app.description}
                   </p>
                 </div>
               </div>

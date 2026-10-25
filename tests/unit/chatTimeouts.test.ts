@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   EDGE_WALL_CLOCK_MS, EDGE_PLAN_IS_PAID, PROVIDER_TIMEOUT_MS, CLIENT_JOB_TIMEOUT_MS,
-  providerTimeoutMs, clientJobTimeoutMs, type TimeoutContext,
+  providerTimeoutMs, clientJobTimeoutMs, clientHardCapMs, nextJobDeadline, DELTA_GRACE_MS, type TimeoutContext,
 } from '../../supabase/functions/_shared/chatTimeouts';
 
 /**
@@ -55,17 +55,41 @@ describe('SQEM-381 — the orderings, under both plans', () => {
     }
   });
 
-  it('⭐ the long pair is earned: connectors AND paid AND not self-host', () => {
-    // With `mcp_servers` every remote tool call runs inside ONE provider request, so each extra
-    // connector packs more round trips into the same budget — but only a paid wall clock can hold
-    // the longer pair.
-    expect(providerTimeoutMs(paid(CLOUD_CONNECTORS))).toBe(PROVIDER_TIMEOUT_MS.connectors);
-    expect(clientJobTimeoutMs(paid(CLOUD_CONNECTORS))).toBe(CLIENT_JOB_TIMEOUT_MS.connectors);
-    expect(PROVIDER_TIMEOUT_MS.connectors).toBeGreaterThan(PROVIDER_TIMEOUT_MS.default);
-    // Any one leg missing → default pair.
-    expect(providerTimeoutMs(free(CLOUD_CONNECTORS))).toBe(PROVIDER_TIMEOUT_MS.default);
-    expect(providerTimeoutMs(paid(CLOUD_PLAIN))).toBe(PROVIDER_TIMEOUT_MS.default);
+  it('⭐ SQEM-582 — the long pair: paid AND not self-host, with or without connectors', () => {
+    // Reasoning models think for minutes before the first byte; 120 s ended hard questions in an
+    // error although nothing was wrong. Only a paid wall clock can hold the longer pair.
+    for (const ctx of [CLOUD_PLAIN, CLOUD_CONNECTORS]) {
+      expect(providerTimeoutMs(paid(ctx))).toBe(PROVIDER_TIMEOUT_MS.long);
+      expect(clientJobTimeoutMs(paid(ctx))).toBe(CLIENT_JOB_TIMEOUT_MS.long);
+    }
+    expect(PROVIDER_TIMEOUT_MS.long).toBeGreaterThan(PROVIDER_TIMEOUT_MS.default);
+    // Either leg missing → default pair.
+    expect(providerTimeoutMs(free(CLOUD_PLAIN))).toBe(PROVIDER_TIMEOUT_MS.default);
     expect(providerTimeoutMs(paid(HOST_CONNECTORS))).toBe(PROVIDER_TIMEOUT_MS.default);
+    expect(providerTimeoutMs(paid(HOST_PLAIN))).toBe(PROVIDER_TIMEOUT_MS.default);
+  });
+
+  it('⛔ SQEM-582 — tool budget plus one provider call still fits the paid wall clock', () => {
+    // No new tool round starts after 90 s (chat-message TOOL_BUDGET_MS); the round in flight may
+    // then take a full provider timeout. 90 + 300 = 390 < 400.
+    const chat = readFileSync(root('supabase/functions/chat-message/index.ts'), 'utf8');
+    const budget = Number(chat.match(/const TOOL_BUDGET_MS = ([\d_]+);/)![1].replace(/_/g, ''));
+    expect(budget + PROVIDER_TIMEOUT_MS.long).toBeLessThan(EDGE_WALL_CLOCK_MS.paid);
+  });
+
+  it('SQEM-582 — a delta extends the client deadline, a stall still ends, never past the cap', () => {
+    const t0 = 1_000_000, cap = clientHardCapMs(paid(CLOUD_PLAIN));
+    let d = t0 + clientJobTimeoutMs(paid(CLOUD_PLAIN));
+    // early delta: the original deadline is later than now + grace → unchanged
+    expect(nextJobDeadline(d, t0 + 10_000, t0, cap)).toBe(d);
+    // a delta near the deadline pushes it a minute out
+    d = nextJobDeadline(d, t0 + 320_000, t0, cap);
+    expect(d).toBe(t0 + 320_000 + DELTA_GRACE_MS > t0 + cap ? t0 + cap : t0 + 320_000 + DELTA_GRACE_MS);
+    // never past the cap, which sits under the wall clock
+    expect(nextJobDeadline(d, t0 + 1_000_000, t0, cap)).toBe(t0 + cap);
+    expect(cap).toBeLessThan(EDGE_WALL_CLOCK_MS.paid);
+    // self-host: the cap is the plain client timeout — deltas extend nothing
+    expect(clientHardCapMs(HOST_PLAIN)).toBe(clientJobTimeoutMs(HOST_PLAIN));
   });
 
   it('⛔ the flag is ON — Cloud production is on a paid plan (owner, 2026-09-11: "no free plan at all")', () => {
@@ -74,9 +98,9 @@ describe('SQEM-381 — the orderings, under both plans', () => {
     // promotion because a reply was misread — the connector fix the owner had approved was withheld
     // on production for that window. The quote in the title is what a pin should rest on.
     expect(EDGE_PLAN_IS_PAID).toBe(true);
-    // …and therefore the live default gives Cloud connector turns the long pair, and nobody else.
-    expect(providerTimeoutMs(CLOUD_CONNECTORS)).toBe(PROVIDER_TIMEOUT_MS.connectors);
-    expect(providerTimeoutMs(CLOUD_PLAIN)).toBe(PROVIDER_TIMEOUT_MS.default);
+    // …and therefore the live default gives every Cloud chat turn the long pair, self-host none.
+    expect(providerTimeoutMs(CLOUD_CONNECTORS)).toBe(PROVIDER_TIMEOUT_MS.long);
+    expect(providerTimeoutMs(CLOUD_PLAIN)).toBe(PROVIDER_TIMEOUT_MS.long);
     expect(providerTimeoutMs(HOST_CONNECTORS)).toBe(PROVIDER_TIMEOUT_MS.default);
   });
 
@@ -87,10 +111,11 @@ describe('SQEM-381 — the orderings, under both plans', () => {
     expect(clientJobTimeoutMs(free(HOST_PLAIN))).toBeGreaterThan(EDGE_WALL_CLOCK_MS.free);
   });
 
-  it('the plain pair is unchanged from before SQEM-381', () => {
-    // Image generation, authoring and ordinary chat turns keep the numbers they always had.
-    expect(providerTimeoutMs(CLOUD_PLAIN)).toBe(120_000);
-    expect(clientJobTimeoutMs(CLOUD_PLAIN)).toBe(180_000);
+  it('the default pair is unchanged — self-host keeps it', () => {
+    expect(PROVIDER_TIMEOUT_MS.default).toBe(120_000);
+    expect(CLIENT_JOB_TIMEOUT_MS.default).toBe(180_000);
+    expect(providerTimeoutMs(HOST_PLAIN)).toBe(120_000);
+    expect(clientJobTimeoutMs(HOST_PLAIN)).toBe(180_000);
   });
 });
 
@@ -102,9 +127,11 @@ describe('SQEM-381 — both ends read the SAME module', () => {
   const CHAT_TSX = code(readFileSync(root('pages/Chat.tsx'), 'utf8'));
   const FETCH    = readFileSync(root('supabase/functions/_shared/fetchWithTimeout.ts'), 'utf8');
 
-  it('the edge function passes the provider timeout on BOTH connector-capable paths', () => {
-    // Claude (Messages API) and OpenAI (Responses) are the two that carry `mcp_servers`.
-    expect([...CHAT_FN.matchAll(/providerTimeoutMs\(/g)].length).toBeGreaterThanOrEqual(2);
+  it('SQEM-582 — the edge function passes the provider timeout on EVERY chat path', () => {
+    // Claude, OpenAI Responses, Gemini, OpenAI-compatible (Grok, DeepSeek, Mistral, OpenRouter,
+    // credits) — plus the connector log line. Before, Gemini and the compatible path used the 120 s
+    // default of fetchWithTimeout.
+    expect([...CHAT_FN.matchAll(/providerTimeoutMs\(/g)].length).toBeGreaterThanOrEqual(5);
     expect(CHAT_FN).toMatch(/from '\.\.\/_shared\/chatTimeouts\.ts'/);
   });
 

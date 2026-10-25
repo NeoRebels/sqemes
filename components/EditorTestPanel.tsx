@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { functionCallUrl } from '../lib/env';
+import { functionCallUrl, IS_SELF_HOSTED } from '../lib/env';
 import { useWorkspace, useData } from '../store';
 import { supabase } from '../lib/supabase';
 import { waitForJobResult } from '../lib/realtimeJob';
+import { clientJobTimeoutMs, clientHardCapMs } from '../supabase/functions/_shared/chatTimeouts.ts';
 import { getWorkspaceFileSignedUrl } from '../lib/api/files';
 import { isImageType } from '../lib/uploadTypes';
 import { buildEnabledModels, isFundedModel } from '../lib/enabledModels';
@@ -183,7 +184,10 @@ export default function EditorTestPanel({ template, resetKey, onReset }: Props) 
     const messagesToSend = truncateMessages(apiMessages, payloadBase);
 
     try {
-      const resultPromise = waitForJobResult(jobId, controller.signal);
+      // SQEM-582 — same chat-message call as Chat, so the same pair: the client must outlast the
+      // provider timeout the server now applies to every Cloud chat turn.
+      const resultPromise = waitForJobResult(jobId, controller.signal, undefined,
+        clientJobTimeoutMs({ selfHosted: IS_SELF_HOSTED }), undefined, clientHardCapMs({ selfHosted: IS_SELF_HOSTED }));
       const res = await fetch(functionCallUrl('chat-message'), {
         method: 'POST',
         signal: controller.signal,
