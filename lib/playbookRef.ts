@@ -20,6 +20,8 @@
 import type { PlaybookRef, PlaybookRefField, PromptKind, Variable } from '../types';
 import { MAX_LOADED_IDS } from '../supabase/functions/_shared/chatPlaybooks.ts';
 import { normalizeLibraryChanges, type LibraryChange } from '../supabase/functions/_shared/libraryChanges.ts';
+import { normalizeWebSources, type WebSources } from '../supabase/functions/_shared/webSearch.ts';
+import { normalizeGeneratedFiles, type GeneratedFile } from '../supabase/functions/_shared/fileOutput.ts';
 
 export { MAX_LOADED_IDS };
 
@@ -115,15 +117,19 @@ export function normalizeLoadedIds(raw: unknown): string[] {
  * (lib/api/chatSessions.ts) AND Chat's Realtime insert handler. Two hand-written copies would let
  * the card appear for the sender and silently not for a collaborator.
  */
-export function messagePlaybookFields(row: { playbook_ref?: unknown; loaded_template_ids?: unknown; library_changes?: unknown }): {
+export function messagePlaybookFields(row: { playbook_ref?: unknown; loaded_template_ids?: unknown; library_changes?: unknown; web_sources?: unknown; generated_files?: unknown }): {
   playbookRef: PlaybookRef | null;
   loadedTemplateIds: string[];
   libraryChanges: LibraryChange[];
+  webSources: WebSources | null;
+  generatedFiles: GeneratedFile[];
 } {
   return {
     playbookRef: parsePlaybookRef(row.playbook_ref),
     loadedTemplateIds: normalizeLoadedIds(row.loaded_template_ids),
     libraryChanges: normalizeLibraryChanges(row.library_changes), // SQEM-561 — the card under an answer
+    webSources: normalizeWebSources(row.web_sources), // SQEM-594 — what the answer searched and read
+    generatedFiles: normalizeGeneratedFiles(row.generated_files), // SQEM-595 — files handed out with it
   };
 }
 

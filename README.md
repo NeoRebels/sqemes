@@ -6,7 +6,7 @@ Build your team's **playbooks** once — prompts and skills — and the **person
 playbook to use when; then use them everywhere you work, through three channels:
 
 - 🧩 **Browser extension** — drop them into ChatGPT, Claude, Gemini, or any chat site
-- 💬 **Sqemes chat** — run them against your own model keys (bring-your-own-key)
+- 💬 **Sqemes chat** — run them against your own model keys (bring-your-own-key), with web search on your own Linkup or Brave key
 - 🔌 **MCP** — expose them to Claude Desktop, Cursor, or any MCP client
 
 Self-hostable and fair-code — own your data. Under the hood every playbook is one `Template` model

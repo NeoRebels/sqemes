@@ -10,12 +10,15 @@ import { AVAILABLE_MODELS } from '../constants';
 import { buildEnabledModels, isFundedModel, isImageModel } from '../lib/enabledModels';
 import { authoringModelId } from '../lib/authoringAI';
 import { edgeError } from '../lib/edgeError';
-import { Send, Square, Bot, User, Sparkles, AlertTriangle, Loader2, Copy, Check, Pencil, Paperclip, Plug, X, FileText, MessageSquarePlus, Search, MoreHorizontal, Globe, Lock, Trash2, MessageSquare, Wand2, Key, Upload, Files } from 'lucide-react';
+import { Send, Square, Bot, User, Sparkles, AlertTriangle, Loader2, Copy, Check, Pencil, Paperclip, Plug, X, FileText, MessageSquarePlus, Search, MoreHorizontal, Globe, Users, Lock, Trash2, MessageSquare, Wand2, Key, Upload, Files } from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { fetchPersona, fetchPersonas } from '../lib/api/personas';
 import { clearChatHandoff, peekChatHandoff } from '../lib/chatHandoff';
 import { buildPendingRef, finalizeRef, messagePlaybookFields, normalizeLoadedIds, pendingFromSent, usedPlaybooks, type PendingPlaybookRef } from '../lib/playbookRef';
-import { ChatPlaybookCard, UsedPlaybookChips, LibraryChangesCard } from '../components/ChatPlaybookCard';
+import { ChatPlaybookCard, UsedPlaybookChips, LibraryChangesCard, WebSourcesCard } from '../components/ChatPlaybookCard';
+import { normalizeWebSources, type WebSources } from '../supabase/functions/_shared/webSearch.ts';
+import { normalizeGeneratedFiles, type GeneratedFile } from '../supabase/functions/_shared/fileOutput.ts';
+import { GeneratedFilesCard, FilePreviewPanel } from '../components/ChatFileOutput';
 import { normalizeLibraryChanges, type LibraryChange } from '../supabase/functions/_shared/libraryChanges.ts';
 import { fetchWorkspaceFiles } from '../lib/api/files';
 import { personaInstruction } from '../lib/personaChat';
@@ -157,6 +160,8 @@ interface ChatMsg {
   playbookRef?: PlaybookRef | null;   // SQEM-551 — user message started from a prompt playbook
   loadedTemplateIds?: string[];       // SQEM-551 — answer: what the model loaded for it
   libraryChanges?: LibraryChange[];   // SQEM-561 — answer: what the model changed in the library
+  webSources?: WebSources | null;     // SQEM-594 — answer: what it searched for and read
+  generatedFiles?: GeneratedFile[];   // SQEM-595 — answer: files it handed out (built on download)
 }
 
 // SQEM-185 — a memoized single message. Extracting this out of the Chat component means composer
@@ -179,11 +184,13 @@ interface MessageItemProps {
   playbookTitles: ReadonlyMap<string, { title: string; kind: PromptKind }>;
   /** SQEM-561 — the viewer's own current title for a changed object; undefined when not theirs to see. */
   libraryTitle: (c: LibraryChange) => string | undefined;
+  /** SQEM-595 — open a generated file in the preview beside the chat (stable callback). */
+  onOpenFile: (f: GeneratedFile) => void;
 }
 
 const MessageItem = memo(function MessageItem({
   msg, currentUserId, currentUserName, userAvatar, showUserAvatar, onAvatarError,
-  isLastAssistant, isLoading, isCopied, onCopy, onEdit, innerRef, playbookTitles, libraryTitle,
+  isLastAssistant, isLoading, isCopied, onCopy, onEdit, innerRef, playbookTitles, libraryTitle, onOpenFile,
 }: MessageItemProps) {
   const isOtherUser = msg.role === 'user' && !!msg.userId && msg.userId !== currentUserId;
   return (
@@ -268,6 +275,8 @@ const MessageItem = memo(function MessageItem({
             </div>
             {!msg.pending && <UsedPlaybookChips used={usedPlaybooks(msg.loadedTemplateIds, playbookTitles)} />}
             {!msg.pending && <LibraryChangesCard changes={msg.libraryChanges} currentTitle={libraryTitle} />}
+            {!msg.pending && <GeneratedFilesCard files={msg.generatedFiles} onOpen={onOpenFile} />}
+            {!msg.pending && <WebSourcesCard sources={msg.webSources} />}
             {!msg.pending && (
               <button onClick={() => onCopy(msg.id, msg.content)} className="mt-2 ml-1 inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
                 {isCopied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
@@ -367,6 +376,11 @@ const Chat = () => {
   // is set up in order to be there, and confirming it again before every conversation was a step that
   // bought nothing. What is left is the list and a status indicator.
   const [connectors, setConnectors]           = useState<Connector[]>([]);
+  // SQEM-594 — web search for the NEXT message only: off by default, and off
+  // again the moment a message is sent. Search costs time and money, so it is a choice per question.
+  const [webNext, setWebNext]                 = useState(false);
+  // SQEM-595 — the generated file shown beside the chat (desktop) or full screen (phone); null = closed.
+  const [previewFile, setPreviewFile]         = useState<GeneratedFile | null>(null);
   const [saveToWorkspace, setSaveToWorkspace] = useState(false);
   const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false);
 
@@ -563,11 +577,14 @@ const Chat = () => {
       try {
         const stored = await fetchChatMessages(routeSessionId);
         supersededIdsRef.current = []; // SQEM-115 — a switch discards any unsent edit truncation
+        setPreviewFile(null); // SQEM-595 — a file belongs to the chat it was made in
         setMessages(stored.map(m => ({
           id: m.id, role: m.role, content: inlineImagesToBlobUrls(m.content), model: m.model,
           userId: m.userId, userName: m.userName, userAvatar: m.userAvatar,
           playbookRef: m.playbookRef, loadedTemplateIds: m.loadedTemplateIds, // SQEM-551
           libraryChanges: m.libraryChanges, // SQEM-561
+          webSources: m.webSources, // SQEM-594
+          generatedFiles: m.generatedFiles, // SQEM-595
         })));
         setSessionId(routeSessionId);
         setMobileTab('chat');
@@ -824,6 +841,10 @@ const Chat = () => {
     () => (connectorsSupported ? connectors.map(c => c.id) : []),
     [connectorsSupported, connectors],
   );
+  // SQEM-594 — web search needs a text model (same rule as connectors) and a search key: sqemes' own
+  // on Cloud, or the workspace's (Linkup or Brave). Self-host without one: the button says where to add it.
+  const webKeyAvailable = !!workspace.webSearchHosted || !!workspace.apiKeys.search_linkup || !!workspace.apiKeys.search_brave;
+  const webAvailable = connectorsSupported && webKeyAvailable;
 
   // SQEM-185 — useCallback so the memoized MessageItem stays memoized between keystrokes. Depends on
   // `messages` (unchanged while typing), so it's stable on the hot path but current when messages change.
@@ -975,6 +996,9 @@ const Chat = () => {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setAttachments([]);
+    // SQEM-594 — read once for this message, then switched off for the next one.
+    const webThis = webNext && webAvailable;
+    setWebNext(false);
     setError(null);
     setErrorCode(null);
     setIsLoading(true);
@@ -1066,6 +1090,8 @@ const Chat = () => {
       // including the `EDGE_PLAN_IS_PAID` gate, which keeps both at the default pair on a free plan.
       let loadedTemplateIds: string[] = [];
       let libraryChanges: LibraryChange[] = []; // SQEM-561
+      let webSources: WebSources | null = null; // SQEM-594
+      let generatedFiles: GeneratedFile[] = []; // SQEM-595
       const resultPromise = waitForJobResult(jobId, controller.signal, (textSoFar) => {
         streamedTextRef.current = textSoFar;
         setMessages(prev => prev.map(m => (
@@ -1076,13 +1102,15 @@ const Chat = () => {
       (meta) => {
         loadedTemplateIds = normalizeLoadedIds(meta.loadedTemplateIds);
         libraryChanges = normalizeLibraryChanges(meta.libraryChanges);
+        webSources = normalizeWebSources(meta.webSources);
+        generatedFiles = normalizeGeneratedFiles(meta.generatedFiles);
       }, clientHardCapMs({ selfHosted: IS_SELF_HOSTED })); // SQEM-582 — deltas may extend up to this
 
       const res = await fetch(functionCallUrl('chat-message'), {
         method: 'POST',
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ ...chatPayloadBase, messages: messagesToSend, jobId, connectorIds: activeConnectorIds }),
+        body: JSON.stringify({ ...chatPayloadBase, messages: messagesToSend, jobId, connectorIds: activeConnectorIds, ...(webThis ? { webSearch: true } : {}) }),
       });
 
       if (!res.ok) throw await edgeError(res);
@@ -1099,7 +1127,7 @@ const Chat = () => {
       } else {
         // Text model — wait for Realtime broadcast
         rawResult = await resultPromise;
-        setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: inlineImagesToBlobUrls(rawResult), pending: false, loadedTemplateIds, libraryChanges } : m));
+        setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: inlineImagesToBlobUrls(rawResult), pending: false, loadedTemplateIds, libraryChanges, webSources, generatedFiles } : m));
         // SQEM-561 — playbooks arrive through the store's realtime channel; personas and files do not,
         // so the lists the card and the pickers read from are fetched again when either changed.
         if (libraryChanges.some(c => c.kind === 'persona')) {
@@ -1111,7 +1139,7 @@ const Chat = () => {
       }
 
       // Save original base64 content to DB (use same ID so realtime can deduplicate)
-      if (activeSessionId) addChatMessage(activeSessionId, 'assistant', rawResult, selectedModel, undefined, assistantMsgId, { loadedTemplateIds, libraryChanges }).catch(() => {});
+      if (activeSessionId) addChatMessage(activeSessionId, 'assistant', rawResult, selectedModel, undefined, assistantMsgId, { loadedTemplateIds, libraryChanges, webSources, generatedFiles }).catch(() => {});
 
       // First exchange of a new chat → upgrade the truncated title to an AI topic title.
       if (isNewSession && activeSessionId) generateChatTitle(trimmed, rawResult, activeSessionId);
@@ -1272,8 +1300,9 @@ const Chat = () => {
         </div>
 
         {/* Visibility icon */}
+        {/* SQEM-594 — shared chats are marked with Users: the globe now means web search. */}
         {isOwner && session.visibility === 'workspace' && (
-          <Globe className="w-3 h-3 text-brand-400 shrink-0 mt-1" />
+          <Users className="w-3 h-3 text-brand-400 shrink-0 mt-1" aria-label="Shared with the team" />
         )}
 
         {/* SQEM-357 — the one action an admin has on somebody else's shared chat. A dead artefact
@@ -1308,7 +1337,7 @@ const Chat = () => {
                   <Pencil className="w-3.5 h-3.5" /> Rename
                 </button>
                 <button onClick={() => handleToggleVisibility(session)} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                  {session.visibility === 'workspace' ? <><Lock className="w-3.5 h-3.5" /> Set Private</> : <><Globe className="w-3.5 h-3.5" /> Share with Team</>}
+                  {session.visibility === 'workspace' ? <><Lock className="w-3.5 h-3.5" /> Set Private</> : <><Users className="w-3.5 h-3.5" /> Share with Team</>}
                 </button>
                 <div className="border-t border-slate-100 dark:border-slate-700 mt-1 pt-1">
                   <button onClick={() => { setDeleteConfirmId(session.id); setOpenMenuId(null); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
@@ -1434,7 +1463,7 @@ const Chat = () => {
               ) : sharedSessions.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
                   <div className="w-10 h-10 bg-slate-50 dark:bg-slate-700 rounded-full flex items-center justify-center mb-3">
-                    <Globe className="w-5 h-5 text-slate-300 dark:text-slate-500" />
+                    <Users className="w-5 h-5 text-slate-300 dark:text-slate-500" />
                   </div>
                   <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-0.5">No shared chats yet</p>
                   <p className="text-xs text-slate-400 dark:text-slate-500">Chats shared with the workspace appear here.</p>
@@ -1598,6 +1627,7 @@ const Chat = () => {
                     onCopy={handleCopyMessage}
                     onEdit={handleEditMessage}
                     playbookTitles={playbookTitles}
+                    onOpenFile={setPreviewFile}
                     libraryTitle={libraryTitle}
                   />
                 ))}
@@ -1766,6 +1796,22 @@ const Chat = () => {
                         className="w-full resize-none bg-transparent px-2 py-2.5 text-sm md:text-base text-ink-strong outline-none transition-all disabled:opacity-50 placeholder:text-ink-subtle"
                       />
                     </div>
+                    {/* SQEM-594 — web search for the next message only; pressed state is the whole UI. */}
+                    <button
+                      type="button"
+                      onClick={() => setWebNext(v => !v)}
+                      disabled={!webAvailable || isLoading}
+                      aria-pressed={webNext && webAvailable}
+                      aria-label="Search the web for this message"
+                      title={!webKeyAvailable
+                        ? 'Web search needs a search key — add one in Settings → API & MCP → Web search'
+                        : !connectorsSupported
+                          ? 'Image models cannot search the web'
+                          : webNext ? 'Web search is on for this message' : 'Search the web for this message'}
+                      className={`p-3 rounded-xl transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${webNext && webAvailable ? 'bg-accent-soft text-accent' : 'text-ink-subtle hover:text-ink hover:bg-surface-sunken'}`}
+                    >
+                      <Globe className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={handleEnhanceInput}
                       disabled={isEnhancing || isLoading || !input.trim() || enabledModels.length === 0}
@@ -1804,6 +1850,11 @@ const Chat = () => {
             </div>
           </div>
         </div>
+
+        {/* SQEM-595 — a generated file beside the chat (md+), full screen on a phone. */}
+        {previewFile && (
+          <FilePreviewPanel file={previewFile} onClose={() => setPreviewFile(null)} markdownComponents={MarkdownComponents} workspaceStyle={workspace.documentStyle} files={workspaceFiles} />
+        )}
       </div>
 
       {/* ── Delete confirm modal ── */}

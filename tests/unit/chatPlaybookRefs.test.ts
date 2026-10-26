@@ -91,11 +91,11 @@ describe('SQEM-551 — "Used" chips (pure)', () => {
 
   it('one row mapping for both read paths', () => {
     expect(messagePlaybookFields({ playbook_ref: { id: A, title: 'T', kind: 'prompt', fields: [], edited: true }, loaded_template_ids: [B] }))
-      .toEqual({ playbookRef: { id: A, title: 'T', kind: 'prompt', fields: [], edited: true }, loadedTemplateIds: [B], libraryChanges: [] });
+      .toEqual({ playbookRef: { id: A, title: 'T', kind: 'prompt', fields: [], edited: true }, loadedTemplateIds: [B], libraryChanges: [], webSources: null, generatedFiles: [] }); // SQEM-594/595 — same mapping carries sources and files
     // SQEM-561 — the same mapping carries the change card, so a collaborator sees it too.
     expect(messagePlaybookFields({ library_changes: [{ action: 'deleted', kind: 'skill', id: A, title: 'Old' }] }).libraryChanges)
       .toEqual([{ action: 'deleted', kind: 'skill', id: A, title: 'Old' }]);
-    expect(messagePlaybookFields({})).toEqual({ playbookRef: null, loadedTemplateIds: [], libraryChanges: [] });
+    expect(messagePlaybookFields({})).toEqual({ playbookRef: null, loadedTemplateIds: [], libraryChanges: [], webSources: null, generatedFiles: [] });
   });
 });
 
@@ -111,7 +111,7 @@ describe('SQEM-551 — wiring', () => {
   });
 
   it('the client hands the extra field to Chat and stores both kinds', () => {
-    expect(read('lib/realtimeJob.ts')).toMatch(/onResultMeta\?\.\(\{ loadedTemplateIds: payload\.loadedTemplateIds, libraryChanges: payload\.libraryChanges \}\);\s*resolve\(/);
+    expect(read('lib/realtimeJob.ts')).toMatch(/onResultMeta\?\.\(\{ loadedTemplateIds: payload\.loadedTemplateIds, libraryChanges: payload\.libraryChanges, webSources: payload\.webSources, generatedFiles: payload\.generatedFiles \}\);\s*resolve\(/);
     const api = read('lib/api/chatSessions.ts');
     expect(api).toMatch(/\.\.\.messagePlaybookFields\(row\)/);
     expect(api).toMatch(/playbook_ref: extra\.playbookRef/);
@@ -123,7 +123,7 @@ describe('SQEM-551 — wiring', () => {
     expect(chat).toMatch(/pendingPlaybookRef\.current = buildPendingRef\(template, template\.variables \?\? \[\], inputs, text\)/);
     expect(chat).toMatch(/const playbookRef = finalizeRef\(pendingPlaybookRef\.current, trimmed\)/);
     expect(chat).toMatch(/userMsg\.id, \{ playbookRef \}\)/);
-    expect(chat).toMatch(/assistantMsgId, \{ loadedTemplateIds, libraryChanges \}\)/);
+    expect(chat).toMatch(/assistantMsgId, \{ loadedTemplateIds, libraryChanges, webSources, generatedFiles \}\)/);
     expect(chat).toMatch(/playbookRef: m\.playbookRef, loadedTemplateIds: m\.loadedTemplateIds/);
     expect(chat).toMatch(/\.\.\.messagePlaybookFields\(row\), \/\/ SQEM-551/);
     expect(chat).toMatch(/if \(!input\.trim\(\)\) pendingPlaybookRef\.current = null;/);

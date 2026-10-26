@@ -110,6 +110,10 @@ export const DEFINER_ALLOWLIST: Record<string, DefinerEntry> = {
     why: 'app (Files page counts); membership-checked (SQEM-234)',
     probe: { sql: `select count(*) from public.workspace_file_usage('${A}')`, expect: 'zeroOrError' },
   },
+  workspace_web_search_usage: {
+    why: 'app (Overview "Web searches" bar, SQEM-594); used/allowance of the credit period, members of that workspace only',
+    probe: { sql: `select count(*) from public.workspace_web_search_usage('${A}')`, expect: 'error' },
+  },
   workspace_usage_summary: {
     why: 'app (Overview channel cards, SQEM-553); aggregates of usage_daily, admins/editors of that workspace only',
     probe: { sql: `select count(*) from public.workspace_usage_summary('${A}')`, expect: 'error' },

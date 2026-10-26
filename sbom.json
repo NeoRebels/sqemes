@@ -3,11 +3,11 @@
   "specVersion": "1.5",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-26T14:34:36.988Z",
+    "timestamp": "2026-10-26T23:09:59.002Z",
     "component": {
       "type": "application",
       "name": "sqemes",
-      "version": "1.11.32"
+      "version": "1.11.33"
     }
   },
   "components": [
@@ -72,6 +72,58 @@
         {
           "license": {
             "id": "OFL-1.1"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@fontsource/lato",
+      "version": "5.3.0",
+      "purl": "pkg:npm/%40fontsource/lato@5.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "OFL-1.1"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@fontsource/open-sans",
+      "version": "5.3.0",
+      "purl": "pkg:npm/%40fontsource/open-sans@5.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "OFL-1.1"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@noble/ciphers",
+      "version": "1.3.0",
+      "purl": "pkg:npm/%40noble/ciphers@1.3.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@noble/hashes",
+      "version": "1.8.0",
+      "purl": "pkg:npm/%40noble/hashes@1.8.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
           }
         }
       ]
@@ -299,6 +351,19 @@
     },
     {
       "type": "library",
+      "name": "@swc/helpers",
+      "version": "0.5.23",
+      "purl": "pkg:npm/%40swc/helpers@0.5.23",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "@types/css-font-loading-module",
       "version": "0.0.7",
       "purl": "pkg:npm/%40types/css-font-loading-module@0.0.7",
@@ -393,6 +458,19 @@
       "name": "@types/node",
       "version": "22.19.1",
       "purl": "pkg:npm/%40types/node@22.19.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@types/node",
+      "version": "26.6.5",
+      "purl": "pkg:npm/%40types/node@26.6.5",
       "licenses": [
         {
           "license": {
@@ -533,6 +611,45 @@
     },
     {
       "type": "library",
+      "name": "base64-js",
+      "version": "0.0.8",
+      "purl": "pkg:npm/base64-js@0.0.8",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "base64-js",
+      "version": "1.5.1",
+      "purl": "pkg:npm/base64-js@1.5.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "brotli",
+      "version": "1.3.3",
+      "purl": "pkg:npm/brotli@1.3.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "ccount",
       "version": "2.0.1",
       "purl": "pkg:npm/ccount@2.0.1",
@@ -588,6 +705,19 @@
       "name": "character-reference-invalid",
       "version": "2.0.1",
       "purl": "pkg:npm/character-reference-invalid@2.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "clone",
+      "version": "2.1.2",
+      "purl": "pkg:npm/clone@2.1.2",
       "licenses": [
         {
           "license": {
@@ -702,6 +832,32 @@
     },
     {
       "type": "library",
+      "name": "dfa",
+      "version": "1.2.0",
+      "purl": "pkg:npm/dfa@1.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "docx",
+      "version": "9.14.0",
+      "purl": "pkg:npm/docx@9.14.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "escape-string-regexp",
       "version": "5.0.0",
       "purl": "pkg:npm/escape-string-regexp@5.0.0",
@@ -741,9 +897,48 @@
     },
     {
       "type": "library",
+      "name": "fast-deep-equal",
+      "version": "3.1.3",
+      "purl": "pkg:npm/fast-deep-equal@3.1.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "fflate",
       "version": "0.4.9",
       "purl": "pkg:npm/fflate@0.4.9",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "fflate",
+      "version": "0.8.3",
+      "purl": "pkg:npm/fflate@0.8.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "fontkit",
+      "version": "2.0.4",
+      "purl": "pkg:npm/fontkit@2.0.4",
       "licenses": [
         {
           "license": {
@@ -761,6 +956,19 @@
         {
           "license": {
             "id": "Commercial"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "hash.js",
+      "version": "1.1.7",
+      "purl": "pkg:npm/hash.js@1.1.7",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
           }
         }
       ]
@@ -806,9 +1014,35 @@
     },
     {
       "type": "library",
+      "name": "https",
+      "version": "1.0.0",
+      "purl": "pkg:npm/https@1.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "iceberg-js",
       "version": "0.8.1",
       "purl": "pkg:npm/iceberg-js@0.8.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "image-size",
+      "version": "2.0.4",
+      "purl": "pkg:npm/image-size@2.0.4",
       "licenses": [
         {
           "license": {
@@ -962,6 +1196,19 @@
     },
     {
       "type": "library",
+      "name": "linebreak",
+      "version": "1.1.0",
+      "purl": "pkg:npm/linebreak@1.1.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "longest-streak",
       "version": "3.1.0",
       "purl": "pkg:npm/longest-streak@3.1.0",
@@ -1015,8 +1262,8 @@
     {
       "type": "library",
       "name": "mdast-util-from-markdown",
-      "version": "2.0.2",
-      "purl": "pkg:npm/mdast-util-from-markdown@2.0.2",
+      "version": "2.1.0",
+      "purl": "pkg:npm/mdast-util-from-markdown@2.1.0",
       "licenses": [
         {
           "license": {
@@ -1560,6 +1807,19 @@
     },
     {
       "type": "library",
+      "name": "minimalistic-assert",
+      "version": "1.0.1",
+      "purl": "pkg:npm/minimalistic-assert@1.0.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "mitt",
       "version": "3.0.1",
       "purl": "pkg:npm/mitt@3.0.1",
@@ -1576,6 +1836,19 @@
       "name": "ms",
       "version": "2.1.3",
       "purl": "pkg:npm/ms@2.1.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "nanoid",
+      "version": "6.0.2",
+      "purl": "pkg:npm/nanoid@6.0.2",
       "licenses": [
         {
           "license": {
@@ -1612,9 +1885,48 @@
     },
     {
       "type": "library",
+      "name": "pako",
+      "version": "0.2.9",
+      "purl": "pkg:npm/pako@0.2.9",
+      "licenses": [
+        {
+          "license": {
+            "id": "(MIT AND Zlib)"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "parse-entities",
       "version": "4.0.2",
       "purl": "pkg:npm/parse-entities@4.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pdfkit",
+      "version": "0.20.2",
+      "purl": "pkg:npm/pdfkit@0.20.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pdfmake",
+      "version": "0.3.13",
+      "purl": "pkg:npm/pdfmake@0.3.13",
       "licenses": [
         {
           "license": {
@@ -1638,9 +1950,28 @@
     },
     {
       "type": "library",
+      "name": "png-js",
+      "version": "2.0.0",
+      "purl": "pkg:npm/png-js@2.0.0"
+    },
+    {
+      "type": "library",
       "name": "postcss",
       "version": "8.5.26",
       "purl": "pkg:npm/postcss@8.5.26",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pptxgenjs",
+      "version": "4.0.1",
+      "purl": "pkg:npm/pptxgenjs@4.0.1",
       "licenses": [
         {
           "license": {
@@ -1794,6 +2125,19 @@
     },
     {
       "type": "library",
+      "name": "restructure",
+      "version": "3.0.2",
+      "purl": "pkg:npm/restructure@3.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "rrdom",
       "version": "2.1.4",
       "purl": "pkg:npm/rrdom@2.1.4",
@@ -1840,6 +2184,19 @@
         {
           "license": {
             "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "sax",
+      "version": "1.6.1",
+      "purl": "pkg:npm/sax@1.6.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "BlueOak-1.0.0"
           }
         }
       ]
@@ -1950,6 +2307,19 @@
     },
     {
       "type": "library",
+      "name": "tiny-inflate",
+      "version": "1.0.3",
+      "purl": "pkg:npm/tiny-inflate@1.0.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "trim-lines",
       "version": "3.0.1",
       "purl": "pkg:npm/trim-lines@3.0.1",
@@ -1990,8 +2360,47 @@
     {
       "type": "library",
       "name": "undici-types",
+      "version": "8.9.0",
+      "purl": "pkg:npm/undici-types@8.9.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "undici-types",
       "version": "6.21.0",
       "purl": "pkg:npm/undici-types@6.21.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "unicode-properties",
+      "version": "1.4.1",
+      "purl": "pkg:npm/unicode-properties@1.4.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "unicode-trie",
+      "version": "2.0.0",
+      "purl": "pkg:npm/unicode-trie@2.0.0",
       "licenses": [
         {
           "license": {
@@ -2132,9 +2541,35 @@
     },
     {
       "type": "library",
+      "name": "write-excel-file",
+      "version": "4.1.1",
+      "purl": "pkg:npm/write-excel-file@4.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "ws",
       "version": "8.21.0",
       "purl": "pkg:npm/ws@8.21.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "xmldoc",
+      "version": "2.0.3",
+      "purl": "pkg:npm/xmldoc@2.0.3",
       "licenses": [
         {
           "license": {

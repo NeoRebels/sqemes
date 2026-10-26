@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import KindBadge from './ui/KindBadge';
 import type { PlaybookRef, PromptKind } from '../types';
 import { changeLabel, type LibraryChange } from '../supabase/functions/_shared/libraryChanges.ts';
+import type { WebSources } from '../supabase/functions/_shared/webSearch.ts';
 
 /**
  * SQEM-551 — a user message that started from a prompt playbook (redesign C, Figma C5).
@@ -113,6 +114,41 @@ export function LibraryChangesCard({
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+/**
+ * SQEM-594 — under an answer that used web search: what it searched for and which pages it read.
+ * Queries and URLs only — the page content itself is never stored (see `_shared/webSearch.ts`).
+ * External links open in a new tab without a referrer.
+ */
+export function WebSourcesCard({ sources }: { sources: WebSources | null | undefined }) {
+  if (!sources || (!sources.queries.length && !sources.pages.length)) return null;
+  const host = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } };
+  return (
+    <div className="mt-2 ml-1 w-full max-w-md rounded-card border border-line bg-surface-raised shadow-rest px-4 py-3 text-left">
+      <p className="text-xs font-medium text-ink-subtle">Searched the web</p>
+      {sources.queries.length > 0 && (
+        <ul className="mt-1.5 space-y-0.5">
+          {sources.queries.map((q, i) => <li key={i} className="text-sm text-ink-muted break-words">“{q}”</li>)}
+        </ul>
+      )}
+      {sources.pages.length > 0 && (
+        <>
+          <p className="mt-2 text-xs font-medium text-ink-subtle">Pages read</p>
+          <ul className="mt-1 space-y-0.5">
+            {sources.pages.map(p => (
+              <li key={p.url} className="text-sm break-words">
+                <a href={p.url} target="_blank" rel="noopener noreferrer nofollow" className="text-ink hover:underline">
+                  {p.title || host(p.url)}
+                </a>
+                <span className="ml-1.5 text-xs text-ink-subtle">{host(p.url)}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

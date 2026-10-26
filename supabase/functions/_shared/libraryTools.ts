@@ -305,8 +305,8 @@ function bound(text: string): string {
  */
 export function toolCapNotice(rounds: number, reason: 'rounds' | 'time' = 'rounds'): string {
   const why = reason === 'time'
-    ? 'ran out of time for further library lookups'
-    : `stopped after ${rounds} rounds of library lookups`;
+    ? 'ran out of time for further tool use'
+    : `stopped after ${rounds} rounds of tool use`; // SQEM-595 — the tools are no longer only library lookups
   return `\n\n---\n_Sqemes ${why} and answered with what had been loaded._`;
 }
 

@@ -3,6 +3,8 @@ import type { Database, Json } from '../database.types';
 import type { ChatSession, PlaybookRef, StoredChatMessage } from '../../types';
 import { messagePlaybookFields } from '../playbookRef';
 import type { LibraryChange } from '../../supabase/functions/_shared/libraryChanges.ts';
+import type { WebSources } from '../../supabase/functions/_shared/webSearch.ts';
+import type { GeneratedFile } from '../../supabase/functions/_shared/fileOutput.ts';
 
 // SQEM-390 — `assistant_id` is optional here because the explicit column lists no longer select it;
 // the column itself stays on the table (legacy, unread) and `select('*')` still returns it.
@@ -132,7 +134,7 @@ export async function addChatMessage(
   userId?: string,
   id?: string,
   // SQEM-551 — the playbook card (user message) or the "Used" ids (answer); see lib/playbookRef.ts.
-  extra?: { playbookRef?: PlaybookRef | null; loadedTemplateIds?: string[]; libraryChanges?: LibraryChange[] },
+  extra?: { playbookRef?: PlaybookRef | null; loadedTemplateIds?: string[]; libraryChanges?: LibraryChange[]; webSources?: WebSources | null; generatedFiles?: GeneratedFile[] },
 ): Promise<StoredChatMessage> {
   const { data, error } = await supabase
     .from('chat_messages')
@@ -142,6 +144,10 @@ export async function addChatMessage(
       ...(extra?.loadedTemplateIds?.length ? { loaded_template_ids: extra.loadedTemplateIds } : {}),
       // SQEM-561 — the card under the answer; capped and shaped by normalizeLibraryChanges before here.
       ...(extra?.libraryChanges?.length ? { library_changes: extra.libraryChanges as unknown as Json } : {}),
+      // SQEM-594 — queries and URLs only, shaped by normalizeWebSources before here. Never page content.
+      ...(extra?.webSources ? { web_sources: extra.webSources as unknown as Json } : {}),
+      // SQEM-595 — file descriptions (Markdown), shaped by normalizeGeneratedFiles. Never a stored file.
+      ...(extra?.generatedFiles?.length ? { generated_files: extra.generatedFiles as unknown as Json } : {}),
     })
     .select()
     .single();

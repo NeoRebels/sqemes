@@ -211,7 +211,8 @@ describe('SQEM-373 — the wiring in chat-message', () => {
     // that is sent. A prompt promising tools the provider never received is how a model starts
     // inventing library contents (SQEM-326).
     expect(CHAT_FN).toMatch(/const tools: ToolRuntime \| null = workspaceId/);
-    expect(CHAT_FN).toMatch(/const instruction = tools \? withLibraryPrompt\(systemInstruction\) : systemInstruction/);
+    // SQEM-594 — the library prompt is still decided by `tools` alone; the web line is added on top only for a web message.
+    expect(CHAT_FN).toMatch(/const libraryInstruction = tools \? withLibraryPrompt\(systemInstruction\) : systemInstruction/);
   });
 
   it('⛔ the loop has a cap, and the cap is VISIBLE', () => {
@@ -219,6 +220,8 @@ describe('SQEM-373 — the wiring in chat-message', () => {
     // the reply would say so.
     expect(CHAT_FN).toMatch(/TOOL_ROUNDS_BYOK\s*=\s*\d+/);
     expect(CHAT_FN).toMatch(/TOOL_ROUNDS_FUNDED\s*=\s*\d+/);
+    // SQEM-595 — 2 fired on finished file answers (lookup + create_file); 4 since.
+    expect(CHAT_FN).toMatch(/const TOOL_ROUNDS_FUNDED = 4;/);
     expect(CHAT_FN).toMatch(/if \(tools\?\.stats\.cappedAt\) result \+= toolCapNotice/);
     expect(toolCapNotice(6, 'rounds')).toContain('6');
     expect(toolCapNotice(6, 'time')).toMatch(/time/);

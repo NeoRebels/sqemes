@@ -11,3 +11,13 @@ export async function fetchUsageSummary(workspaceId: string): Promise<Partial<Re
   if (error) throw error;
   return parseUsageSummary(data);
 }
+
+/**
+ * SQEM-594 — web searches on the included (sqemes) key in this credit period, against the plan's
+ * allowance. `limit === null` = unlimited (managed). Null on failure: the Overview simply leaves the bar out.
+ */
+export async function fetchWebSearchUsage(workspaceId: string): Promise<{ used: number; limit: number | null } | null> {
+  const { data, error } = await supabase.rpc('workspace_web_search_usage', { p_workspace_id: workspaceId });
+  if (error || !data?.length) return null;
+  return { used: Number(data[0].used) || 0, limit: data[0].allowance ?? null };
+}

@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { normalizeDocumentStyle, type DocumentStyle } from '../../supabase/functions/_shared/documentStyle.ts';
 import { functionCallUrl } from '../env';
 import type { Database } from '../database.types';
 import type { Workspace, User, BrandProfile, UserRole } from '../../types';
@@ -33,6 +34,8 @@ export function rowToWorkspace(row: WorkspaceRow, members: User[] = []): Workspa
     defaultEditRestricted: (row as unknown as { default_edit_restricted?: boolean }).default_edit_restricted ?? false,
     // SQEM-311 — likewise added by migration, not yet in the generated types.
     authoringModelId: (row as unknown as { authoring_model_id?: string | null }).authoring_model_id ?? null,
+    // SQEM-597 — validated on read; a malformed value becomes null, never a broken document.
+    documentStyle: normalizeDocumentStyle((row as unknown as { document_style?: unknown }).document_style),
   };
 }
 
@@ -107,6 +110,7 @@ export async function updateWorkspace(id: string, updates: Partial<{
   default_template_access: string[] | null;
   default_edit_restricted: boolean;
   authoring_model_id: string | null;
+  document_style: DocumentStyle | null; // SQEM-597 — admins only (guard_document_style)
 }>) {
   const { data, error } = await supabase
     .from('workspaces')

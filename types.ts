@@ -1,4 +1,7 @@
 import type { LibraryChange } from './supabase/functions/_shared/libraryChanges.ts';
+import type { WebSources } from './supabase/functions/_shared/webSearch.ts';
+import type { GeneratedFile } from './supabase/functions/_shared/fileOutput.ts';
+import type { DocumentStyle } from './supabase/functions/_shared/documentStyle.ts';
 
 export type UserRole = 'admin' | 'editor' | 'member';
 
@@ -29,6 +32,10 @@ export interface Workspace {
   cancelAtPeriodEnd?: boolean;
   /** SQEM-082 — Sqemes-funded AI available (Cloud has MISTRAL_API_KEY). From getApiKeyStatus, not the DB row. */
   fundedAvailable?: boolean;
+  /** SQEM-594 — sqemes provides web search without a key of the workspace's own (Cloud). */
+  webSearchHosted?: boolean;
+  /** SQEM-597 — the default look of files from Chat (Settings → Brand, admins). */
+  documentStyle?: DocumentStyle | null;
   /**
    * SQEM-311 — the model used for AI *authoring* (enhance, descriptions, both wizards, brand
    * adaptation). Null/absent ⇒ pick the first text model with a key, which is what happened
@@ -45,6 +52,9 @@ export interface Workspace {
     mistral?: string;
     openrouter?: string;
     ollama?: string;
+    /** SQEM-594 — the workspace's own search key; at most one of the two is set. */
+    search_linkup?: string;
+    search_brave?: string;
   };
   members: User[];
   blacklistedTerms: string[];
@@ -280,6 +290,10 @@ export interface StoredChatMessage {
   loadedTemplateIds?: string[];
   /** SQEM-561 — assistant message: what the model changed in the library for this answer. */
   libraryChanges?: LibraryChange[];
+  /** SQEM-594 — assistant message: what the answer searched for and read (queries + URLs). */
+  webSources?: WebSources | null;
+  /** SQEM-595 — assistant message: files handed out with it (descriptions; built on download). */
+  generatedFiles?: GeneratedFile[];
 }
 
 export interface Invitation {

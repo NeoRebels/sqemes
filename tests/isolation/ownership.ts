@@ -48,7 +48,8 @@ export const OWNERSHIP: Record<string, Ownership> = {
   template_access: ws(),
   template_editors: ws(),  // SQEM-473 — who may change a playbook
   template_versions: ws(), // SQEM-477 — version history, written by a trigger only
-  usage_daily: ws(),   // SQEM-517 — counts per workspace, no client access at all
+  usage_daily: ws(),
+  web_search_daily: { ...ws(), mayBeEmpty: 'rows exist only on Cloud once a workspace searched the web on the sqemes key' }, // SQEM-594 — service role only   // SQEM-517 — counts per workspace, no client access at all
   workspace_api_keys: ws(),
   workspace_connectors: ws(),
   workspace_file_texts: ws(),

@@ -12,7 +12,7 @@ import { withLibraryPrompt } from '../_shared/libraryPrompt.ts';
 import { providerTimeoutMs } from '../_shared/chatTimeouts.ts';
 import { watchForCancel } from '../_shared/chatCancel.ts';
 import { loadConnectorTools, withConnectorTools } from '../_shared/mcpClient.ts';
-import { readSSE, geminiDelta, openAiDelta, claudeDelta } from '../_shared/sseStream.ts';
+import { readSSE, geminiDelta, openAiDelta, claudeDelta, contentText } from '../_shared/sseStream.ts';
 import { createDeltaBroadcaster } from '../_shared/deltaBroadcast.ts';
 import { createLibraryReader } from '../_shared/libraryQueries.ts';
 import {
@@ -41,6 +41,11 @@ import { isLoadtestRequest, runLoadtestMock, LOADTEST_HEADER } from '../_shared/
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
 import { countUsage } from '../_shared/usageCounts.ts';
 import { MAX_LOADED_IDS } from '../_shared/chatPlaybooks.ts';
+import {
+  searchWeb, readWebPage, withWebTools, WEB_SEARCH_INSTRUCTION, SEARCH_KEY_PROVIDERS, ALLOWANCE_NOTICE,
+  type SearchProvider, type WebSources, type WebState,
+} from '../_shared/webSearch.ts';
+import { withFileTool, type GeneratedFile } from '../_shared/fileOutput.ts';
 
 // SQEM-082 — keyless chat + editor test-run route through the Sqemes-funded model
 // (direct Mistral, EU/GDPR), metered against the workspace's monthly AI credits.
@@ -89,7 +94,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { workspaceId, modelId, systemInstruction, jobId, funded, connectorIds, timeZone } = body;
+    const { workspaceId, modelId, systemInstruction, jobId, funded, connectorIds, timeZone, webSearch } = body;
     // SQEM-514 — a file part no provider can take never reaches a provider branch (_shared/messageParts.ts).
     const messages = Array.isArray(body.messages) ? dropUnsendableInMessages(body.messages) : body.messages;
 
@@ -313,6 +318,9 @@ Deno.serve(async (req) => {
     const connectors = (Array.isArray(connectorIds) && connectorIds.length > 0)
       ? await resolveConnectors(adminClient, workspaceId, user.id, connectorIds)
       : null;
+    // SQEM-594 — web search, only when the person switched it on for THIS message. The workspace's own
+    // search key wins over ours; without either (self-host without a key) the tools are not offered.
+    const web = webSearch === true ? await resolveWebSearch(adminClient, workspaceId) : null;
     EdgeRuntime.waitUntil(runAndBroadcast({
       jobId, provider, apiKey,
       modelId: effectiveModelId,
@@ -327,6 +335,8 @@ Deno.serve(async (req) => {
       // workspace-shared one would let anybody act as its owner (SQEM-346).
       userId: user.id,
       role: (membership as { role?: string }).role ?? null, // SQEM-561
+      web,
+      webRequested: webSearch === true,
     }));
     return new Response(JSON.stringify({ jobId }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
@@ -405,6 +415,46 @@ interface JobRequest {
    * edit right per object (`can_edit_*`) on top.
    */
   role: string | null;
+  /** SQEM-594 — the search key for this message, or null (not switched on, or none available). */
+  web: WebSearchConfig | null;
+  /** SQEM-594 — switched on by the person, whether or not a key was found (to say so if not). */
+  webRequested: boolean;
+}
+
+interface WebSearchConfig {
+  provider: SearchProvider;
+  key: string;
+  /** Our Cloud key — counted against the plan's monthly allowance (consume_web_search). */
+  hosted: boolean;
+}
+
+/**
+ * SQEM-594 — which search key this message uses: the workspace's own (Linkup or Brave, one per
+ * workspace) before ours (Linkup, Cloud only). Self-host sets no LINKUP_API_KEY, so there it is the
+ * workspace's own key or nothing.
+ */
+async function resolveWebSearch(adminClient: ReturnType<typeof createAdminClient>, workspaceId: string): Promise<WebSearchConfig | null> {
+  const { data: rows } = await adminClient
+    .from('workspace_api_keys')
+    .select('provider, encrypted_key')
+    .eq('workspace_id', workspaceId)
+    .in('provider', Object.values(SEARCH_KEY_PROVIDERS));
+  const own = (rows ?? [])[0] as { provider: string; encrypted_key: string } | undefined;
+  if (own?.encrypted_key) {
+    const provider = (Object.keys(SEARCH_KEY_PROVIDERS) as SearchProvider[]).find(p => SEARCH_KEY_PROVIDERS[p] === own.provider)!;
+    return { provider, key: await decryptApiKey(own.encrypted_key), hosted: false };
+  }
+  const hostedKey = Deno.env.get('LINKUP_API_KEY');
+  return hostedKey ? { provider: 'linkup', key: hostedKey, hosted: true } : null;
+}
+
+/** A–AAAA lookup for the page reader's private-address check; absent where the runtime cannot resolve. */
+async function resolveHost(host: string): Promise<string[]> {
+  const [a, aaaa] = await Promise.all([
+    Deno.resolveDns(host, 'A').catch(() => [] as string[]),
+    Deno.resolveDns(host, 'AAAA').catch(() => [] as string[]),
+  ]);
+  return [...a, ...aaaa];
 }
 
 /**
@@ -419,7 +469,11 @@ interface JobRequest {
  * allowance rather than the user's own key.
  */
 const TOOL_ROUNDS_BYOK   = 6;
-const TOOL_ROUNDS_FUNDED = 2;
+// SQEM-595 — was 2, set when the library was the only tool. Since web search (594) and files (595) a
+// finished file answer is already two rounds (library lookup + create_file), and the cap fired on work
+// that was done — seen in testing: "stopped after 2 rounds" under a delivered Word file. 4 leaves
+// room for lookup + search + read + file; credits are still charged by tokens actually used.
+const TOOL_ROUNDS_FUNDED = 4;
 
 /**
  * ⛔ **The deadline, and why it exists next to the round cap rather than instead of it.**
@@ -441,7 +495,7 @@ const TOOL_BUDGET_MS = 90_000;
 
 async function runAndBroadcast({
   jobId, provider, apiKey, modelId, systemInstruction, messages,
-  funded, workspaceId, creditLimit, connectors, userId, role,
+  funded, workspaceId, creditLimit, connectors, userId, role, web, webRequested,
 }: JobRequest): Promise<void> {
   /**
    * SQEM-372 — the streaming decision, made ONCE and in one place rather than inside each provider.
@@ -503,6 +557,11 @@ async function runAndBroadcast({
   const loadedTemplateIds: string[] = [];
   // SQEM-561 — what the model changed for THIS answer, for the card under it. Same ride as the ids.
   const libraryChanges: LibraryChange[] = [];
+  // SQEM-594 — what this answer searched for and read. Queries and URLs only, never page content.
+  const webSources: WebSources = { queries: [], pages: [] };
+  const webState: WebState = { allowanceExhausted: false };
+  // SQEM-595 — files the model handed out with this answer (built in the browser, never here).
+  const generatedFiles: GeneratedFile[] = [];
   const tools: ToolRuntime | null = workspaceId
     ? createLibraryToolRuntime(
         () => createLibraryReader({ client: createAdminClient(), workspaceId, userId }),
@@ -540,7 +599,12 @@ async function runAndBroadcast({
    * behaviour rules — say which template you used, ask when several match, do not paste the contents
    * — exist nowhere else, and the tool descriptions alone do not carry them.
    */
-  const instruction = tools ? withLibraryPrompt(systemInstruction) : systemInstruction;
+  // SQEM-594 — the web line goes OUTSIDE the library prompt: it is about this one message, the
+  // library rule about every message.
+  const libraryInstruction = tools ? withLibraryPrompt(systemInstruction) : systemInstruction;
+  const instruction = tools && web
+    ? `${WEB_SEARCH_INSTRUCTION}\n\n${libraryInstruction ?? ''}`.trim()
+    : libraryInstruction;
 
   // SQEM-381 — measured, so the next timeout decision rests on a distribution rather than on the
   // observation "the more connectors, the more often it times out". Logged below only for connector
@@ -563,21 +627,40 @@ async function runAndBroadcast({
     // SQEM-584 — providers without their own MCP support get the connectors' tools as functions in the
     // same loop as the library. A connector whose tool list cannot be fetched is left out and named
     // under the answer, as Claude and OpenAI do (SQEM-466/572) — never the whole answer lost.
-    let runtime = tools;
+    // SQEM-594 — the web tools go into the BASE runtime: Claude and OpenAI get `base` (they run
+    // connectors themselves), every other provider gets it wrapped with the connectors on top.
+    let base = tools;
+    if (base && web) {
+      base = withWebTools(base, {
+        search: (q, signal) => searchWeb(web.provider, web.key, q, fetch, signal),
+        read: (url, signal) => readWebPage(url, fetch, typeof Deno.resolveDns === 'function' ? resolveHost : undefined, signal),
+        allowSearch: web.hosted && workspaceId
+          ? async () => {
+              // SQEM-594 — the allowance comes from the plan, decided in the database (one source of truth).
+              const { data, error } = await createAdminClient().rpc('consume_web_search', { p_workspace_id: workspaceId });
+              if (error) { console.error('[chat-web] consume failed:', error.message); return false; }
+              return data === true;
+            }
+          : undefined,
+      }, webSources, cancel.signal, webState);
+    }
+    // SQEM-595 — create_file for every text model, always: it costs nothing until it is used.
+    if (base) base = withFileTool(base, generatedFiles);
+    let runtime = base;
     let unreachable: string[] = [];
-    if (tools && connectors?.length && provider !== 'claude' && provider !== 'openai') {
+    if (base && connectors?.length && provider !== 'claude' && provider !== 'openai') {
       const loaded = await loadConnectorTools(connectors.map(c => ({
         url: c.url, token: c.token, displayName: c.displayName, allowedTools: c.allowedTools,
       })), { signal: cancel.signal });
-      runtime = withConnectorTools(tools, loaded, cancel.signal);
+      runtime = withConnectorTools(base!, loaded, cancel.signal);
       unreachable = loaded.failed;
     }
     if (provider === 'gemini') {
       result = await callGemini(apiKey, modelId, instruction, messages, false, onDelta, runtime, cancel.signal);
     } else if (provider === 'openai') {
-      result = await callOpenAIResponses(apiKey, modelId, instruction, messages, connectors, onDelta, tools, cancel.signal);
+      result = await callOpenAIResponses(apiKey, modelId, instruction, messages, connectors, onDelta, base, cancel.signal);
     } else if (provider === 'claude') {
-      result = await callClaude(apiKey, modelId, instruction, messages, connectors, onDelta, tools, cancel.signal);
+      result = await callClaude(apiKey, modelId, instruction, messages, connectors, onDelta, base, cancel.signal);
     } else if (provider === 'deepseek') {
       ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.deepseek.com/v1/chat/completions', instruction, messages, 'deepseek', onDelta, runtime, cancel.signal));
     } else if (provider === 'mistral') {
@@ -616,6 +699,14 @@ async function runAndBroadcast({
     // material, and nothing in the reply would say so.
     if (tools?.stats.cappedAt) result += toolCapNotice(tools.stats.cappedAt, tools.stats.cappedBy ?? 'rounds');
     if (unreachable.length) result += connectorRefusedNotice(unreachable); // SQEM-584
+    // SQEM-594 — switched on but no key anywhere (self-host without a search key): say so, once.
+    if (webRequested && !web) result += '\n\n---\n_Web search is not set up here. A workspace admin can add a search key in Settings → API & MCP → Web search._';
+    // SQEM-594 — the model is told too, but says it in its own words (seen in testing: "I cannot search
+    // right now") — the reason has to be stated, once, in ours.
+    if (webState.allowanceExhausted) result += ALLOWANCE_NOTICE;
+    if (webSources.queries.length || webSources.pages.length) {
+      console.log('[chat-web]', JSON.stringify({ jobId, provider, hosted: web?.hosted ?? null, searches: webSources.queries.length, pages: webSources.pages.length }));
+    }
 
     // Funded (Sqemes-credit) calls debit the workspace allowance by tokens used. A
     // metering failure must not fail the user's result — log and move on (COGS is bounded).
@@ -636,6 +727,10 @@ async function runAndBroadcast({
       result,
       ...(loadedTemplateIds.length ? { loadedTemplateIds } : {}),
       ...(libraryChanges.length ? { libraryChanges } : {}),
+      // SQEM-594 — an older client ignores the key.
+      ...(webSources.queries.length || webSources.pages.length ? { webSources } : {}),
+      // SQEM-595 — the file descriptions; an older client ignores the key.
+      ...(generatedFiles.length ? { generatedFiles } : {}),
     });
   } catch (err: any) {
     // SQEM-583 — stopped by the person: nobody is listening any more, and an error would be a lie.
@@ -990,7 +1085,7 @@ async function readOpenAiRound(
   const data = await response.json();
   if (data?.usage?.total_tokens) onUsage?.(data.usage.total_tokens);
   const message = data.choices?.[0]?.message;
-  return { text: message?.content || '', toolCalls: readOpenAiToolCalls(message) };
+  return { text: contentText(message?.content), toolCalls: readOpenAiToolCalls(message) }; // SQEM-594 — may be an array of parts
 }
 
 /**

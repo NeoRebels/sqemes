@@ -69,6 +69,8 @@ export function useWorkspaceState(
       if (updates.defaultEditRestricted !== undefined) dbUpdates.default_edit_restricted = updates.defaultEditRestricted;
       // SQEM-311 — null is a real value here ("back to automatic"), so the guard is `!== undefined`.
       if (updates.authoringModelId !== undefined) dbUpdates.authoring_model_id = updates.authoringModelId;
+      // SQEM-597 — null clears it (back to the built-in layout).
+      if (updates.documentStyle !== undefined) dbUpdates.document_style = updates.documentStyle;
 
       if (Object.keys(dbUpdates).length > 0) {
         await workspacesApi.updateWorkspace(activeWorkspaceId, dbUpdates);

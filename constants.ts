@@ -108,19 +108,21 @@ export const VAT_NOTE = 'Includes VAT. Business customers with a valid VAT ID ar
 // MCP + AI credits ship on every tier (differentiation is seats/credits/team features).
 // SQEM-556 — `storageGb` is display only, like the prices: the limit that is enforced lives in the
 // database (`sqemes_cloud.storage_limit`, SQEM-515). tests/unit/planStorage.test.ts holds the two together.
-export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly: number; tagline: string; storageGb: number; features: string[]; libraryAccess: boolean; mcpAccess: boolean }> = {
+export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly: number; tagline: string; storageGb: number; webSearches: number; features: string[]; libraryAccess: boolean; mcpAccess: boolean }> = {
   Solo: {
     users: 1,
     price: '€12/mo',
     priceYearly: 9,
     tagline: 'For individuals getting started',
     storageGb: 1,
+    webSearches: 100, // SQEM-594 — per credit period; mirrors web_search_allowance() in the migration
     libraryAccess: true,
     mcpAccess: true,
     features: [
       '1 team member',
       '2,000 AI credits / month',
       '1 GB file storage',
+      '100 web searches / month',
       'MCP server access',
       'Unlimited AI with your own key (BYOK)',
       'Unlimited playbooks',
@@ -133,12 +135,14 @@ export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly
     priceYearly: 79,
     tagline: 'For teams that move fast',
     storageGb: 10,
+    webSearches: 1_000, // SQEM-594 — per credit period; mirrors web_search_allowance() in the migration
     libraryAccess: true,
     mcpAccess: true,
     features: [
       'Up to 10 team members',
       '25,000 AI credits / month',
       '10 GB file storage',
+      '1,000 web searches / month',
       'MCP server access',
       'Roles & permissions',
       'Unlimited AI with your own key (BYOK)',
@@ -152,12 +156,14 @@ export const PLANS: Record<PlanTier, { users: number; price: string; priceYearly
     priceYearly: 199,
     tagline: 'For teams that need more room',
     storageGb: 50,
+    webSearches: 3_000, // SQEM-594 — per credit period; mirrors web_search_allowance() in the migration
     libraryAccess: true,
     mcpAccess: true,
     features: [
       'Up to 30 team members',
       '100,000 AI credits / month',
       '50 GB file storage',
+      '3,000 web searches / month',
       'MCP server access',
       'Roles & permissions',
       'Unlimited AI with your own key (BYOK)',

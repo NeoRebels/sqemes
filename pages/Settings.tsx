@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useUI, useWorkspace } from '../store';
+import { useUI, useWorkspace, useData } from '../store';
+import DocumentStyleCard from '../components/DocumentStyleCard';
 import { can } from '../lib/permissions';
 import { useLocation, useNavigate } from 'react-router';
 import { PLANS, ROLE_LABELS, TRIAL_DAYS, VAT_NOTE } from '../constants';
@@ -82,6 +83,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   ArrowUpRight,
+  Globe,
 } from 'lucide-react';
 
 // SQEM-539 — the Content Governance switches, saved together by their card's Save button.
@@ -240,6 +242,7 @@ const Settings = () => {
     addMember, removeMember, updateMemberRole, pendingInvitations, fetchInvitations,
     cancelInvitation, resendInvitation, deleteWorkspace, leaveWorkspace, deleteAccount,
     isSqemesAdmin } = useWorkspace();
+  const { workspaceFiles } = useData(); // SQEM-597 — the logo choices of the document style
   const { showToast } = useUI();
 
   const location = useLocation();
@@ -260,6 +263,9 @@ const Settings = () => {
   
   // LLM API Keys State
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
+  // SQEM-594 — the workspace's own search key: ONE per workspace, Linkup or Brave.
+  const [searchProvider, setSearchProvider] = useState<'linkup' | 'brave'>('linkup');
+  const [searchKey, setSearchKey] = useState('');
   const [newOrModelId, setNewOrModelId] = useState(''); // OpenRouter "add custom model id" repeater input
 
   // Public API Keys State
@@ -652,7 +658,8 @@ const Settings = () => {
 
   const visibleTabs = tabs.filter(tab => {
     if (IS_SELF_HOSTED && tab.id === 'plans') return false; // SQEM-119 — no billing on self-host
-    if (IS_SELF_HOSTED && tab.id === 'brand') return false;  // SQEM-170 — Brand is Cloud-only
+    // SQEM-170 made Brand Cloud-only (the brand profile feeds the Cloud wizard). SQEM-597 — the Document
+    // style card lives here too and works on self-host, so the tab stays; only the profile card is Cloud.
     if (tab.id === 'security' && !securityTabVisible) return false;
     // Members (no settings:general) still get their Profile + Connectors (they may add personal ones)
     // and, since SQEM-328, **API & MCP** — the only place to obtain the key their own MCP client
@@ -746,12 +753,12 @@ const Settings = () => {
   const handleRemoveKey = async (providerId: string) => {
     try {
       await deleteApiKey(workspace.id, providerId);
-      const { keys: status, fundedAvailable } = await getApiKeyStatus(workspace.id);
+      const { keys: status, fundedAvailable, webSearchHosted } = await getApiKeyStatus(workspace.id);
       const updatedKeys: Record<string, string> = {};
       for (const [provider, configured] of Object.entries(status)) {
         if (configured) updatedKeys[provider] = '••••••••';
       }
-      updateWorkspace({ apiKeys: updatedKeys, fundedAvailable });
+      updateWorkspace({ apiKeys: updatedKeys, fundedAvailable, webSearchHosted });
       setApiKeys(prev => { const next = { ...prev }; delete next[providerId]; return next; });
       showToast('Key removed', 'success');
     } catch (err: any) {
@@ -778,18 +785,39 @@ const Settings = () => {
       }
 
       // Refresh API key status so the model selector updates
-      const { keys: status, fundedAvailable } = await getApiKeyStatus(workspace.id);
+      const { keys: status, fundedAvailable, webSearchHosted } = await getApiKeyStatus(workspace.id);
       const updatedKeys: Record<string, string> = {};
       for (const [provider, configured] of Object.entries(status)) {
         if (configured) updatedKeys[provider] = '••••••••';
       }
-      updateWorkspace({ apiKeys: updatedKeys, fundedAvailable });
+      updateWorkspace({ apiKeys: updatedKeys, fundedAvailable, webSearchHosted });
 
       showToast('API Configuration updated successfully', 'success');
       // Clear the local key inputs after saving (keys are now server-side)
       setApiKeys({});
     } catch (err: any) {
       showToast(err.message || 'Failed to save API keys', 'error');
+    }
+  };
+
+  // SQEM-594 — save the search key. The server removes the other provider's key, so the
+  // workspace never has two.
+  const handleSaveSearchKey = async () => {
+    const key = searchKey.trim();
+    if (!key) { showToast('Paste a search key before saving.', 'info'); return; }
+    if (isPlaceholderKey(key)) { showToast('Paste the original key from your search provider.', 'error'); return; }
+    try {
+      await saveApiKey(workspace.id, `search_${searchProvider}`, key);
+      const { keys: status, fundedAvailable, webSearchHosted } = await getApiKeyStatus(workspace.id);
+      const updatedKeys: Record<string, string> = {};
+      for (const [provider, configured] of Object.entries(status)) {
+        if (configured) updatedKeys[provider] = '••••••••';
+      }
+      updateWorkspace({ apiKeys: updatedKeys, fundedAvailable, webSearchHosted });
+      setSearchKey('');
+      showToast('Search key saved', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to save the search key', 'error');
     }
   };
 
@@ -1413,8 +1441,9 @@ const Settings = () => {
             </div>
           )}
           {/* --- Brand Tab --- */}
-          {activeTab === 'brand' && !IS_SELF_HOSTED && can(currentUser, workspace, 'settings:general') && (
+          {activeTab === 'brand' && can(currentUser, workspace, 'settings:general') && (
             <div className="space-y-6 animate-fade-in">
+              {!IS_SELF_HOSTED && (
               <Card className="p-6 md:p-8">
                 <SettingsCardHeader
                   title="Brand Profile"
@@ -1430,6 +1459,17 @@ const Settings = () => {
                   onChange={patch => { setBrandForm(f => ({ ...f, ...patch })); setBpDirty(true); }}
                 />
               </Card>
+              )}
+              {/* SQEM-597 — admins edit (guard_document_style enforces it in the database too). */}
+              <DocumentStyleCard
+                value={workspace.documentStyle}
+                files={workspaceFiles}
+                canEdit={can(currentUser, workspace, 'team:manage')}
+                onSave={async (style) => {
+                  await updateWorkspace({ documentStyle: style });
+                  showToast('Document style saved', 'success');
+                }}
+              />
             </div>
           )}
 
@@ -1930,6 +1970,91 @@ const Settings = () => {
                 </div>
               </Card>
               )}
+
+              {/* SQEM-594 — web search in Chat. ONE search key per workspace: Linkup or
+                  Brave, chosen here; saving one removes the other. On Cloud sqemes provides Linkup with a
+                  monthly allowance per plan, and the workspace's own key always wins over it. */}
+              {can(currentUser, workspace, 'api-keys:manage') && (() => {
+                const configured: 'linkup' | 'brave' | null = workspace.apiKeys.search_linkup ? 'linkup' : workspace.apiKeys.search_brave ? 'brave' : null;
+                const SEARCH = {
+                  linkup: { name: 'Linkup', link: 'https://app.linkup.so' },
+                  brave: { name: 'Brave Search', link: 'https://api-dashboard.search.brave.com' },
+                } as const;
+                return (
+              <Card className="p-6 md:p-8">
+                <div className="flex items-center justify-between mb-6 gap-4">
+                  <div>
+                    <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
+                      <Globe className="w-5 h-5 text-accent" />
+                      Web search
+                    </h2>
+                    <p className="text-sm text-ink-muted mt-1">
+                      {workspace.webSearchHosted
+                        ? 'Web search in Chat is included in your plan, with a monthly allowance. Add your own search key to use your own account instead — it always takes priority.'
+                        : 'Add a search key to switch on web search in Chat.'}
+                    </p>
+                  </div>
+                  <Button onClick={handleSaveSearchKey} className="px-5 py-2 shadow-lg shrink-0">
+                    <Save className="w-4 h-4" /> Save
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-[12rem_1fr] gap-4 items-start">
+                  <div>
+                    <label htmlFor="search-provider" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-2">Provider</label>
+                    <select
+                      id="search-provider"
+                      value={searchProvider}
+                      onChange={(e) => setSearchProvider(e.target.value as 'linkup' | 'brave')}
+                      className="w-full p-3 border border-line-strong bg-surface-field rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 text-ink-strong"
+                    >
+                      <option value="linkup">Linkup</option>
+                      <option value="brave">Brave Search</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="search-key" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-2 flex items-center gap-2">
+                      Key
+                      {configured && !searchKey && (
+                        <>
+                          <span className="text-2xs bg-success-soft text-ink-strong px-1.5 py-0.5 rounded-md font-bold normal-case">{SEARCH[configured].name} configured</span>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDialog({
+                              title: 'Remove the search key?',
+                              message: workspace.webSearchHosted
+                                ? 'Web search falls back to the included allowance.'
+                                : 'Web search in Chat stops working until a new key is added.',
+                              onConfirm: () => handleRemoveKey(`search_${configured}`),
+                            })}
+                            className="ml-auto text-2xs font-bold text-ink-subtle hover:text-danger normal-case transition-colors"
+                          >
+                            Remove
+                          </button>
+                        </>
+                      )}
+                    </label>
+                    <input
+                      id="search-key"
+                      type="password"
+                      value={searchKey}
+                      onChange={(e) => setSearchKey(e.target.value)}
+                      placeholder={configured ? '••••••••  (enter a new key to replace it)' : `${SEARCH[searchProvider].name} API key`}
+                      className={`w-full p-3 border rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all font-mono text-ink-strong placeholder:text-ink-subtle ${configured && !searchKey ? 'border-success/40 bg-success-soft' : 'border-line-strong bg-surface-field'}`}
+                    />
+                    <div className="mt-1.5 ml-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <a href={SEARCH[searchProvider].link} target="_blank" rel="noopener noreferrer" className="text-2xs text-accent hover:opacity-80 font-bold hover:underline inline-flex items-center gap-1">
+                        Get API Key <ExternalLink className="w-3 h-3" />
+                      </a>
+                      <span className="text-2xs text-ink-subtle">
+                        One search key per workspace — saving a key for one provider removes the other.
+                        {searchProvider === 'brave' && ' With your own Brave key, Brave’s terms apply between your workspace and Brave.'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+                );
+              })()}
 
               {/* Public API Keys */}
               <Card className="p-6 md:p-8">

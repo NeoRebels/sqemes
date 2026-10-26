@@ -155,7 +155,8 @@ describe('wiring', () => {
   const fn = readFileSync(resolve(__dirname, '../../supabase/functions/chat-message/index.ts'), 'utf8');
   it('connectors are resolved for every provider, and loaded for all but Claude/OpenAI', () => {
     expect(fn).toMatch(/const connectors = \(Array\.isArray\(connectorIds\) && connectorIds\.length > 0\)/);
-    expect(fn).toMatch(/if \(tools && connectors\?\.length && provider !== 'claude' && provider !== 'openai'\)/);
+    // SQEM-594 — `base` is the library runtime plus, for a web message, the web tools.
+    expect(fn).toMatch(/if \(base && connectors\?\.length && provider !== 'claude' && provider !== 'openai'\)/);
     expect(fn).toMatch(/callGemini\(apiKey, modelId, instruction, messages, false, onDelta, runtime, cancel\.signal\)/);
     expect([...fn.matchAll(/onDelta, runtime, cancel\.signal\)\)/g)]).toHaveLength(4);
     expect(fn).toMatch(/if \(unreachable\.length\) result \+= connectorRefusedNotice\(unreachable\);/);

@@ -121,9 +121,21 @@ export const geminiDelta: DeltaExtractor = (chunk) => {
 };
 
 /** OpenAI chat completions, and every OpenAI-compatible endpoint (DeepSeek, Mistral, Grok, OpenRouter). */
+/**
+ * SQEM-594 — the text of an OpenAI-compatible `content`, which is not always a string. Mistral returns
+ * an ARRAY of parts in some answers — text chunks beside `reference` chunks, seen first when web search
+ * results were in the conversation — and `answer += content` turned that into "[object Object],…".
+ * Only text parts count; anything else (references, images) contributes nothing.
+ */
+export function contentText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content.map(p => (typeof p === 'string' ? p : (p && typeof p === 'object' && (p as { type?: string }).type === 'text' && typeof (p as { text?: unknown }).text === 'string') ? (p as { text: string }).text : '')).join('');
+}
+
 export const openAiDelta: DeltaExtractor = (chunk) => {
-  const delta = (chunk as { choices?: { delta?: { content?: string } }[] })?.choices?.[0]?.delta;
-  return delta?.content || null;
+  const delta = (chunk as { choices?: { delta?: { content?: unknown } }[] })?.choices?.[0]?.delta;
+  return contentText(delta?.content) || null;
 };
 
 /**

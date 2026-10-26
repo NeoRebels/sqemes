@@ -23,7 +23,7 @@ import { canManage } from '../lib/navMode';
 import { needsAttention } from '../lib/needsAttention';
 import { fetchPersonas } from '../lib/api/personas';
 import type { Persona } from '../types';
-import { fetchUsageSummary } from '../lib/api/usage';
+import { fetchUsageSummary, fetchWebSearchUsage } from '../lib/api/usage';
 import { usageLine, type ChannelUsage, type UsageChannel } from '../lib/usageSummary';
 
 /**
@@ -78,6 +78,17 @@ const Overview = () => {
     getWorkspaceStorageUsage(workspace.id).then(u => { if (!cancelled) setStorage(u); }).catch(() => {});
     return () => { cancelled = true; };
   }, [workspace.id]);
+
+  // SQEM-594 — the included web searches of this credit period (Cloud, only while the workspace uses
+  // OUR search key; with its own Linkup/Brave key nothing is counted, so there is no bar).
+  const ownSearchKey = !!workspace.apiKeys.search_linkup || !!workspace.apiKeys.search_brave;
+  const [webSearch, setWebSearch] = useState<{ used: number; limit: number | null } | null>(null);
+  useEffect(() => {
+    if (IS_SELF_HOSTED || !workspace.id || !workspace.webSearchHosted || ownSearchKey) { setWebSearch(null); return; }
+    let cancelled = false;
+    fetchWebSearchUsage(workspace.id).then(u => { if (!cancelled) setWebSearch(u); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [workspace.id, workspace.webSearchHosted, ownSearchKey]);
 
   // SQEM-057 — reactivate a subscription that's set to cancel (via the Stripe portal).
   const [portalLoading, setPortalLoading] = useState(false);
@@ -455,6 +466,7 @@ const Overview = () => {
             <div className="mb-4 space-y-3">
               <UsageBar label="Seats" used={seatsUsed} limit={seatsLimit} tone="onBrand" />
               {storage && <UsageBar label="Storage" used={storage.used} limit={storage.limit} format={formatStorage} tone="onBrand" />}
+              {webSearch && <UsageBar label="Web searches" used={webSearch.used} limit={webSearch.limit} format={n => n.toLocaleString('en-US')} tone="onBrand" />}
             </div>
 
             {showAiCredits && (

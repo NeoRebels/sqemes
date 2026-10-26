@@ -33,7 +33,7 @@ export function waitForJobResult(
    * `loadedTemplateIds`, and since SQEM-561 `libraryChanges`). Unvalidated — the caller normalizes.
    * Other callers leave it out.
    */
-  onResultMeta?: (meta: { loadedTemplateIds?: unknown; libraryChanges?: unknown }) => void,
+  onResultMeta?: (meta: { loadedTemplateIds?: unknown; libraryChanges?: unknown; webSources?: unknown; generatedFiles?: unknown }) => void,
   /**
    * SQEM-582 — how far deltas may push the deadline (from the start). Defaults to `timeoutMs`, i.e.
    * deltas extend nothing — callers that do not stream keep the old behaviour exactly.
@@ -66,13 +66,13 @@ export function waitForJobResult(
           onDelta?.(payload.delta);
         }
       })
-      .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string; loadedTemplateIds?: unknown; libraryChanges?: unknown } }) => {
+      .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string; loadedTemplateIds?: unknown; libraryChanges?: unknown; webSources?: unknown; generatedFiles?: unknown } }) => {
         clearTimeout(timeout);
         supabase.removeChannel(channel);
         if (payload.error) {
           reject(new Error(payload.error));
         } else {
-          onResultMeta?.({ loadedTemplateIds: payload.loadedTemplateIds, libraryChanges: payload.libraryChanges });
+          onResultMeta?.({ loadedTemplateIds: payload.loadedTemplateIds, libraryChanges: payload.libraryChanges, webSources: payload.webSources, generatedFiles: payload.generatedFiles });
           resolve(payload.result ?? '');
         }
       })

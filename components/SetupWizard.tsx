@@ -303,12 +303,12 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
     setRemovingKey(true);
     try {
       await deleteApiKey(workspace.id, provider);
-      const { keys: status, fundedAvailable } = await getApiKeyStatus(workspace.id);
+      const { keys: status, fundedAvailable, webSearchHosted } = await getApiKeyStatus(workspace.id);
       const remaining: Record<string, string> = {};
       for (const [p, isConfigured] of Object.entries(status)) {
         if (isConfigured) remaining[p] = '••••••••';
       }
-      updateWorkspace({ apiKeys: remaining, fundedAvailable });
+      updateWorkspace({ apiKeys: remaining, fundedAvailable, webSearchHosted });
       setConfigured(new Set(Object.keys(remaining)));
       setConfirmRemove(false);
       showToast(`${activeProvider.name} key removed`, 'success');

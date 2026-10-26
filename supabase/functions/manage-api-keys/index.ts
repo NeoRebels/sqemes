@@ -1,6 +1,10 @@
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { encryptApiKey } from '../_shared/crypto.ts';
+import { SEARCH_KEY_PROVIDERS } from '../_shared/webSearch.ts';
+
+/** SQEM-594 — a workspace has at most ONE search key: Linkup or Brave. */
+const SEARCH_PROVIDERS = Object.values(SEARCH_KEY_PROVIDERS);
 
 const MASKED_KEY_RE = /(?:\u2022){4,}|^\*{4,}$/;
 
@@ -88,8 +92,10 @@ Deno.serve(async (req) => {
       // SQEM-082 — whether Sqemes-funded AI (keyless, credit-metered) is available here.
       // Cloud sets MISTRAL_API_KEY; self-host leaves it unset → BYOK-only.
       const fundedAvailable = !!Deno.env.get('MISTRAL_API_KEY');
+      // SQEM-594 — whether sqemes provides web search without a key of the workspace's own (Cloud).
+      const webSearchHosted = !!Deno.env.get('LINKUP_API_KEY');
 
-      return new Response(JSON.stringify({ keys, fundedAvailable }), {
+      return new Response(JSON.stringify({ keys, fundedAvailable, webSearchHosted }), {
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
     }
@@ -147,6 +153,16 @@ Deno.serve(async (req) => {
         );
 
       if (upsertError) throw upsertError;
+
+      // SQEM-594 — saving a search key replaces the other provider's: one search key per workspace.
+      // After the upsert, so a failed save never leaves the workspace with none.
+      if (SEARCH_PROVIDERS.includes(provider)) {
+        await adminClient
+          .from('workspace_api_keys')
+          .delete()
+          .eq('workspace_id', workspaceId)
+          .in('provider', SEARCH_PROVIDERS.filter(p => p !== provider));
+      }
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...cors, 'Content-Type': 'application/json' },

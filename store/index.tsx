@@ -239,13 +239,13 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
           ui.setIsLoading(false);
         }
 
-        getApiKeyStatus(wsId).then(({ keys: apiKeyStatus, fundedAvailable }) => {
+        getApiKeyStatus(wsId).then(({ keys: apiKeyStatus, fundedAvailable, webSearchHosted }) => {
           if (wsId !== activeWsRef.current) return;
           const apiKeys: Record<string, string> = {};
           for (const [provider, configured] of Object.entries(apiKeyStatus)) {
             if (configured) apiKeys[provider] = '••••••••';
           }
-          ws.setWorkspace(prev => ({ ...prev, apiKeys, fundedAvailable }));
+          ws.setWorkspace(prev => ({ ...prev, apiKeys, fundedAvailable, webSearchHosted }));
         }).catch(() => {/* non-critical */});
 
       } catch (err) {

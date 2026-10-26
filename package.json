@@ -1,7 +1,7 @@
 {
   "name": "sqemes",
   "private": true,
-  "version": "1.11.32",
+  "version": "1.11.33",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
@@ -29,22 +29,32 @@
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
     "@fontsource-variable/figtree": "^5.3.0",
+    "@fontsource/lato": "^5.3.0",
+    "@fontsource/open-sans": "^5.3.0",
     "@sentry/react": "^10.63.0",
     "@supabase/supabase-js": "^2.95.3",
     "@vercel/speed-insights": "^2.0.0",
+    "docx": "^9.14.0",
     "gleap": "^17.0.3",
     "jszip": "^3.10.1",
     "lucide-react": "^0.554.0",
+    "mdast-util-from-markdown": "^2.1.0",
+    "mdast-util-gfm": "^3.1.0",
+    "micromark-extension-gfm": "^3.0.0",
+    "pdfmake": "^0.3.13",
+    "pptxgenjs": "^4.0.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-markdown": "^10.1.0",
     "react-router": "^8.3.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.58.2",
     "@types/jszip": "^3.4.0",
+    "@types/mdast": "^4.0.4",
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
@@ -74,6 +84,7 @@
     "undici": "^7.30.1",
     "browserslist": "^4.28.8",
     "source-map-js": "^1.2.2",
-    "zod": "^4.6.6"
+    "zod": "^4.6.6",
+    "image-size": "^2.0.3"
   }
 }

@@ -7,6 +7,8 @@ export interface AiStatus {
   keys: ApiKeyStatus;
   /** SQEM-082 — whether Sqemes-funded AI (keyless, credit-metered) is available (Cloud). */
   fundedAvailable: boolean;
+  /** SQEM-594 — whether sqemes provides web search without a key of the workspace's own (Cloud). */
+  webSearchHosted: boolean;
 }
 
 
@@ -34,7 +36,7 @@ async function invokeFunction(functionName: string, body: Record<string, any>) {
 
 export async function getApiKeyStatus(workspaceId: string): Promise<AiStatus> {
   const data = await invokeFunction('manage-api-keys', { workspaceId });
-  return { keys: data?.keys || {}, fundedAvailable: !!data?.fundedAvailable };
+  return { keys: data?.keys || {}, fundedAvailable: !!data?.fundedAvailable, webSearchHosted: !!data?.webSearchHosted };
 }
 
 export async function saveApiKey(workspaceId: string, provider: string, key: string) {

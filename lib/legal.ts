@@ -42,7 +42,18 @@ export interface LegalDocument {
 }
 
 /**
- * **`privacy` is at `1.5` since 2026-10-22 (SQEM-553); `terms` stays at `1.3`.** The usage statistics
+ * **`privacy` is at `1.6` since 2026-10-26 (SQEM-594); `terms` stays at `1.3`.** A new processor:
+ * **Linkup** for web search in sqemes Chat (section 4 "Web search in chat", the section 9 summary and a
+ * section 12 row — France; queries may be processed in the EU, USA, Canada or Asia-Pacific depending on
+ * load; DPA under Art. 28), and a search key a workspace adds itself (Linkup or Brave) named under "Not
+ * on this list". In the same pass the Supabase row lost "Frankfurt": the projects are in eu-west-1
+ * (Ireland), read from the Management API on 2026-10-26. Checked on the live page before the bump —
+ * all five parts present, dated October 26 2026 (⚠️ the first check found "Not on this list" unchanged
+ * and the October 22 date; the bump waited for the second).
+ */
+
+/**
+ * **`privacy` was at `1.5` from 2026-10-22 (SQEM-553); `terms` stays at `1.3`.** The usage statistics
  * are now shown to workspace **editors** as well as administrators — the Overview's numbers per channel
  * over the last seven days and the most-used playbook; still never who. A wider circle of people seeing
  * data that, in a Solo or two-person workspace, relates to one person is a change of substance, so it
@@ -138,7 +149,7 @@ export interface LegalDocument {
  */
 export const LEGAL_DOCUMENTS: LegalDocument[] = [
   { id: 'terms',   label: 'Terms and Conditions', url: 'https://sqemes.com/terms',   version: '1.3' },
-  { id: 'privacy', label: 'Privacy Policy',       url: 'https://sqemes.com/privacy', version: '1.5' },
+  { id: 'privacy', label: 'Privacy Policy',       url: 'https://sqemes.com/privacy', version: '1.6' },
 ];
 
 /** A row from `legal_acceptances` — only the two columns that decide anything. */

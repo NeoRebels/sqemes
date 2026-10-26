@@ -69,7 +69,7 @@ describe('fetchWithTimeout and an outside signal', () => {
 describe('wiring', () => {
   const fn = read('supabase/functions/chat-message/index.ts');
   it('every text provider request carries the stop signal', () => {
-    expect([...fn.matchAll(/cancel\.signal\)/g)].length).toBe(8); // gemini, openai, claude, 4× compatible, + connector loading (SQEM-584)
+    expect([...fn.matchAll(/cancel\.signal[,)]/g)].length).toBe(9); // `,` since SQEM-594 passes webState after it // gemini, openai, claude, 4× compatible, + connector loading (SQEM-584), + the web tools (SQEM-594)
     expect([...fn.matchAll(/^\s+signal,$/gm)].length).toBe(4);   // the four fetch sites
   });
   it('a stopped job broadcasts nothing and always ends its watch', () => {

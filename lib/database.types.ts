@@ -459,6 +459,8 @@ export type Database = {
           playbook_ref: Json | null;
           loaded_template_ids: string[] | null;
           library_changes: Json | null;
+          web_sources: Json | null;
+          generated_files: Json | null;
         };
         Insert: {
           id?: string;
@@ -471,6 +473,8 @@ export type Database = {
           playbook_ref?: Json | null;
           loaded_template_ids?: string[] | null;
           library_changes?: Json | null;
+          web_sources?: Json | null;
+          generated_files?: Json | null;
         };
         Update: {
           id?: string;
@@ -483,6 +487,8 @@ export type Database = {
           playbook_ref?: Json | null;
           loaded_template_ids?: string[] | null;
           library_changes?: Json | null;
+          web_sources?: Json | null;
+          generated_files?: Json | null;
         };
         Relationships: [];
       };
@@ -788,6 +794,11 @@ export type Database = {
       workspace_usage_summary: {
         Args: { p_workspace_id: string; p_days?: number };
         Returns: { channel: string; uses: number; top_template_id: string | null; top_uses: number }[];
+      };
+      // SQEM-594 — included web searches used in this credit period and the plan's allowance (null = unlimited).
+      workspace_web_search_usage: {
+        Args: { p_workspace_id: string };
+        Returns: { used: number; allowance: number | null }[];
       };
       // SQEM-343 — the demotion flow. Admin-gated inside; see the migration for why the handover
       // wrapper exists separately from `reassign_orphaned_content` (the triggers call that one with
