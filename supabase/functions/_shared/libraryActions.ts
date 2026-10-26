@@ -26,7 +26,7 @@ import { countUsage } from './usageCounts.ts';
 import { safeStorageFileName } from './storageKey.ts';
 import { classifySkillFile, extensionOf, sniffBinaryMime, TEXT_EXT_TO_MIME, STORAGE_TEXT_MIME, OCTET_STREAM, SKILL_STORAGE_MIMES } from './skillFile.ts';
 import { readSkillMd, toSlug as skillSlug, withoutOwnFrontmatter, buildSkillMd } from './skillMd.ts';
-import { relativeSkillPaths } from './skillPaths.ts';
+import { relativeSkillPaths, uploadedFileName } from './skillPaths.ts';
 import { isTextContentMime, deliveryOf } from './skillFile.ts';
 import { onPublicHost, dailyLimitMessage, MAX_PATHS_PER_CALL } from './fileLinks.ts';
 import {
@@ -1075,6 +1075,16 @@ export async function runLibraryTool(
       return rpcError(id, -32603, `Could not create upload URL: ${signErr?.message ?? 'unknown error'}`);
     }
 
+    // SQEM-592 — the storage key above has its `/` defused, so it cannot tell finalize_upload what the
+    // file is called. The announced name — folders included, which is what a skill's fonts/x.woff2
+    // needs — travels across the PUT in this row.
+    const { error: pendingErr } = await adminClient
+      .from('pending_uploads')
+      .insert({ file_id: fileId, workspace_id: workspaceId, name: fileName });
+    if (pendingErr) {
+      return rpcError(id, -32603, `Could not create upload URL: ${pendingErr.message}`);
+    }
+
     // SQEM-522 — on the public host like every download link (SQEM-514). This line handed out the raw
     // storage URL (`*.supabase.co`, on self-host the internal one) since SQEM-059, so a sandbox that
     // allows only api.sqemes.com — what Help Center 54 tells admins to allow — could read but not upload.
@@ -1143,12 +1153,22 @@ export async function runLibraryTool(
       return rpcError(id, -32602, `The bytes are not ${storedMime}. Upload it again with Content-Type: ${OCTET_STREAM}.`);
     }
 
+    // SQEM-592 — the name create_upload_url was given, not the defused storage key. No row means the
+    // URL was issued before this shipped; the key is then the best name there is, as it always was.
+    const { data: pending } = await adminClient
+      .from('pending_uploads')
+      .select('name')
+      .eq('file_id', fileId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    const fileName = uploadedFileName(pending?.name, obj.name);
+
     const { data: inserted, error: insertErr } = await adminClient
       .from('workspace_files')
       .insert({
         id:           fileId,
         workspace_id: workspaceId,
-        name:         obj.name,
+        name:         fileName,
         mime_type:    kind.rowMime,
         size_bytes:   sizeBytes,
         storage_path: storagePath,
@@ -1160,6 +1180,14 @@ export async function runLibraryTool(
     if (insertErr || !inserted) {
       return rpcError(id, -32603, `Failed to register file: ${insertErr?.message ?? 'unknown error'}`);
     }
+
+    // Best effort: this upload's row, plus any of this workspace's that were never finalised.
+    // A leftover row is harmless — it is never read again once its file is registered.
+    // Two plain filters, not one `.or()`: fileId comes from the caller and must not be spliced into
+    // PostgREST filter syntax.
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    await adminClient.from('pending_uploads').delete().eq('workspace_id', workspaceId).eq('file_id', fileId);
+    await adminClient.from('pending_uploads').delete().eq('workspace_id', workspaceId).lt('created_at', dayAgo);
 
     return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
       id: inserted.id, name: inserted.name, mimeType: inserted.mime_type,

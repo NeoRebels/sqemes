@@ -67,6 +67,8 @@ export const OWNERSHIP: Record<string, Ownership> = {
   workspace_group_members: { ownedByA: `t.group_id in (select id from public.workspace_groups where workspace_id = '${A}')` },
   // SQEM-583 — Stop requests; insert-only for clients, rows live seconds (the job deletes them).
   chat_job_cancellations: { ...byUser('user_id'), mayBeEmpty: 'rows exist only between Stop and the next poll of the running job' },
+  // SQEM-592 — the name of a binary MCP upload between create_upload_url and finalize_upload; service role only.
+  pending_uploads: { ...ws(), mayBeEmpty: 'rows exist only between create_upload_url and finalize_upload' },
   mcp_call_counters: { ownedByA: `t.key_id in (select id from public.sqemes_api_keys where workspace_id = '${A}')` },
   mcp_rate_counters: { ownedByA: `t.key_id in (select id from public.sqemes_api_keys where workspace_id = '${A}')` },
 

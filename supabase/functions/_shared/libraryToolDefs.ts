@@ -315,7 +315,7 @@ export const LIBRARY_TOOL_DEFS = [
     inputSchema: {
       type: 'object',
       properties: {
-        name:     { type: 'string', description: 'Filename with extension (e.g. report.pdf, diagram.png)' },
+        name:     { type: 'string', description: 'Filename with extension (e.g. report.pdf, diagram.png). May be a RELATIVE PATH and is stored exactly as given — uploading a skill or any folder, send each file under its path relative to the folder root (assets/logo.png, fonts/Lato-400.woff2), never the bare filename.' },
         mimeType: { type: 'string', description: 'The file\'s type as you know it (e.g. application/pdf, image/png, font/ttf). Only used to pick the Content-Type for the PUT.' },
       },
       required: ['name', 'mimeType'],

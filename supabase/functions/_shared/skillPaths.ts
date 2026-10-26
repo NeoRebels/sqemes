@@ -64,3 +64,12 @@ export function relativeSkillPaths(names: string[], slug: string): string[] {
     return normalizeSkillPath(rel) ?? (rel.split('/').pop() || 'file');
   });
 }
+
+/**
+ * SQEM-592 — the visible name of a file finalised after a signed-URL upload: the name create_upload_url
+ * was given, never the storage key, whose `/` are defused to `_` (`storageKey.ts`). The key is the
+ * fallback only for a URL issued before `pending_uploads` existed.
+ */
+export function uploadedFileName(announced: string | null | undefined, storageObjectName: string): string {
+  return announced?.trim() ? announced : storageObjectName;
+}
