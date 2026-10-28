@@ -54,7 +54,9 @@ describe('delete-workspace-file — rules where they were, and proof that the ob
     expect(fn).toMatch(/\(data \?\? \[\]\)\.some\(\(o: \{ name\?: string \}\) => o\.name === path\)/);
   });
   it('a refused delete answers like a missing file (no existence oracle)', () => {
-    expect(fn).toMatch(/if \(still\) return json\(\{ error: 'Not found' \}, 404\)/);
+    // SQEM-612 — the same message as a missing row, in whichever language: no oracle in either.
+    expect(fn).toMatch(/if \(still\) return json\(\{ error: txt\.srv_not_found\(\{\}, \{ locale \}\) \}, 404\)/);
+    expect(fn).toMatch(/if \(!row\) return json\(\{ error: txt\.srv_not_found\(\{\}, \{ locale \}\) \}, 404\)/);
   });
   it('orphans only through the database rule', () => {
     expect(fn).toMatch(/admin\.rpc\('can_delete_orphan_object', \{ p_path: path, p_uid: user\.id \}\)/);

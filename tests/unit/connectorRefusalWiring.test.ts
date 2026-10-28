@@ -50,7 +50,7 @@ describe('SQEM-466 — a refused connector does not kill the message', () => {
   it('⛔ the person is told, by real name', () => {
     const b = claude();
     expect(b).toMatch(/droppedConnectors\.push\(c\.displayName\)/);
-    expect(b).toMatch(/connectorRefusedNotice\(droppedConnectors\)/);
+    expect(b).toMatch(/connectorRefusedNotice\(droppedConnectors, locale\)/); // SQEM-604 — in the user's language
   });
 
   it('⚠️ displayName is carried out of the database, not derived', () => {
@@ -94,6 +94,6 @@ describe('SQEM-572 — the same on OpenAI Responses', () => {
   it('⛔ the person is told, by real name', () => {
     const b = openai();
     expect(b).toMatch(/droppedConnectors\.push\(c\.displayName\)/);
-    expect(b).toMatch(/connectorRefusedNotice\(droppedConnectors\)/);
+    expect(b).toMatch(/connectorRefusedNotice\(droppedConnectors, locale\)/); // SQEM-604 — in the user's language
   });
 });

@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { m } from '../i18n';
 import type { Database } from '../database.types';
 import type { LibraryTemplate, TemplateCategory, Variable, Step, PromptKind, Prompt, WorkspaceFile } from '../../types';
 // SQEM-186 — templateBundle (which statically imports jszip) and injectionScan are dynamically imported
@@ -139,7 +140,7 @@ export async function fetchPublicListingBundle(listing: LibraryTemplate): Promis
   if (!listing.hasBundle) return null;
   const { url } = await marketplaceApi<{ url: string }>('bundle', { listingId: listing.id });
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Could not download the bundle (${res.status})`);
+  if (!res.ok) throw new Error(m.api_bundle_download({ status: res.status }));
   return res.blob();
 }
 
@@ -208,7 +209,7 @@ export async function copyTemplateToWorkspace(
     .eq('id', templateId)
     .single();
 
-  if (fetchErr || !tpl) throw fetchErr || new Error('Playbook not found');
+  if (fetchErr || !tpl) throw fetchErr || new Error(m.api_playbook_not_found());
 
   // 2. Build new prompt row with fresh step IDs
   const steps = ((tpl.steps || []) as unknown as Step[]).map(s => ({
@@ -312,7 +313,7 @@ async function copyListingFieldsToWorkspace(listing: LibraryTemplate, workspaceI
 
 /** Copy a listing into a workspace. UGC listings (with a bundle) apply the full bundle (files + skills);
  *  curated listings fall back to the text-only copy. Returns the new prompt id (or null for a bundle copy). */
-export const BUNDLE_CHANGED = 'The files of this listing changed after it was reviewed, so nothing was added. Please report it.';
+export const BUNDLE_CHANGED = () => m.api_bundle_changed();
 
 /**
  * SQEM-519 — the bundle that is imported must be the one that was reviewed. `bundle_hash` is written by
@@ -333,7 +334,7 @@ async function readVerifiedBundle(blob: Blob, listingId: string) {
   const { readBundle } = await import('../templateBundle');
   const { bundleMatches } = await import('../../supabase/functions/_shared/submissionManifest.ts');
   const read = await readBundle(new File([blob], 'bundle.sqemes.zip'));
-  if (!(await bundleMatches(read.zip, await expectedBundleHash(listingId)))) throw new Error(BUNDLE_CHANGED);
+  if (!(await bundleMatches(read.zip, await expectedBundleHash(listingId)))) throw new Error(BUNDLE_CHANGED());
   return read;
 }
 
@@ -391,7 +392,7 @@ export async function voteListing(listingId: string, value: 1 | -1): Promise<voi
   // server-side, mirroring the Cloud path below).
   if (IS_SELF_HOSTED) {
     const voterKey = await selfHostVoterKey();
-    if (!voterKey) throw new Error('Not signed in');
+    if (!voterKey) throw new Error(m.api_not_signed_in());
     await marketplaceVoteApi({ action: 'cast', listingId, value, voterKey });
     return;
   }

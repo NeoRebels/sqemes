@@ -4,6 +4,7 @@ import KindBadge from './ui/KindBadge';
 import type { PlaybookRef, PromptKind } from '../types';
 import { changeLabel, type LibraryChange } from '../supabase/functions/_shared/libraryChanges.ts';
 import type { WebSources } from '../supabase/functions/_shared/webSearch.ts';
+import { m } from '../lib/i18n';
 
 /**
  * SQEM-551 — a user message that started from a prompt playbook (redesign C, Figma C5).
@@ -41,9 +42,9 @@ export function ChatPlaybookCard({
           ))}
         </dl>
       )}
-      {playbookRef.edited && <p className="mt-2 text-xs text-ink-subtle">Edited before sending</p>}
+      {playbookRef.edited && <p className="mt-2 text-xs text-ink-subtle">{m.chatcard_edited()}</p>}
       <details className="mt-2 group">
-        <summary className="cursor-pointer text-xs font-medium text-accent select-none">Text sent</summary>
+        <summary className="cursor-pointer text-xs font-medium text-accent select-none">{m.chatcard_text_sent()}</summary>
         {children}
         <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-ink">{content}</p>
       </details>
@@ -59,7 +60,7 @@ export function UsedPlaybookChips({ used }: { used: { id: string; title: string;
   if (used.length === 0) return null;
   return (
     <div className="mt-2 ml-1 flex flex-wrap items-center gap-1.5">
-      <span className="text-xs font-medium text-ink-subtle">Used</span>
+      <span className="text-xs font-medium text-ink-subtle">{m.chatcard_used()}</span>
       {used.map(p => (
         <Link
           key={p.id}
@@ -79,8 +80,12 @@ export function UsedPlaybookChips({ used }: { used: { id: string; title: string;
  * `changeLabel` (supabase/functions/_shared/libraryChanges.ts), so a shared chat never names an
  * object the viewer cannot see.
  */
-const CHANGE_VERB: Record<LibraryChange['action'], string> = { created: 'Created', updated: 'Updated', deleted: 'Deleted' };
-const CHANGE_NOUN: Record<LibraryChange['kind'], string> = { prompt: 'prompt', skill: 'skill', persona: 'persona', file: 'file' };
+// SQEM-604 — one text per action with the noun as a placeholder: German turns the order round
+// ("Created prompt" → "Prompt erstellt"), so two words glued together would not translate.
+const CHANGE_TEXT: Record<LibraryChange['action'], (i: { noun: string }) => string> = { created: m.chatcard_change_created, updated: m.chatcard_change_updated, deleted: m.chatcard_change_deleted };
+const CHANGE_NOUN: Record<LibraryChange['kind'], () => string> = { prompt: m.chatcard_noun_prompt, skill: m.chatcard_noun_skill, persona: m.chatcard_noun_persona, file: m.chatcard_noun_file };
+/** The object's name when the viewer cannot open it — changeLabel (shared with the server) words it in English. */
+const HIDDEN_LABEL: Record<LibraryChange['kind'], () => string> = { prompt: m.chatcard_hidden_playbook, skill: m.chatcard_hidden_playbook, persona: m.chatcard_hidden_persona, file: m.chatcard_hidden_file };
 
 function changeHref(c: LibraryChange): string {
   if (c.kind === 'persona') return `/personas?id=${encodeURIComponent(c.id)}`;
@@ -98,14 +103,19 @@ export function LibraryChangesCard({
   if (!changes?.length) return null;
   return (
     <div className="mt-2 ml-1 w-full max-w-md rounded-card border border-line bg-surface-raised shadow-rest px-4 py-3 text-left">
-      <p className="text-xs font-medium text-ink-subtle">Changed in your library</p>
+      <p className="text-xs font-medium text-ink-subtle">{m.chatcard_changed_library()}</p>
       <ul className="mt-1.5 space-y-1">
         {changes.map(c => {
-          const { title, linked } = changeLabel(c, currentTitle(c));
+          const current = currentTitle(c);
+          const label = changeLabel(c, current);
+          // Visible title or a deleted object's last title are names, not words — only the fallback is translated.
+          const named = (current !== undefined && c.action !== 'deleted') || (c.action === 'deleted' && !!c.title);
+          const { linked } = label;
+          const title = named ? label.title : HIDDEN_LABEL[c.kind]();
           return (
             <li key={`${c.kind}:${c.id}`} className="flex items-baseline gap-2 text-sm">
               <span className={`shrink-0 text-xs font-medium ${c.action === 'deleted' ? 'text-danger' : 'text-ink-muted'}`}>
-                {CHANGE_VERB[c.action]} {CHANGE_NOUN[c.kind]}
+                {CHANGE_TEXT[c.action]({ noun: CHANGE_NOUN[c.kind]() })}
               </span>
               {linked
                 ? <Link to={changeHref(c)} className="text-ink hover:underline break-words">{title}</Link>
@@ -128,7 +138,7 @@ export function WebSourcesCard({ sources }: { sources: WebSources | null | undef
   const host = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } };
   return (
     <div className="mt-2 ml-1 w-full max-w-md rounded-card border border-line bg-surface-raised shadow-rest px-4 py-3 text-left">
-      <p className="text-xs font-medium text-ink-subtle">Searched the web</p>
+      <p className="text-xs font-medium text-ink-subtle">{m.chatcard_searched_web()}</p>
       {sources.queries.length > 0 && (
         <ul className="mt-1.5 space-y-0.5">
           {sources.queries.map((q, i) => <li key={i} className="text-sm text-ink-muted break-words">“{q}”</li>)}
@@ -136,7 +146,7 @@ export function WebSourcesCard({ sources }: { sources: WebSources | null | undef
       )}
       {sources.pages.length > 0 && (
         <>
-          <p className="mt-2 text-xs font-medium text-ink-subtle">Pages read</p>
+          <p className="mt-2 text-xs font-medium text-ink-subtle">{m.chatcard_pages_read()}</p>
           <ul className="mt-1 space-y-0.5">
             {sources.pages.map(p => (
               <li key={p.url} className="text-sm break-words">

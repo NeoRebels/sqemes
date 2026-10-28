@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { en } from './i18nText';
 
 /**
  * SQEM-554 (a) — the shared blocks in redesign C's look: EmptyState, Modal/ConfirmModal, the loading
@@ -42,7 +43,8 @@ describe('SQEM-554 (a) — dialogs', () => {
 
 describe('SQEM-554 (a) — loading and toasts', () => {
   it('"Loading…" with an ellipsis, no pulse for reduced motion, surface background', () => {
-    expect(app).toMatch(/>Loading…<\/p>/);
+    expect(app).toMatch(/>\{m\.app_loading\(\)\}<\/p>/);
+    expect(en.app_loading).toBe('Loading…'); // SQEM-611
     expect(app).not.toMatch(/Loading\.\.\./);
     expect(app).not.toMatch(/[^:]animate-pulse/);
     expect(app).not.toMatch(/bg-slate-50 dark:bg-slate-900/);

@@ -16,6 +16,12 @@ export type AppTile = OAuthApp | TokenAppUI | OAuthIdAppUI | PublicAppUI;
 export const GOOGLE_PENDING_REVIEW = '';
 export const GOOGLE_TESTING_NOTE = '';
 export const OAUTH_APPS: AppTile[] = [];
+export const TILE_TEXT_DE: Record<string, string> = {};
+
+/** No tiles, no tile texts (SQEM-615). */
+export function tileText(text: string | undefined): string {
+  return text ?? '';
+}
 
 /** No app logos ship with self-host; custom connectors show their site's favicon instead. */
 export function appLogoForMcpUrl(_url: string, _className: string): ReactElement | null {

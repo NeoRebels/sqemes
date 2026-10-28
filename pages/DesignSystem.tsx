@@ -8,7 +8,7 @@ import { canSeeDesignSystem } from '../lib/designAccess';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
+import { Input, Textarea } from '../components/ui/Input';
 import Checkbox from '../components/ui/Checkbox';
 import Switch from '../components/ui/Switch';
 import SegmentedTabs from '../components/ui/SegmentedTabs';
@@ -18,6 +18,7 @@ import EmptyState from '../components/ui/EmptyState';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import CardSaveBar from '../components/ui/CardSaveBar';
 import MoveButtons from '../components/ui/MoveButtons';
+import Select from '../components/ui/Select';
 
 /**
  * SQEM-545 — the webapp's design system, shown from the real code.
@@ -228,6 +229,38 @@ export default function DesignSystem() {
           <div>
             <label htmlFor="ds-input-disabled" className="block text-xs font-bold text-ink-muted mb-1.5">Input, disabled</label>
             <Input id="ds-input-disabled" placeholder="Not editable" disabled />
+          </div>
+          {/* SQEM-602 — the field states: one `tone` prop on Input / Textarea, never a call-site class list. */}
+          <div>
+            <label htmlFor="ds-input-error" className="block text-xs font-bold text-ink-muted mb-1.5">{'Input, tone="error"'}</label>
+            <Input id="ds-input-error" defaultValue="not a valid value" tone="error" aria-invalid />
+          </div>
+          <div>
+            <label htmlFor="ds-input-warning" className="block text-xs font-bold text-ink-muted mb-1.5">{'Input, tone="warning"'}</label>
+            <Input id="ds-input-warning" placeholder="Allowed, but worth a look" tone="warning" />
+          </div>
+          <div>
+            <label htmlFor="ds-input-success" className="block text-xs font-bold text-ink-muted mb-1.5">{'Input, tone="success"'}</label>
+            <Input id="ds-input-success" placeholder="••••••••  (already configured)" tone="success" />
+          </div>
+          <div>
+            <label htmlFor="ds-textarea" className="block text-xs font-bold text-ink-muted mb-1.5">Textarea</label>
+            <Textarea id="ds-textarea" rows={2} placeholder="Several lines" className="resize-none" />
+          </div>
+          {/* SQEM-601 — the form field select; next to Input so the equal height is visible. */}
+          <div>
+            <label htmlFor="ds-select" className="block text-xs font-bold text-ink-muted mb-1.5">Select</label>
+            <Select id="ds-select" defaultValue="two">
+              <option value="one">Option one</option>
+              <option value="two">Option two</option>
+              <option value="three">Option three</option>
+            </Select>
+          </div>
+          <div>
+            <label htmlFor="ds-select-disabled" className="block text-xs font-bold text-ink-muted mb-1.5">Select, disabled</label>
+            <Select id="ds-select-disabled" disabled defaultValue="one">
+              <option value="one">Not changeable</option>
+            </Select>
           </div>
           <div className="flex items-center gap-6">
             <Checkbox checked={checked} onChange={() => setChecked(c => !c)} aria-label="Checkbox sample" />

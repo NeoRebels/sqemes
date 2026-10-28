@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PersonaSelect } from '../../components/PersonaSelect';
 import type { Persona } from '../../types';
+import { en } from './i18nText';
 
 /**
  * SQEM-390 (PR C) — the persona picker in Chat.
@@ -121,7 +122,8 @@ describe('SQEM-390 (PR C) — wired into Chat, beside the model', () => {
   });
 
   it('offers "Create a persona" only to somebody who may create one', () => {
-    expect(chat).toMatch(/emptyActionLabel=\{can\(currentUser, workspace, 'prompts:edit'\) \? 'Create a persona' : undefined\}/);
+    expect(chat).toMatch(/emptyActionLabel=\{can\(currentUser, workspace, 'prompts:edit'\) \? txt\.chat_create_persona\(\) : undefined\}/);
+    expect(en.chat_create_persona).toBe('Create a persona'); // SQEM-604
     expect(chat).toMatch(/onEmptyAction=\{can\(currentUser, workspace, 'prompts:edit'\) \? \(\) => navigate\('\/personas'\) : undefined\}/);
   });
 });

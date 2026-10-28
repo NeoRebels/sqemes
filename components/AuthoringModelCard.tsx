@@ -5,6 +5,8 @@ import CardSaveBar from './ui/CardSaveBar';
 import { buildEnabledModels, isImageModel } from '../lib/enabledModels';
 import { authoringModelState } from '../lib/authoringAI';
 import type { Workspace } from '../types';
+import Select from './ui/Select';
+import { m as txt } from '../lib/i18n'; // SQEM-608 — `m` is the model in a loop here
 
 /**
  * SQEM-311 — choose the model that does AI *authoring*. SQEM-577 — and the default model of a new chat;
@@ -56,14 +58,12 @@ export default function AuthoringModelCard({
     <Card className="p-6 md:p-8">
       <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2 mb-2">
         <Sparkles className="w-5 h-5 text-accent" />
-        Default AI model
+        {txt.am_title()}
       </h2>
       {/* SQEM-577 — one default for both: new chats start with it (switchable per chat), and every
           place where sqemes writes for you uses it. Before, the card was about authoring only and left Chat alone. */}
       <p className="text-sm text-ink-muted mb-6">
-        New chats start with this model — you can still switch it in any chat. sqemes also uses it when
-        it writes for you: enhancing a prompt, generating a description, the setup and playbook wizards,
-        and adapting a playbook to your brand.
+        {txt.am_desc()}
       </p>
 
       {models.length === 0 ? (
@@ -71,35 +71,34 @@ export default function AuthoringModelCard({
           <KeyRound className="w-4 h-4 text-ink-subtle shrink-0 mt-0.5" />
           <div>
             <p className="text-sm text-ink">
-              There is nothing to choose yet — a model can only be offered here once its provider has an
-              API key.
+              {txt.am_none()}
             </p>
             <button
               onClick={onOpenApiKeys}
               className="mt-2 text-sm font-bold text-accent hover:underline"
             >
-              Add a provider key in the API tab →
+              {txt.am_add_key()}
             </button>
           </div>
         </div>
       ) : (
         <>
           <label htmlFor="authoring-model" className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-2">
-            Model
+            {txt.am_model()}
           </label>
-          <select
+          <Select
             id="authoring-model"
             value={(draft !== undefined ? draft : state.chosenId) ?? ''}
             onChange={e => setDraft(e.target.value || null)}
-            className="w-full max-w-md p-3 bg-surface-field border border-line-strong text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+            className="max-w-md"
           >
             <option value="">
-              Automatic{effective ? ` — currently ${effective.name}` : ''}
+              {effective ? txt.am_automatic_current({ name: effective.name }) : txt.am_automatic()}
             </option>
             {models.map(m => (
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}
-          </select>
+          </Select>
 
           {/* The two ordinary ways a saved choice stops applying — a retired model, a deleted key —
               look identical from outside: it simply used something else. Saying so is the whole
@@ -108,17 +107,15 @@ export default function AuthoringModelCard({
             <div className="mt-3 flex items-start gap-2 rounded-xl border border-warning/40 bg-warning-soft px-3 py-2.5 max-w-md">
               <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
               <p className="text-xs text-ink">
-                <span className="font-semibold">{state.chosenId}</span> can&apos;t be used right now — it
-                was either retired or its provider key was removed.{' '}
-                {effective ? <>Authoring is running on <span className="font-semibold">{effective.name}</span> until you pick another.</> : null}
+                <span className="font-semibold">{state.chosenId}</span> {txt.am_unavailable()}{' '}
+                {effective ? <>{txt.am_running_1()} <span className="font-semibold">{effective.name}</span>{txt.am_running_2()}</> : null}
               </p>
             </div>
           )}
 
           {state.status === 'auto' && (
             <p className="mt-2 text-2xs text-ink-subtle max-w-md">
-              Automatic takes the first model with a key, in the order the catalogue happens to list
-              them — pick one explicitly if that matters to you.
+              {txt.am_auto_hint()}
             </p>
           )}
 

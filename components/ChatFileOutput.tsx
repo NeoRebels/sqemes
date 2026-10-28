@@ -8,6 +8,7 @@ import { downloadGeneratedFile, plainTextFromMarkdown, sheetsFromMarkdown, slide
 import { effectiveStyle, type DocumentStyle } from '../supabase/functions/_shared/documentStyle.ts';
 import { loadLogo } from '../lib/logoImage';
 import type { WorkspaceFile } from '../types';
+import { m } from '../lib/i18n';
 
 /**
  * SQEM-595 — a file a Chat answer handed out: the card under the answer, and the preview beside the
@@ -38,11 +39,11 @@ function useDownload(file: GeneratedFile | null, workspaceStyle: DocumentStyle |
       let logo = null;
       if (style.logo && file.format !== 'md' && file.format !== 'txt') {
         const r = await loadLogo(style.logo, files);
-        if ('logo' in r) logo = r.logo; else setNote(`${r.missing} The file was built without it.`);
+        if ('logo' in r) logo = r.logo; else setNote(m.chatfile_built_without({ reason: r.missing }));
       }
       await downloadGeneratedFile(file, { style, logo });
     }
-    catch (e) { setError(e instanceof Error ? e.message : 'The file could not be created.'); }
+    catch (e) { setError(e instanceof Error ? e.message : m.chatfile_create_failed()); }
     finally { setBusy(false); }
   };
   return { busy, error, note, run };
@@ -57,7 +58,7 @@ function StyleLine({ file, workspaceStyle }: { file: GeneratedFile; workspaceSty
   return (
     <p className="text-xs text-ink-subtle flex items-center gap-1.5 flex-wrap">
       {s.primaryColor && <span className="inline-block w-3 h-3 rounded-sm border border-line" style={{ backgroundColor: s.primaryColor }} aria-hidden="true" />}
-      <span>{file.style ? 'Style from this request' : 'Workspace style'}{s.font ? ` · ${pdfFallback ? `${s.font} → Roboto in PDF` : s.font}` : ''}{s.logo ? ' · logo' : ''}</span>
+      <span>{file.style ? m.chatfile_style_request() : m.chatfile_style_workspace()}{s.font ? ` · ${pdfFallback ? m.chatfile_font_fallback({ font: s.font }) : s.font}` : ''}{s.logo ? ` · ${m.chatfile_logo()}` : ''}</span>
     </p>
   );
 }
@@ -76,7 +77,7 @@ export function GeneratedFilesCard({ files, onOpen }: { files: GeneratedFile[] |
           <FileIcon format={f.format} className="w-5 h-5 text-accent shrink-0" />
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium text-ink truncate">{f.name}</span>
-            <span className="block text-xs text-ink-subtle">{FILE_LABELS[f.format]} · open preview</span>
+            <span className="block text-xs text-ink-subtle">{FILE_LABELS[f.format]} · {m.chatfile_open_preview()}</span>
           </span>
         </button>
       ))}
@@ -88,11 +89,11 @@ function XlsxPreview({ content }: { content: string }) {
   const sheets = useMemo(() => sheetsFromMarkdown(content), [content]);
   const [active, setActive] = useState(0);
   const sheet = sheets[Math.min(active, sheets.length - 1)];
-  if (!sheet) return <p className="text-sm text-ink-muted">No table in this file.</p>;
+  if (!sheet) return <p className="text-sm text-ink-muted">{m.chatfile_no_table()}</p>;
   return (
     <div>
       {sheets.length > 1 && (
-        <div className="flex flex-wrap gap-1 mb-3" role="tablist" aria-label="Sheets">
+        <div className="flex flex-wrap gap-1 mb-3" role="tablist" aria-label={m.chatfile_sheets()}>
           {sheets.map((s, i) => (
             <button key={s.name} type="button" role="tab" aria-selected={i === active} onClick={() => setActive(i)}
               className={`px-2.5 py-1 rounded-md text-xs font-medium ${i === active ? 'bg-accent-soft text-accent' : 'text-ink-muted hover:bg-surface-sunken'}`}>
@@ -119,9 +120,9 @@ function XlsxPreview({ content }: { content: string }) {
 /** SQEM-596 — the slides as 16:9 cards, from the same parse the .pptx is built from. */
 function SlidesPreview({ content }: { content: string }) {
   const slides = useMemo(() => slidesFromMarkdown(content), [content]);
-  if (!slides.length) return <p className="text-sm text-ink-muted">No slides in this file.</p>;
+  if (!slides.length) return <p className="text-sm text-ink-muted">{m.chatfile_no_slides()}</p>;
   return (
-    <ol className="space-y-4" aria-label="Slides">
+    <ol className="space-y-4" aria-label={m.chatfile_slides()}>
       {slides.map((s, i) => (
         <li key={i} className="aspect-video w-full rounded-lg border border-line bg-surface shadow-rest overflow-hidden flex flex-col p-[4%]">
           {s.isTitle ? (
@@ -170,7 +171,7 @@ export function FilePreviewPanel({ file, onClose, markdownComponents, workspaceS
   const text = useMemo(() => (file.format === 'txt' ? plainTextFromMarkdown(file.content) : ''), [file]);
   return (
     <aside
-      aria-label={`Preview of ${file.name}`}
+      aria-label={m.chatfile_preview_of({ name: file.name })}
       className="fixed inset-0 z-40 md:static md:z-auto md:w-[46%] md:max-w-3xl shrink-0 flex flex-col min-h-0 h-full bg-surface-raised border-l border-line"
     >
       <div className="flex items-center gap-3 px-4 py-3 border-b border-line shrink-0">
@@ -182,9 +183,9 @@ export function FilePreviewPanel({ file, onClose, markdownComponents, workspaceS
         </div>
         <button type="button" onClick={run} disabled={busy}
           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-control bg-accent-strong text-white text-sm font-medium hover:opacity-90 disabled:opacity-50">
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Download
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} {m.chatfile_download()}
         </button>
-        <button type="button" onClick={onClose} aria-label="Close preview" className="p-2 rounded-control text-ink-subtle hover:text-ink hover:bg-surface-sunken">
+        <button type="button" onClick={onClose} aria-label={m.chatfile_close_preview()} className="p-2 rounded-control text-ink-subtle hover:text-ink hover:bg-surface-sunken">
           <X className="w-4 h-4" />
         </button>
       </div>

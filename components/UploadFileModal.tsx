@@ -5,6 +5,7 @@ import { uploadWorkspaceFile } from '../lib/api/files';
 import { FILE_ACCEPT_STRING, MAX_FILE_SIZE_MB } from '../lib/uploadTypes';
 import { useUI } from '../store';
 import type { WorkspaceFile } from '../types';
+import { m } from '../lib/i18n';
 
 // SQEM-074 — upload a context file straight from the editor's file picker.
 // Uploads via the existing workspace-file API and hands the uploaded files back
@@ -32,10 +33,10 @@ export function UploadFileModal({
       for (const file of Array.from(fileList)) {
         uploaded.push(await uploadWorkspaceFile(workspaceId, file));
       }
-      showToast(uploaded.length === 1 ? 'File uploaded' : `${uploaded.length} files uploaded`, 'success');
+      showToast(m.up_uploaded({ count: uploaded.length }), 'success');
       onUploaded(uploaded);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Upload failed', 'error');
+      showToast(err instanceof Error ? err.message : m.up_failed(), 'error');
     } finally {
       setUploading(false);
     }
@@ -45,7 +46,7 @@ export function UploadFileModal({
     <Modal open onClose={uploading ? undefined : onClose} size="md">
       <div className="p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Upload context file</h3>
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">{m.up_title()}</h3>
           <button
             type="button"
             onClick={onClose}
@@ -65,19 +66,19 @@ export function UploadFileModal({
           {uploading ? (
             <div className="flex flex-col items-center gap-3 text-slate-500 dark:text-slate-400">
               <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
-              <p className="text-sm font-medium">Uploading…</p>
+              <p className="text-sm font-medium">{m.up_uploading()}</p>
             </div>
           ) : (
             <>
               <Upload className="w-10 h-10 text-brand-400 mx-auto mb-3" />
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Drag &amp; drop files here</p>
-              <p className="text-xs text-slate-400 mt-1 mb-4">or browse · max {MAX_FILE_SIZE_MB} MB per file</p>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{m.up_drop()}</p>
+              <p className="text-xs text-slate-400 mt-1 mb-4">{m.up_browse_hint({ size: MAX_FILE_SIZE_MB })}</p>
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all"
               >
-                <Upload className="w-4 h-4" /> Browse files
+                <Upload className="w-4 h-4" /> {m.up_browse()}
               </button>
             </>
           )}

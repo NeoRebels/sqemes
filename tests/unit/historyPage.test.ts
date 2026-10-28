@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { buildHistory, filterHistory, historySources, deleteWarning, type HistoryEntry } from '../../lib/historyItems';
 import type { ChatSession } from '../../types';
+import { en } from './i18nText';
 
 /** SQEM-563 — History as its own Work page, with delete. */
 const ROOT = resolve(__dirname, '../..');
@@ -68,7 +69,8 @@ describe('the delete dialog says how far a delete reaches', () => {
 describe('wiring', () => {
   it('route, sidebar link and the delete API', () => {
     expect(read('App.tsx')).toMatch(/<Route path="\/history" element=\{<LayoutPage><History \/><\/LayoutPage>\} \/>/);
-    expect(read('components/Sidebar.tsx')).toMatch(/\{ to: "\/history", icon: HistoryIcon, label: "History" \}/);
+    expect(read('components/Sidebar.tsx')).toMatch(/\{ to: "\/history", icon: HistoryIcon, label: m\.nav_history\(\) \}/);
+    expect(JSON.parse(read('messages/en.json')).nav_history).toBe('History'); // SQEM-599 — the word lives in messages/
     const api = read('lib/api/externalChatHistory.ts');
     expect(api).toMatch(/from\('external_chat_history'\)\.delete\(\)\.eq\('id', id\)\.select\('id'\)/);
     expect(api).toMatch(/if \(!data\?\.length\) throw/);
@@ -80,7 +82,8 @@ describe('wiring', () => {
     expect(w).toMatch(/all\.filter\(e => e\.pinned\)/);
     expect(w).toMatch(/pinned\.map\(renderItem\)/);
     expect(w).not.toMatch(/PREVIEW_COUNT|\.slice\(0,/); // no cap
-    expect(w).toMatch(/Pin a chat in History to keep it here\./);
+    expect(w).toMatch(/m\.recent_pin_hint\(\)/);
+    expect(en.recent_pin_hint).toBe('Pin a chat in History to keep it here.'); // SQEM-604
     expect(w).toMatch(/<Link to="\/history"/);
     expect(w).not.toMatch(/ChevronLeft|setPage|Trash2|deleteExternalChat/); // no paging, no delete
   });
@@ -102,10 +105,11 @@ describe('wiring', () => {
     const page = read('pages/History.tsx');
     expect(page).toMatch(/text-sm font-medium text-ink break-words/);
     expect(page).not.toMatch(/font-medium text-ink truncate/);
-    expect(read('components/Sidebar.tsx')).toMatch(/>Recent Chats<\/p>/);
+    expect(read('components/Sidebar.tsx')).toMatch(/>\{m\.sb_recent\(\)\}<\/p>/);
+    expect(en.sb_recent).toBe('Recent Chats'); // SQEM-611
     // ⛔ Padding: inside the parent's space-y-1 a margin class is overridden (SQEM-563, measured in the build CSS).
-    expect(read('components/Sidebar.tsx')).toMatch(/<div className="pt-5 pb-6">\s*<p className="px-3 mb-1[^"]*">Recent Chats</);
-    expect(read('pages/History.tsx')).toMatch(/section\('Recent Chats', recent\)/);
+    expect(read('components/Sidebar.tsx')).toMatch(/<div className="pt-5 pb-6">\s*<p className="px-3 mb-1[^"]*">\{m\.sb_recent\(\)\}</);
+    expect(read('pages/History.tsx')).toMatch(/section\(m\.sb_recent\(\), recent\)/);
   });
 
   it('the page asks before deleting', () => {

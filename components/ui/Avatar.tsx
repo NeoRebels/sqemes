@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { m } from '../../lib/i18n';
 
 /**
  * SQEM-205 — an avatar that never depends on the network to render.
@@ -121,7 +122,7 @@ export function Avatar({
   return (
     <img
       src={url}
-      alt={label || 'Profile picture'}
+      alt={label || m.av_profile_picture()}
       onError={() => setFailedSrc(url)}
       className={`${className} ${rounded} object-cover shrink-0`}
     />

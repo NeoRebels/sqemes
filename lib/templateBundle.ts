@@ -15,6 +15,7 @@ export type { BundleFile, BundleTemplate, BundleManifest, BundlePersona };
 import { createPrompt, deletePrompt } from './api/prompts';
 import { createPersona, deletePersona, setPersonaRoutes } from './api/personas';
 import { errorMessage } from './errorMessage';
+import { m } from './i18n';
 import { getWorkspaceFileSignedUrl, uploadSkillFile, deleteWorkspaceFile } from './api/files';
 
 
@@ -148,7 +149,7 @@ function buildPrompt(b: BundleTemplate, workspaceId: string, userId: string, con
   return {
     workspaceId,
     kind,
-    title: b.title || 'Imported playbook',
+    title: b.title || m.tb_imported_playbook(),
     description: b.description || '',
     tag: b.tag ?? null,
     variables: Array.isArray(b.variables) ? b.variables : [],
@@ -231,7 +232,7 @@ export async function importBundle(
       const created = await createPersona(
         workspaceId,
         {
-          title: bp.title || 'Imported persona',
+          title: bp.title || m.tb_imported_persona(),
           description: bp.description || '',
           content: bp.content || '',
           tags: Array.isArray(bp.tags) ? bp.tags : [],
@@ -262,9 +263,9 @@ async function undoImport(
   const personas = failed(await Promise.allSettled(personaIds.map(id => deletePersona(id))));
   const templates = failed(await Promise.allSettled(templateIds.map(id => deletePrompt(id))));
   const fileCount = failed(await Promise.allSettled(files.map(f => deleteWorkspaceFile(f.id, f.storagePath))));
-  const left = ([[personas, 'persona'], [templates, 'playbook'], [fileCount, 'file']] as [number, string][])
+  const left = ([[personas, m.tb_n_personas], [templates, m.tb_n_playbooks], [fileCount, m.tb_n_files]] as [number, (i: { count: number }) => string][])
     .filter(([n]) => n > 0)
-    .map(([n, word]) => `${n} ${word}${n === 1 ? '' : 's'}`);
+    .map(([n, word]) => word({ count: n }));
   if (!left.length) return cause;
-  return new Error(`${errorMessage(cause, 'Import failed.')} Some imported items could not be removed: ${left.join(', ')}.`);
+  return new Error(errorMessage(cause, m.tb_import_failed()) + m.tb_not_removed({ items: left.join(', ') }));
 }

@@ -20,6 +20,8 @@ import { describeAIError } from '../lib/aiErrors';
 import { getWorkspaceFileSignedUrl, uploadWorkspaceFile } from '../lib/api/files';
 import sqemesIcon from '../assets/sqemes-icon.svg';
 import type { Prompt, PromptKind, WorkspaceFile } from '../types';
+import { Textarea } from './ui/Input';
+import { m } from '../lib/i18n';
 
 const KINDS: readonly SegmentedTab<PromptKind>[] = [
   { value: 'prompt', label: 'Prompt' },
@@ -99,7 +101,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
           if (text) setUploads(prev => [...prev.filter(u => u.name !== f.name), { name: f.name, text }]);
         }
       } catch (err) {
-        showToast(err instanceof Error ? err.message : `${f.name} could not be read.`, 'error');
+        showToast(err instanceof Error ? err.message : m.wiz_read_failed({ name: f.name }), 'error');
       }
     }
   };
@@ -146,12 +148,12 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
   const run = async () => {
     if (!workspace?.brandProfile || !currentUser || !goal.trim()) return;
     setBusy(true); setError(null);
-    setStage(files.length ? 'Reading your documents' : 'Reading your brand');
+    setStage(files.length ? m.wiz_reading_docs() : m.wiz_reading_brand());
     const provider = providerOfModel(workspace, authoringModelId(workspace))
       ?? (authoringModelId(workspace) ? null : 'sqemes');
     try {
       const attachments = await readAttachments(provider);
-      setStage(`Writing your ${KINDS.find(k => k.value === kind)?.label.toLowerCase()}`);
+      setStage(kind === 'skill' ? m.wiz_writing_skill() : m.wiz_writing_prompt());
       const draft = await generateSingleTemplate(
         kind,
         goal.trim(),
@@ -212,7 +214,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
       let foundIds: string[] = [];
       try {
       if (draft.inspectFiles.length) {
-        setStage('Looking through your files');
+        setStage(m.wiz_looking_files());
         const shortlist = resolveVisibleFiles(draft.inspectFiles, workspaceFiles);
         // SQEM-318 — likewise parallel; the model shortlisted a handful, not a library.
         const loaded = (await Promise.all(shortlist.map(async f => {
@@ -253,7 +255,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
         published: true,
       } as Prompt);
 
-      if (!created) throw new Error('The playbook was generated but could not be saved. Try again.');
+      if (!created) throw new Error(m.wiz_save_failed());
 
       // ⛔ SQEM-318 — the workspace's access default applies here too, and it did not before.
       //
@@ -277,7 +279,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
         } catch (accessErr) {
           await deletePromptApi(created.id).catch(() => { /* nothing better to try */ });
           throw new Error(
-            `Generated, but the workspace's access default could not be applied — the playbook was removed rather than left open to everyone. ${accessErr instanceof Error ? accessErr.message : ''}`.trim(),
+            `${m.wiz_access_failed()} ${accessErr instanceof Error ? accessErr.message : ''}`.trim(),
           );
         }
       }
@@ -292,7 +294,7 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
       // files are visible, which SQEM-308 required and Chat cannot show.
       navigate(`/playbooks/${created.id}/edit`);
     } catch (err) {
-      setError(describeAIError(err, 'Generating the playbook failed.', { alternativesAvailable: hasAuthoringAlternatives(workspace) }));
+      setError(describeAIError(err, m.wiz_failed(), { alternativesAvailable: hasAuthoringAlternatives(workspace) }));
     } finally {
       setBusy(false); setStage('');
     }
@@ -309,8 +311,8 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
            90 % is a worse lie than an honest pulse. */
         <div className="flex flex-col items-center justify-center py-14 text-center">
           <img src={sqemesIcon} alt="" className="w-14 h-14 animate-pulse" />
-          <p className="mt-5 text-sm font-bold text-slate-800 dark:text-slate-100">{stage || `Writing your ${KINDS.find(k => k.value === kind)?.label.toLowerCase()}`}…</p>
-          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">This can take a minute when documents are involved.</p>
+          <p className="mt-5 text-sm font-bold text-slate-800 dark:text-slate-100">{stage || (kind === 'skill' ? m.wiz_writing_skill() : m.wiz_writing_prompt())}…</p>
+          <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{m.wiz_takes_a_minute()}</p>
         </div>
       ) : (
         <>
@@ -319,38 +321,37 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
               <Sparkles className="w-5 h-5 text-brand-600 dark:text-brand-400" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Playbook Wizard</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Describe what you need. Your brand fills in the rest.</p>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">{m.wiz_title()}</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{m.wiz_subtitle()}</p>
             </div>
           </div>
 
-          <p className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">What do you want to build?</p>
+          <p className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{m.wiz_what_build()}</p>
           {/* SQEM-568 — `w-fit`: standing alone, the pill group stretched to the full width (a wide grey bar
               behind two short tabs). In the Persona wizard it sits in a row and shrinks to its tabs. */}
           <SegmentedTabs<PromptKind> tabs={KINDS} value={kind} onChange={setKind} className="mb-5 w-fit" />
 
           <label htmlFor="wizard-goal" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-            What do you want to achieve with your playbook?
+            {m.wiz_goal()}
           </label>
-          <textarea
+          <Textarea
             id="wizard-goal"
             value={goal}
             onChange={e => setGoal(e.target.value)}
             rows={4}
-            placeholder="e.g. Answer support emails about delivery delays, in our tone, without promising a date we cannot keep."
-            className="w-full p-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
+            placeholder={m.wiz_goal_placeholder()}
           />
 
           {/* SQEM-396 — a question, like the two above it, and the attach/upload difference BEFORE
               the click: SQEM-315 explains it under the lists, i.e. after the choice was made. */}
-          <label htmlFor="template-wizard-modal-which-context-should-it-draw" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mt-5 mb-1">Which context should it draw on?</label>
-          <p className="text-2xs text-slate-400 dark:text-slate-500 mb-2">Optional. Attach keeps a file on the playbook · Upload reads a document once and throws it away.</p>
+          <label htmlFor="template-wizard-modal-which-context-should-it-draw" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mt-5 mb-1">{m.wiz_context()}</label>
+          <p className="text-2xs text-slate-400 dark:text-slate-500 mb-2">{m.wiz_context_hint()}</p>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => setPicking(true)} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-              <Paperclip className="w-3.5 h-3.5" /> Attach a file
+              <Paperclip className="w-3.5 h-3.5" /> {m.wiz_attach()}
             </button>
             <button type="button" onClick={() => uploadRef.current?.click()} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-              <Upload className="w-3.5 h-3.5" /> Upload
+              <Upload className="w-3.5 h-3.5" /> {m.wiz_upload()}
             </button>
             <input id="template-wizard-modal-which-context-should-it-draw" ref={uploadRef} type="file" multiple onChange={onUpload} className="hidden" />
           </div>
@@ -361,35 +362,35 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
               difference between a person choosing the right button and finding out afterwards. */}
           {files.length > 0 && (
             <div className="mt-3">
-              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Attached — kept on the playbook</p>
+              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">{m.wiz_attached()}</p>
               <div className="flex flex-wrap gap-1.5">
                 {files.map(f => (
                   <span key={f.id} className="inline-flex items-center gap-1 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-lg px-2 py-1 text-slate-600 dark:text-slate-300">
                     {f.name}
-                    <button type="button" onClick={() => setFiles(prev => prev.filter(x => x.id !== f.id))} className="text-slate-400 hover:text-red-500" aria-label={`Remove ${f.name}`}>
+                    <button type="button" onClick={() => setFiles(prev => prev.filter(x => x.id !== f.id))} className="text-slate-400 hover:text-red-500" aria-label={m.wiz_remove({ name: f.name })}>
                       <X className="w-3 h-3" />
                     </button>
                   </span>
                 ))}
               </div>
-              <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2">These stay attached, and their contents also shape what gets written.</p>
+              <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2">{m.wiz_attached_hint()}</p>
             </div>
           )}
 
           {(uploads.length > 0 || binaries.length > 0) && (
             <div className="mt-3">
-              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Source material — not saved</p>
+              <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">{m.wiz_source()}</p>
               <div className="flex flex-wrap gap-1.5">
                 {[...uploads.map(u => ({ name: u.name })), ...binaries.map(b => ({ name: b.name }))].map(u => (
                   <span key={u.name} className="inline-flex items-center gap-1 text-xs bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/50 rounded-lg px-2 py-1 text-brand-700 dark:text-brand-300">
                     {u.name}
-                    <button type="button" onClick={() => { setUploads(prev => prev.filter(x => x.name !== u.name)); setBinaries(prev => prev.filter(x => x.name !== u.name)); }} className="text-brand-400 hover:text-red-500" aria-label={`Remove ${u.name}`}>
+                    <button type="button" onClick={() => { setUploads(prev => prev.filter(x => x.name !== u.name)); setBinaries(prev => prev.filter(x => x.name !== u.name)); }} className="text-brand-400 hover:text-red-500" aria-label={m.wiz_remove({ name: u.name })}>
                       <X className="w-3 h-3" />
                     </button>
                   </span>
                 ))}
               </div>
-              <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2">Read, then discarded — these files are not added to your library. What the playbook needs from them is written into new context files, and existing files that help are attached.</p>
+              <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2">{m.wiz_source_hint()}</p>
             </div>
           )}
 
@@ -402,13 +403,13 @@ export default function TemplateWizardModal({ open, onClose }: { open: boolean; 
           )}
 
           <div className="flex gap-2 mt-6">
-            <button onClick={closeAndReset} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-sm font-bold transition-colors">Cancel</button>
+            <button onClick={closeAndReset} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-sm font-bold transition-colors">{m.wiz_cancel()}</button>
             <button
               onClick={run}
               disabled={!goal.trim()}
               className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
             >
-              <Sparkles className="w-4 h-4" /> Create playbook
+              <Sparkles className="w-4 h-4" /> {m.wiz_create()}
             </button>
           </div>
         </>

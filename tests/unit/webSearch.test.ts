@@ -228,7 +228,7 @@ describe('wiring', () => {
   it('the globe means web search and nothing else in Chat — shared chats use Users', () => {
     const page = code(read('pages/Chat.tsx'));
     expect([...page.matchAll(/<Globe\b/g)].length).toBe(1);
-    expect(page).toMatch(/<Users className="w-3\.5 h-3\.5" \/> Share with Team/);
+    expect(page).toMatch(/<Users className="w-3\.5 h-3\.5" \/> \{txt\.chat_share_team\(\)\}/); // SQEM-604
   });
 
   it('⛔ the migration: web_search_daily is service-role only, the counter atomic', () => {
@@ -256,6 +256,6 @@ describe('contentText — OpenAI-compatible content is not always a string (foun
   });
   it('⛔ the non-streaming reader never concatenates raw content', () => {
     expect(code(read('supabase/functions/chat-message/index.ts'))).toMatch(/text: contentText\(message\?\.content\)/);
-    expect(code(read('supabase/functions/chat-message/index.ts'))).toMatch(/if \(webState\.allowanceExhausted\) result \+= ALLOWANCE_NOTICE;/);
+    expect(code(read('supabase/functions/chat-message/index.ts'))).toMatch(/if \(webState\.allowanceExhausted\) result \+= allowanceNotice\(locale\);/); // SQEM-604 — in the user's language
   });
 });

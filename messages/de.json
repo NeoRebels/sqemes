@@ -1,0 +1,2810 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "nav_start": "Start",
+  "nav_overview": "Übersicht",
+  "nav_playbooks": "Playbooks",
+  "nav_personas": "Personas",
+  "nav_marketplace": "Marktplatz",
+  "nav_files": "Dateien",
+  "nav_chat": "Chat",
+  "nav_history": "Verlauf",
+  "nav_mode_work": "Arbeiten",
+  "nav_mode_manage": "Verwalten",
+  "nav_opens_full_screen": "{label} — öffnet im Vollbild",
+  "chat_tool_cap_rounds": "Sqemes hat nach {rounds} Runden Werkzeugnutzung aufgehört und mit dem bisher Geladenen geantwortet.",
+  "chat_tool_cap_time": "Sqemes hatte keine Zeit mehr für weitere Werkzeugnutzung und hat mit dem bisher Geladenen geantwortet.",
+  "language_name_en": "English",
+  "language_name_de": "Deutsch",
+  "settings_language_workspace_title": "Sprache des Workspace",
+  "settings_language_workspace_description": "Die Sprache, in der sqemes für alle in diesem Workspace erscheint. Jede Person kann im Profil eine eigene wählen.",
+  "settings_language_profile_title": "Sprache",
+  "settings_language_profile_description": "Gilt nur für dieses Profil. Ohne eigene Wahl gilt die Sprache des Workspace.",
+  "settings_language_follow_workspace": "Wie der Workspace ({language})",
+  "settings_language_preview_note": "Bis zur Freigabe von Deutsch nur für sqemes-Admins sichtbar.",
+  "settings_language_field_label": "Sprache",
+  "auth_heading_login": "Melde dich bei deinem Konto an",
+  "auth_heading_register": "Erstelle dein Konto",
+  "auth_heading_forgot": "Setze dein Passwort zurück",
+  "auth_continue_google": "Weiter mit Google",
+  "auth_continue_github": "Weiter mit GitHub",
+  "auth_or_email": "oder weiter mit E-Mail",
+  "auth_full_name": "Vollständiger Name",
+  "auth_full_name_placeholder": "Max Mustermann",
+  "auth_email": "E-Mail",
+  "auth_email_placeholder": "du@firma.de",
+  "auth_password": "Passwort",
+  "auth_forgot_password": "Passwort vergessen?",
+  "auth_password_placeholder": "Mindestens 8 Zeichen",
+  "auth_show_password": "Passwort anzeigen",
+  "auth_hide_password": "Passwort verbergen",
+  "auth_resend": "Keine E-Mail bekommen? Erneut senden",
+  "auth_sending": "Wird gesendet …",
+  "auth_please_wait": "Einen Moment …",
+  "auth_sign_in": "Anmelden",
+  "auth_send_reset": "Link zum Zurücksetzen senden",
+  "auth_create_account": "Konto erstellen",
+  "auth_no_account": "Noch kein Konto?",
+  "auth_sign_up": "Registrieren",
+  "auth_back_to_sign_in": "Zurück zur Anmeldung",
+  "auth_have_account": "Schon ein Konto?",
+  "auth_reset_sent": "Schau in dein Postfach – dort findest du einen Link zum Zurücksetzen deines Passworts.",
+  "auth_name_required": "Bitte gib deinen Namen ein.",
+  "auth_signup_check_inbox": "Schau in dein Postfach – ist diese Adresse neu, ist ein Bestätigungslink unterwegs. Hast du schon ein Konto, melde dich unten an.",
+  "auth_resend_sent": "Gesendet. Wartet diese Adresse noch auf ihre Bestätigung, ist der Link unterwegs.",
+  "auth_generic_error": "Etwas ist schiefgegangen.",
+  "auth_error_invalid_credentials": "E-Mail oder Passwort ist falsch.",
+  "auth_error_email_not_confirmed": "Diese E-Mail-Adresse ist noch nicht bestätigt. Schau in deinem Postfach nach dem Bestätigungslink.",
+  "auth_error_user_exists": "Mit dieser E-Mail-Adresse gibt es schon ein Konto. Melde dich stattdessen an.",
+  "auth_error_weak_password": "Dieses Passwort ist zu schwach. Wähle ein längeres, am besten mit Zahlen und Sonderzeichen.",
+  "auth_error_same_password": "Das neue Passwort muss sich vom alten unterscheiden.",
+  "auth_error_rate_limit": "Zu viele Versuche. Warte bitte eine Minute und versuch es dann noch einmal.",
+  "auth_error_captcha": "Die Sicherheitsprüfung ist fehlgeschlagen. Versuch es bitte noch einmal.",
+  "auth_error_email_invalid": "Diese E-Mail-Adresse ist ungültig.",
+  "auth_error_signup_disabled": "Registrieren ist gerade nicht möglich.",
+  "auth_error_link_expired": "Dieser Link ist abgelaufen. Fordere einen neuen an.",
+  "auth_error_user_banned": "Dieses Konto ist gesperrt.",
+  "reset_verifying": "Dein Link wird geprüft …",
+  "reset_link_invalid_title": "Link ungültig oder abgelaufen",
+  "reset_link_invalid_body": "Dieser Link zum Zurücksetzen ist nicht mehr gültig. Fordere einen neuen an und nutze ihn gleich.",
+  "reset_updated_title": "Passwort geändert",
+  "reset_redirecting": "Du wirst zur Anmeldung weitergeleitet …",
+  "reset_title": "Neues Passwort festlegen",
+  "reset_subtitle": "Wähle ein sicheres Passwort für dein Konto.",
+  "reset_new_password": "Neues Passwort",
+  "reset_new_password_placeholder": "Mindestens 8 Zeichen",
+  "reset_confirm_password": "Passwort bestätigen",
+  "reset_confirm_placeholder": "Passwort wiederholen",
+  "reset_too_short": "Das Passwort muss mindestens 8 Zeichen lang sein.",
+  "reset_mismatch": "Die Passwörter stimmen nicht überein.",
+  "reset_failed": "Das Passwort konnte nicht geändert werden.",
+  "reset_updating": "Wird gespeichert …",
+  "reset_submit": "Passwort ändern",
+  "invite_invalid_link": "Ungültiger Einladungslink.",
+  "invite_failed": "Die Einladung konnte nicht angenommen werden.",
+  "invite_accepting_title": "Einladung wird angenommen",
+  "invite_accepting_body": "Einen Moment, wir fügen dich dem Workspace hinzu …",
+  "invite_accepted_title": "Einladung angenommen!",
+  "invite_redirecting": "Du wirst zum Workspace weitergeleitet …",
+  "invite_error_title": "Etwas ist schiefgegangen",
+  "invite_go_to_start": "Zum Start",
+  "legal_title_first": "Bevor du loslegst",
+  "legal_title_updated": "Wir haben unsere Bedingungen aktualisiert",
+  "legal_body_first": "Bitte lies die folgenden Dokumente und stimme ihnen zu, um sqemes zu nutzen.",
+  "legal_body_updated": "Bitte lies die aktualisierten Dokumente und stimme ihnen zu, um weiterzumachen.",
+  "legal_version": "Version {version}",
+  "legal_agree_one": "Ich habe das Dokument oben gelesen und stimme ihm zu.",
+  "legal_agree_many": "Ich habe die Dokumente oben gelesen und stimme ihnen zu.",
+  "legal_save_failed": "Deine Zustimmung konnte nicht gespeichert werden. Versuch es bitte noch einmal.",
+  "legal_agree_continue": "Zustimmen und weiter",
+  "legal_record_note": "Wir speichern, welcher Version du wann zugestimmt hast.",
+  "legal_doc_terms": "Allgemeine Geschäftsbedingungen",
+  "legal_doc_privacy": "Datenschutzerklärung",
+  "start_subscription_activated": "Abo aktiviert! Dein Plan wurde aktualisiert.",
+  "start_question_named": "Woran arbeiten wir, {name}?",
+  "start_question": "Woran arbeiten wir?",
+  "start_in_workspace": "in",
+  "start_favourites": "Deine Favoriten",
+  "start_new_playbook": "Neues Playbook",
+  "start_all_playbooks": "Alle Playbooks",
+  "start_no_favourites": "Noch keine Lieblings-Playbooks.",
+  "start_star_hint": "Markiere ein Playbook mit dem Stern, um es hier anzuheften",
+  "start_use": "Nutzen",
+  "start_composer_label": "Beschreibe die Aufgabe",
+  "start_composer_placeholder": "Beschreibe die Aufgabe – oder starte mit / von einem Playbook",
+  "start_no_persona": "Keine Persona",
+  "start_playbook_button": "Playbook",
+  "start_send": "Senden",
+  "start_work_in": "Arbeite in",
+  "start_tool_new_tab": "{name} (öffnet in neuem Tab)",
+  "start_tools_note": "Deine Playbooks kommen über die sqemes-Extension oder MCP mit.",
+  "recent_history": "Verlauf",
+  "recent_view_all": "Alle anzeigen ({count}) →",
+  "recent_loading": "Wird geladen …",
+  "recent_no_chats": "Noch keine Chats.",
+  "recent_pin_hint": "Hefte einen Chat im Verlauf an, um ihn hier zu behalten.",
+  "chat_copy": "Kopieren",
+  "chat_copied": "Kopiert",
+  "chat_edit": "Bearbeiten",
+  "chat_attachment_alt": "Anhang",
+  "chat_thinking": "Denkt nach …",
+  "chat_time_just_now": "gerade eben",
+  "chat_time_minutes": "vor {count} Min.",
+  "chat_time_hours": "vor {count} Std.",
+  "chat_time_days": "vor {count} T.",
+  "chat_using_persona": "Persona „{title}“ wird in diesem Chat genutzt",
+  "chat_using_playbook": "„{title}“ wird in diesem Chat genutzt",
+  "chat_shared_load_failed": "Geteilte Chats konnten nicht geladen werden",
+  "chat_copy_failed": "Text konnte nicht kopiert werden",
+  "chat_unsupported_file": "Dateityp nicht unterstützt. Unterstützt: PNG, JPG, WEBP, GIF, PDF, TXT, CSV, MD",
+  "chat_file_too_big": "Die Datei muss kleiner als {size} MB sein",
+  "chat_save_to_workspace_failed": "{name} konnte nicht im Workspace gespeichert werden",
+  "chat_attach_too_large": "{name} ist zu groß zum Anhängen",
+  "chat_attach_failed": "{name} konnte nicht angehängt werden – versuch es noch einmal oder zieh die Datei direkt hinein.",
+  "chat_enhance_no_model": "Kein Textmodell zum Verbessern verfügbar. Hinterlege einen API-Schlüssel in den Einstellungen.",
+  "chat_enhance_failed": "Die Eingabe konnte nicht verbessert werden",
+  "chat_no_content": "Es wurde kein Inhalt erzeugt.",
+  "chat_shared_with_workspace": "Chat mit dem Workspace geteilt",
+  "chat_set_private": "Chat ist jetzt privat",
+  "chat_withdrawn": "Teilen zurückgenommen – der Chat bleibt bei der Person, die ihn erstellt hat",
+  "chat_withdraw_failed": "Teilen konnte nicht zurückgenommen werden",
+  "chat_shared_with_team": "Mit dem Team geteilt",
+  "chat_withdraw_title": "Teilen zurücknehmen – der Chat bleibt bei der Person, die ihn erstellt hat",
+  "chat_rename": "Umbenennen",
+  "chat_make_private": "Privat stellen",
+  "chat_share_team": "Mit dem Team teilen",
+  "chat_delete": "Löschen",
+  "chat_tab_chats": "Chats",
+  "chat_tab_conversation": "Unterhaltung",
+  "chat_back_to_start": "Zurück zum Start",
+  "chat_new_chat": "Neuer Chat",
+  "chat_search_title": "Chats durchsuchen (⌘K / Strg+K)",
+  "chat_search": "Chats durchsuchen",
+  "chat_my_chats": "Meine Chats",
+  "chat_shared": "Geteilt",
+  "chat_no_chats": "Noch keine Chats",
+  "chat_no_chats_hint": "Hier erscheinen deine Chats.",
+  "chat_no_shared": "Noch keine geteilten Chats",
+  "chat_no_shared_hint": "Hier erscheinen Chats, die mit dem Workspace geteilt wurden.",
+  "chat_private_expiry": "Private Chats werden nach 30 Tagen automatisch gelöscht",
+  "chat_create_persona": "Persona erstellen",
+  "chat_using": "Genutzt:",
+  "chat_persona": "Persona",
+  "chat_skill": "Skill",
+  "chat_remove": "Entfernen",
+  "chat_file_count": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Datei",
+        "countPlural=other": "{count} Dateien"
+      }
+    }
+  ],
+  "chat_start_conversation": "Starte eine Unterhaltung",
+  "chat_start_hint": "Chatte mit {model}. Schreib unten eine Nachricht.",
+  "chat_start_hint_persona": "Chatte mit {model} als {persona}. Schreib unten eine Nachricht.",
+  "chat_model_fallback": "KI",
+  "chat_upgrade_or_key": "Plan erweitern oder Schlüssel hinterlegen",
+  "chat_someone_waiting": "Jemand wartet auf eine Antwort …",
+  "chat_attach_file": "Datei anhängen",
+  "chat_choose_workspace": "Aus dem Workspace wählen",
+  "chat_upload_device": "Vom Gerät hochladen",
+  "chat_save_uploads": "Uploads im Workspace speichern",
+  "chat_use_playbook": "Playbook nutzen  (/)",
+  "chat_connectors_active": "Deine MCP-Connectors sind aktiv",
+  "chat_connectors_inactive_label": "Deine MCP-Connectors sind inaktiv – Bildmodelle können sie nicht nutzen",
+  "chat_connectors_inactive": "Deine MCP-Connectors sind inaktiv",
+  "chat_connectors_image_models": "Bildmodelle können sie nicht nutzen",
+  "chat_message_label": "Nachricht",
+  "chat_drop_here": "Datei hier ablegen …",
+  "chat_type_message": "Nachricht schreiben",
+  "chat_web_label": "Für diese Nachricht im Web suchen",
+  "chat_web_needs_key": "Die Websuche braucht einen Suchschlüssel – hinterlege ihn unter Einstellungen → API & MCP → Websuche",
+  "chat_web_image_models": "Bildmodelle können nicht im Web suchen",
+  "chat_web_on": "Websuche ist für diese Nachricht an",
+  "chat_enhance": "Mit KI verbessern",
+  "chat_stop_label": "Antwort stoppen",
+  "chat_stop": "Stopp",
+  "chat_send_label": "Nachricht senden",
+  "chat_ai_disclosure": "Antworten werden von einem KI-System erzeugt und können falsch sein.",
+  "chat_key_hints": "↵ zum Senden · Umschalt+↵ für neue Zeile · Nachrichten werden in deinem Chatverlauf gespeichert",
+  "chat_delete_title": "Chat löschen?",
+  "chat_delete_body": "Diese Unterhaltung wird endgültig gelöscht und kann nicht wiederhergestellt werden.",
+  "chat_cancel": "Abbrechen",
+  "chat_ctrl_k": "Strg K",
+  "chat_not_authenticated": "Nicht angemeldet",
+  "chat_error_status": "Fehler {status}",
+  "chatcard_edited": "Vor dem Senden bearbeitet",
+  "chatcard_text_sent": "Gesendeter Text",
+  "chatcard_used": "Genutzt",
+  "chatcard_changed_library": "In deiner Bibliothek geändert",
+  "chatcard_change_created": "{noun} erstellt",
+  "chatcard_change_updated": "{noun} geändert",
+  "chatcard_change_deleted": "{noun} gelöscht",
+  "chatcard_noun_prompt": "Prompt",
+  "chatcard_noun_skill": "Skill",
+  "chatcard_noun_persona": "Persona",
+  "chatcard_noun_file": "Datei",
+  "chatcard_hidden_playbook": "ein Playbook, das du nicht öffnen kannst",
+  "chatcard_hidden_persona": "eine Persona, die du nicht öffnen kannst",
+  "chatcard_hidden_file": "eine Datei, die du nicht öffnen kannst",
+  "chatcard_searched_web": "Im Web gesucht",
+  "chatcard_pages_read": "Gelesene Seiten",
+  "chatfile_built_without": "{reason} Die Datei wurde ohne es erstellt.",
+  "chatfile_create_failed": "Die Datei konnte nicht erstellt werden.",
+  "chatfile_style_request": "Stil aus dieser Anfrage",
+  "chatfile_style_workspace": "Workspace-Stil",
+  "chatfile_font_fallback": "{font} → Roboto im PDF",
+  "chatfile_logo": "Logo",
+  "chatfile_open_preview": "Vorschau öffnen",
+  "chatfile_no_table": "In dieser Datei gibt es keine Tabelle.",
+  "chatfile_sheets": "Tabellenblätter",
+  "chatfile_no_slides": "In dieser Datei gibt es keine Folien.",
+  "chatfile_slides": "Folien",
+  "chatfile_preview_of": "Vorschau von {name}",
+  "chatfile_download": "Herunterladen",
+  "chatfile_close_preview": "Vorschau schließen",
+  "logo_not_found": "Das Logo „{name}“ wurde unter Dateien nicht gefunden.",
+  "logo_wrong_type": "Das Logo „{name}“ ist kein PNG oder JPEG.",
+  "logo_load_failed": "Das Logo „{name}“ konnte nicht geladen werden.",
+  "model_none": "Keine Modelle verfügbar",
+  "model_works_with_connectors": "Funktioniert mit deinen MCP-Connectors",
+  "model_cost": "Kosten",
+  "model_speed": "Tempo",
+  "model_thinking": "Denken",
+  "persona_select_title": "Persona: {title}",
+  "persona_select_hint": "Wähle eine Persona – die Rolle für diesen Chat",
+  "chatsearch_label": "Chats durchsuchen",
+  "chatsearch_placeholder": "Chats nach Titel oder Inhalt durchsuchen …",
+  "chatsearch_min_chars": "Gib mindestens 2 Zeichen ein, um zu suchen.",
+  "chatsearch_none": "Keine Chats zu „{term}“ gefunden.",
+  "chatsearch_untitled": "Chat ohne Titel",
+  "filepick_title": "Workspace-Dateien anhängen",
+  "filepick_search": "Dateien durchsuchen …",
+  "filepick_none": "In diesem Workspace gibt es keine Dateien zum Anhängen",
+  "filepick_no_match": "Keine Dateien passen zu deiner Suche",
+  "filepick_cancel": "Abbrechen",
+  "filepick_attaching": "Wird angehängt …",
+  "filepick_attach": "Anhängen",
+  "filepick_attach_count": "Anhängen ({count})",
+  "launch_title": "Playbook nutzen",
+  "launch_search": "Playbooks durchsuchen …",
+  "launch_favorites": "Favoriten",
+  "launch_no_favourites": "Noch keine Lieblings-Playbooks",
+  "launch_none_found": "Keine Playbooks gefunden",
+  "launch_unfavourite": "Aus den Favoriten entfernen",
+  "launch_favourite": "Zu den Favoriten hinzufügen",
+  "launch_no_inputs": "Keine Eingaben nötig – das Playbook wird unverändert in den Chat eingefügt.",
+  "launch_skill": "Skill",
+  "launch_skill_hint": "Nutzt du ihn, kommt dieses Wissen als Kontext für jede Nachricht in diesen Chat – in das Eingabefeld wird nichts eingefügt.",
+  "launch_select_option": "Option wählen",
+  "launch_preview_alt": "Vorschau",
+  "launch_file_uploaded": "Datei hochgeladen",
+  "launch_click_or_drag": "Datei anklicken oder hineinziehen",
+  "launch_file_types": "Bilder, PDF, Text · max. {size} MB",
+  "launch_back": "Zurück",
+  "launch_preparing": "Wird vorbereitet …",
+  "launch_use_skill": "Skill nutzen",
+  "launch_insert": "In den Chat einfügen",
+  "aierr_busy": "{provider} ist gerade ausgelastet.",
+  "aierr_refused_key": "{provider} hat den Schlüssel abgelehnt.",
+  "aierr_refused_key_next": "Prüf den API-Schlüssel für diesen Anbieter in den Einstellungen – er ist vielleicht falsch, widerrufen oder sein Kontingent ist aufgebraucht.",
+  "aierr_unknown_model": "{provider} kennt dieses Modell nicht.",
+  "aierr_unknown_model_next": "Es wurde vermutlich eingestellt. sqemes wählt das Modell anhand deiner Anbieter-Schlüssel – entfernst du den Schlüssel dieses Anbieters in den Einstellungen, nimmt sqemes ein anderes.",
+  "aierr_problem": "{provider} hatte ein Problem.",
+  "aierr_problem_next": "Daran kannst du nichts ändern – versuch es gleich noch einmal.",
+  "aierr_generic": "{provider} hat einen Fehler gemeldet ({status}).",
+  "aierr_quoted": " Die Meldung lautet: „{detail}“",
+  "aierr_alternative": " Du kannst das Modell unter Einstellungen → Allgemein → Standard-KI-Modell wechseln.",
+  "aierr_provider_fallback": "Der KI-Anbieter",
+  "keyhint_text_manage": "Noch kein KI-Anbieter-Schlüssel. Hinterlege einen, um zu chatten.",
+  "keyhint_action": "KI-Anbieter-Schlüssel hinterlegen",
+  "keyhint_text_member": "Noch kein KI-Anbieter-Schlüssel. Bitte einen Admin oder Editor des Workspace, einen zu hinterlegen.",
+  "job_timeout": "Das Modell hat zu lange gebraucht. Versuch es mit einer kürzeren Eingabe.",
+  "server_connector_refused_one": "Ohne {list} beantwortet: Der Connector hat die Verbindung abgelehnt. Verbinde ihn neu unter Einstellungen → Connectors.",
+  "server_connector_refused_many": "Ohne {list} beantwortet: Die Connectors haben die Verbindung abgelehnt. Verbinde sie neu unter Einstellungen → Connectors.",
+  "server_web_allowance": "Die Websuchen in deinem Plan sind für diesen Monat aufgebraucht. Ein Admin des Workspace kann unter Einstellungen → API & MCP → Websuche einen eigenen Suchschlüssel hinterlegen oder den Plan erweitern.",
+  "server_web_not_setup": "Die Websuche ist hier nicht eingerichtet. Ein Admin des Workspace kann unter Einstellungen → API & MCP → Websuche einen Suchschlüssel hinterlegen.",
+  "role_admin": "Admin",
+  "role_editor": "Editor",
+  "role_member": "Mitglied",
+  "kind_help_prompt": "Eine Aufgabe, die du immer wieder nutzt und jedes Mal ausfüllst. Beispiel: „Kaltakquise-E-Mail“ – du gibst Kunde und Produkt an.",
+  "kind_help_skill": "Ein Stück Wissen deines Unternehmens, das die KI nutzt, wann immer es passt – nichts auszufüllen. Beispiel: „AIDA-Texterformel“ oder eure Markenstimme.",
+  "access_badge_private": "Nur ich",
+  "access_badge_restricted": "Eingeschränkt",
+  "access_badge_private_title": "Nur ich – nur für die Person sichtbar, die es erstellt hat",
+  "access_badge_restricted_title": "Eingeschränkt – nicht für alle in diesem Workspace sichtbar",
+  "category_marketing_sales": "Marketing & Vertrieb",
+  "category_writing_content": "Schreiben & Inhalte",
+  "category_engineering_product": "Entwicklung & Produkt",
+  "category_data_research": "Daten & Recherche",
+  "category_business_ops": "Business & Betrieb",
+  "category_support_success": "Support & Kundenerfolg",
+  "category_creative_design": "Kreativ & Design",
+  "bulk_add_tag": "Tag hinzufügen",
+  "bulk_remove_tag": "Tag entfernen",
+  "bulk_selected_playbook": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Playbook ausgewählt",
+        "countPlural=other": "{count} Playbooks ausgewählt"
+      }
+    }
+  ],
+  "bulk_selected_persona": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Persona ausgewählt",
+        "countPlural=other": "{count} Personas ausgewählt"
+      }
+    }
+  ],
+  "bulk_selected_file": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Datei ausgewählt",
+        "countPlural=other": "{count} Dateien ausgewählt"
+      }
+    }
+  ],
+  "bulk_selected_chat": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Chat ausgewählt",
+        "countPlural=other": "{count} Chats ausgewählt"
+      }
+    }
+  ],
+  "bulk_deselect_all": "Auswahl aufheben",
+  "bulk_select_all": "Alle {count} auswählen",
+  "bulk_access": "Zugriff …",
+  "bulk_export": "Exportieren",
+  "bulk_delete": "Löschen",
+  "bulk_clear": "Auswahl leeren",
+  "save_unsaved": "Ungespeicherte Änderungen",
+  "save_cancel": "Abbrechen",
+  "save_save": "Speichern",
+  "confirm_type_before": "Gib",
+  "confirm_type_after": "ein, um zu bestätigen",
+  "confirm_confirm": "Bestätigen",
+  "move_up_label": "{label} nach oben verschieben",
+  "move_down_label": "{label} nach unten verschieben",
+  "move_up": "Nach oben",
+  "move_down": "Nach unten",
+  "tags_all": "Alle Tags",
+  "tooltip_more_info": "Mehr Informationen",
+  "count_playbook": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Playbook",
+        "countPlural=other": "{count} Playbooks"
+      }
+    }
+  ],
+  "count_persona": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Persona",
+        "countPlural=other": "{count} Personas"
+      }
+    }
+  ],
+  "count_file": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Datei",
+        "countPlural=other": "{count} Dateien"
+      }
+    }
+  ],
+  "count_chat": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Chat",
+        "countPlural=other": "{count} Chats"
+      }
+    }
+  ],
+  "bulksum_done": "{done} für {things}",
+  "bulksum_skipped": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} übersprungen – du darfst es nicht ändern",
+        "countPlural=other": "{count} übersprungen – du darfst sie nicht ändern"
+      }
+    }
+  ],
+  "bulksum_failed": "{count} fehlgeschlagen",
+  "bulksum_nothing": "Nichts zu ändern",
+  "pb_select": "{title} auswählen",
+  "pb_unfavourite": "{title} aus den Favoriten entfernen",
+  "pb_favourite": "{title} zu den Favoriten hinzufügen",
+  "pb_wizard": "Playbook-Assistent",
+  "pb_wizard_needs_brand": "Der Playbook-Assistent schreibt in der Stimme deiner Marke – dafür muss die Marke zuerst eingerichtet sein",
+  "pb_set_up_brand": "Marke einrichten",
+  "pb_tag_set": "Tag „{tag}“ gesetzt",
+  "pb_tag_removed": "Tag entfernt",
+  "pb_access_changed": "Zugriff geändert",
+  "pb_deleted": "Playbook gelöscht",
+  "pb_duplicated": "Playbook dupliziert",
+  "pb_unfavourited_toast": "Aus den Favoriten entfernt",
+  "pb_favourited_toast": "Zu den Favoriten hinzugefügt",
+  "pb_exported": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Playbook exportiert",
+        "countPlural=other": "{count} Playbooks exportiert"
+      }
+    }
+  ],
+  "pb_export_failed": "Export fehlgeschlagen",
+  "pb_downloaded": "Playbook heruntergeladen",
+  "pb_imported_skill": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "„{title}“ mit {count} Datei importiert",
+        "countPlural=other": "„{title}“ mit {count} Dateien importiert"
+      }
+    }
+  ],
+  "pb_import_failed": "Import fehlgeschlagen",
+  "pb_submitted": "Im Marktplatz eingereicht – die Prüfung steht aus",
+  "pb_publish_failed": "Veröffentlichen fehlgeschlagen",
+  "pb_imported_playbooks": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Playbook importiert",
+        "countPlural=other": "{count} Playbooks importiert"
+      }
+    }
+  ],
+  "pb_imported_and_personas": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": " und {count} Persona",
+        "countPlural=other": " und {count} Personas"
+      }
+    }
+  ],
+  "pb_title": "Playbooks",
+  "pb_subtitle": "Die Playbooks deines Teams – Prompts für Aufgaben, Skills für Wissen.",
+  "pb_import_title": "Ein .sqemes.zip-Paket oder einen Agent-Skill-Ordner (.zip) importieren",
+  "pb_import": "Importieren",
+  "pb_new": "Neues Playbook",
+  "pb_search": "Playbooks durchsuchen …",
+  "pb_favorites": "Favoriten",
+  "pb_tab_all": "Alle",
+  "pb_tab_prompts": "Prompts",
+  "pb_tab_skills": "Skills",
+  "pb_empty_title": "Noch keine Playbooks",
+  "pb_empty_description": "Zwei Arten, je nachdem, was du brauchst:",
+  "pb_create_first": "Erstelle dein erstes Playbook",
+  "pb_browse_marketplace": "Marktplatz durchsuchen",
+  "pb_no_favourites": "Keine Lieblings-Playbooks",
+  "pb_none_found": "Keine Playbooks gefunden",
+  "pb_star_hint": "Markiere Playbooks mit dem Stern, um sie hier zu sehen.",
+  "pb_adjust_filters": "Ändere deine Suche oder die Filter.",
+  "pb_delete_title": "Playbook löschen?",
+  "pb_delete_body": "Willst du dieses Playbook wirklich löschen? Das lässt sich nicht rückgängig machen.",
+  "pb_cancel": "Abbrechen",
+  "pb_yes_delete": "Ja, löschen",
+  "pb_bulk_delete_title": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Playbook löschen?",
+        "countPlural=other": "{count} Playbooks löschen?"
+      }
+    }
+  ],
+  "pb_bulk_delete_body": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Das ausgewählte Playbook wird endgültig gelöscht. Das lässt sich nicht rückgängig machen.",
+        "countPlural=other": "Die ausgewählten Playbooks werden endgültig gelöscht. Das lässt sich nicht rückgängig machen."
+      }
+    }
+  ],
+  "pb_deleting": "Wird gelöscht …",
+  "pb_delete": "Löschen",
+  "pb_bulk_access_title": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Zugriff für {count} Playbook festlegen",
+        "countPlural=other": "Zugriff für {count} Playbooks festlegen"
+      }
+    }
+  ],
+  "pb_bulk_access_body": "Das ersetzt den bisherigen Zugriff jedes ausgewählten Playbooks, das du ändern darfst. Personas, die diese Playbooks nutzen, laden sie nur für Personen, die sie sehen können.",
+  "pb_bulk_access_hint": "Wer diese Playbooks sehen und nutzen kann",
+  "pb_pick_someone": "Wähle mindestens eine Person oder Gruppe.",
+  "pb_lose_sight": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Du bist nicht genannt und siehst {count} dieser Playbooks danach nicht mehr – das, das du nicht erstellt hast.",
+        "countPlural=other": "Du bist nicht genannt und siehst {count} dieser Playbooks danach nicht mehr – die, die du nicht erstellt hast."
+      }
+    }
+  ],
+  "pb_applying": "Wird übernommen …",
+  "pb_apply": "Übernehmen",
+  "pb_publish_title": "Im Marktplatz veröffentlichen",
+  "pb_publish_1": "Veröffentliche",
+  "pb_publish_2": "(inkl. Kontextdateien) als Momentaufnahme, die andere kopieren können. Es wird",
+  "pb_publish_3": "zur Prüfung eingereicht",
+  "pb_publish_4": "und geht nach der Freigabe online.",
+  "pb_publish_skill_review": "Skills werden vor der Freigabe zusätzlich geprüft.",
+  "pb_category": "Kategorie",
+  "pb_submitting": "Wird eingereicht …",
+  "pb_submit_review": "Zur Prüfung einreichen",
+  "pb_need_key_title": "Du brauchst einen Publisher-Schlüssel",
+  "pb_need_key_1": "Um Playbooks im sqemes-Community-Marktplatz einzureichen, brauchst du einen",
+  "pb_need_key_2": "Publisher-Schlüssel",
+  "pb_need_key_3": ". Fordere einen an und hinterlege ihn unter",
+  "pb_need_key_4": "Einstellungen → Allgemein → Marktplatz-Publisher",
+  "pb_more_info": "Mehr erfahren",
+  "pb_import_bundle_title": "Playbooks importieren",
+  "pb_import_bundle_1": "Dieses Paket wird zu",
+  "pb_import_bundle_2": "hinzugefügt. Importierte Playbooks stammen aus einer anderen Quelle – prüf, was hinzukommt, bevor du weitermachst.",
+  "pb_import_playbooks": "Playbooks",
+  "pb_import_context_files": "Kontextdateien",
+  "pb_import_personas": "Personas",
+  "pb_untitled": "Ohne Titel",
+  "pb_more": "+ {count} weitere …",
+  "pb_importing": "Wird importiert …",
+  "pb_import_skill_title": "Agent Skill importieren",
+  "pb_import_skill_1": "Das fügt",
+  "pb_import_skill_2": "einen Skill mit seinen Dateien hinzu. sqemes speichert und verteilt sie – es führt nichts aus, was sie enthalten.",
+  "pb_import_skill": "Skill",
+  "pb_import_files": "Dateien",
+  "pb_import_folders": "Ordner",
+  "pb_list_label": "Playbooks",
+  "ed_save_playbook": "Playbook speichern",
+  "ed_save_changes": "Änderungen speichern",
+  "ed_create_playbook": "Playbook erstellen",
+  "ed_title_required": "Das Playbook braucht einen Titel.",
+  "ed_saved": "Playbook gespeichert",
+  "ed_access_failed": "Gespeichert, aber der Zugriff konnte nicht aktualisiert werden – versuch es noch einmal.",
+  "ed_editors_failed": "Gespeichert, aber „Wer bearbeiten darf“ konnte nicht aktualisiert werden – versuch es noch einmal.",
+  "ed_version_current": "Diese Version ist bereits der aktuelle Stand – nichts geändert.",
+  "ed_restored_missing": "Als Version {version} wiederhergestellt. Weggelassen, weil gelöscht: {files}.",
+  "ed_restored": "Als Version {version} wiederhergestellt.",
+  "ed_var_name_invalid": "Der Name muss mit einem Buchstaben oder Unterstrich beginnen und darf nur Buchstaben, Ziffern und Unterstriche enthalten.",
+  "ed_var_reserved": "„{name}“ ist ein reservierter Name.",
+  "ed_var_exists": "Eine Variable namens „{name}“ gibt es schon.",
+  "ed_enhance_empty": "Gib zuerst Text ein, der verbessert werden soll.",
+  "ed_enhanced_skill": "Skill mit KI verbessert! ✨",
+  "ed_enhanced_prompt": "Prompt mit KI verbessert! ✨",
+  "ed_enhance_failed": "Verbessern fehlgeschlagen",
+  "ed_description_failed": "Beschreibung konnte nicht erzeugt werden",
+  "ed_edit_playbook": "Playbook bearbeiten",
+  "ed_new_playbook": "Neues Playbook",
+  "ed_back_marketplace": "Zurück zum Marktplatz",
+  "ed_back_playbooks": "Zurück zu den Playbooks",
+  "ed_duplicate": "Duplizieren",
+  "ed_delete": "Löschen",
+  "ed_readonly_1": "Du kannst dieses Playbook nutzen, aber nicht ändern.",
+  "ed_readonly_2": "Bearbeiten dürfen nur die Personen, die der Eigentümer ausgewählt hat. Frag sie oder einen Admin des Workspace.",
+  "ed_readonly_2_named": "Bearbeiten dürfen nur die Personen, die der Eigentümer ({owner}) ausgewählt hat. Frag sie oder einen Admin des Workspace.",
+  "ed_tab_editor": "Editor",
+  "ed_tab_history_test": "Verlauf · Test",
+  "ed_tab_test": "Test",
+  "ed_tab_settings": "Einstellungen",
+  "ed_type": "Art",
+  "ed_description": "Beschreibung",
+  "ed_enter_content_first": "Gib zuerst Inhalt ein",
+  "ed_add_api_key": "Hinterlege einen API-Schlüssel in den Einstellungen",
+  "ed_generate_description": "Beschreibung mit KI erzeugen",
+  "ed_generating": "Wird erzeugt …",
+  "ed_generate": "Mit KI erzeugen",
+  "ed_desc_placeholder_skill": "Beschreibe, wann und wie dieser Skill genutzt wird – KI-Agenten finden ihn darüber …",
+  "ed_desc_placeholder_prompt": "Beschreibe, was dieses Playbook tut …",
+  "ed_desc_needed": "Die Beschreibung brauchen KI-Agenten, um den Skill zu finden",
+  "ed_desc_used": "KI-Agenten entscheiden anhand dieser Beschreibung, wann sie diesen Skill nutzen",
+  "ed_tag": "Tag",
+  "ed_category": "Kategorie",
+  "ed_status": "Status",
+  "ed_listed": "Gelistet",
+  "ed_draft": "Entwurf",
+  "ed_listed_hint": "Wird im Marktplatz angezeigt",
+  "ed_draft_hint": "Noch nicht gelistet – nur Admins sehen es",
+  "ed_only_me_unavailable": "Nicht verfügbar – für dieses Playbook ist kein Eigentümer gespeichert, „Nur ich“ würde es vor allen verbergen",
+  "ed_who_can_edit": "Wer bearbeiten darf",
+  "ed_who_can_edit_hint": "Wer dieses Playbook ändern darf. Alle, die es sehen, können es weiter nutzen.",
+  "ed_who_can_edit_readonly": "Nur der Eigentümer oder ein Admin des Workspace kann ändern, wer dieses Playbook bearbeiten darf.",
+  "ed_access": "Zugriff",
+  "ed_selfhost_access_1": "Alle in diesem Workspace",
+  "ed_selfhost_access_2": "können dieses Playbook sehen und nutzen. Auf Personen oder Gruppen einschränken kannst du in der",
+  "ed_context_files": "Kontextdateien",
+  "ed_context_files_tip": "Workspace-Dateien, die an dieses Playbook angehängt sind. Ihr Inhalt wird als Kontext vorangestellt, wenn das Playbook läuft.",
+  "ed_variables": "Variablen",
+  "ed_variables_tip": "Platzhalter, die beim Ausführen ausgefüllt werden. Füge sie mit {token} in deinen Prompt ein.",
+  "ed_add_variable": "Variable hinzufügen",
+  "ed_edit_variable_label": "Variable {name} bearbeiten",
+  "ed_delete_variable_label": "Variable {name} löschen",
+  "ed_add": "Hinzufügen",
+  "ed_no_variables": "Keine Variablen festgelegt.",
+  "ed_owner": "Eigentümer",
+  "ed_owner_gone": "Nicht mehr in diesem Workspace",
+  "ed_owner_none": "Nicht gespeichert",
+  "ed_owner_gone_hint": "Das Playbook bleibt, wo es ist",
+  "ed_owner_none_hint": "„Nur ich“ ergibt nur mit einem Eigentümer Sinn",
+  "ed_title_label": "Titel",
+  "ed_untitled": "Ohne Titel",
+  "ed_legacy_steps": "Dieser Prompt hatte mehrere Schritte. Nur der erste wurde übernommen – prüf und aktualisiere bitte den Inhalt.",
+  "ed_skill_content": "Skill-Inhalt",
+  "ed_prompt_content": "Prompt-Inhalt",
+  "ed_skill_content_label": "Skill-Inhalt",
+  "ed_prompt_content_label": "Prompt-Inhalt",
+  "ed_enhancing": "Wird verbessert …",
+  "ed_enhance": "Mit KI verbessern",
+  "ed_skill_placeholder": "Schreib hier das Wissen oder den Kontext des Skills …",
+  "ed_prompt_placeholder": "Schreib hier deinen Prompt. Mit {token} fügst du Variablen ein.",
+  "ed_var_edit_title": "Variable bearbeiten",
+  "ed_var_add_title": "Variable hinzufügen",
+  "ed_var_name": "Name (ID)",
+  "ed_var_name_placeholder": "z. B. produkt_name",
+  "ed_var_label": "Bezeichnung",
+  "ed_var_label_placeholder": "z. B. Produktname",
+  "ed_var_type": "Typ",
+  "ed_var_text": "Textfeld",
+  "ed_var_textarea": "Mehrzeiliges Textfeld",
+  "ed_var_select": "Auswahlliste",
+  "ed_var_file": "Datei-Upload",
+  "ed_var_options": "Optionen (durch Komma getrennt)",
+  "ed_var_options_placeholder": "Option A, Option B",
+  "ed_var_default": "Standardwert",
+  "ed_var_update": "Variable aktualisieren",
+  "ed_var_add": "Variable hinzufügen",
+  "ed_unsaved_title": "Ungespeicherte Änderungen",
+  "ed_unsaved_body": "Du hast ungespeicherte Änderungen. Willst du wirklich ohne Speichern gehen?",
+  "ed_keep_editing": "Weiter bearbeiten",
+  "ed_discard": "Verwerfen",
+  "ta_label": "Zugriff",
+  "ta_hint": "Wer dieses Playbook sehen und nutzen kann",
+  "ta_legacy_1": "Dieses Playbook hat noch eine ältere Regel, die",
+  "ta_legacy_2": "als Ganzes freigibt – das kann diese Liste nicht anzeigen, sie vergibt Rollen statt Personen.",
+  "ta_legacy_3": "Beim Speichern wird sie durch deine Auswahl unten ersetzt.",
+  "role_plural_admin": "Admins",
+  "role_plural_editor": "Editoren",
+  "role_plural_member": "Mitglieder",
+  "ta_anyone_edit": "Alle, die bearbeiten dürfen",
+  "ta_everyone": "Alle",
+  "ta_anyone_edit_hint": "Admins und Editoren, die es sehen können",
+  "ta_everyone_hint": "Alle im Workspace können es nutzen",
+  "ta_only_me": "Nur ich",
+  "ta_only_me_hint": "Sonst niemand – keine Admins, keine Editoren",
+  "ta_only_selected": "Nur ausgewählte Personen",
+  "ta_restrict": "Zugriff einschränken",
+  "ta_restricted_default": "Standardmäßig eingeschränkt",
+  "ta_pick_editors": "Wähle, wer es ändern darf – alle, die es sehen, können es weiter nutzen",
+  "ta_pick_users": "Wähle die Personen, die es nutzen können",
+  "ta_new_restricted": "Neue Playbooks starten eingeschränkt – wer eines nutzen darf, wählst du im Playbook selbst",
+  "ta_groups": "Gruppen",
+  "ta_people": "Personen",
+  "ta_no_groups": "Noch keine Gruppen",
+  "ta_groups_explain": "Eine Gruppe wächst mit dem Team mit – füg jemanden einmal hinzu, und jedes Playbook dieser Gruppe folgt.",
+  "ta_create_group": "Erstelle deine erste Gruppe →",
+  "ta_ask_admin": "Bitte einen Admin des Workspace, eine anzulegen, oder wähle stattdessen Personen.",
+  "ta_group_empty": "Keine Mitglieder – gibt niemandem Zugriff",
+  "ta_group_people": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Person",
+        "countPlural=other": "{count} Personen"
+      }
+    }
+  ],
+  "ta_search_people": "Personen suchen …",
+  "ta_no_people_match": "Keine Personen passen zu „{term}“.",
+  "ta_edit_named": "Nur die hier genannten Editoren und Gruppen sowie der Eigentümer und die Admins des Workspace dürfen es ändern. Eine Gruppe zählt für ihre Editoren; Mitglieder bearbeiten nie.",
+  "ta_edit_nobody": "Noch niemand ist genannt, deshalb dürfen es nur der Eigentümer und die Admins des Workspace ändern.",
+  "ta_use_named": "Nur die hier genannten Personen und Gruppen sowie die Person, die das Playbook erstellt hat. Personen gelten einzeln – wer später dazukommt, bekommt es nicht automatisch; eine Gruppe wächst dagegen mit dem Team mit.",
+  "ta_use_nobody": "Noch niemand ist genannt, deshalb ist das dasselbe wie „Nur ich“ – nur die Person, die es erstellt hat.",
+  "vh_unknown": "Unbekannt",
+  "vh_former_member": "Ehemaliges Mitglied",
+  "vh_error": "Etwas ist schiefgegangen – versuch es noch einmal.",
+  "vh_title_changed": "Titel: „{before}“ → „{now}“",
+  "vh_description_changed": "Beschreibung geändert",
+  "vh_tag_changed": "Tag: {before} → {now}",
+  "vh_tag_none": "keiner",
+  "vh_files_attached": "Dateien angehängt: {names}",
+  "vh_files_detached": "Dateien entfernt: {names}",
+  "vh_empty": "Noch keine Versionen. Jedes Speichern legt eine an.",
+  "vh_version": "Version {version}",
+  "vh_current": "aktuell",
+  "vh_changes_since": "Änderungen seit Version {version}",
+  "vh_first": "Erste Version",
+  "vh_restore": "Wiederherstellen",
+  "vh_delete": "Löschen",
+  "vh_delete_label": "Version {version} löschen",
+  "vh_files": "Dateien:",
+  "vh_unnamed_file": "Datei ohne Namen",
+  "vh_deleted_suffix": " (gelöscht)",
+  "vh_unchanged_lines": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "⋯ {count} unveränderte Zeile",
+        "countPlural=other": "⋯ {count} unveränderte Zeilen"
+      }
+    }
+  ],
+  "vh_empty_line": "(leere Zeile)",
+  "vh_restore_q": "Version {version} wiederherstellen?",
+  "vh_delete_q": "Version {version} löschen?",
+  "vh_restore_body": "Titel, Beschreibung, Inhalt und Dateien werden zum aktuellen Playbook und als neue Version gespeichert. Nichts geht verloren – der aktuelle Stand bleibt im Verlauf. Seitdem gelöschte Dateien kommen nicht zurück und bleiben weg.",
+  "vh_unsaved_discarded": "Deine ungespeicherten Änderungen im Editor werden verworfen.",
+  "vh_delete_body": "Sie verschwindet für alle aus dem Verlauf und lässt sich danach nicht wiederherstellen.",
+  "wiz_read_failed": "{name} konnte nicht gelesen werden.",
+  "wiz_reading_docs": "Deine Dokumente werden gelesen",
+  "wiz_reading_brand": "Deine Marke wird gelesen",
+  "wiz_writing_prompt": "Dein Prompt wird geschrieben",
+  "wiz_writing_skill": "Dein Skill wird geschrieben",
+  "wiz_looking_files": "Deine Dateien werden durchgesehen",
+  "wiz_save_failed": "Das Playbook wurde erzeugt, konnte aber nicht gespeichert werden. Versuch es noch einmal.",
+  "wiz_access_failed": "Erzeugt, aber der Zugriffs-Standard des Workspace ließ sich nicht anwenden – das Playbook wurde entfernt, statt für alle offen zu bleiben.",
+  "wiz_failed": "Das Playbook konnte nicht erzeugt werden.",
+  "wiz_takes_a_minute": "Mit Dokumenten kann das eine Minute dauern.",
+  "wiz_title": "Playbook-Assistent",
+  "wiz_subtitle": "Beschreibe, was du brauchst. Deine Marke ergänzt den Rest.",
+  "wiz_what_build": "Was willst du bauen?",
+  "wiz_goal": "Was soll dein Playbook erreichen?",
+  "wiz_goal_placeholder": "z. B. Support-E-Mails zu Lieferverzögerungen beantworten, in unserem Ton, ohne ein Datum zu versprechen, das wir nicht halten können.",
+  "wiz_context": "Auf welchen Kontext soll es zugreifen?",
+  "wiz_context_hint": "Optional. Anhängen behält eine Datei am Playbook · Hochladen liest ein Dokument einmal und verwirft es.",
+  "wiz_attach": "Datei anhängen",
+  "wiz_upload": "Hochladen",
+  "wiz_attached": "Angehängt – bleibt am Playbook",
+  "wiz_remove": "{name} entfernen",
+  "wiz_attached_hint": "Diese bleiben angehängt, und ihr Inhalt prägt auch, was geschrieben wird.",
+  "wiz_source": "Quellmaterial – wird nicht gespeichert",
+  "wiz_source_hint": "Gelesen, dann verworfen – diese Dateien kommen nicht in deine Bibliothek. Was das Playbook daraus braucht, wird in neue Kontextdateien geschrieben, und passende vorhandene Dateien werden angehängt.",
+  "wiz_cancel": "Abbrechen",
+  "wiz_create": "Playbook erstellen",
+  "pv_all_playbooks": "Alle Playbooks",
+  "pv_unfavourite": "Aus den Favoriten entfernen",
+  "pv_favourite": "Zu den Favoriten hinzufügen",
+  "pv_edit": "Bearbeiten",
+  "pv_use_now": "Jetzt nutzen",
+  "pv_loaded_by": "Geladen von",
+  "pv_no_persona": "Noch keine Persona lädt es.",
+  "pv_blanks": "Lücken",
+  "pv_applied_as": "Genutzt als",
+  "pv_skill_knowledge": "Wissen, das die KI nutzt – keine Lücken auszufüllen.",
+  "pv_no_blanks": "Keine – läuft so, wie es geschrieben ist.",
+  "pv_duplicate": "Duplizieren",
+  "pv_download_title": "Playbook herunterladen (.sqemes.zip)",
+  "pv_download": "Herunterladen",
+  "pv_submit_marketplace": "Im Marktplatz einreichen",
+  "pv_publish_marketplace": "Im Marktplatz veröffentlichen",
+  "pv_delete": "Löschen",
+  "tp_test": "Test",
+  "tp_clear": "Test zurücksetzen",
+  "tp_fill_variables": "Variablen ausfüllen",
+  "tp_select": "Auswählen …",
+  "tp_enter": "{name} eingeben …",
+  "tp_start": "Test starten",
+  "tp_continue": "Unterhaltung fortsetzen …",
+  "up_uploaded": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Datei hochgeladen",
+        "countPlural=other": "{count} Dateien hochgeladen"
+      }
+    }
+  ],
+  "up_failed": "Hochladen fehlgeschlagen",
+  "up_title": "Kontextdatei hochladen",
+  "up_uploading": "Wird hochgeladen …",
+  "up_drop": "Dateien hierher ziehen",
+  "up_browse_hint": "oder auswählen · max. {size} MB pro Datei",
+  "up_browse": "Dateien auswählen",
+  "tag_change": "Tag ändern …",
+  "tag_select": "Tag wählen …",
+  "tag_create": "„{tag}“ anlegen",
+  "tag_none": "Keine Tags im Workspace",
+  "tag_no_match": "Keine Tags passen zu deiner Suche",
+  "tag_no_other": "Keine weiteren Tags",
+  "cf_none": "Keine Dateien im Workspace",
+  "cf_attach": "Kontextdateien anhängen …",
+  "cf_upload": "Kontextdatei hochladen",
+  "cf_no_match": "Keine Dateien passen zu deiner Suche",
+  "cf_all_attached": "Alle Dateien sind schon angehängt",
+  "vh_history_tab": "Verlauf",
+  "bulk_set_tag": "Tag setzen",
+  "chat_no_model": "Kein Modell verfügbar",
+  "tags_filter_label": "Nach Tag filtern",
+  "ppv_all_personas": "Alle Personas",
+  "ppv_loads": "Lädt",
+  "ppv_empty": "Noch keine Playbooks – diese Persona lädt nichts.",
+  "ppv_add_one": "Eins hinzufügen",
+  "ppv_if": "Wenn",
+  "ppv_download_title": "Persona mit ihren Playbooks herunterladen (.sqemes.zip)",
+  "pwiz_describe_first": "Beschreib zuerst die Rolle.",
+  "pwiz_stage_reading": "Deine Playbooks werden gelesen",
+  "pwiz_stage_writing": "Die Rolle wird geschrieben",
+  "pwiz_stage_choosing": "Die Rolle wird geschrieben und ihre Playbooks werden gewählt",
+  "pwiz_stage_saving": "Wird gespeichert",
+  "pwiz_no_content": "Das Modell hat keine Rollenbeschreibung geliefert. Versuch es noch einmal oder beschreib die Rolle etwas genauer.",
+  "pwiz_failed": "Die Persona konnte nicht erstellt werden",
+  "pwiz_title": "Persona-Assistent",
+  "pwiz_goal_label": "Was soll diese Persona sein?",
+  "pwiz_goal_placeholder": "Eine Vertriebsrolle, die Angebote schreibt, Workshops vorschlägt und KI-Anwendungsfälle für einen Kunden findet. Sie fragt immer zuerst nach dem Kundenkontext und erfindet nie Preise.",
+  "pwiz_playbooks_label": "Playbooks, auf die sie zugreifen darf",
+  "pwiz_selected": "{count} ausgewählt",
+  "pwiz_no_playbooks": "Dieser Workspace hat noch keine Playbooks. Eine Persona ohne Routen ist nur eine Rollenbeschreibung – du kannst sie trotzdem erstellen und Playbooks später anhängen.",
+  "pwiz_nothing_matches": "Keine Treffer.",
+  "pwiz_none_warning": "Ohne Playbooks kann diese Persona nichts laden – sie ist dann nur eine Rollenbeschreibung. Du kannst sie später anhängen.",
+  "pwiz_generate": "Persona erstellen",
+  "count_context_file": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Kontextdatei",
+        "countPlural=other": "{count} Kontextdateien"
+      }
+    }
+  ],
+  "ps_loads_nothing": "Lädt noch nichts",
+  "ps_load_failed": "Die Personas konnten nicht geladen werden",
+  "ps_fav_failed": "Favorit konnte nicht geändert werden",
+  "ps_tag_failed": "Tag konnte nicht geändert werden",
+  "ps_duplicated": "Persona dupliziert",
+  "ps_duplicate_failed": "Die Persona konnte nicht dupliziert werden",
+  "ps_downloaded_with": "{personas} mit {playbooks} heruntergeladen",
+  "ps_downloaded_alone": "Heruntergeladen – diese Persona nutzt keine Playbooks, daher ist keins mitgekommen",
+  "ps_not_bundle": "Kein sqemes-Paket",
+  "ps_imported": "{personas} importiert",
+  "ps_imported_with": "{personas} und {playbooks} importiert",
+  "ps_deleted": "{personas} gelöscht",
+  "ps_deleted_partial": "{done} von {total} gelöscht – {failed} fehlgeschlagen",
+  "ps_subtitle": "Eine Arbeitsrolle, die weiß, welches deiner Playbooks sie wann nutzt – eine KI-Rolle, kein Teammitglied. Funktioniert im Chat und über MCP.",
+  "ps_import_title": "Ein .sqemes.zip-Paket importieren – Personas kommen mit den Playbooks, die sie nutzen",
+  "ps_new": "Neue Persona",
+  "ps_search": "Personas durchsuchen …",
+  "ps_loading": "Personas werden geladen …",
+  "ps_empty_title": "Noch keine Personas",
+  "ps_empty_desc": "Eine Persona bündelt die Playbooks, die eine Rolle braucht – mit einer Bedingung für jedes.",
+  "ps_example_label": "Beispiel – „Vertrieb“:",
+  "ps_example_text": "der Angebotslayout-Skill, wenn ein Angebot geschrieben wird, das Workshop-Playbook, wenn ein Workshop angeboten wird, der Use-Case-Generator, wenn jemand fragt, was KI für die eigene Arbeit tun könnte.",
+  "ps_example_how": "Der Chat oder dein MCP-Client lädt die Persona und holt ein Playbook erst, wenn seine Bedingung zutrifft – so kommt das Wissen dann, wenn es gebraucht wird, statt alles auf einmal.",
+  "ps_create_first": "Erstelle deine erste Persona",
+  "ps_no_favourites": "Keine favorisierten Personas",
+  "ps_nothing_matches": "Keine Treffer",
+  "ps_star_hint": "Markiere Personas mit einem Stern, um sie hier zu sehen.",
+  "ps_no_match": "Keine Persona passt zu deiner Suche oder deinen Filtern.",
+  "ps_generated": "Persona erstellt – prüf ihre Playbooks, bevor du sie nutzt",
+  "ps_import_bundle_title": "Dieses Paket importieren?",
+  "ps_import_adds": "Fügt dem Workspace {workspace} {personas} und {playbooks} hinzu.",
+  "ps_import_adds_files": "Fügt dem Workspace {workspace} {personas} und {playbooks} sowie {files} hinzu.",
+  "ps_import_note": "Die Playbooks werden als Kopien angelegt – die Routen einer Persona müssen auf etwas zeigen, deshalb kommen sie mit. Zugriffsregeln kommen nicht mit: Eine importierte Persona startet mit der Regel dieses Workspace.",
+  "ps_delete_title_many": "{count} Personas löschen?",
+  "ps_delete_title_one": "Diese Persona löschen?",
+  "ps_delete_many": "Personas löschen",
+  "ps_delete_one": "Persona löschen",
+  "ps_delete_body_many": "Die Personas werden entfernt, mit den Listen der Playbooks, die sie nutzen.",
+  "ps_delete_body_one": "Die Persona wird entfernt, mit der Liste der Playbooks, die sie nutzt.",
+  "ps_delete_untouched": "Die Playbooks selbst bleiben unberührt",
+  "ps_delete_untouched_rest": "– sie funktionieren weiter für sich.",
+  "pe_not_found": "Persona nicht gefunden",
+  "pe_access_read_failed": "Konnte nicht lesen, wer diese Persona nutzen darf",
+  "pe_load_failed": "Die Persona konnte nicht geladen werden",
+  "pe_enhance_empty": "Schreib zuerst etwas – Verbessern verbessert, was schon da ist.",
+  "pe_enhanced": "Rollenbeschreibung verbessert ✨",
+  "pe_enhance_failed": "Die Persona konnte nicht verbessert werden",
+  "pe_describe_empty": "Schreib zuerst die Rolle oder häng ein Playbook an – es gibt noch nichts zu beschreiben.",
+  "pe_describe_failed": "Die Beschreibung konnte nicht erstellt werden",
+  "pe_condition_failed": "Die Bedingung konnte nicht geschrieben werden",
+  "pe_name_needed": "Gib der Persona einen Namen.",
+  "pe_access_not_applied": "Gespeichert, aber wer sie nutzen darf, konnte nicht übernommen werden – sie ist für den Workspace offen. {detail}",
+  "pe_saved": "Persona gespeichert",
+  "pe_save_failed": "Die Persona konnte nicht gespeichert werden",
+  "pe_deleted": "Persona gelöscht",
+  "pe_delete_failed": "Die Persona konnte nicht gelöscht werden",
+  "pe_loading": "Persona wird geladen …",
+  "pe_edit_title": "Persona bearbeiten",
+  "pe_new_title": "Neue Persona",
+  "pe_back": "Zurück zu den Personas",
+  "pe_delete": "Persona löschen",
+  "pe_create": "Persona erstellen",
+  "pe_readonly_1": "Du kannst diese Persona nutzen, aber nicht ändern.",
+  "pe_tab_details": "Details",
+  "pe_tab_role": "Rolle",
+  "pe_tab_playbooks": "Playbooks",
+  "pe_write_for_me": "Für mich schreiben",
+  "pe_description_placeholder": "Angebote, Anwendungsfälle und Workshop-Material für das Vertriebsteam",
+  "pe_description_hint": "Wird in der Auswahl deines MCP-Clients angezeigt und ist oft das Einzige, was eine Person oder ein Modell vor der Wahl sieht. Schreib sie für die Entscheidung:",
+  "pe_description_hint_question": "Für welche Aufgabe ist das die richtige Rolle?",
+  "pe_access_hint": "Wer diese Persona sehen und nutzen kann",
+  "pe_only_me_unavailable": "Nicht verfügbar – für diese Persona ist kein Eigentümer hinterlegt, „Nur ich“ würde sie also vor allen verbergen",
+  "pe_who_can_edit_hint": "Wer diese Persona und ihre Routen ändern darf. Alle, die sie sehen, können sie weiter nutzen.",
+  "pe_who_can_edit_readonly": "Nur der Eigentümer oder ein Workspace-Admin kann ändern, wer diese Persona bearbeiten darf.",
+  "pe_owner_gone_hint": "Die Person, die sie erstellt hat, ist nicht mehr da; die Persona bleibt, wo sie ist.",
+  "pe_owner_none_hint": "Ohne hinterlegten Eigentümer erstellt – „Nur ich“ ist nicht verfügbar.",
+  "pe_name_label": "Name",
+  "pe_name_placeholder": "Vertrieb",
+  "pe_role_label": "Rolle und Regeln",
+  "pe_role_placeholder": "Du arbeitest im Vertrieb bei …\n\nFrag nach dem Kundenkontext, bevor du etwas entwirfst.\nNenn nie einen Preis, der nicht im angehängten Material steht.",
+  "pe_role_hint": "Nur die Rolle selbst. Die Routing-Tabelle wird aus den Routen gebaut und automatisch ergänzt.",
+  "pe_attach": "Playbook anhängen",
+  "pe_route_hint_1": "Eine Route sagt,",
+  "pe_route_hint_when": "wann",
+  "pe_route_hint_2": "ein Playbook geladen wird – der Client holt es erst, wenn seine Bedingung zutrifft; das hält eine Persona günstig. Lässt du die Bedingung leer, wird die eigene Beschreibung des Playbooks genutzt.",
+  "pe_no_playbooks": "Noch keine Playbooks",
+  "pe_no_playbooks_body": "Ohne Playbook ist diese Persona nur eine Rollenbeschreibung – sie kann nichts laden.",
+  "pe_write_condition_title": "Eine Bedingung speziell für diese Persona schreiben",
+  "pe_write": "Schreiben",
+  "pe_condition_placeholder": "wenn jemand ein Angebot gestaltet haben möchte",
+  "pe_fallback_a": "Die eigene Beschreibung des Playbooks wird genutzt. Schreib hier nur etwas, wenn es",
+  "pe_fallback_em": "in dieser Persona",
+  "pe_fallback_b": " etwas anderes bedeutet.",
+  "pe_no_description": "Dieses Playbook hat auch keine Beschreibung – ohne sie bekommt das Modell nur seinen Titel. Schreib eine Bedingung oder gib dem Playbook eine Beschreibung.",
+  "pe_load": "Laden",
+  "pe_untitled_playbook": "Unbenanntes Playbook",
+  "pe_only_me_route": "Nur ich – Kolleg:innen erhalten diese Persona ohne dieses Playbook",
+  "pe_restricted_route": "Eingeschränkt – Kolleg:innen, die es nicht öffnen können, erhalten diese Persona ohne dieses Playbook",
+  "pe_playbook_word": "Playbook",
+  "pe_remove_route": "Dieses Playbook aus der Persona entfernen",
+  "pe_remove_route_label": "{title} aus dieser Persona entfernen",
+  "pe_add_condition": "Bedingung hinzufügen",
+  "pe_restricted_one": "{restricted} von {playbooks} ist eingeschränkt",
+  "pe_restricted_other": "{restricted} von {playbooks} sind eingeschränkt",
+  "pe_restricted_a_one": "Kolleg:innen, die es nicht öffnen können, erhalten diese Persona",
+  "pe_restricted_a_other": "Kolleg:innen, die sie nicht öffnen können, erhalten diese Persona",
+  "pe_restricted_b_one": "ohne dieses Playbook",
+  "pe_restricted_b_other": "ohne diese Playbooks",
+  "pe_restricted_c": "– die Route fällt ganz weg und wird nie als nicht verfügbar angezeigt. Teile das Playbook, wenn sie es haben sollen.",
+  "pe_attach_title": "Ein Playbook anhängen",
+  "pe_pick_no_playbooks": "Dieser Workspace hat noch keine Playbooks – eine Persona braucht Playbooks, die sie nutzen kann.",
+  "pe_pick_all_attached": "Alle Playbooks sind schon angehängt.",
+  "pe_delete_body": "Die Persona und ihre Routen werden entfernt.",
+  "pe_unsaved_title": "Ungespeicherte Änderungen",
+  "pe_unsaved_body": "Du hast ungespeicherte Änderungen. Wenn du jetzt gehst, werden sie verworfen.",
+  "pe_keep_editing": "Weiter bearbeiten",
+  "pb_create_failed": "Das Playbook konnte nicht angelegt werden",
+  "pb_update_failed": "Das Playbook konnte nicht gespeichert werden",
+  "pb_delete_failed": "Das Playbook konnte nicht gelöscht werden",
+  "pb_duplicate_failed": "Das Playbook konnte nicht dupliziert werden",
+  "pb_deleted_many": "{playbooks} gelöscht",
+  "lib_copied": "Playbook im Workspace gespeichert",
+  "lib_copy_failed": "Das Playbook konnte nicht kopiert werden",
+  "fi_tags_failed": "Tags konnten nicht geändert werden",
+  "fi_open_failed": "Die Datei konnte nicht geöffnet werden",
+  "fi_rename_failed": "Die Datei konnte nicht umbenannt werden",
+  "fi_preview_image": "Bild ansehen",
+  "fi_rename": "Datei umbenennen",
+  "fi_used_title": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Von {count} Playbook genutzt – klicken, um es zu sehen",
+        "countPlural=other": "Von {count} Playbooks genutzt – klicken, um sie zu sehen"
+      }
+    }
+  ],
+  "fi_unused_title": "Von keinem Playbook genutzt",
+  "fi_used_in": "Genutzt in {count}",
+  "fi_unused": "Ungenutzt",
+  "fi_used_in_heading": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Genutzt in {count} Playbook",
+        "countPlural=other": "Genutzt in {count} Playbooks"
+      }
+    }
+  ],
+  "fi_restricted": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} eingeschränktes Playbook",
+        "countPlural=other": "{count} eingeschränkte Playbooks"
+      }
+    }
+  ],
+  "fi_open_tab": "In neuem Tab öffnen",
+  "fi_in_use_title": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Kann nicht gelöscht werden – {count} Playbook nutzt diese Datei",
+        "countPlural=other": "Kann nicht gelöscht werden – {count} Playbooks nutzen diese Datei"
+      }
+    }
+  ],
+  "fi_delete": "Datei löschen",
+  "fi_delete_unavailable": "Datei löschen (nicht möglich – die Datei wird genutzt)",
+  "fi_not_used_yet": "Noch nicht genutzt",
+  "fi_nothing_deleted": "Nichts gelöscht – jede ausgewählte Datei wird noch von einem Playbook genutzt",
+  "fi_uploaded": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Datei hochgeladen",
+        "countPlural=other": "{count} Dateien hochgeladen"
+      }
+    }
+  ],
+  "fi_upload_failed": "Hochladen fehlgeschlagen",
+  "fi_tab_media": "Medien",
+  "fi_tab_documents": "Dokumente",
+  "fi_title": "Dateien",
+  "fi_subtitle": "Lade Dateien hoch, um sie als Kontext in deinen Playbooks zu nutzen · Höchstens {size} MB pro Datei",
+  "fi_uploading": "Wird hochgeladen …",
+  "fi_upload": "Datei hochladen",
+  "fi_search": "Dateien oder Tags durchsuchen …",
+  "fi_filter_usage": "Nach dem Playbook filtern, das die Datei nutzt",
+  "fi_all_files": "Alle Dateien",
+  "fi_sort": "Dateien sortieren",
+  "fi_sort_newest": "Neueste",
+  "fi_sort_name": "Name",
+  "fi_sort_largest": "Größte",
+  "fi_sort_most_used": "Meistgenutzt",
+  "fi_sort_least_used": "Am wenigsten genutzt",
+  "fi_drop": "Dateien zum Hochladen hier ablegen",
+  "fi_empty_title": "Noch keine Dateien",
+  "fi_empty_desc": "Lade PDFs, Dokumente und Bilder hoch, um sie als Kontext in deinen Playbooks zu nutzen.",
+  "fi_upload_first": "Lade deine erste Datei hoch",
+  "fi_no_match_title": "Keine passenden Dateien",
+  "fi_no_match_desc": "Passe deine Suche oder deinen Filter an.",
+  "fi_bulk_title": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Datei löschen?",
+        "countPlural=other": "{count} Dateien löschen?"
+      }
+    }
+  ],
+  "fi_bulk_body": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Sie wird endgültig entfernt. Das lässt sich nicht rückgängig machen.",
+        "countPlural=other": "Sie werden endgültig entfernt. Das lässt sich nicht rückgängig machen."
+      }
+    }
+  ],
+  "fi_bulk_kept": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} der ausgewählten Dateien wird noch von einem Playbook genutzt und bleibt erhalten. Löse sie dort zuerst.",
+        "countPlural=other": "{count} der ausgewählten Dateien werden noch von einem Playbook genutzt und bleiben erhalten. Löse sie dort zuerst."
+      }
+    }
+  ],
+  "fi_deleting": "Wird gelöscht …",
+  "fi_deleted": "Datei gelöscht",
+  "fi_delete_failed": "Die Datei konnte nicht gelöscht werden",
+  "fi_deleted_many": "{files} gelöscht",
+  "chat_update_failed": "Der Chat konnte nicht geändert werden",
+  "chat_deleted_toast": "Chat gelöscht",
+  "chat_delete_failed": "Der Chat konnte nicht gelöscht werden",
+  "ftag_nothing_add": "Nichts zu ändern – jede ausgewählte Datei hat „{tag}“ schon.",
+  "ftag_nothing_remove": "Nichts zu ändern – keine ausgewählte Datei hat „{tag}“.",
+  "ftag_added": "„{tag}“ zu {files} hinzugefügt.",
+  "ftag_removed": "„{tag}“ von {files} entfernt.",
+  "ftag_added_partial": "„{tag}“ zu {done} von {files} hinzugefügt – der Rest ist fehlgeschlagen und bleibt ausgewählt.",
+  "ftag_removed_partial": "„{tag}“ von {done} von {files} entfernt – der Rest ist fehlgeschlagen und bleibt ausgewählt.",
+  "mk_vote_failed": "Abstimmung fehlgeschlagen",
+  "mk_title": "Marktplatz",
+  "mk_subtitle": "Stöbere in Playbooks und speichere sie in deinem Workspace",
+  "mk_none_found": "Keine Playbooks gefunden",
+  "mk_try_other_search": "Versuch einen anderen Suchbegriff",
+  "mk_none_in_category": "In dieser Kategorie gibt es noch keine Playbooks",
+  "mk_delete_title": "Playbook löschen?",
+  "mk_delete_body": "Damit wird dieses Playbook endgültig aus dem Marktplatz entfernt.",
+  "mk_edit": "Bearbeiten",
+  "mk_draft": "Entwurf",
+  "mk_hot": "Heiß",
+  "mk_cold": "Kalt",
+  "mk_details": "Details",
+  "mk_reason_spam": "Spam oder geringe Qualität",
+  "mk_reason_malicious": "Schädlicher oder unsicherer Inhalt",
+  "mk_reason_copyright": "Urheberrecht / nicht deins zum Teilen",
+  "mk_reason_other": "Sonstiges",
+  "mk_added": "Zu deinen Playbooks hinzugefügt ✨",
+  "mk_copy_failed": "Kopieren fehlgeschlagen",
+  "mk_download_failed": "Download fehlgeschlagen",
+  "mk_adapted": "An deine Marke angepasst ✨",
+  "mk_adapt_failed": "Anpassung fehlgeschlagen",
+  "mk_reported": "Gemeldet – danke. Unser Team sieht es sich an.",
+  "mk_report_failed": "Melden fehlgeschlagen",
+  "mk_adapt": "An Marke anpassen",
+  "mk_set_up_brand": "Marke einrichten",
+  "mk_adapt_needs_brand": "Richte dein Markenprofil ein, um anzupassen",
+  "mk_adapt_needs_key": "Verbinde einen Schlüssel eines KI-Anbieters, um anzupassen",
+  "mk_adapt_title": "Dieses Playbook an deine Marke anpassen",
+  "mk_report_title": "Dieses Playbook melden",
+  "mk_report_body": "Sag uns, was nicht stimmt. Unser Team prüft Meldungen und kann einen Eintrag zurückziehen.",
+  "mk_reason": "Grund",
+  "mk_details_placeholder": "Optionale Details …",
+  "mk_reporting": "Wird gemeldet …",
+  "mk_submit_report": "Meldung absenden",
+  "count_script": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Skript",
+        "countPlural=other": "{count} Skripte"
+      }
+    }
+  ],
+  "count_other_file": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} andere Datei",
+        "countPlural=other": "{count} andere Dateien"
+      }
+    }
+  ],
+  "count_text_file": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Textdatei",
+        "countPlural=other": "{count} Textdateien"
+      }
+    }
+  ],
+  "lv_back": "Zurück zum Marktplatz",
+  "lv_pending": "Wird geprüft",
+  "lv_rating": "Bewertung der Community",
+  "lv_report": "Melden",
+  "lv_add": "Zu Playbooks hinzufügen",
+  "lv_download_title_files": "Eine .sqemes.zip mit {files}",
+  "lv_download_title_none": "Eine .sqemes.zip – dieser Eintrag enthält keine Dateien",
+  "lv_download": "Playbook herunterladen",
+  "lv_before_add": "Bevor du es hinzufügst",
+  "lv_brings": "Dieses Playbook bringt {scripts}, {binaries} und {texts} mit.",
+  "lv_scripts_note": "Skripte tun von sich aus nichts. Ein KI-Agent, der Code ausführen kann, führt sie womöglich aus, wenn er dieses Playbook nutzt – lies sie also, bevor du es dort einsetzt.",
+  "lv_hosts": "Es nennt diese Webadressen:",
+  "lv_what_comes": "Was mit diesem Playbook kommt",
+  "lv_preview": "Vorschau",
+  "lv_variables": "Variablen",
+  "lv_made_with": "Gemacht mit sqemes",
+  "lv_unavailable": "Dieses Playbook ist nicht verfügbar.",
+  "pl_point_add": "Mit einem Klick zu deinen Playbooks hinzufügen",
+  "pl_point_adapt": "Mit KI an deine Marke anpassen",
+  "pl_point_use": "In ChatGPT, Claude, Cursor und mehr nutzen",
+  "pl_offer_title": "Mach dieses Playbook zu deinem",
+  "pl_trial": "14 Tage kostenlos testen",
+  "pl_card_required": "Eine Karte ist nötig · jederzeit kündbar",
+  "pl_free_forever": "Lieber dauerhaft kostenlos?",
+  "pl_self_host": "sqemes selbst hosten",
+  "pl_self_host_rest": "– dieser Marktplatz ist auch von deiner eigenen Instanz aus lesbar.",
+  "count_member": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Mitglied",
+        "countPlural=other": "{count} Mitglieder"
+      }
+    }
+  ],
+  "count_model": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Modell",
+        "countPlural=other": "{count} Modelle"
+      }
+    }
+  ],
+  "count_provider_key": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Anbieter-Schlüssel",
+        "countPlural=other": "{count} Anbieter-Schlüssel"
+      }
+    }
+  ],
+  "ov_ago_min": "vor {count} Min.",
+  "ov_ago_h": "vor {count} Std.",
+  "ov_yesterday": "gestern",
+  "ov_ago_days": "vor {count} Tagen",
+  "ov_not_authenticated": "Nicht angemeldet",
+  "ov_portal_failed": "Das Abrechnungsportal konnte nicht geöffnet werden",
+  "ov_trial": "Testphase",
+  "ov_days_left": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "noch {count} Tag",
+        "countPlural=other": "noch {count} Tage"
+      }
+    }
+  ],
+  "ov_canceling": "Wird gekündigt",
+  "ov_most_used": "Am meisten genutzt:",
+  "ov_ready": "Bereit",
+  "ov_not_set_up": "Nicht eingerichtet",
+  "ov_title": "Übersicht",
+  "ov_invite": "Einladen",
+  "ov_new_playbook": "Neues Playbook",
+  "ov_cancelled_title": "Dein Abo ist gekündigt",
+  "ov_deactivated_after": "{workspace} wird nach dem {date} deaktiviert.",
+  "ov_deactivated_after_trial": "{workspace} wird nach dem Ende der Testphase deaktiviert.",
+  "ov_trial_active": "Deine {plan}-Testphase läuft",
+  "ov_trial_body": "Deine Karte ist hinterlegt – die Testphase geht automatisch in ein bezahltes {plan}-Abo über. Kündigst du vorher, zahlst du nichts.",
+  "ov_opening": "Wird geöffnet …",
+  "ov_reactivate": "Reaktivieren",
+  "ov_manage_plan": "Plan verwalten",
+  "ov_finish_title": "Richte deinen Workspace fertig ein",
+  "ov_finish_selfhost": "Wähl aus, wo du deine Playbooks nutzen willst – und richte nur das ein.",
+  "ov_finish_cloud": "Lass die KI deine ersten Playbooks schreiben, wähl aus, wo du sie nutzen willst, und richte nur das ein.",
+  "ov_finish": "Einrichtung abschließen",
+  "ov_channels": "Kanäle",
+  "ov_extension": "Browser-Erweiterung",
+  "ov_ext_installed": "In diesem Browser installiert.",
+  "ov_ext_missing": "In diesem Browser nicht gefunden.",
+  "ov_install": "Installieren",
+  "ov_mcp": "MCP-Server",
+  "ov_mcp_intro": "Nutze deine Playbooks in Claude, ChatGPT, Cursor und anderen KI-Tools.",
+  "ov_mcp_active": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} aktive Verbindung.",
+        "countPlural=other": "{count} aktive Verbindungen."
+      }
+    }
+  ],
+  "ov_mcp_none": "Noch keine aktive Verbindung.",
+  "ov_manage": "Verwalten",
+  "ov_set_up": "Einrichten",
+  "ov_chat_keys": "{keys} · {models}",
+  "ov_chat_managed": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} verwaltetes Modell",
+        "countPlural=other": "{count} verwaltete Modelle"
+      }
+    }
+  ],
+  "ov_chat_none": "Noch kein KI-Modell verfügbar.",
+  "ov_provider_keys": "Schlüssel der KI-Anbieter",
+  "ov_add_provider_key": "Schlüssel eines KI-Anbieters hinzufügen",
+  "ov_attention": "Braucht Aufmerksamkeit",
+  "ov_checking": "Wird geprüft …",
+  "ov_all_set": "Alles bereit – nichts braucht Aufmerksamkeit.",
+  "ov_current_plan": "Aktueller Plan",
+  "ov_managed": "Verwaltet",
+  "ov_per_month": "0 €/Monat",
+  "ov_team_members": "Teammitglieder",
+  "ov_unlimited": "Unbegrenzt",
+  "ov_members_byok": "{members} · BYOK",
+  "ov_storage": "Speicher",
+  "ov_seats": "Plätze",
+  "ov_web_searches": "Websuchen",
+  "ov_recent": "Zuletzt geändert",
+  "ov_all_playbooks": "Alle Playbooks",
+  "ov_no_playbooks": "Noch keine Playbooks.",
+  "ov_usage_none": "Keine Nutzung in den letzten {days} Tagen",
+  "ov_usage_label": [
+    {
+      "declarations": [
+        "input count",
+        "input days",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Nutzung · letzte {days} Tage",
+        "countPlural=other": "Nutzungen · letzte {days} Tage"
+      }
+    }
+  ],
+  "att_personas_title": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Persona lädt keine Playbooks",
+        "countPlural=other": "{count} Personas laden keine Playbooks"
+      }
+    }
+  ],
+  "att_personas_detail": "Ohne Playbook ist eine Persona nur eine Rollenbeschreibung.",
+  "att_fix": "Beheben",
+  "att_undescribed_title": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Playbook hat keine Beschreibung",
+        "countPlural=other": "{count} Playbooks haben keine Beschreibung"
+      }
+    }
+  ],
+  "att_undescribed_detail": "Mitglieder und KI-Tools können es in der Suche nicht unterscheiden.",
+  "att_review": "Prüfen",
+  "att_model_title": "Der Chat hat kein KI-Modell",
+  "att_model_detail": "Füg einen Anbieter-Schlüssel hinzu, damit das Team chatten kann.",
+  "att_add_key": "Schlüssel hinzufügen",
+  "ai_own_key": "Eigener Schlüssel",
+  "ai_own_key_title": "Dein eigener API-Schlüssel wird genutzt – KI-Credits werden nicht verbraucht",
+  "ai_credits": "KI-Credits",
+  "ai_credits_unlimited": "Unbegrenzte KI-Credits",
+  "ai_credits_left": "{left} / {limit} Credits übrig",
+  "usage_unlimited": "{used} · Unbegrenzt",
+  "tag_remove": "Tag entfernen",
+  "tag_add_label": "Einen Workspace-Tag hinzufügen",
+  "tag_choose": "Tag wählen …",
+  "tag_add": "Tag hinzufügen",
+  "st_title": "Workspace-Einstellungen",
+  "st_subtitle": "Verwalte die Einstellungen und das Team deines Workspace",
+  "st_sections": "Bereiche der Einstellungen",
+  "st_tab_general": "Allgemein",
+  "st_tab_brand": "Marke",
+  "st_tab_team": "Teammitglieder",
+  "st_tab_security": "Sicherheit",
+  "st_tab_plans": "Pläne & Abrechnung",
+  "st_tab_api": "API & MCP",
+  "st_tab_connectors": "Connectors",
+  "st_tab_profile": "Mein Profil",
+  "st_save": "Speichern",
+  "st_pub_saved": "Publisher-Token gespeichert",
+  "st_pub_cleared": "Publisher-Token entfernt",
+  "st_pub_failed": "Das Token konnte nicht gespeichert werden",
+  "st_brand_saved": "Marke gespeichert",
+  "st_demote_check_failed": "Die eingeschränkten Inhalte dieses Mitglieds konnten nicht geprüft werden – die Rolle wird trotzdem herabgestuft",
+  "st_demote_failed": "Diese Auswahl konnte nicht angewendet werden – die Rolle bleibt unverändert",
+  "stg_details": "Workspace-Details",
+  "stg_name": "Name des Workspace",
+  "stg_managed": "Verwalteter Workspace",
+  "stg_managed_hint": "Unbegrenzte Plätze, keine Plan-Beschränkungen",
+  "stg_tags": "Workspace-Tags",
+  "stg_add_tag_placeholder": "Tag hinzufügen …",
+  "stg_remove_tag": "Tag {tag} entfernen",
+  "stg_pub_title": "Marktplatz-Publisher",
+  "stg_pub_desc_1": "Mit einem Publisher-Token kann diese Instanz Playbooks im Community-Marktplatz von sqemes",
+  "stg_pub_desc_submit": "einreichen",
+  "stg_pub_desc_2": "(Stöbern und Kopieren geht auch ohne). Es wird verschlüsselt gespeichert und nie wieder angezeigt.",
+  "stg_pub_apply": "Publisher-Schlüssel beantragen →",
+  "stg_pub_configured": "Eingerichtet",
+  "stg_pub_not_configured": "Nicht eingerichtet",
+  "stg_pub_token": "Publisher-Token",
+  "stg_pub_replace": "Neues Token eingeben, um es zu ersetzen …",
+  "stg_pub_clear": "Token entfernen",
+  "stg_danger": "Gefahrenbereich",
+  "stg_danger_desc": "Diesen Workspace und alle zugehörigen Daten endgültig löschen. Das lässt sich nicht rückgängig machen.",
+  "stg_delete_title": "Workspace „{name}“ löschen?",
+  "stg_delete_body_sub": "Damit werden alle Playbooks, Personas, Dateien, Chats und Mitglieder endgültig gelöscht. Das Abo wird sofort gekündigt – der Rest der bezahlten Laufzeit wird nicht erstattet. Das lässt sich nicht rückgängig machen.",
+  "stg_delete_body": "Damit werden alle Playbooks, Personas, Dateien, Chats und Mitglieder endgültig gelöscht. Das lässt sich nicht rückgängig machen.",
+  "stg_delete_confirm": "Workspace löschen",
+  "stg_delete_button": "Workspace löschen",
+  "sts_access_title": "Zugriff auf Playbooks",
+  "sts_access_desc": "Wie neue Playbooks starten. Wer eines nutzen darf, wird im Playbook selbst festgelegt.",
+  "sts_access_label": "Standard für neue Playbooks",
+  "sts_access_hint": "Gilt für Playbooks, die nach dem Speichern angelegt werden",
+  "sts_edit_title": "Wer neue Playbooks und Personas bearbeiten darf",
+  "sts_edit_desc": "Wie neue starten. Wer eines ändern darf, wird im Playbook oder in der Persona selbst unter „Wer darf bearbeiten“ festgelegt. Gilt für alle, die nach dem Speichern angelegt werden, auch über MCP.",
+  "sts_edit_anyone": "Alle, die bearbeiten dürfen",
+  "sts_edit_anyone_desc": "Alle Admins und alle Editoren, die es sehen können.",
+  "sts_edit_creator": "Nur die Person, die es erstellt hat, und Admins",
+  "sts_edit_creator_desc": "Andere Editoren können es nutzen und als eigene Kopie duplizieren, aber nicht ändern.",
+  "sts_selfhost_desc": "Jedes Playbook in diesem Workspace steht allen Mitgliedern zur Verfügung.",
+  "sts_selfhost_title": "Zugriffssteuerung und Gruppen",
+  "sts_selfhost_body": "Leg pro Playbook fest, wer es sehen und nutzen darf: alle, nur du oder namentlich genannte Personen und Gruppen, die mit deinem Team mitwachsen. Verfügbar in sqemes Cloud.",
+  "sts_selfhost_cta": "sqemes Cloud ansehen",
+  "sts_governance": "Inhaltsrichtlinien",
+  "sts_blacklist": "Gesperrte Begriffe",
+  "sts_blacklist_placeholder": "z. B. geheimes_projekt",
+  "sts_add": "Hinzufügen",
+  "sts_remove_term": "{term} entfernen",
+  "sts_no_terms": "Noch keine gesperrten Begriffe.",
+  "sts_pii": "Personenbezogene Daten blockieren",
+  "sts_pii_email": "E-Mail-Adressen",
+  "sts_pii_email_desc": "Eingaben mit E-Mail-Adressen blockieren",
+  "sts_pii_iban": "IBAN-Nummern",
+  "sts_pii_iban_desc": "Eingaben mit IBAN-Kontonummern blockieren",
+  "sts_pii_phone": "Telefonnummern",
+  "sts_pii_phone_desc": "Eingaben mit Telefonnummern blockieren",
+  "stb_title": "Markenprofil",
+  "stb_desc": "Beim Onboarding erfasst. Wird genutzt, um KI-Texte anzupassen und Marktplatz-Playbooks auf deine Marke zuzuschneiden.",
+  "stb_doc_saved": "Dokumentstil gespeichert",
+  "stt_active_members": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} aktives Mitglied",
+        "countPlural=other": "{count} aktive Mitglieder"
+      }
+    }
+  ],
+  "stt_unlimited_seats": " · Unbegrenzte Plätze",
+  "stt_of_seats": " von {limit} Plätzen",
+  "stt_storage": "Speicher: {used}",
+  "stt_storage_unlimited": " · unbegrenzt",
+  "stt_storage_of": " von {limit}",
+  "stt_upgrade_invite": "Upgrade zum Einladen",
+  "stt_invite": "Mitglied einladen",
+  "stt_col_user": "Person",
+  "stt_col_role": "Rolle",
+  "stt_col_actions": "Aktionen",
+  "stt_col_email": "E-Mail",
+  "stt_col_expires": "Läuft ab",
+  "stt_remove_title": "{name} entfernen?",
+  "stt_remove_body": "{name} verliert sofort den Zugang zu diesem Workspace.",
+  "stt_pending": "Offene Einladungen ({count})",
+  "stt_link_copied": "Einladungslink kopiert",
+  "stt_link_copy_failed": "Link konnte nicht kopiert werden",
+  "stt_copy_link_title": "Einladungslink kopieren",
+  "stt_copy_link": "Link kopieren",
+  "stt_resend_title": "Einladung erneut senden",
+  "stt_resend": "Erneut senden",
+  "stt_cancel_inv_title": "Einladung zurückziehen?",
+  "stt_cancel_inv_body": "Die Einladung an {email} wird zurückgezogen, der Link funktioniert dann nicht mehr.",
+  "stt_cancel_inv": "Einladung zurückziehen",
+  "stp_email_required": "Eine E-Mail-Adresse ist nötig",
+  "stp_passwords_mismatch": "Die Passwörter stimmen nicht überein",
+  "stp_email_change_failed": "Die Änderung der E-Mail-Adresse konnte nicht gestartet werden",
+  "stp_email_change_sent": "Bestätige die Änderung in beiden Postfächern – {old} und {new}. Deine Anmelde-E-Mail ändert sich, sobald beide bestätigt sind.",
+  "stp_saved": "Profil gespeichert",
+  "stp_signout_title": "Abmelden",
+  "stp_signout_body": "Willst du dich wirklich abmelden?",
+  "stp_signed_out": "Du bist abgemeldet",
+  "stp_export_done": "Deine Daten wurden heruntergeladen.",
+  "stp_export_failed": "Der Export konnte nicht erstellt werden. Versuch es bitte noch einmal.",
+  "stp_title": "Mein Profil",
+  "stp_change_picture": "Profilbild ändern",
+  "stp_full_name": "Vollständiger Name",
+  "stp_email": "E-Mail-Adresse",
+  "stp_email_hint": "Das ist deine Anmelde-E-Mail. Eine Änderung wird von der alten und der neuen Adresse aus bestätigt.",
+  "stp_avatar_actions": "Profilbild",
+  "stp_upload": "Hochladen",
+  "stp_randomize": "Zufällig",
+  "stp_avatar_url": "Profilbild-URL (optional)",
+  "stp_change_password": "Passwort ändern",
+  "stp_new_password": "Neues Passwort",
+  "stp_confirm_password": "Passwort bestätigen",
+  "stp_sign_out": "Abmelden",
+  "stp_leave_title": "Workspace verlassen?",
+  "stp_leave_only_sub": "Du bist das einzige Mitglied von „{name}“. Wenn du gehst, werden der Workspace und alles darin gelöscht und sein Abo sofort gekündigt – der Rest der bezahlten Laufzeit wird nicht erstattet. Das lässt sich nicht rückgängig machen.",
+  "stp_leave_only": "Du bist das einzige Mitglied von „{name}“. Wenn du gehst, werden der Workspace und alles darin gelöscht. Das lässt sich nicht rückgängig machen.",
+  "stp_leave_body": "Du verlierst den Zugang zu „{name}“. Du kannst später wieder eingeladen werden.",
+  "stp_leave": "Verlassen",
+  "stp_save_changes": "Änderungen speichern",
+  "stp_your_data": "Deine Daten",
+  "stp_data_1": "Lade alles aus",
+  "stp_data_2": "als ZIP herunter – Playbooks, Chats, Dateien und dein Profil. Im Archiv liegt eine README, die genau auflistet, was drin ist und was nicht.",
+  "stp_data_several": " Du bist in mehreren Workspaces? Wechsle den Workspace und exportiere noch einmal.",
+  "stp_preparing": "Wird vorbereitet …",
+  "stp_download_data": "Meine Daten herunterladen",
+  "stp_danger": "Gefahrenbereich",
+  "stp_danger_desc": "Dein Konto endgültig löschen und den Zugang zu allen Workspaces entfernen. Das lässt sich nicht rückgängig machen.",
+  "stp_delete_title": "Dein Konto löschen?",
+  "stp_delete_body": "Damit werden dein Konto und alle deine Daten endgültig gelöscht. Workspaces, in denen du das einzige Mitglied bist, werden mitgelöscht. Das lässt sich nicht rückgängig machen.",
+  "stp_delete": "Konto löschen",
+  "exp_playbooks": "Playbooks werden gesammelt …",
+  "exp_chats": "Chats werden gesammelt …",
+  "exp_files": "Dateien werden gesammelt …",
+  "exp_file": "{name} wird heruntergeladen …",
+  "exp_profile": "Profil wird gesammelt …",
+  "exp_packing": "Archiv wird gepackt …",
+  "stt_demote_title": "{name} zum Mitglied machen?",
+  "stt_demote_intro": "Mitglieder können die Bibliothek nutzen, aber nicht ändern. {name} hat",
+  "stt_demote_playbooks": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} eingeschränktes Playbook",
+        "countPlural=other": "{count} eingeschränkte Playbooks"
+      }
+    }
+  ],
+  "stt_demote_personas": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": " und {count} eingeschränkte Persona",
+        "countPlural=other": " und {count} eingeschränkte Personas"
+      }
+    }
+  ],
+  "stt_demote_after": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": ". Nach der Änderung kann niemand mehr es bearbeiten – die Person sieht es, kann aber nicht schreiben, und Editoren können schreiben, sehen es aber nicht.",
+        "countPlural=other": ". Nach der Änderung kann niemand mehr sie bearbeiten – die Person sieht sie, kann aber nicht schreiben, und Editoren können schreiben, sehen sie aber nicht."
+      }
+    }
+  ],
+  "stt_handover": "Obhut übergeben",
+  "stt_handover_body": "Übergibt sie an den Admin, der am längsten dabei ist – so wie beim Verlassen. {name} sieht die eigene Arbeit dann nicht mehr, und auch die hochgeladenen Dateien wechseln die Obhut, obwohl sie ohnehin alle sehen.",
+  "stt_release": "Freigeben",
+  "stt_release_body": "Entfernt die Markierung „Nur ich“, sodass der Workspace sie sehen und bearbeiten kann. Damit wird ein Versprechen an jemanden gebrochen, der noch da ist.",
+  "stt_leave_as_is": "So lassen",
+  "stt_leave_as_is_body": "{name} sieht sie weiterhin, und niemand kann sie bearbeiten, auch {name} nicht. Für den Moment in Ordnung – du kannst sie später übergeben.",
+  "stt_applying": "Wird angewendet …",
+  "stt_make_member": "Zum Mitglied machen",
+  "stt_invite_title": "Teammitglied einladen",
+  "stt_invite_placeholder": "name@firma.de",
+  "stt_role_admin_hint": "{role} (voller Zugriff)",
+  "stt_role_editor_hint": "{role} (kann erstellen)",
+  "stt_role_member_hint": "{role} (nur lesen)",
+  "stt_send_invite": "Einladung senden",
+  "st_unsaved_title": "Ungespeicherte Änderungen",
+  "st_unsaved_body": "Eine Karte auf diesem Reiter hat ungespeicherte Änderungen. Ohne Speichern verlassen?",
+  "ab_title": "Über",
+  "ab_self_hosted": "Selbst gehostet",
+  "ab_update": "Version {version} ist verfügbar",
+  "ab_running": "Du nutzt v{version}.",
+  "ab_how": "So aktualisierst du",
+  "ab_latest": "Du hast die neueste Version.",
+  "am_title": "Standard-KI-Modell",
+  "am_desc": "Neue Chats starten mit diesem Modell – du kannst es in jedem Chat wechseln. sqemes nutzt es auch, wenn es für dich schreibt: beim Verbessern eines Prompts, beim Erzeugen einer Beschreibung, in den Assistenten für Einrichtung und Playbooks und beim Anpassen eines Playbooks an deine Marke.",
+  "am_none": "Noch gibt es nichts zu wählen – ein Modell erscheint hier erst, wenn sein Anbieter einen API-Schlüssel hat.",
+  "am_add_key": "Anbieter-Schlüssel im Reiter API hinzufügen →",
+  "am_model": "Modell",
+  "am_automatic": "Automatisch",
+  "am_automatic_current": "Automatisch – derzeit {name}",
+  "am_unavailable": "kann gerade nicht genutzt werden – es wurde entweder eingestellt oder der Schlüssel seines Anbieters entfernt.",
+  "am_running_1": "Bis du ein anderes wählst, schreibt sqemes mit",
+  "am_running_2": ".",
+  "am_auto_hint": "Automatisch nimmt das erste Modell mit Schlüssel, in der Reihenfolge des Katalogs – wähl eines ausdrücklich, wenn dir das wichtig ist.",
+  "ag_load_failed": "Die Gruppen konnten nicht geladen werden",
+  "ag_exists": "Eine Gruppe namens „{name}“ gibt es schon.",
+  "ag_create_failed": "Die Gruppe konnte nicht angelegt werden",
+  "ag_deleted": "„{name}“ gelöscht",
+  "ag_delete_failed": "Die Gruppe konnte nicht gelöscht werden",
+  "ag_save_failed": "Die Gruppe konnte nicht gespeichert werden",
+  "ag_rename_failed": "Die Gruppe konnte nicht umbenannt werden",
+  "ag_title": "Zugriffsgruppen",
+  "ag_desc": "Leg eine Gruppe von Personen einmal an und gib ein Playbook dann der Gruppe statt jeder einzelnen Person. Wer in eine Gruppe kommt, bekommt alles, was die Gruppe erreicht.",
+  "ag_placeholder": "Gruppenname, z. B. Marketing",
+  "ag_loading": "Wird geladen …",
+  "ag_empty": "Noch keine Gruppen. Eine Gruppe funktioniert weiter, wenn sich das Team ändert – eine Liste von Namen nicht.",
+  "ag_no_members": "Keine Mitglieder – gibt niemandem Zugriff",
+  "ag_people": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Person",
+        "countPlural=other": "{count} Personen"
+      }
+    }
+  ],
+  "ag_delete_title": "„{name}“ löschen?",
+  "ag_delete": "Gruppe löschen",
+  "ag_used_rest": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "gibt derzeit über diese Gruppe Zugriff – dieser fällt weg, und am Playbook steht nicht, warum.",
+        "countPlural=other": "geben derzeit über diese Gruppe Zugriff – dieser fällt weg, und an den Playbooks steht nicht, warum."
+      }
+    }
+  ],
+  "ag_unused": "Kein Playbook nutzt sie.",
+  "bp_filled": "Aus deiner Website ausgefüllt – prüf und bearbeite es unten.",
+  "bp_read_failed": "Diese Website konnte nicht gelesen werden. Füll das Formular bitte selbst aus.",
+  "bp_analyze_label": "Deine Website analysieren",
+  "bp_analyze_optional": "(optional – füllt das Formular)",
+  "bp_analyzing": "Wird analysiert …",
+  "bp_analyze": "Analysieren",
+  "bp_needs_ai": "Füg einen Anbieter-Schlüssel hinzu oder aktiviere sqemes AI, um eine Website zu analysieren.",
+  "bp_manual": "Oder trag die Angaben selbst ein",
+  "bp_back_to_site": "← Stattdessen eine Website analysieren",
+  "bp_or_manual": "oder selbst ausfüllen",
+  "bp_name": "Markenname",
+  "bp_name_placeholder": "Muster GmbH",
+  "bp_what": "Was macht deine Marke?",
+  "bp_what_placeholder": "Ein Satz – z. B. wir geben Führungsworkshops für Tech-Teams",
+  "bp_audience": "Wer ist deine Zielgruppe?",
+  "bp_audience_placeholder": "z. B. Personalleitungen im Mittelstand",
+  "ds_title": "Dokumentstil",
+  "ds_desc": "So sehen Word-, PDF-, PowerPoint- und Excel-Dateien aus dem Chat aus. Ein Playbook kann für seine eigenen Dateien ein anderes Aussehen verlangen; das hat Vorrang.",
+  "ds_color": "Hausfarbe",
+  "ds_color_hex": "Hausfarbe als Hex-Wert",
+  "ds_font": "Schrift",
+  "ds_default": "Standard",
+  "ds_pdf_fallback": "PDFs nutzen stattdessen Roboto – eingebettet sind nur Roboto, Open Sans und Lato. Word und PowerPoint zeigen die Schrift, wenn sie installiert ist.",
+  "ds_logo": "Logo",
+  "ds_no_logo": "Kein Logo",
+  "ds_not_found": "{name} (nicht gefunden)",
+  "ds_logo_hint": "Ein PNG oder JPEG aus Dateien.",
+  "ds_page": "Seitenformat",
+  "ds_header": "Kopfzeile",
+  "ds_header_placeholder": "z. B. Vertraulich",
+  "ds_footer": "Fußzeile",
+  "ds_footer_placeholder": "z. B. Firma GmbH · Straße 1 · Ort",
+  "ds_preview": "Vorschau",
+  "ds_no_logo_preview": "kein Logo",
+  "ds_sample_title": "Angebot für Müller GmbH",
+  "ds_sample_item": "Position",
+  "ds_sample_price": "Preis",
+  "ds_sample_row": "Beratung",
+  "ds_admins_only": "Nur Admins können den Dokumentstil ändern.",
+  "plan_f_1_team_member": "1 Teammitglied",
+  "plan_f_up_to_10_team_members": "Bis zu 10 Teammitglieder",
+  "plan_f_up_to_30_team_members": "Bis zu 30 Teammitglieder",
+  "plan_f_2_000_ai_credits_month": "2.000 KI-Credits / Monat",
+  "plan_f_25_000_ai_credits_month": "25.000 KI-Credits / Monat",
+  "plan_f_100_000_ai_credits_month": "100.000 KI-Credits / Monat",
+  "plan_f_1_gb_file_storage": "1 GB Dateispeicher",
+  "plan_f_10_gb_file_storage": "10 GB Dateispeicher",
+  "plan_f_50_gb_file_storage": "50 GB Dateispeicher",
+  "plan_f_100_web_searches_month": "100 Websuchen / Monat",
+  "plan_f_1_000_web_searches_month": "1.000 Websuchen / Monat",
+  "plan_f_3_000_web_searches_month": "3.000 Websuchen / Monat",
+  "plan_f_mcp_server_access": "Zugang zum MCP-Server",
+  "plan_f_roles_permissions": "Rollen und Berechtigungen",
+  "plan_f_unlimited_ai_with_your_own_key_byok": "Unbegrenzt KI mit eigenem Schlüssel (BYOK)",
+  "plan_f_unlimited_playbooks": "Unbegrenzt Playbooks",
+  "plan_f_marketplace_access": "Zugang zum Marktplatz",
+  "plan_f_priority_support": "Bevorzugter Support",
+  "plan_tagline_solo": "Für Einzelne, die anfangen",
+  "plan_tagline_team": "Für Teams, die schnell sind",
+  "plan_tagline_business": "Für Teams, die mehr Raum brauchen",
+  "plan_per_month": "{price}/Monat",
+  "stl_checkout_failed": "Der Bezahlvorgang konnte nicht gestartet werden",
+  "stl_start_failed": "Der Bezahlvorgang konnte nicht gestartet werden",
+  "stl_managed_body": "Dieser Workspace wird von sqemes verwaltet. Du hast unbegrenzte Plätze und vollen Zugriff auf alle Funktionen – ohne Abo.",
+  "stl_monthly_cost": "Monatliche Kosten",
+  "stl_title": "Abo",
+  "stl_current": "Aktueller Plan:",
+  "stl_monthly": "Monatlich",
+  "stl_yearly": "Jährlich",
+  "stl_save20": "20 % sparen",
+  "stl_billed_monthly": "Monatliche Abrechnung",
+  "stl_billed_yearly": "Jährlich {amount} abgerechnet",
+  "stl_trial_badge": "Testphase",
+  "stl_active": "Aktiv",
+  "stl_vat": "Inklusive MwSt. Unternehmen mit gültiger USt-IdNr. zahlen netto.",
+  "stl_current_plan": "Aktueller Plan",
+  "stl_redirecting": "Weiterleitung …",
+  "stl_start_trial": "{days} Tage testen",
+  "stl_change_portal": "Im Abrechnungsportal ändern",
+  "stl_enterprise_tagline": "Für Organisationen mit besonderen Anforderungen",
+  "stl_lets_talk": "Lass uns sprechen",
+  "stl_custom_pricing": "Individueller Preis für dein Team",
+  "stl_ent_1": "Alles aus Business",
+  "stl_ent_2": "30+ Teammitglieder",
+  "stl_ent_3": "Individuelles Kontingent an KI-Credits",
+  "stl_ent_4": "Eigener Support und SLA",
+  "stl_ent_5": "Individuelles Onboarding",
+  "stl_talk": "Sprich mit uns",
+  "stl_manage_sub": "Abo verwalten",
+  "stl_manage_sub_desc": "Plan wechseln, Zahlungsmethode ändern, kündigen oder Rechnungen ansehen – im Stripe-Abrechnungsportal.",
+  "stl_opening": "Wird geöffnet …",
+  "stl_open_portal": "Abrechnungsportal öffnen",
+  "ks_create": "Playbooks und Personas anlegen, Dateien hochladen",
+  "ks_update": "Playbooks und Personas ändern, festlegen, welche Playbooks eine Persona nutzt",
+  "ks_delete": "Playbooks, Personas und Dateien löschen",
+  "ks_permissions": "Berechtigungen",
+  "ks_read_always": "Playbooks, Dateien und Personas lesen – immer enthalten",
+  "ks_member_note": "Mitglieder können die Bibliothek lesen, aber nicht ändern – deshalb lassen sich diese Rechte hier nicht vergeben. Ein Workspace-Admin kann dich zum Editor machen.",
+  "ks_expires": "Läuft ab",
+  "ks_never": "Nie",
+  "ks_30": "In 30 Tagen",
+  "ks_90": "In 90 Tagen",
+  "ks_custom": "Eigenes Datum …",
+  "ks_scope_read": "lesen",
+  "ks_scope_create": "anlegen",
+  "ks_scope_update": "ändern",
+  "ks_scope_delete": "löschen",
+  "sta_provider_title": "Schlüssel der KI-Anbieter",
+  "sta_provider_desc": "Deine eigenen Schlüssel für OpenAI, Anthropic, Google und andere. Verschlüsselt gespeichert, nur für deine Anfragen genutzt.",
+  "sta_configured": "Eingerichtet",
+  "sta_remove_key_title": "Schlüssel für {provider} entfernen?",
+  "sta_remove_key_body": "Der gespeicherte Schlüssel für {provider} wird gelöscht. Du kannst ihn jederzeit neu eingeben.",
+  "sta_remove": "Entfernen",
+  "sta_replace_placeholder": "••••••••  (neuen Schlüssel eingeben, um ihn zu ersetzen)",
+  "sta_get_key": "API-Schlüssel holen",
+  "sta_ollama_hint": "Gib die Basis-URL ein (z. B. http://localhost:11434)",
+  "sta_models": "Modelle",
+  "sta_or_placeholder": "anbieter/modell – z. B. anthropic/claude-3.7-sonnet",
+  "sta_or_hint": "Nur die Modelle, die du hier hinzufügst, erscheinen in der Modellauswahl (braucht den Schlüssel oben).",
+  "sta_browse_models": "Modelle ansehen",
+  "sta_search_title": "Websuche",
+  "sta_search_hosted": "Die Websuche im Chat ist in deinem Plan enthalten, mit einem monatlichen Kontingent. Füg einen eigenen Such-Schlüssel hinzu, um stattdessen dein eigenes Konto zu nutzen – er hat immer Vorrang.",
+  "sta_search_add": "Füg einen Such-Schlüssel hinzu, um die Websuche im Chat einzuschalten.",
+  "sta_provider": "Anbieter",
+  "sta_key": "Schlüssel",
+  "sta_search_configured": "{name} eingerichtet",
+  "sta_search_remove_title": "Such-Schlüssel entfernen?",
+  "sta_search_remove_hosted": "Die Websuche nutzt dann wieder das enthaltene Kontingent.",
+  "sta_search_remove_stops": "Die Websuche im Chat funktioniert nicht mehr, bis ein neuer Schlüssel hinzugefügt wird.",
+  "sta_search_replace": "••••••••  (neuen Schlüssel eingeben, um ihn zu ersetzen)",
+  "sta_search_key_placeholder": "API-Schlüssel für {name}",
+  "sta_search_one": "Ein Such-Schlüssel pro Workspace – wer einen für einen Anbieter speichert, entfernt den anderen.",
+  "sta_brave_terms": " Mit deinem eigenen Brave-Schlüssel gelten die Bedingungen von Brave zwischen deinem Workspace und Brave.",
+  "sta_public_title": "Öffentliche API-Schlüssel",
+  "sta_public_desc": "Erzeuge Schlüssel, um über die API oder MCP-Clients auf deine Playbooks zuzugreifen.",
+  "sta_upgrade_for_keys": "Upgrade auf Team oder Business, um MCP-Schlüssel zu erzeugen",
+  "sta_generate": "Schlüssel erzeugen",
+  "sta_no_keys": "Noch keine API-Schlüssel",
+  "sta_no_keys_hint": "Erzeuge einen Schlüssel, um die öffentliche API zu nutzen.",
+  "sta_you": "Du",
+  "sta_member": "Mitglied",
+  "sta_workspace_wide": "Workspace-weit",
+  "sta_expired": "Abgelaufen",
+  "sta_expires": "Läuft ab am {date}",
+  "sta_created": "Erstellt am {date}",
+  "sta_last_used": "Zuletzt genutzt am {date}",
+  "sta_never_used": "Nie genutzt",
+  "sta_idle_stopped": "Inaktiv – funktioniert nicht mehr",
+  "sta_idle": "{days} Tage inaktiv – endet bei {limit}",
+  "sta_edit_connection": "Verbindung bearbeiten",
+  "sta_revoke": "Schlüssel widerrufen",
+  "mcp_title": "MCP-Server",
+  "mcp_desc": "Verbinde Claude, ChatGPT, Claude Code, Codex, Cursor, VS Code oder jeden anderen MCP-Client mit deiner ganzen Playbook-Bibliothek – Prompts und Skills – und mit deinen Personas.",
+  "mcp_locked_title": "Der MCP-Zugang braucht Team oder Business",
+  "mcp_locked_body": "Mach ein Upgrade deines Plans, um Claude, ChatGPT, Cursor und andere MCP-Clients zu verbinden.",
+  "mcp_upgrade": "Plan upgraden",
+  "mcp_step1": "Endpunkt kopieren",
+  "mcp_copy_url": "URL kopieren",
+  "mcp_copy_url_label": "Endpunkt-URL kopieren",
+  "mcp_step2": "Dein KI-Tool verbinden",
+  "mcp_step3": "Auch den System-Prompt einfügen",
+  "mcp_prompt_body": "Das ist dieselbe Anweisung, nach der schon der sqemes-Chat arbeitet. Ein verbundenes KI-Tool befolgt sie nur, wenn sie in deinen dauerhaften Anweisungen steht – ohne sie schaut das Tool in deine Playbooks, wenn du es darum bittest, und selten von sich aus. Füg sie dort ein, wo dein KI-Tool seine Anweisungen speichert, dann gilt sie für alle auf einmal.",
+  "mcp_copy_prompt": "System-Prompt kopieren",
+  "mcp_copied": "Kopiert",
+  "mcp_copy": "Kopieren",
+  "mcp_show_less": "Weniger anzeigen",
+  "mcp_show_full": "Ganzen Text anzeigen",
+  "mcp_just_you": "Nur für dich: ",
+  "mcp_just_you_where": "ChatGPT → Settings → Personalization → Custom instructions. Claude → Settings → deine eigenen Anweisungen.",
+  "mcp_everyone": "Für alle auf einmal: ",
+  "mcp_everyone_where": "In Claude Team oder Enterprise kann ein Admin sie unter „Organization and access“ hinterlegen; dann gilt sie in jeder Unterhaltung der Organisation. ChatGPT hat keine dokumentierte Einstellung, die jeden Chat erreicht; am nächsten kommt ein geteilter Skill, und der wird genutzt, wenn das Modell ihn für passend hält.",
+  "stk_denied": "Der Schlüssel konnte nicht erzeugt werden – deine Rolle erlaubt das hier nicht. Frag einen Workspace-Admin.",
+  "stk_generate_failed": "Der Schlüssel konnte nicht erzeugt werden",
+  "stk_delete_active": "Der Schlüssel konnte nicht gelöscht werden – er ist noch aktiv. Versuch es noch einmal.",
+  "stk_name_empty": "Der Name darf nicht leer sein",
+  "stk_update_failed": "Die Verbindung konnte nicht geändert werden",
+  "stk_updated": "Verbindung geändert",
+  "stk_removed": "Schlüssel entfernt",
+  "stk_remove_failed": "Der Schlüssel konnte nicht entfernt werden",
+  "stk_enter_new": "Gib vor dem Speichern mindestens einen neuen Schlüssel ein.",
+  "stk_invalid": "Ungültiger Schlüssel für {provider}. Füg den Originalschlüssel des Anbieters ein.",
+  "stk_saved": "Schlüssel gespeichert",
+  "stk_save_failed": "Die Schlüssel konnten nicht gespeichert werden",
+  "stk_search_paste": "Füg vor dem Speichern einen Such-Schlüssel ein.",
+  "stk_search_original": "Füg den Originalschlüssel deines Suchanbieters ein.",
+  "stk_search_saved": "Such-Schlüssel gespeichert",
+  "stk_search_failed": "Der Such-Schlüssel konnte nicht gespeichert werden",
+  "stk_or_format": "OpenRouter-Modell-IDs sehen so aus: „anbieter/modell“.",
+  "stk_gen_title": "API-Schlüssel erzeugen",
+  "stk_gen_desc": "Gib dem Schlüssel einen Namen, damit du ihn später wiedererkennst.",
+  "stk_name_placeholder": "z. B. Produktion, Zapier, n8n",
+  "stk_access": "Zugriff auf Playbooks",
+  "stk_access_body": "Dieser Schlüssel erbt deinen Zugriff auf Playbooks – er erreicht nur Playbooks, auf die du Zugriff hast, und wird entfernt, wenn du den Workspace verlässt.",
+  "stk_generating": "Wird erzeugt …",
+  "stk_edit_title": "Verbindung bearbeiten",
+  "stk_name": "Name",
+  "stk_saving": "Wird gespeichert …",
+  "stk_save_changes": "Änderungen speichern",
+  "stk_copy_title": "Deinen API-Schlüssel kopieren",
+  "stk_copy_desc": "Dieser Schlüssel wird nur einmal angezeigt. Bewahr ihn sicher auf.",
+  "stk_saved_key": "Ich habe meinen Schlüssel gespeichert",
+  "mcpc_claude_1": "In Claude (Web oder Desktop-App): Customize → Connectors → + Add → Add custom connector.",
+  "mcpc_claude_2": "Nenn ihn „sqemes“ und füg die Endpunkt-URL von oben ein. Weiter.",
+  "mcpc_claude_3": "Wähl die Anmeldung, melde dich mit deinem sqemes-Konto an und wähl den Workspace.",
+  "mcpc_claude_note": "In Claude Team oder Enterprise fügt ein Eigentümer der Organisation den Connector einmal unter Organization settings → Connectors → Add → Custom → Web hinzu; alle verbinden ihn dann unter Customize → Connectors.",
+  "mcpc_chatgpt_1": "Öffne chatgpt.com/plugins, wähl das Plus und dann „Add custom MCP server“.",
+  "mcpc_chatgpt_2": "Nenn ihn „sqemes“ und füg die Endpunkt-URL von oben ein.",
+  "mcpc_chatgpt_3": "Melde dich mit deinem sqemes-Konto an, wenn ChatGPT danach fragt.",
+  "mcpc_chatgpt_note": "Die Richtlinien deines ChatGPT-Workspace entscheiden, ob eigene MCP-Server erlaubt sind; in einem Business-Plan muss das eventuell ein Admin freischalten.",
+  "mcpc_cc_1": "Führ den Befehl unten in deinem Terminal aus.",
+  "mcpc_cc_2": "Führ in Claude Code /mcp aus, wähl sqemes und melde dich mit deinem sqemes-Konto an.",
+  "mcpc_cc_note": "Füg --scope user hinzu, um ihn in jedem Projekt zu nutzen. Ohne Browser hängst du stattdessen --header \"Authorization: Bearer $SQEMES_MCP_KEY\" mit einem Schlüssel an.",
+  "mcpc_codex_1": "Füg die Tabelle unten in ~/.codex/config.toml ein.",
+  "mcpc_codex_2": "Führ codex mcp login sqemes aus und melde dich mit deinem sqemes-Konto an.",
+  "mcpc_codex_note": "Für einen Schlüssel stattdessen ergänzt du bearer_token_env_var = \"SQEMES_MCP_KEY\" in der Tabelle und setzt diese Variable.",
+  "mcpc_cursor_1": "Erzeug oben einen Schlüssel und setz ihn als Umgebungsvariable SQEMES_MCP_KEY.",
+  "mcpc_cursor_2": "Füg den Block unten in ~/.cursor/mcp.json ein (oder in .cursor/mcp.json in einem Projekt).",
+  "mcpc_cursor_3": "Starte Cursor neu und schalte den sqemes-Server in den MCP-Einstellungen ein.",
+  "mcpc_vscode_1": "Erzeug oben einen Schlüssel.",
+  "mcpc_vscode_2": "Leg die Datei unten als .vscode/mcp.json in deinem Projekt an (oder in deinem Benutzerprofil).",
+  "mcpc_vscode_3": "Starte den Server aus der Datei; VS Code fragt einmal nach dem Schlüssel und speichert ihn.",
+  "mcpc_other_1": "Füg die Endpunkt-URL von oben als entfernten (HTTP-)MCP-Server hinzu.",
+  "mcpc_other_2": "Bietet der Client eine Anmeldung an, nutz sie. Sonst schick einen Schlüssel als Authorization: Bearer <key>.",
+  "mcpc_other_note": "Halte eine Datei mit Schlüssel aus der Versionskontrolle heraus.",
+  "mcpc_other": "Andere",
+  "mcpc_shape": "Viele Clients lesen dieses Format",
+  "mcpg_copy_label": "{label} kopieren",
+  "mcpg_oauth": "Meldet sich mit deinem sqemes-Konto an – kein Schlüssel nötig.",
+  "mcpg_key": "Braucht einen sqemes-Schlüssel.",
+  "mcpg_differs": "Die Schritte sehen bei dir anders aus?",
+  "mcpg_docs": "Dokumentation von {client}",
+  "psu_storage_used": "Belegter Speicher",
+  "cc_connector": "Connector",
+  "cc_read_missing": "{name} ist verbunden, aber der READ-Scope fehlt{granted}. Erteil den Lese-Scope im Zustimmungsdialog und verbinde neu.",
+  "cc_granted": " (erteilt: {scopes})",
+  "cc_connected_scopes": "{name} verbunden – Scopes: {scopes}",
+  "cc_connected": "{name} verbunden",
+  "cc_failed": "Verbindung fehlgeschlagen{detail}.{desc} Versuch es noch einmal – wenn es weiter scheitert, schick uns diese Meldung.",
+  "cc_start_failed": "Die Verbindung konnte nicht gestartet werden",
+  "cc_tools_load_failed": "Die Tool-Liste konnte nicht geladen werden",
+  "cc_saved_n": "Gespeichert – {count} Tools aktiv",
+  "cc_saved_all": "Gespeichert – alle Tools aktiv",
+  "cc_save_failed": "Speichern fehlgeschlagen",
+  "cc_bad_domain": "Das sieht nicht nach einer Shop-Domain aus – versuch z. B. example.com",
+  "cc_connected_tools": "✓ Verbunden – {count} Tools",
+  "cc_store_no_answer": "Verbunden, aber der Shop hat nicht geantwortet: {error}",
+  "cc_connect_failed": "Verbindung fehlgeschlagen",
+  "cc_https_first": "Gib zuerst eine MCP-URL mit https:// ein.",
+  "cc_probe_failed": "Prüfung fehlgeschlagen",
+  "cc_unreachable": "Diese Adresse ist nicht erreichbar",
+  "cc_added": "Connector hinzugefügt",
+  "cc_add_failed": "Der Connector konnte nicht hinzugefügt werden",
+  "cc_remove_failed": "Der Connector konnte nicht entfernt werden",
+  "cc_test_ok": "✓ {name} – {count} Tools",
+  "cc_connected_word": "Verbunden",
+  "cc_test_failed_with": "Fehlgeschlagen: {error}",
+  "cc_test_failed": "Test fehlgeschlagen",
+  "cc_title": "Connectors",
+  "cc_desc": "Verbinde externe MCP-Tools, um sie im Chat zu nutzen.",
+  "cc_add": "Connector hinzufügen",
+  "cc_none": "Noch keine Connectors",
+  "cc_none_hint": "Füg einen gehosteten MCP-Endpunkt hinzu, um seine Tools im Chat zu nutzen.",
+  "cc_personal": "Persönlich",
+  "cc_workspace": "Workspace",
+  "cc_n_tools": "{count} Tools",
+  "cc_test": "Testen",
+  "cc_tools": "Tools",
+  "cc_remove": "Entfernen",
+  "cc_apps": "Apps",
+  "cc_apps_desc": "Connectors mit einem Klick – einmal anmelden, dann im Chat nutzen.",
+  "cc_apps_selfhost": "Apps mit einem Klick – Google Workspace, Microsoft 365, Atlassian, Linear, Notion und mehr – gibt es in sqemes Cloud.",
+  "cc_reconnect": "Neu verbinden",
+  "cc_connect": "Verbinden",
+  "cc_disconnect": "Trennen",
+  "cc_add_desc": "Gib einen gehosteten MCP-Endpunkt an. Wir fragen den Server, wie er verbunden werden will.",
+  "cc_name": "Name",
+  "cc_name_placeholder": "z. B. Mein Shopify-Shop",
+  "cc_open_server": "Offener Server – keine Anmeldung nötig",
+  "cc_tools_available": "{count} Tools verfügbar.",
+  "cc_signs_in_with": "Meldet dich an über {host}",
+  "cc_nothing_to_enter": "Nichts einzugeben – dieser Server vergibt seine eigenen Zugangsdaten.",
+  "cc_register_app": "Dieser Server braucht eine App, die du selbst registrierst. Nutz diese Redirect-URI:",
+  "cc_copied": "Kopiert",
+  "cc_copy": "Kopieren",
+  "cc_from_app": "aus der App, die du registriert hast",
+  "cc_optional": "– optional",
+  "cc_secret_empty": "leer lassen, falls keines ausgegeben wurde",
+  "cc_bearer": "Bearer-Token",
+  "cc_bearer_placeholder": "das Token, das dieser Server erwartet",
+  "cc_share": "Mit dem ganzen Workspace teilen",
+  "cc_share_hint": "Aus = nur für dich. Geteilte Connectors brauchen Admin oder Editor.",
+  "cc_checking": "Wird geprüft …",
+  "cc_check": "Server prüfen",
+  "cc_testing": "Wird getestet …",
+  "cc_test_token": "Mit diesem Token testen",
+  "cc_could_not_connect": "Verbindung fehlgeschlagen.",
+  "cc_connecting": "Wird verbunden …",
+  "cc_continue": "Weiter",
+  "cc_adding": "Wird hinzugefügt …",
+  "cc_connect_app": "{name} verbinden",
+  "cc_redirect_nifty": "Redirect-URI – in Nifty registrieren",
+  "cc_redirect_instance": "Diese Adresse gilt nur für diese sqemes-Instanz – eine App, die für eine andere registriert wurde, wird abgelehnt.",
+  "cc_shop_domain": "Shop-Domain",
+  "cc_nifty_secret_empty": "leer lassen, falls Nifty keines ausgegeben hat",
+  "cc_tools_title": "{name} – Tools",
+  "cc_all_tools": "Alle Tools",
+  "cc_all_tools_hint": "Alles, was dieser Dienst anbietet, jetzt und später. Neue Tools kommen automatisch dazu.",
+  "cc_pick": "Nur die, die ich auswähle",
+  "cc_pick_hint": "Weniger Tools heißt kleinere Anfragen und weniger Fehlgriffe – ein später hinzugekommenes Tool bleibt aber aus, bis du wiederkommst.",
+  "cc_loading_tools": "Tool-Liste wird geladen …",
+  "cc_live_failed": "Die aktuelle Tool-Liste konnte nicht geladen werden ({error}). Deine gespeicherte Auswahl bleibt unverändert und lässt sich unten weiter bearbeiten.",
+  "cc_no_tool_list": "Gerade ist keine Tool-Liste verfügbar.",
+  "cc_saving": "Wird gespeichert …",
+  "cc_probe_ok": "{name} – {count} Tools",
+  "nw_selfhost_title": "Noch kein Workspace",
+  "nw_cloud_title": "Leg deinen ersten Workspace an",
+  "nw_selfhost_body": "Bitte einen Admin dieser Instanz, dich in einen Workspace einzuladen.",
+  "nw_cloud_body": "In einem Workspace arbeitet dein Team gemeinsam an Playbooks.",
+  "nw_name": "Name des Workspace",
+  "nw_name_placeholder": "Mein Team",
+  "nw_creating": "Wird angelegt …",
+  "nw_create": "Workspace anlegen",
+  "cp_downloaded": "Deine Daten wurden heruntergeladen",
+  "cp_export_failed": "Export fehlgeschlagen",
+  "cp_sign_out": "Abmelden",
+  "cp_confirming": "Dein Abo wird bestätigt …",
+  "cp_confirming_body_1": "Das dauert nur einen Moment – du wirst automatisch zu",
+  "cp_confirming_body_2": "weitergeleitet.",
+  "cp_failed_title": "Deine letzte Zahlung ist fehlgeschlagen",
+  "cp_failed_body_1": "Aktualisiere deine Zahlungsmethode, damit",
+  "cp_failed_body_2": "aktiv bleibt. Dein Plan und deine Daten bleiben unverändert.",
+  "cp_opening": "Wird geöffnet …",
+  "cp_update_payment": "Zahlungsmethode aktualisieren",
+  "cp_ended_title": "Dein Abo ist beendet",
+  "cp_choose_title": "Wähl einen Plan, um loszulegen",
+  "cp_resubscribe_1": "Schließ wieder ein Abo ab, um den Zugang zu",
+  "cp_resubscribe_2": " wiederherzustellen.",
+  "cp_trial_1": "Teste {days} Tage kostenlos mit",
+  "cp_trial_2": ". Du kannst jederzeit vor dem Ende kündigen.",
+  "cp_billed_yearly": "Jährlich {amount} abgerechnet",
+  "cp_redirecting": "Weiterleitung …",
+  "cp_resubscribe": "Wieder abonnieren",
+  "cp_charged_resub": "Bezahlt wird, sobald du wieder abonnierst.",
+  "cp_card_required": "Für die Testphase ist eine Karte nötig. Belastet wird sie erst, wenn die Testphase endet.",
+  "cp_member_lapsed_title": "Das Abo dieses Workspace ist nicht aktiv",
+  "cp_member_new_title": "Dieser Workspace braucht einen aktiven Plan",
+  "cp_member_lapsed_billing": "hat kein aktives Abo mehr. Bitte einen Workspace-Admin, die Abrechnung zu aktualisieren.",
+  "cp_member_lapsed_plan": "hat kein aktives Abo mehr. Bitte einen Workspace-Admin, einen Plan zu starten.",
+  "cp_member_new_billing": "hat noch kein aktives Abo. Bitte einen Workspace-Admin, die Abrechnung zu aktualisieren.",
+  "cp_member_new_plan": "hat noch kein aktives Abo. Bitte einen Workspace-Admin, einen Plan zu starten.",
+  "cp_yours": "Deine Playbooks und Dateien gehören dir. Du kannst sie jederzeit vollständig herunterladen – ob du wieder abonnierst oder nicht.",
+  "cp_preparing": "Download wird vorbereitet …",
+  "cp_download_all": "Alles herunterladen",
+  "cp_admin": "sqemes-Admin",
+  "cp_make_managed_1": "Mach",
+  "cp_make_managed_2": "zu einem verwalteten Workspace – kein Plan, keine Bezahlschranke, KI ohne Abrechnung.",
+  "cp_make_managed": "Als verwaltet festlegen",
+  "cp_switch": "Oder Workspace wechseln",
+  "cp_select": "Workspace wählen",
+  "sw_ch_browser": "In deinem Browser",
+  "sw_ch_browser_text": "Deine Playbooks direkt in ChatGPT, Claude und Gemini. Einen Klick entfernt, ohne den Tab zu wechseln.",
+  "sw_ch_browser_name": "deinem Browser",
+  "sw_ch_chat": "Im sqemes-Chat",
+  "sw_ch_chat_text": "Nutze deine Playbooks mit jedem KI-Anbieter, den du verbindest – direkt in der sqemes-Webapp.",
+  "sw_ch_chat_name": "dem sqemes-Chat",
+  "sw_ch_mcp": "In Claude Code, Cursor und Codex",
+  "sw_ch_mcp_text": "Dieselben Playbooks in Claude Code, Codex, Cursor und jedem anderen Tool, das sich über MCP verbindet.",
+  "sw_ch_mcp_name": "Claude Code, Cursor und Codex",
+  "sw_step_welcome": "Willkommen",
+  "sw_step_templates": "Playbooks erstellen",
+  "sw_step_channels": "Wo du sie nutzt",
+  "sw_step_extension": "Erweiterung",
+  "sw_step_done": "Fertig",
+  "sw_key_saved": "Schlüssel für {provider} gespeichert",
+  "sw_key_save_failed": "Der Schlüssel konnte nicht gespeichert werden",
+  "sw_key_removed": "Schlüssel für {provider} entfernt",
+  "sw_getting_started": "Erste Schritte",
+  "sw_title": "Richte deinen Workspace ein",
+  "sw_all_done": "Alles erledigt",
+  "sw_step_of": "Schritt {step} von {total} · {label}",
+  "sw_welcome_title": "Willkommen bei sqemes",
+  "sw_welcome_selfhost": "Ein paar Minuten, und deine Playbooks funktionieren dort, wo du schon arbeitest – im sqemes-Chat, in ChatGPT, Claude & Co. oder in deinen Desktop- und Coding-Tools.",
+  "sw_welcome_cloud": "Ein paar Minuten, und deine ersten Playbooks sind fertig – dort, wo du schon arbeitest.",
+  "sw_w1_title": "Deine Playbooks werden geschrieben",
+  "sw_w1_sub": "Deine Website reicht – die KI entwirft ein Starter-Set für deine Marke.",
+  "sw_w2_title": "Du sagst, wo du arbeitest",
+  "sw_w2_sub": "Im Browser, im sqemes-Chat, in Desktop-Apps und Code-Editoren – wähl, was passt.",
+  "sw_w3_title": "Nur das wird eingerichtet",
+  "sw_w3_sub": "Nichts davon ist endgültig – du kannst alles später in den Einstellungen ändern.",
+  "sw_key_required_title": "Schlüssel eines KI-Anbieters hinzufügen",
+  "sw_key_selfhost_chat": "Diese Instanz läuft mit deinen eigenen Schlüsseln – einer ist nötig für die KI im sqemes-Chat und zum Erzeugen von Playbooks. Bring deinen eigenen Schlüssel mit; sqemes berechnet nie etwas für die KI-Nutzung.",
+  "sw_key_selfhost_nochat": "Diese Instanz läuft mit deinen eigenen Schlüsseln – einer ist nötig zum Erzeugen und Anpassen von Playbooks. Bring deinen eigenen Schlüssel mit; sqemes berechnet nie etwas für die KI-Nutzung.",
+  "sw_key_cloud_chat": "Nötig für die KI im sqemes-Chat und zum Erzeugen von Playbooks hier. Bring deinen eigenen Schlüssel mit – sqemes berechnet nie etwas für die KI-Nutzung.",
+  "sw_key_cloud_nochat": "Nötig zum Erzeugen und Anpassen von Playbooks hier. Bring deinen eigenen Schlüssel mit – sqemes berechnet nie etwas für die KI-Nutzung.",
+  "sw_key_optional_title": "Optional: eigenen Schlüssel hinzufügen",
+  "sw_key_optional_body": "Optional – unbegrenzt KI mit deinem eigenen ChatGPT-, Claude-, Gemini- oder Mistral-Konto. Das geht auch jederzeit später unter Einstellungen → API & MCP.",
+  "sw_start_now": "Du kannst sofort loslegen",
+  "sw_credits_included": "Dein Workspace enthält schon {credits} KI-Credits im Monat.",
+  "sw_own_key_first": "Dein eigener Schlüssel wird zuerst genutzt, die Credits bleiben also unberührt – und die KI unbegrenzt.",
+  "sw_works_without_key": "Chat und deine Playbooks funktionieren ohne Schlüssel. Füg einen hinzu, um die KI unbegrenzt zu nutzen und die enthaltenen Credits zu schonen.",
+  "sw_credit_unit": "1 Credit = 1.000 Tokens.",
+  "sw_ai_included_title": "KI ist in deinem Workspace enthalten",
+  "sw_ai_included_body": "Kein Schlüssel nötig – Chat und deine Playbooks funktionieren sofort. Füg nur dann einen eigenen Schlüssel hinzu, wenn du einen bestimmten Anbieter oder ein bestimmtes Modell willst.",
+  "sw_ai_provider": "KI-Anbieter",
+  "sw_get_key": "Schlüssel für {provider} holen",
+  "sw_remove_saved": "Den gespeicherten Schlüssel für {provider} entfernen?",
+  "sw_removing": "Wird entfernt …",
+  "sw_remove_key": "Schlüssel entfernen",
+  "sw_channels_title": "Wo willst du deine Playbooks nutzen?",
+  "sw_channels_body": "Wähl alles, was passt – du bekommst nur die Schritte für das, was du wählst, und kannst den Rest später ergänzen.",
+  "sw_mcp_body": "Claude Desktop, Cursor, VS Code, Codex und Claude Code erreichen deine Playbooks und Personas als Tools – über MCP, ein Endpunkt pro Tool.",
+  "sw_endpoint": "Endpunkt-URL",
+  "sw_mcp_key_1": "Ein Tool braucht einen Schlüssel? Erzeug ihn unter",
+  "sw_settings_api": "Einstellungen → API & MCP",
+  "sw_mcp_key_2": ".",
+  "sw_mcp_nothing": "Hier musst du nichts tun – verbunden wird im anderen Tool, wann immer du dazu kommst.",
+  "sw_ext_body": "Die Erweiterung bringt deine Playbooks in die KI, die du schon nutzt. Ohne sie funktionieren sie weiter im sqemes-Chat und in deinen MCP-Tools – und du kannst sie jederzeit aus den Einstellungen installieren.",
+  "sw_ext_installed": "Erweiterung installiert – alles bereit",
+  "sw_ext_install": "Im Chrome Web Store installieren",
+  "sw_ext_selfhost_1": "Öffnet den Chrome Web Store in einem neuen Tab. Öffne nach der Installation die Optionen der Erweiterung, trag die Adresse dieser Instanz unter",
+  "sw_ext_selfhost_2": "ein und verbinde – eine selbst gehostete Instanz lässt sich von dieser Seite aus nicht erkennen, deshalb bietet dieser Schritt die Installation in jedem Fall weiter an.",
+  "sw_ext_cloud": "Öffnet den Chrome Web Store in einem neuen Tab. Komm nach der Installation hierher zurück – dieser Schritt merkt es.",
+  "sw_works_with": "Funktioniert mit",
+  "sw_in": "In",
+  "sw_ready_n": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Playbook bereit",
+        "countPlural=other": "{count} Playbooks bereit"
+      }
+    }
+  ],
+  "sw_ws_ready": "Dein Workspace ist bereit",
+  "sw_work_in": "Sie funktionieren in {channels}. Alles unten lässt sich später ändern.",
+  "sw_stands": "So steht dein Workspace gerade. Alles unten lässt sich später ändern.",
+  "sw_created_1": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Playbook erstellt – du findest es unter",
+        "countPlural=other": "{count} Playbooks erstellt – du findest sie unter"
+      }
+    }
+  ],
+  "sw_none_1": "Noch keine Playbooks. Deine Bibliothek füllt sich über den",
+  "sw_editor": "Editor",
+  "sw_none_2": ", einen",
+  "sw_import": ".sqemes-Import",
+  "sw_none_3": " oder den",
+  "sw_another_1": " Du brauchst noch eins? Der",
+  "sw_another_2": "schreibt es aus einem Satz.",
+  "sw_ext_row": "Browser-Erweiterung",
+  "sw_ext_row_installed": "Installiert – deine Playbooks stehen in ChatGPT, Claude & Co. bereit.",
+  "sw_ext_row_selfhost": "Lässt sich von einer selbst gehosteten Instanz aus nicht prüfen. Installier sie aus dem",
+  "sw_ext_row_selfhost_2": "und verbinde sie in ihren Optionen mit dieser Instanz.",
+  "sw_ext_row_notyet": "Noch nicht – installier sie jederzeit aus dem",
+  "sw_mcp_row": "Desktop-Apps und Code-Editoren",
+  "sw_mcp_row_connected": "Verbunden – ein Tool hat den Endpunkt dieses Workspace schon genutzt. Weitere fügst du hinzu unter",
+  "sw_mcp_row_add": "Trag den Endpunkt in Claude Desktop, Cursor, VS Code oder Codex ein – er und das Konfigurations-Snippet stehen unter",
+  "sw_chat_row": "sqemes-Chat",
+  "sw_chat_ready_1": "Bereit – öffne den",
+  "sw_chat_ready_2": "und er findet das Playbook, das zu deiner Frage passt.",
+  "sw_chat_own_key": "Er läuft mit deinem eigenen Schlüssel, die KI ist hier also unbegrenzt.",
+  "sw_chat_credits": "Er läuft mit den KI-Credits deines Workspace; einen eigenen Schlüssel fügst du jederzeit hinzu unter",
+  "sw_chat_included": "KI ist in deinem Workspace enthalten – nichts zu tun.",
+  "sw_chat_needs_key": "⚠️ Er braucht noch einen Anbieter-Schlüssel – füg ihn hinzu unter",
+  "sw_ai_row": "KI in sqemes",
+  "sw_ai_row_set": "Dein eigener Schlüssel ist eingerichtet – die KI ist hier unbegrenzt.",
+  "sw_ai_row_notyet": "Noch nicht – für das Entwerfen und Anpassen von Playbooks ist ein Anbieter-Schlüssel nötig. Füg ihn hinzu unter",
+  "sw_back": "Zurück",
+  "sw_later": "Später – du kannst es in der Übersicht abschließen",
+  "sw_skip": "Vorerst überspringen",
+  "sw_lets_go": "Los geht's",
+  "sw_done": "Fertig",
+  "sw_next": "Weiter",
+  "wc_gen_failed_all": "Die Starter-Playbooks konnten nicht erzeugt werden. {reason}",
+  "wc_try_again": "Versuch es gleich noch einmal.",
+  "wc_nothing_usable": "Die KI hat nichts Brauchbares geliefert. Versuch es noch einmal oder schau im Marktplatz nach fertigen Playbooks.",
+  "wc_partial": "{sections} konnten nicht erzeugt werden – du kannst sie später ergänzen. {reason}",
+  "wc_gen_failed": "Erzeugung fehlgeschlagen",
+  "wc_created": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Playbook erstellt",
+        "countPlural=other": "{count} Playbooks erstellt"
+      }
+    }
+  ],
+  "wc_create_failed": "Die Playbooks konnten nicht erstellt werden",
+  "wc_continue": "Weiter",
+  "wc_generating": "Deine Starter-Playbooks werden erzeugt …",
+  "wc_generate": "Meine Starter-Playbooks erzeugen",
+  "wc_creating": "Wird erstellt …",
+  "wc_create_n": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Playbook erstellen",
+        "countPlural=other": "{count} Playbooks erstellen"
+      }
+    }
+  ],
+  "wc_review_title": "Prüf deine Starter-Playbooks",
+  "wc_review_1": "Für {brand} erzeugt, aus dem, was du uns gesagt hast.",
+  "wc_review_bold": "Leicht anfangen, später anpassen",
+  "wc_review_2": "– das sind Startpunkte; du kannst Playbooks jederzeit bearbeiten, löschen oder ergänzen.",
+  "wc_your_brand": "deine Marke",
+  "wc_group_brand": "Marke",
+  "wc_variables": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Variable",
+        "countPlural=other": "{count} Variablen"
+      }
+    }
+  ],
+  "wc_description": "Beschreibung",
+  "wc_hide_content": "Inhalt ausblenden",
+  "wc_preview_content": "Inhalt ansehen",
+  "wc_sec_brand": "Deine Marke wird gelesen",
+  "wc_sec_prompts": "Ein Prompt pro Bereich wird geschrieben",
+  "wc_sec_skills": "Ein Skill pro Bereich wird geschrieben",
+  "wc_sec_name_brand": "Markenstimme",
+  "wc_sec_name_prompts": "Prompts",
+  "wc_sec_name_skills": "Skills",
+  "wc_writing_title": "Deine Starter-Playbooks werden geschrieben",
+  "wc_writing_for": "Für {brand} – {areas}. Das dauert ein paar Sekunden.",
+  "wc_areas_title": "Welche Bereiche sollen deine ersten Playbooks abdecken?",
+  "wc_areas_body": "Du bekommst deine Markenstimme plus einen Prompt und einen Skill pro Bereich – geschrieben für {brand}.",
+  "wc_key_needed": "Zum Erzeugen von Playbooks ist hier ein Anbieter-Schlüssel nötig – das ist Schritt 3. Du kannst ihn zuerst hinzufügen und dann zurückkommen.",
+  "wc_go_step3": "Zu Schritt 3",
+  "wc_pick": "Wähl einen bis drei – zwei sind ein guter Anfang.",
+  "wc_picked": "{count} von {max} – leicht anfangen, später anpassen.",
+  "wc_create_title": "Erstell deine Starter-Playbooks",
+  "wc_create_body": "Deine Website reicht – die KI entwirft deine Markenstimme plus einen Prompt und einen Skill für jeden Bereich, den du wählst.",
+  "wu_not_readable": "{name} konnte nicht gelesen werden.",
+  "wu_wrong_type": "{name} ist weder ein Textdokument noch ein PDF oder Bild – hier lässt sich die Datei nicht lesen.",
+  "wu_too_large": "{name} ist größer als {size} MB – mehr, als eine Anfrage an das Modell tragen kann.",
+  "wu_pdf_provider": "{name} ist ein PDF, und {provider} kann keine Dokumente annehmen – es würde stillschweigend wegfallen und das Playbook so geschrieben, als hättest du nichts angehängt. Wähl unter Einstellungen → Allgemein → Standard-KI-Modell ein Modell von Gemini, OpenAI, Claude, Mistral oder OpenRouter.",
+  "wu_selected_provider": "der gewählte Anbieter",
+  "wg_site_failed": "Diese Website konnte nicht gelesen werden.",
+  "wg_voice_empty": "Die Markenstimme kam leer zurück.",
+  "wg_unknown": "Unbekannter Fehler",
+  "wg_unreadable": "Das Modell hat etwas geliefert, das sich nicht als Playbook lesen lässt. Beschreib das Ziel etwas genauer.",
+  "nav_settings": "Einstellungen",
+  "title_design": "Designsystem",
+  "title_playbook_editor": "Playbook-Editor",
+  "title_persona_editor": "Persona-Editor",
+  "title_marketplace_editor": "Marktplatz-Editor",
+  "title_marketplace_listing": "Marktplatz-Eintrag",
+  "title_accept_invite": "Einladung annehmen",
+  "title_reset_password": "Passwort zurücksetzen",
+  "app_staging": "Staging-Umgebung",
+  "app_dismiss_toast": "Meldung schließen",
+  "app_skip": "Zum Inhalt springen",
+  "app_open_menu": "Menü öffnen",
+  "app_loading": "Wird geladen …",
+  "sb_name_required": "Gib dem Workspace einen Namen.",
+  "sb_checkout_failed": "Der Workspace ist angelegt, aber die Zahlung ließ sich nicht öffnen.",
+  "sb_close_menu": "Menü schließen",
+  "sb_expand": "Seitenleiste ausklappen",
+  "sb_collapse": "Seitenleiste einklappen",
+  "sb_switch_workspace": "Workspace wechseln",
+  "sb_to_manage": "Zu Verwalten wechseln",
+  "sb_to_work": "Zu Arbeiten wechseln",
+  "sb_nav_mode": "Navigationsmodus",
+  "sb_recent": "Letzte Chats",
+  "sb_install": "Erweiterung holen",
+  "sb_whats_new": "Neuigkeiten",
+  "sb_docs": "Dokumentation",
+  "sb_light": "Heller Modus",
+  "sb_dark": "Dunkler Modus",
+  "sb_toggle_dark": "Dunklen Modus umschalten",
+  "sb_update_version": "Update verfügbar (v{version})",
+  "sb_version": "Version v{version}",
+  "sb_newer_version": "Eine neuere Version ist verfügbar – klick für Details",
+  "sb_about": "Info & Version",
+  "sb_update_available": "Update verfügbar",
+  "sb_step_plan": "Schritt 1 von 2 · Plan wählen",
+  "sb_step_name_selfhost": "Gib deinem Workspace einen Namen",
+  "sb_step_name": "Schritt 2 von 2 · Name",
+  "sb_cancel": "Abbrechen",
+  "sb_back": "Zurück",
+  "sb_create": "Anlegen",
+  "sb_continue_payment": "Weiter zur Zahlung",
+  "sb_name_placeholder": "z. B. Mein neues Team",
+  "sb_billed_monthly": ", monatliche Abrechnung. Als Nächstes kommt die Zahlung – der Workspace wird angelegt, wenn du weitermachst.",
+  "sb_billed_yearly": ", jährliche Abrechnung. Als Nächstes kommt die Zahlung – der Workspace wird angelegt, wenn du weitermachst.",
+  "hi_new_chat": "Neuer Chat",
+  "hi_del_external": "Das entfernt den Eintrag nur aus deinem sqemes-Verlauf – der Chat selbst bleibt in {platform}. Öffnest du ihn dort mit aktiver Erweiterung wieder, wird er erneut aufgezeichnet.",
+  "hi_del_shared": "Das löscht den Chat mit allen Nachrichten. Er ist mit deinem Workspace geteilt und verschwindet deshalb für alle. Das lässt sich nicht rückgängig machen.",
+  "hi_del_own": "Das löscht den Chat mit allen Nachrichten. Das lässt sich nicht rückgängig machen.",
+  "hi_bulk_own": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} sqemes-Chat wird mit allen Nachrichten gelöscht",
+        "countPlural=other": "{count} sqemes-Chats werden mit allen Nachrichten gelöscht"
+      }
+    }
+  ],
+  "hi_bulk_shared": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": " – {count} davon ist mit deinem Workspace geteilt und verschwindet für alle",
+        "countPlural=other": " – {count} davon sind mit deinem Workspace geteilt und verschwinden für alle"
+      }
+    }
+  ],
+  "hi_cannot_undo": ". Das lässt sich nicht rückgängig machen.",
+  "hi_bulk_ext": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Eintrag der Erweiterung wird nur aus deinem sqemes-Verlauf entfernt – die Chats bleiben, wo sie geführt wurden, und werden wieder aufgezeichnet, wenn du sie mit aktiver Erweiterung öffnest.",
+        "countPlural=other": "{count} Einträge der Erweiterung werden nur aus deinem sqemes-Verlauf entfernt – die Chats bleiben, wo sie geführt wurden, und werden wieder aufgezeichnet, wenn du sie mit aktiver Erweiterung öffnest."
+      }
+    }
+  ],
+  "hi_removed": "Aus deinem Verlauf entfernt",
+  "hi_delete_failed": "Löschen fehlgeschlagen",
+  "hi_bulk_partial": "{deleted} gelöscht, {failed} ließen sich nicht löschen",
+  "hi_bulk_done": "{deleted} gelöscht",
+  "hi_select": "{title} auswählen",
+  "hi_shared": " · geteilt",
+  "hi_pin": "Anheften",
+  "hi_unpin": "Lösen",
+  "hi_pin_x": "{title} anheften",
+  "hi_unpin_x": "{title} lösen",
+  "hi_delete": "Löschen",
+  "hi_delete_x": "{title} löschen",
+  "hi_subtitle": "Deine sqemes-Chats und die Chats, die die Browser-Erweiterung bei ChatGPT, Claude und anderen aufgezeichnet hat.",
+  "hi_search": "Chats durchsuchen …",
+  "hi_source": "Quelle",
+  "hi_all_sources": "Alle Quellen",
+  "hi_loading": "Verlauf wird geladen …",
+  "hi_empty_title": "Noch keine Chats",
+  "hi_empty_desc": "Hier erscheinen die Chats, die du in sqemes startest, und die Chats bei ChatGPT, Claude oder Gemini, die die Browser-Erweiterung aufzeichnet.",
+  "hi_nomatch_title": "Kein Chat passt",
+  "hi_nomatch_desc": "Versuch ein anderes Wort oder zeig alle Quellen.",
+  "hi_pinned": "Angeheftet",
+  "hi_remove_title": "Aus dem Verlauf entfernen?",
+  "hi_delete_title": "Chat löschen?",
+  "hi_remove": "Entfernen",
+  "hi_bulk_title": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Chat löschen?",
+        "countPlural=other": "{count} Chats löschen?"
+      }
+    }
+  ],
+  "eb_updated_title": "Wir haben sqemes aktualisiert",
+  "eb_updated_body": "Lade neu, um die neueste Version zu nutzen.",
+  "eb_reload": "Neu laden",
+  "eb_error_title": "Etwas ist schiefgelaufen",
+  "eb_error_unknown": "Ein unerwarteter Fehler ist aufgetreten.",
+  "eb_reload_page": "Seite neu laden",
+  "nf_title": "Seite nicht gefunden",
+  "nf_body": "Die Seite, die du suchst, gibt es nicht oder sie wurde verschoben.",
+  "nf_home": "Zum Start",
+  "ptr_refreshing": "Wird aktualisiert …",
+  "ptr_release": "Loslassen zum Aktualisieren",
+  "ptr_pull": "Ziehen zum Aktualisieren",
+  "av_profile_picture": "Profilbild",
+  "bf_not_bundle": "Kein sqemes-Paket (manifest.json fehlt).",
+  "bf_corrupt": "Beschädigtes Paket (ungültiges Manifest).",
+  "bf_version": "Nicht unterstützte Paketversion: {version}.",
+  "bf_unknown": "unbekannt",
+  "bf_too_many": "Das Paket enthält zu viele Dateien ({count}, höchstens {max}).",
+  "bf_too_big": "Das Paket überschreitet die Größenbeschränkung.",
+  "skb_ambiguous": "Dieses Archiv enthält {count} Skills – {folders}. Pack nur den gewünschten in ein ZIP und importiere das.",
+  "skb_neither": "Weder ein sqemes-Paket noch ein Agent Skill: Im Archiv gibt es keine {entry} – {detail}.",
+  "skb_unreadable": "es ließ sich nicht lesen",
+  "skb_context_named": "Eine Kontextdatei heißt {entry} und würde die Anweisungen des Skills ersetzen. Benenne sie zuerst um.",
+  "skb_none": "Keine {entry} im Archiv – ein Agent Skill ist ein Ordner mit einer {entry} darin.",
+  "skb_empty": "Das Archiv ist leer.",
+  "skb_too_many": "Dieser Skill hat {count} Dateien, mehr als die {max}, die ein Import erlaubt.",
+  "skb_too_big": "Das Archiv überschreitet die Größenbeschränkung.",
+  "skb_imported_skill": "Importierter Skill",
+  "tb_imported_playbook": "Importiertes Playbook",
+  "tb_imported_persona": "Importierte Persona",
+  "tb_import_failed": "Import fehlgeschlagen.",
+  "tb_not_removed": " Einige importierte Elemente ließen sich nicht entfernen: {items}.",
+  "tb_n_personas": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Persona",
+        "countPlural=other": "{count} Personas"
+      }
+    }
+  ],
+  "tb_n_playbooks": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Playbook",
+        "countPlural=other": "{count} Playbooks"
+      }
+    }
+  ],
+  "tb_n_files": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Datei",
+        "countPlural=other": "{count} Dateien"
+      }
+    }
+  ],
+  "cg_term": "Deine Nachricht enthält einen gesperrten Begriff: „{term}“",
+  "cg_email": "E-Mail-Adressen sind in Eingaben nicht erlaubt",
+  "cg_iban": "IBAN-Nummern sind in Eingaben nicht erlaubt",
+  "cg_phone": "Telefonnummern sind in Eingaben nicht erlaubt",
+  "bill_not_signed_in": "Nicht angemeldet",
+  "bill_failed": "Die Zahlung ließ sich nicht starten",
+  "ws_update_failed": "Der Workspace ließ sich nicht speichern",
+  "ws_managed_on": "Workspace ist jetzt verwaltet",
+  "ws_managed_off": "Verwalteter Modus ausgeschaltet",
+  "ws_managed_failed": "Der verwaltete Modus ließ sich nicht ändern",
+  "ws_created": "Workspace angelegt",
+  "ws_create_failed": "Der Workspace ließ sich nicht anlegen",
+  "ws_switch_failed": "Der Workspace ließ sich nicht wechseln",
+  "ws_deleted": "Workspace gelöscht",
+  "ws_delete_failed": "Der Workspace ließ sich nicht löschen",
+  "ws_sole_admin_leave": "Du bist der einzige Admin dieses Workspace. Mach jemand anderen zum Admin, bevor du gehst.",
+  "ws_leave_failed": "Du konntest den Workspace nicht verlassen",
+  "ws_left": "Du hast den Workspace verlassen",
+  "ws_not_signed_in": "Nicht angemeldet",
+  "ws_account_delete_failed": "Das Konto ließ sich nicht löschen",
+  "ws_profile_failed": "Das Profil ließ sich nicht speichern",
+  "ws_invite_no_email": "Die Einladung ist angelegt, aber die E-Mail ließ sich nicht senden. Teile sie über „Link kopieren“ bei der offenen Einladung.",
+  "ws_invite_sent": "Einladung an {email} gesendet",
+  "ws_invite_failed": "Die Einladung ließ sich nicht senden",
+  "ws_member_removed": "Mitglied entfernt",
+  "ws_member_remove_failed": "Das Mitglied ließ sich nicht entfernen",
+  "ws_last_admin": "Ein Workspace braucht mindestens einen Admin. Mach zuerst jemand anderen zum Admin.",
+  "ws_role_updated": "Rolle geändert",
+  "ws_role_failed": "Die Rolle ließ sich nicht ändern",
+  "ws_invite_cancelled": "Einladung zurückgezogen",
+  "ws_invite_cancel_failed": "Die Einladung ließ sich nicht zurückziehen",
+  "ws_invite_resent": "Einladung erneut an {email} gesendet",
+  "ws_invite_resent_unknown": "Einladung erneut gesendet",
+  "ws_invite_resend_failed": "Die Einladung ließ sich nicht erneut senden",
+  "init_invite_reopen": "Öffne deinen Einladungslink noch einmal, um dem Workspace beizutreten.",
+  "init_invite_failed": "Die Einladung ließ sich nicht annehmen. Öffne den Einladungslink noch einmal.",
+  "init_workspaces_failed": "Die Workspaces ließen sich nicht laden",
+  "init_failed": "Der Start ist fehlgeschlagen",
+  "init_data_failed": "Die Daten des Workspace ließen sich nicht laden",
+  "md_gemini_flash": "Googles intelligentestes Flash-Modell – Spitzenqualität mit Flash-Tempo. Die Standardwahl für Chat, Zusammenfassungen und Extraktion.",
+  "md_gemini_lite": "Gebaut für große Mengen bei kurzer Antwortzeit – Klassifizieren, Routing, Massenverarbeitung. 1M Kontextfenster.",
+  "md_gemini_pro": "Googles Spitzenmodell für Reasoning – tiefes Nachdenken und Programmieren, stabil. 1M Kontextfenster.",
+  "md_image_efficient": "Effiziente Bilderzeugung und -bearbeitung.",
+  "md_image_fidelity": "Bilderzeugung und -bearbeitung in höchster Qualität.",
+  "md_openai_top": "Fortgeschrittenes Reasoning und Programmieren – die Wahl für schwierige Aufgaben.",
+  "md_openai_balance": "Ausgewogen zwischen Intelligenz und Kosten. Die vernünftige Standardwahl für den Alltag.",
+  "md_openai_cost": "Kostenoptimiert für große Mengen, bei denen Durchsatz mehr zählt als Tiefe.",
+  "md_image_edit": "Bilderzeugung und -bearbeitung.",
+  "md_claude_deep": "Für anspruchsvolles Reasoning und lange, agentische Aufgaben. 1M Kontext.",
+  "md_claude_recommended": "Anthropics empfohlener Einstieg – lange Programmier- und Wissensarbeit. 1M Kontext.",
+  "md_claude_balance": "Die beste Verbindung von Tempo und Intelligenz. 1M Kontext.",
+  "md_claude_fast": "Für große Mengen und kurze Antwortzeiten, etwa Klassifizieren, Extraktion und Routing. 1M Kontext.",
+  "md_grok": "Das leistungsstärkste Modell von xAI für Code und Chat, mit aktuellem Wissen.",
+  "md_image": "Bilderzeugung.",
+  "md_deepseek_fast": "Sehr effizientes Modell, das bei Code und Mathematik mit den besten proprietären Modellen mithält. Außergewöhnlich günstig. 128K Kontext.",
+  "md_deepseek_reason": "Spezialisiertes Reasoning-Modell, das Schritt für Schritt denkt. Hält mit den besten Reasoning-Modellen mit – zu einem Bruchteil der Kosten. 128K Kontext.",
+  "md_mistral_large": "Modernes multimodales Open-Weight-Modell mit starkem Reasoning und vielen Sprachen. 128K Kontext.",
+  "md_mistral_medium": "Effizientes Modell mit starker multimodaler Leistung. Gute Balance aus Tempo und Qualität. 128K Kontext.",
+  "md_mistral_code": "Gebaut für Code-Vervollständigung und -Erzeugung. Auf Entwickler-Abläufe zugeschnitten. 256K Kontext.",
+  "api_invite_pending": "An diese E-Mail-Adresse wurde schon eine Einladung geschickt.",
+  "api_already_member": "Diese Person ist schon Mitglied dieses Workspace.",
+  "api_entry_not_deleted": "Dieser Eintrag ließ sich nicht löschen.",
+  "api_bundle_download": "Das Paket ließ sich nicht herunterladen ({status})",
+  "api_playbook_not_found": "Playbook nicht gefunden",
+  "api_bundle_changed": "Die Dateien dieses Eintrags haben sich nach der Prüfung geändert, deshalb wurde nichts hinzugefügt. Bitte melde den Eintrag.",
+  "api_not_signed_in": "Nicht angemeldet",
+  "api_persona_read_only": "Du darfst diese Persona nutzen, aber nicht ändern.",
+  "api_playbook_read_only": "Du darfst dieses Playbook nutzen, aber nicht ändern.",
+  "api_copy_title": "{title} (Kopie)",
+  "api_duplicate_access": "Dupliziert, aber die Zugriffsregeln ließen sich nicht übernehmen – die Kopie wurde entfernt, damit sie nicht offener ist als das Original.",
+  "api_file_too_big": "Die Datei ist größer als 15 MB",
+  "api_file_type": "Nicht unterstützter Dateityp: {type}",
+  "api_file_open": "Die Datei ließ sich nicht öffnen ({status})",
+  "api_file_missing": "Datei nicht gefunden oder nicht zugänglich",
+  "api_storage_limit": "Speicher voll: Dieser Workspace nutzt {used} MB von {limit} MB. Ein Admin kann Dateien löschen oder den Plan ändern.",
+  "si_show": "Schlüssel anzeigen",
+  "si_hide": "Schlüssel verbergen",
+  "chat_stopped": "_Gestoppt._",
+  "chat_stopped_empty": "_Vor einer Antwort gestoppt._",
+  "srv_unauthorized": "Nicht angemeldet",
+  "srv_forbidden": "Keine Berechtigung",
+  "srv_not_allowed": "Nicht erlaubt",
+  "srv_not_found": "Nicht gefunden",
+  "srv_not_member": "Du bist kein Mitglied dieses Workspace",
+  "srv_connector_not_found": "Connector nicht gefunden",
+  "srv_https_required": "Eine https://-Adresse ist erforderlich",
+  "srv_https_only": "Die Adresse muss mit https:// beginnen",
+  "srv_https_host": "Die Adresse muss eine https://-Adresse mit Hostnamen sein",
+  "srv_shared_connector_role": "Nur Admins und Editoren können Connectoren für den ganzen Workspace hinzufügen",
+  "srv_server_refused": "Der Server hat diese Verbindung nicht angenommen: {why}",
+  "srv_token_refused": "Der Server hat diesen Token nicht angenommen: {why}",
+  "srv_client_id_required": "Eine Client ID ist erforderlich",
+  "srv_token_required": "Ein Zugriffstoken ist erforderlich",
+  "srv_secret_required": "Ein Client Secret ist erforderlich",
+  "srv_shop_format": "Gib deinen Shop als {example} ein",
+  "srv_connector_unconfigured": "Dieser Connector ist auf dieser Instanz nicht eingerichtet ({env}).",
+  "srv_editor_required": "Keine Berechtigung. Dafür brauchst du die Rolle Admin oder Editor.",
+  "srv_key_format": "Ungültiges Format des API-Schlüssels",
+  "srv_key_format_original": "Ungültiges Format des API-Schlüssels. Füge den Originalschlüssel des Anbieters ein.",
+  "srv_encryption_missing": "Auf dem Server ist kein Verschlüsselungsschlüssel eingerichtet. Wende dich an deinen Administrator.",
+  "srv_remove_failed": "Die gespeicherte Datei ließ sich nicht entfernen",
+  "srv_rate_limit": "Zu viele Anfragen. Warte einen Moment und versuch es noch einmal.",
+  "srv_valid_url": "Gib eine gültige http(s)-Adresse ein.",
+  "srv_site_status": "Die Website hat mit {status} geantwortet. Versuch eine andere Adresse oder füll das Formular selbst aus.",
+  "srv_not_web_page": "Diese Adresse ist keine Webseite. Füge die Adresse deiner Startseite ein oder füll das Formular selbst aus.",
+  "srv_too_little_text": "Auf dieser Seite war nicht genug Text zu lesen. Füll das Formular selbst aus.",
+  "srv_vote_rate": "Zu viele Stimmen – versuch es gleich noch einmal",
+  "srv_admin_subscriptions": "Nur Admins des Workspace können das Abo verwalten.",
+  "srv_invalid_plan": "Ungültiger Plan oder Abrechnungszeitraum.",
+  "srv_no_billing": "Für diesen Workspace gibt es kein Abrechnungskonto.",
+  "srv_admin_delete_ws": "Nur Admins können einen Workspace löschen.",
+  "srv_sole_admin_account": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Du bist der einzige Admin von {names}. Mach dort zuerst jemand anderen zum Admin – sonst bliebe der Workspace ohne jemanden, der Mitglieder oder Abrechnung verwalten kann.",
+        "countPlural=other": "Du bist der einzige Admin von {names}. Mach dort zuerst jemand anderen zum Admin – sonst blieben die Workspaces ohne jemanden, der Mitglieder oder Abrechnung verwalten kann."
+      }
+    }
+  ],
+  "srv_body_too_large": "Die Anfrage ist zu groß. Höchstens 20 MB.",
+  "srv_no_subscription": "Dieser Workspace hat kein aktives Abo.",
+  "srv_funded_unavailable": "KI-Credits gibt es hier nicht. Hinterlege in den Einstellungen deinen eigenen API-Schlüssel, um KI zu nutzen.",
+  "srv_out_of_credits": "Du hast diesen Monat alle KI-Credits verbraucht. Hinterlege deinen eigenen API-Schlüssel (BYOK) oder wechsle zu einem größeren Plan.",
+  "srv_unsupported_model": "Nicht unterstütztes Modell: {model}",
+  "srv_no_key": "Für {provider} ist kein API-Schlüssel hinterlegt. Füge ihn unter Einstellungen → API & MCP hinzu.",
+  "srv_budget_person": "Du hast in der letzten Minute mehr als {limit} Anfragen gesendet. Das setzt sich innerhalb von 60 Sekunden zurück – versuch es dann noch einmal.",
+  "srv_budget_workspace": "Dieser Workspace hat in der letzten Minute mehr als {limit} Anfragen gesendet. Das setzt sich innerhalb von 60 Sekunden zurück – versuch es dann noch einmal."
+}

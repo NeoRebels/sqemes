@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { isMediaFile, isImageType } from '../../lib/uploadTypes';
+import { en } from './i18nText';
 
 /**
  * SQEM-562 — the Files page filter is "All · Media · Documents". Media = images, video and audio, by
@@ -34,7 +35,8 @@ describe('isMediaFile', () => {
 describe('the Files page uses it', () => {
   const src = readFileSync(resolve(__dirname, '../../pages/Files.tsx'), 'utf8');
   it('tabs are All · Media · Documents, both sides of the filter by isMediaFile', () => {
-    expect(src).toMatch(/\{ value: 'media', label: 'Media' \}/);
+    expect(src).toMatch(/\{ value: 'media', label: m\.fi_tab_media\(\) \}/);
+    expect(en.fi_tab_media).toBe('Media'); // SQEM-607 — the word lives in messages/
     expect(src).not.toMatch(/label: 'Images'/);
     expect(src).toMatch(/typeFilter === 'media' && isMediaFile\(f\.name, f\.mimeType\)/);
     expect(src).toMatch(/typeFilter === 'documents' && !isMediaFile\(f\.name, f\.mimeType\)/);

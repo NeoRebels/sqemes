@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
 import { Home, AlertCircle } from 'lucide-react';
+import { m } from '../lib/i18n';
 
 const NotFound = () => {
   const navigate = useNavigate();
@@ -12,16 +13,16 @@ const NotFound = () => {
           <AlertCircle className="w-7 h-7 text-ink-subtle" />
         </div>
         <h1 className="font-display text-3xl font-semibold text-ink-strong mb-2">404</h1>
-        <h2 className="text-lg font-semibold text-ink mb-3">Page not found</h2>
+        <h2 className="text-lg font-semibold text-ink mb-3">{m.nf_title()}</h2>
         <p className="text-sm text-ink-muted mb-8">
-          The page you&apos;re looking for doesn&apos;t exist or has been moved.
+          {m.nf_body()}
         </p>
         <button
           onClick={() => navigate('/')}
           className="inline-flex items-center gap-2 px-6 py-2.5 bg-accent-strong text-white rounded-xl text-sm font-bold hover:opacity-90 transition-all shadow-lg"
         >
           <Home className="w-4 h-4" />
-          Go to Start
+          {m.nf_home()}
         </button>
       </div>
     </div>

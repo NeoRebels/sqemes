@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { en } from './i18nText';
 
 /**
  * SQEM-581 — files already moved to the design-system tokens stay on them.
@@ -28,7 +29,8 @@ describe('SQEM-581 — token-only files', () => {
   it('the editor opens on Test, with History second', () => {
     const ed = readFileSync(resolve(__dirname, '../../pages/TemplateEditor.tsx'), 'utf8');
     expect(ed).toMatch(/useState<'history' \| 'test'>\('test'\)/);
-    expect(ed).toMatch(/\[\['test', 'Test', FlaskConical\], \['history', 'History', History\]\]/);
+    expect(ed).toMatch(/\[\['test', txt\.ed_tab_test\(\), FlaskConical\], \['history', txt\.vh_history_tab\(\), History\]\]/);
+    expect([en.ed_tab_test, en.vh_history_tab]).toEqual(['Test', 'History']); // SQEM-605 — the words live in messages/
   });
 
   it('the version tab confirms through ConfirmModal', () => {

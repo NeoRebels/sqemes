@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { personaInstruction } from '../../lib/personaChat';
 import type { Persona, Prompt } from '../../types';
+import { en } from './i18nText';
 
 /**
  * SQEM-389 — a persona card opens Chat with the persona as the session's role.
@@ -88,7 +89,8 @@ describe('⛔ SQEM-389 — the wiring', () => {
     expect(app).toMatch(/<Route path="\/personas\/:id" element=\{<PersonaChatRedirect \/>\} \/>/);
     expect(app).toMatch(/state: \{ launchPersonaId: id \}/);
     const preview = code(read('components/PersonaPreview.tsx'));
-    expect(preview).toMatch(/<Link to=\{`\/personas\/\$\{persona\.id\}`\}[^>]*>\s*<Play className="w-4 h-4" \/> Use now\s*<\/Link>/);
+    expect(preview).toMatch(/<Link to=\{`\/personas\/\$\{persona\.id\}`\}[^>]*>\s*<Play className="w-4 h-4" \/> \{m\.pv_use_now\(\)\}\s*<\/Link>/);
+    expect(en.pv_use_now).toBe('Use now'); // SQEM-605
     expect(preview).toMatch(/to=\{`\/personas\/\$\{persona\.id\}\/edit`\}/);
   });
 
@@ -105,7 +107,8 @@ describe('⛔ SQEM-389 — the wiring', () => {
     expect(raw).toMatch(/setActivePersona\(null\); \/\/ SQEM-389/);
     expect(raw).toMatch(/activePersona\?\.id, \/\/ SQEM-389/);
     // the pill
-    expect(chat).toMatch(/<span className="opacity-60 font-medium">Persona<\/span>/);
+    expect(chat).toMatch(/<span className="opacity-60 font-medium">\{txt\.chat_persona\(\)\}<\/span>/);
+    expect(en.chat_persona).toBe('Persona'); // SQEM-604
     expect(chat).toMatch(/onClick=\{removePersona\}/);
   });
 });

@@ -4,6 +4,7 @@
 // `personas.content`, the routes in `persona_templates`. Every read here reassembles them, so no
 // caller has to know that — and no caller is tempted to write a route into the text.
 import { supabase } from '../supabase';
+import { m } from '../i18n';
 import type { Persona, PersonaRoute, PromptKind } from '../../types';
 
 export type PersonaRow = {
@@ -165,7 +166,7 @@ export async function updatePersona(
   // SQEM-473 — `.select('id')` so a write RLS filtered (no edit right) is noticed: no error, zero rows.
   const { data, error } = await supabase.from('personas').update(row).eq('id', id).select('id');
   if (error) throw error;
-  if (!data || data.length === 0) throw new Error('You may use this persona but not change it.');
+  if (!data || data.length === 0) throw new Error(m.api_persona_read_only());
 }
 
 /**
@@ -215,7 +216,7 @@ export async function duplicatePersona(persona: Persona, createdBy: string | nul
   return createPersona(
     persona.workspaceId,
     {
-      title: `${persona.title} (Copy)`,
+      title: m.api_copy_title({ title: persona.title }),
       description: persona.description,
       content: persona.content,
       tags: persona.tags,

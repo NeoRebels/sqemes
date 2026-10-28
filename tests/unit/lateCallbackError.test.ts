@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { en } from './i18nText';
 
 /**
  * SQEM-443 — a provider error that arrives after the connector exists is not a failure.
@@ -48,7 +49,8 @@ describe('SQEM-443 — a late provider error', () => {
     expect(CALLBACK).toMatch(/url\.searchParams\.get\('error_description'\)/);
     expect(CALLBACK).toMatch(/desc=\$\{encodeURIComponent\(desc\.slice\(0, 300\)\)\}/);
     expect(CARD).toMatch(/const desc = searchParams\.get\('desc'\)/);
-    expect(CARD).toMatch(/\$\{desc \? ` \$\{desc\}` : ''\}/);
+    expect(CARD).toMatch(/desc: desc \? ` \$\{desc\}` : ''/); // SQEM-609 — the sentence lives in messages/
+    expect(en.cc_failed).toMatch(/\{detail\}\.\{desc\} Try connecting again/);
   });
 
   it('⚠️ …and it is logged too, because a redirect can be truncated', () => {
@@ -73,7 +75,8 @@ describe('SQEM-443 — a late provider error', () => {
     // decides on what it can see instead: a connector created moments ago.
     const CARD = readFileSync(resolve(ROOT, 'components/ConnectorsCard.tsx'), 'utf8');
     expect(CARD).toMatch(/Date\.now\(\) - new Date\(c\.created_at\)\.getTime\(\) < 120_000/);
-    expect(CARD).toMatch(/showToast\(`\$\{justNow\.name\} connected`, 'success'\)/);
+    expect(CARD).toMatch(/showToast\(m\.cc_connected\(\{ name: justNow\.name \}\), 'success'\)/);
+    expect(en.cc_connected).toBe('{name} connected');
   });
 
   it('⛔ …and OUR OWN stages stay loud', () => {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { en } from './i18nText';
 
 /**
  * SQEM-550 (c) — the playbook editor in redesign C's look. No new functions: the same fields, panels
@@ -14,7 +15,8 @@ describe('SQEM-550 (c) — the editor', () => {
     const toolbar = src.indexOf('{/* Toolbar + content textarea */}');
     expect(head).toBeGreaterThan(-1);
     const block = src.slice(head, toolbar);
-    expect(block).toMatch(/<label htmlFor="template-editor-title" className="sr-only">Title<\/label>/);
+    expect(block).toMatch(/<label htmlFor="template-editor-title" className="sr-only">\{txt\.ed_title_label\(\)\}<\/label>/);
+    expect(en.ed_title_label).toBe('Title'); // SQEM-605
     expect(block).toMatch(/<input id="template-editor-title"\s+className="[^"]*font-display/);
     expect(block).toMatch(/<KindBadge kind=\{formData\.kind\} \/>/);
     expect(src.match(/id="template-editor-title"/g)).toHaveLength(1); // moved, not copied
@@ -35,6 +37,7 @@ describe('SQEM-550 (c) — the editor', () => {
     expect(src).toMatch(/<VersionHistoryPanel/);
     expect(src).toMatch(/onClick=\{handleEnhance\}/);
     expect(src).toMatch(/onClick=\{handleGenerateDescription\}/);
-    expect(src).toMatch(/You can use this playbook but not change it\./);
+    expect(src).toMatch(/txt\.ed_readonly_1\(\)/);
+    expect(en.ed_readonly_1).toBe('You can use this playbook but not change it.');
   });
 });

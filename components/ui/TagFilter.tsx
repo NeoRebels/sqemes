@@ -1,6 +1,7 @@
 import React from 'react';
 import { Tag } from 'lucide-react';
 import SelectFilter from './SelectFilter';
+import { m } from '../../lib/i18n';
 
 // SQEM-071 — shared tag-filter dropdown used by Templates and Files.
 // Presentational + controlled; `tags` is the workspace tag vocabulary
@@ -12,7 +13,7 @@ export default function TagFilter({
   tags,
   value,
   onChange,
-  allLabel = 'All Tags',
+  allLabel = m.tags_all(),
 }: {
   tags: string[];
   value: string | null;
@@ -22,7 +23,7 @@ export default function TagFilter({
   return (
     <SelectFilter
       icon={Tag}
-      ariaLabel="Filter by tag"
+      ariaLabel={m.tags_filter_label()}
       allLabel={allLabel}
       options={tags.map(tag => ({ value: tag, label: tag }))}
       value={value}

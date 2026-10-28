@@ -3,6 +3,7 @@
 
 import { PLAN_AI_CREDITS } from '../constants';
 import type { Workspace } from '../types';
+import { m, getLocale } from './i18n';
 
 /**
  * The monthly allowance to *display* for a workspace: the provisioned `credits_limit` if there is
@@ -36,7 +37,7 @@ export function creditsUsagePercent(used: number, limit: number): number {
 
 /** Tooltip text for the abstract usage indicator. */
 export function creditsTooltip(used: number, limit: number): string {
-  if (limit === 0) return 'Unlimited AI credits';
+  if (limit === 0) return m.ai_credits_unlimited();
   const left = Math.max(0, limit - used);
-  return `${left.toLocaleString('en-US')} / ${limit.toLocaleString('en-US')} credits left`;
+  return m.ai_credits_left({ left: left.toLocaleString(getLocale()), limit: limit.toLocaleString(getLocale()) });
 }

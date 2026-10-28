@@ -15,6 +15,8 @@ import SegmentedTabs from '../components/ui/SegmentedTabs';
 import KindBadge from '../components/ui/KindBadge';
 import TemplateCard from '../components/ui/TemplateCard';
 import MarketplaceAdminEntry from '../components/MarketplaceAdminEntry';
+import { m as txt } from '../lib/i18n'; // SQEM-607 — `m` is a state-updater argument here
+import { categoryLabel } from '../lib/labels';
 
 const LibrarySkeleton = () => (
   <Card className="animate-pulse p-6 flex flex-col gap-3">
@@ -67,7 +69,7 @@ const Library = () => {
     catch (e) {
       setMyVotes(m => ({ ...m, [listingId]: prev }));
       setScoreOverrides(s => ({ ...s, [listingId]: current }));
-      showToast(e instanceof Error ? e.message : 'Vote failed', 'error');
+      showToast(e instanceof Error ? e.message : txt.mk_vote_failed(), 'error');
     }
   }, [myVotes, scoreOverrides, showToast]);
 
@@ -119,8 +121,8 @@ const Library = () => {
       {/* SQEM-182 — Cloud-admin moderation + publishers, in a self-contained overlay (stubbed to null
           on self-host, so no admin surface ships there). */}
       <PageHeader
-        title="Marketplace"
-        subtitle="Browse and save playbooks to your workspace"
+        title={txt.mk_title()}
+        subtitle={txt.mk_subtitle()}
         actions={<MarketplaceAdminEntry />}
       />
 
@@ -129,16 +131,16 @@ const Library = () => {
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Search playbooks..."
+          placeholder={txt.pb_search()}
         />
         <SegmentedTabs<'all' | PromptKind>
           value={activeKind}
           onChange={setActiveKind}
           className="self-stretch"
           tabs={[
-            { value: 'all', label: 'All' },
-            { value: 'prompt', label: 'Prompts', icon: <PenTool className="w-3 h-3" /> },
-            { value: 'skill', label: 'Skills', icon: <Wand2 className="w-3 h-3" /> },
+            { value: 'all', label: txt.pb_tab_all() },
+            { value: 'prompt', label: txt.pb_tab_prompts(), icon: <PenTool className="w-3 h-3" /> },
+            { value: 'skill', label: txt.pb_tab_skills(), icon: <Wand2 className="w-3 h-3" /> },
           ]}
         />
       </div>
@@ -155,7 +157,8 @@ const Library = () => {
                 : 'bg-surface-raised text-ink-muted border-line-strong hover:border-ink-subtle'
             }`}
           >
-            {cat}
+            {/* SQEM-607 — 'All' and the category values stay the filter's keys; only the label is translated. */}
+            {cat === 'All' ? txt.pb_tab_all() : categoryLabel(cat)}
           </button>
         ))}
       </div>
@@ -170,9 +173,9 @@ const Library = () => {
           <div className="w-16 h-16 bg-surface-sunken rounded-full flex items-center justify-center mx-auto mb-4">
             <Layers className="w-8 h-8 text-ink-subtle" />
           </div>
-          <h3 className="font-display text-xl font-semibold text-ink-strong">No playbooks found</h3>
+          <h3 className="font-display text-xl font-semibold text-ink-strong">{txt.mk_none_found()}</h3>
           <p className="text-ink-muted text-sm mt-1">
-            {search ? 'Try a different search term' : 'No playbooks in this category yet'}
+            {search ? txt.mk_try_other_search() : txt.mk_none_in_category()}
           </p>
         </div>
       ) : (
@@ -195,11 +198,11 @@ const Library = () => {
 
       {/* Delete Confirmation Modal */}
       <Modal open={!!deleteModalId} onClose={() => setDeleteModalId(null)} size="sm" className="p-6">
-        <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">Delete Playbook?</h3>
-        <p className="text-sm text-ink-muted mb-6">This will permanently remove this playbook from the marketplace.</p>
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">{txt.mk_delete_title()}</h3>
+        <p className="text-sm text-ink-muted mb-6">{txt.mk_delete_body()}</p>
         <div className="flex gap-2">
-          <button onClick={() => setDeleteModalId(null)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">Cancel</button>
-          <Button variant="danger" onClick={() => handleDelete(deleteModalId!)} className="flex-1 py-2.5 text-xs shadow-lg">Yes, Delete</Button>
+          <button onClick={() => setDeleteModalId(null)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">{txt.pb_cancel()}</button>
+          <Button variant="danger" onClick={() => handleDelete(deleteModalId!)} className="flex-1 py-2.5 text-xs shadow-lg">{txt.pb_yes_delete()}</Button>
         </div>
       </Modal>
 
@@ -232,10 +235,10 @@ const MarketplaceCard = memo(function MarketplaceCard({
       topRight={isAdmin && (
         // SQEM-168 — bigger padding + gap so the hover admin buttons clear the stretched card link.
         <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1.5 reveal-on-hover transition-opacity">
-          <button onClick={() => onEdit(template.id)} className="p-2.5 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors bg-surface-raised/80" title="Edit">
+          <button onClick={() => onEdit(template.id)} className="p-2.5 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors bg-surface-raised/80" title={txt.mk_edit()}>
             <Edit className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => onDelete(template.id)} className="p-2.5 text-ink-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors bg-surface-raised/80" title="Delete">
+          <button onClick={() => onDelete(template.id)} className="p-2.5 text-ink-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors bg-surface-raised/80" title={txt.pb_delete()}>
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -246,11 +249,11 @@ const MarketplaceCard = memo(function MarketplaceCard({
           {/* SQEM-554 (e2) — neutral: colour belongs to the kind and the accent; eight
               category hues competed with C's palette. */}
           <span className="text-2xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-surface-sunken text-ink-muted">
-            {template.category}
+            {categoryLabel(template.category)}
           </span>
           {!template.published && isAdmin && (
             <span className="text-2xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-warning-soft text-ink-strong flex items-center gap-1">
-              <EyeOff className="w-3 h-3" /> Draft
+              <EyeOff className="w-3 h-3" /> {txt.mk_draft()}
             </span>
           )}
         </>
@@ -264,11 +267,11 @@ const MarketplaceCard = memo(function MarketplaceCard({
         // SQEM-554 (e2) made that a quiet "Details →" link; the height stays as the widget's own.
         // SQEM-178 — hidden on self-host (voting needs a Cloud account).
         <div className="flex items-stretch h-8 rounded-lg border border-line-strong">
-          <button onClick={() => onVote(template.id, score, 1)} title="Hot" className={`flex items-center px-2 rounded-l-lg transition-colors ${myVote === 1 ? 'text-danger bg-danger-soft' : 'text-ink-subtle hover:bg-surface-sunken'}`}>
+          <button onClick={() => onVote(template.id, score, 1)} title={txt.mk_hot()} className={`flex items-center px-2 rounded-l-lg transition-colors ${myVote === 1 ? 'text-danger bg-danger-soft' : 'text-ink-subtle hover:bg-surface-sunken'}`}>
             <Flame className="w-3.5 h-3.5" />
           </button>
           <span className={`flex items-center px-1.5 text-xs font-bold tabular-nums ${score > 0 ? 'text-danger' : score < 0 ? 'text-sky-500' : 'text-ink-subtle'}`}>{score > 0 ? `+${score}` : score}°</span>
-          <button onClick={() => onVote(template.id, score, -1)} title="Cold" className={`flex items-center px-2 rounded-r-lg transition-colors ${myVote === -1 ? 'text-sky-500 bg-sky-50 dark:bg-sky-900/20' : 'text-ink-subtle hover:bg-surface-sunken'}`}>
+          <button onClick={() => onVote(template.id, score, -1)} title={txt.mk_cold()} className={`flex items-center px-2 rounded-r-lg transition-colors ${myVote === -1 ? 'text-sky-500 bg-sky-50 dark:bg-sky-900/20' : 'text-ink-subtle hover:bg-surface-sunken'}`}>
             <Snowflake className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -280,7 +283,7 @@ const MarketplaceCard = memo(function MarketplaceCard({
           to={`/library/${template.id}`}
           className="ml-auto inline-flex items-center gap-1 text-sm font-semibold text-accent hover:underline"
         >
-          Details <ArrowRight className="w-3.5 h-3.5" />
+          {txt.mk_details()} <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       )}
     />

@@ -9,6 +9,7 @@
 
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { cancelAndDeleteWorkspace, classifyWorkspacesOnDeparture } from '../_shared/workspaceDeletion.ts';
+import { m as txt, requestLocale } from '../_shared/locale.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -17,6 +18,7 @@ const cors = {
 };
 
 Deno.serve(async (req) => {
+  const locale = requestLocale(req); // SQEM-612 — refusals in the person's language
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: cors });
   }
@@ -34,7 +36,7 @@ Deno.serve(async (req) => {
     const token = authHeader.replace(/^Bearer\s+/i, '');
     const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: txt.srv_unauthorized({}, { locale }) }), {
         status: 401,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -47,9 +49,7 @@ Deno.serve(async (req) => {
     if (blocking.length > 0) {
       const names = blocking.map(w => `"${w.name}"`).join(', ');
       return new Response(JSON.stringify({
-        error: `You are the only admin of ${names}. Make someone else an admin there first — deleting your account would leave ${
-          blocking.length === 1 ? 'it' : 'them'
-        } with nobody who can manage members or billing.`,
+        error: txt.srv_sole_admin_account({ count: blocking.length, names }, { locale }),
       }), { status: 409, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 

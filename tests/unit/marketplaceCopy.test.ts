@@ -27,7 +27,7 @@ describe('the bundle that is imported is the one that was reviewed', () => {
   it('the check compares against a freshly read bundle_hash and refuses before importing', () => {
     const verify = fn(LIB, 'async function readVerifiedBundle');
     expect(verify).toMatch(/bundleMatches\(read\.zip, await expectedBundleHash\(listingId\)\)/);
-    expect(verify).toMatch(/throw new Error\(BUNDLE_CHANGED\)/);
+    expect(verify).toMatch(/throw new Error\(BUNDLE_CHANGED\(\)\)/); // SQEM-611 — a function: the text follows the app language
     expect(fn(LIB, 'async function expectedBundleHash')).toMatch(/select\('bundle_hash'\)/);
   });
 });

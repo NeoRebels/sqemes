@@ -4,13 +4,16 @@ import { useWorkspace, useUI } from '../store';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { startCheckout } from '../lib/billing';
-import { PLANS, TRIAL_DAYS, VAT_NOTE } from '../constants';
+import { PLANS, TRIAL_DAYS } from '../constants';
 import { can } from '../lib/permissions';
 import { isPaymentFailing } from '../lib/subscription';
 import type { PlanTier } from '../types';
 import { Check, Loader2, LogOut, Building2, CreditCard, ExternalLink, Download, Shield } from 'lucide-react';
 import { buildAccountExport, accountExportFilename } from '../lib/accountExport';
 import { downloadBlob } from '../lib/bundleFormat';
+import Select from './ui/Select';
+import { m } from '../lib/i18n';
+import { planFeature, planTagline, planMonthly, planMonthlyAmount, formatEuro } from '../lib/labels';
 
 // SQEM-057/083 — gate shown when a non-managed workspace has no active/trialing
 // subscription: never-subscribed (pick a plan) or lapsed (resubscribe / fix payment).
@@ -39,9 +42,9 @@ const ChoosePlanScreen = () => {
     try {
       const blob = await buildAccountExport(workspace, currentUser, p => setExportStep(p.step));
       downloadBlob(blob, accountExportFilename(workspace.name));
-      showToast('Your data has been downloaded', 'success');
+      showToast(m.cp_downloaded(), 'success');
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Export failed', 'error');
+      showToast(err instanceof Error ? err.message : m.cp_export_failed(), 'error');
     } finally {
       setExportBusy(false);
       setExportStep(null);
@@ -88,17 +91,17 @@ const ChoosePlanScreen = () => {
     setPortalLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      if (!session) throw new Error(m.ov_not_authenticated());
       const res = await fetch(functionCallUrl('create-portal-session'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ workspaceId: workspace.id }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to open billing portal');
+      if (!res.ok) throw new Error(data.error || m.ov_portal_failed());
       window.location.href = data.url;
     } catch (err: any) {
-      showToast(err.message || 'Failed to open billing portal', 'error');
+      showToast(err.message || m.ov_portal_failed(), 'error');
       setPortalLoading(false);
     }
   };
@@ -109,7 +112,7 @@ const ChoosePlanScreen = () => {
       // SQEM-209 — shared with the create-workspace flow so checkout is opened in exactly one place.
       await startCheckout(workspace.id, tier, billingCycle);
     } catch (err: any) {
-      showToast(err.message || 'Failed to start checkout', 'error');
+      showToast(err.message || m.stl_start_failed(), 'error');
       setLoadingTier(null);
     }
   };
@@ -127,15 +130,15 @@ const ChoosePlanScreen = () => {
             onClick={() => signOut()}
             className="inline-flex items-center gap-2 text-sm font-medium text-ink-muted hover:text-ink-strong transition-colors"
           >
-            <LogOut className="w-4 h-4" /> Sign out
+            <LogOut className="w-4 h-4" /> {m.cp_sign_out()}
           </button>
         </div>
 
         {confirming ? (
           <div className="max-w-md mx-auto text-center bg-surface-raised rounded-2xl shadow-soft border border-line p-8">
             <Loader2 className="w-8 h-8 text-accent animate-spin mx-auto mb-4" />
-            <h2 className="font-display text-xl font-semibold text-ink-strong">Confirming your subscription…</h2>
-            <p className="text-sm text-ink-muted mt-2">This only takes a moment — you&apos;ll be taken to <span className="font-semibold">{workspace.name}</span> automatically.</p>
+            <h2 className="font-display text-xl font-semibold text-ink-strong">{m.cp_confirming()}</h2>
+            <p className="text-sm text-ink-muted mt-2">{m.cp_confirming_body_1()} <span className="font-semibold">{workspace.name}</span> {m.cp_confirming_body_2()}</p>
           </div>
         ) : isAdmin ? (
           paymentFailing ? (
@@ -143,26 +146,26 @@ const ChoosePlanScreen = () => {
               <div className="w-12 h-12 rounded-full bg-warning-soft flex items-center justify-center mx-auto mb-4">
                 <CreditCard className="w-5 h-5 text-warning" />
               </div>
-              <h2 className="font-display text-xl font-semibold text-ink-strong">Your last payment failed</h2>
+              <h2 className="font-display text-xl font-semibold text-ink-strong">{m.cp_failed_title()}</h2>
               <p className="text-sm text-ink-muted mt-2">
-                Update your payment method to keep <span className="font-semibold">{workspace.name}</span> active. Your plan and data are unchanged.
+                {m.cp_failed_body_1()} <span className="font-semibold">{workspace.name}</span> {m.cp_failed_body_2()}
               </p>
               <button
                 onClick={openBillingPortal}
                 disabled={portalLoading}
                 className="w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 bg-ink-strong text-surface-raised hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {portalLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Opening…</> : 'Update payment method'}
+                {portalLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> {m.cp_opening()}</> : m.cp_update_payment()}
               </button>
             </div>
           ) : (
           <>
             <div className="text-center mb-8">
-              <h1 className="font-display text-2xl md:text-3xl font-semibold text-ink-strong tracking-tight">{isLapsed ? 'Your subscription has ended' : 'Choose a plan to get started'}</h1>
+              <h1 className="font-display text-2xl md:text-3xl font-semibold text-ink-strong tracking-tight">{isLapsed ? m.cp_ended_title() : m.cp_choose_title()}</h1>
               <p className="text-ink-muted mt-2">
                 {isLapsed
-                  ? <>Resubscribe to restore access to <span className="font-semibold text-accent">{workspace.name}</span>.</>
-                  : <>Start a {TRIAL_DAYS}-day free trial for <span className="font-semibold text-accent">{workspace.name}</span>. Cancel anytime before it ends.</>}
+                  ? <>{m.cp_resubscribe_1()} <span className="font-semibold text-accent">{workspace.name}</span>{m.cp_resubscribe_2()}</>
+                  : <>{m.cp_trial_1({ days: TRIAL_DAYS })} <span className="font-semibold text-accent">{workspace.name}</span>{m.cp_trial_2()}</>}
               </p>
             </div>
 
@@ -173,13 +176,13 @@ const ChoosePlanScreen = () => {
                   onClick={() => setBillingCycle('monthly')}
                   className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-surface-field shadow-sm text-ink-strong' : 'text-ink-muted hover:text-ink-strong'}`}
                 >
-                  Monthly
+                  {m.stl_monthly()}
                 </button>
                 <button
                   onClick={() => setBillingCycle('yearly')}
                   className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-surface-field shadow-sm text-ink-strong' : 'text-ink-muted hover:text-ink-strong'}`}
                 >
-                  Yearly <span className="text-2xs bg-success-soft text-ink-strong px-1.5 py-0.5 rounded-md uppercase tracking-wide">Save 20%</span>
+                  {m.stl_yearly()} <span className="text-2xs bg-success-soft text-ink-strong px-1.5 py-0.5 rounded-md uppercase tracking-wide">{m.stl_save20()}</span>
                 </button>
               </div>
             </div>
@@ -187,25 +190,25 @@ const ChoosePlanScreen = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {(Object.keys(PLANS) as PlanTier[]).map(tier => {
                 const p = PLANS[tier];
-                const price = billingCycle === 'yearly' ? p.priceYearly : parseInt(p.price.replace(/[^0-9]/g, ''), 10);
-                const billingText = billingCycle === 'yearly' ? `€${p.priceYearly * 12} billed yearly` : 'Billed monthly';
+                const price = billingCycle === 'yearly' ? p.priceYearly : planMonthlyAmount(p.price);
+                const billingText = billingCycle === 'yearly' ? m.cp_billed_yearly({ amount: formatEuro(p.priceYearly * 12) }) : m.stl_billed_monthly();
                 const isLoading = loadingTier === tier;
                 return (
                   <div key={tier} className="relative p-6 rounded-2xl border border-line-strong bg-surface-raised flex flex-col hover:border-accent/50 hover:shadow-soft-lg transition-all">
                     <h3 className="font-bold text-lg text-ink-strong">{tier}</h3>
-                    <p className="text-xs mt-0.5 mb-4 text-ink-muted">{p.tagline}</p>
+                    <p className="text-xs mt-0.5 mb-4 text-ink-muted">{planTagline(tier, p.tagline)}</p>
                     <div className="mb-6">
-                      <p className="text-3xl font-bold text-ink-strong">€{price}<span className="text-base font-medium text-ink-subtle">/mo</span></p>
+                      <p className="text-3xl font-bold text-ink-strong">{planMonthly(price)}</p>
                       <p className="text-xs text-ink-muted font-medium mt-1">{billingText}</p>
-                      {/* SQEM-283 — the Terms promise consumers that a shown price includes VAT.
+                      {/* SQEM-283 — the Terms promise consumers that a shown price includes VAT (VAT_NOTE; SQEM-609: shown as stl_vat).
                           This is where that promise has to be visible, not two screens later. */}
-                      <p className="text-2xs text-ink-subtle mt-1">{VAT_NOTE}</p>
+                      <p className="text-2xs text-ink-subtle mt-1">{m.stl_vat()}</p>
                     </div>
                     <ul className="space-y-2.5 text-sm flex-1 text-ink">
                       {p.features.map(feature => (
                         <li key={feature} className="flex items-center gap-2.5">
                           <Check className="w-3.5 h-3.5 shrink-0 text-accent" />
-                          {feature}
+                          {planFeature(feature)}
                         </li>
                       ))}
                     </ul>
@@ -214,7 +217,7 @@ const ChoosePlanScreen = () => {
                       onClick={() => startTrial(tier)}
                       className="w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 bg-ink-strong text-surface-raised hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Redirecting…</> : isLapsed ? 'Resubscribe' : `Start ${TRIAL_DAYS}-day trial`}
+                      {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> {m.cp_redirecting()}</> : isLapsed ? m.cp_resubscribe() : m.stl_start_trial({ days: TRIAL_DAYS })}
                     </button>
                   </div>
                 );
@@ -223,13 +226,13 @@ const ChoosePlanScreen = () => {
               {/* SQEM-098 — Enterprise: contact-sales card (not a Stripe plan). */}
               <div className="relative p-6 rounded-2xl border border-line-strong bg-surface-raised flex flex-col hover:border-accent/50 hover:shadow-soft-lg transition-all">
                 <h3 className="font-bold text-lg text-ink-strong">Enterprise</h3>
-                <p className="text-xs mt-0.5 mb-4 text-ink-muted">For organisations with custom needs</p>
+                <p className="text-xs mt-0.5 mb-4 text-ink-muted">{m.stl_enterprise_tagline()}</p>
                 <div className="mb-6">
-                  <p className="text-3xl font-bold text-ink-strong">Let&apos;s talk</p>
-                  <p className="text-xs text-ink-muted font-medium mt-1">Custom pricing for your team</p>
+                  <p className="text-3xl font-bold text-ink-strong">{m.stl_lets_talk()}</p>
+                  <p className="text-xs text-ink-muted font-medium mt-1">{m.stl_custom_pricing()}</p>
                 </div>
                 <ul className="space-y-2.5 text-sm flex-1 text-ink">
-                  {['Everything in Business', '30+ team members', 'Custom AI credit volume', 'Dedicated support & SLA', 'Custom onboarding'].map(feature => (
+                  {[m.stl_ent_1(), m.stl_ent_2(), m.stl_ent_3(), m.stl_ent_4(), m.stl_ent_5()].map(feature => (
                     <li key={feature} className="flex items-center gap-2.5">
                       <Check className="w-3.5 h-3.5 shrink-0 text-accent" />
                       {feature}
@@ -242,13 +245,15 @@ const ChoosePlanScreen = () => {
                   rel="noopener noreferrer"
                   className="w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 bg-ink-strong text-surface-raised hover:opacity-90"
                 >
-                  Talk to us <ExternalLink className="w-4 h-4" />
+                  {m.stl_talk()} <ExternalLink className="w-4 h-4" />
                 </a>
               </div>
             </div>
             <p className="text-center text-xs text-ink-subtle mt-4">
-              {isLapsed ? 'You’ll be charged when you resubscribe.' : "A card is required to start the trial. You won't be charged until it ends."}{' '}
-              Prices exclude VAT, calculated at checkout.
+              {/* SQEM-610 — "Prices exclude VAT, calculated at checkout." stood here and contradicted the cards
+                  above (VAT_NOTE) and PRICING.md: the shown price is what a consumer pays (SQEM-283). Removed
+                  in SQEM-610. */}
+              {isLapsed ? m.cp_charged_resub() : m.cp_card_required()}
             </p>
           </>
           )
@@ -257,9 +262,12 @@ const ChoosePlanScreen = () => {
             <div className="w-12 h-12 rounded-full bg-warning-soft flex items-center justify-center mx-auto mb-4">
               <Building2 className="w-5 h-5 text-warning" />
             </div>
-            <h2 className="font-display text-xl font-semibold text-ink-strong">{isLapsed ? "This workspace's subscription is inactive" : 'This workspace needs an active plan'}</h2>
+            <h2 className="font-display text-xl font-semibold text-ink-strong">{isLapsed ? m.cp_member_lapsed_title() : m.cp_member_new_title()}</h2>
             <p className="text-sm text-ink-muted mt-2">
-              <span className="font-semibold">{workspace.name}</span> {isLapsed ? 'no longer has an active subscription' : "doesn't have an active subscription yet"}. Ask a workspace admin to {paymentFailing ? 'update billing' : 'start a plan'}.
+              <span className="font-semibold">{workspace.name}</span>{' '}
+              {isLapsed
+                ? (paymentFailing ? m.cp_member_lapsed_billing() : m.cp_member_lapsed_plan())
+                : (paymentFailing ? m.cp_member_new_billing() : m.cp_member_new_plan())}
             </p>
           </div>
         )}
@@ -290,7 +298,7 @@ const ChoosePlanScreen = () => {
         {isLapsed && (
         <div className="max-w-md mx-auto mt-8 text-center">
           <p className="text-sm text-ink-muted">
-            Your playbooks and files are yours. You can download all of them at any time, whether or not you resubscribe.
+            {m.cp_yours()}
           </p>
           <button
             onClick={handleExport}
@@ -298,8 +306,8 @@ const ChoosePlanScreen = () => {
             className="inline-flex items-center justify-center gap-2 mt-3 text-sm font-semibold text-accent hover:text-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {exportBusy
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> {exportStep ?? 'Preparing your download…'}</>
-              : <><Download className="w-4 h-4" /> Download everything</>}
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> {exportStep ?? m.cp_preparing()}</>
+              : <><Download className="w-4 h-4" /> {m.cp_download_all()}</>}
           </button>
         </div>
         )}
@@ -313,8 +321,8 @@ const ChoosePlanScreen = () => {
             <div className="flex items-center gap-3">
               <Shield className="w-5 h-5 text-accent shrink-0" />
               <div>
-                <p className="text-sm font-bold text-ink-strong">Sqemes admin</p>
-                <p className="text-xs text-accent mt-0.5">Make <span className="font-semibold">{workspace.name}</span> a managed workspace — no plan, no paywall, AI not metered.</p>
+                <p className="text-sm font-bold text-ink-strong">{m.cp_admin()}</p>
+                <p className="text-xs text-accent mt-0.5">{m.cp_make_managed_1()} <span className="font-semibold">{workspace.name}</span> {m.cp_make_managed_2()}</p>
               </div>
             </div>
             <button
@@ -322,7 +330,7 @@ const ChoosePlanScreen = () => {
               disabled={managedBusy}
               className="shrink-0 inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg bg-accent-strong text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {managedBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Make managed
+              {managedBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : null} {m.cp_make_managed()}
             </button>
           </div>
         )}
@@ -330,17 +338,16 @@ const ChoosePlanScreen = () => {
         {/* Workspace switcher — for users who belong to other workspaces */}
         {otherWorkspaces.length > 0 && (
           <div className="max-w-md mx-auto mt-8">
-            <p className="text-xs font-bold text-ink-subtle uppercase tracking-wider mb-2 text-center">Or switch workspace</p>
-            <select
+            <p className="text-xs font-bold text-ink-subtle uppercase tracking-wider mb-2 text-center">{m.cp_switch()}</p>
+            <Select
               value=""
               onChange={(e) => { if (e.target.value) switchWorkspace(e.target.value); }}
-              className="w-full px-4 py-3 border border-line-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all bg-surface-raised text-ink"
             >
-              <option value="" disabled>Select workspace</option>
+              <option value="" disabled>{m.cp_select()}</option>
               {otherWorkspaces.map(w => (
                 <option key={w.id} value={w.id}>{w.name}</option>
               ))}
-            </select>
+            </Select>
           </div>
         )}
       </div>

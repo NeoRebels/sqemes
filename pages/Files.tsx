@@ -22,19 +22,22 @@ import { collectWorkspaceTags } from '../lib/workspaceTags';
 import { FILE_ACCEPT_STRING, isImageType, isMediaFile, fileTypeLabel, MAX_FILE_SIZE_MB } from '../lib/uploadTypes';
 import type { WorkspaceFile } from '../types';
 import Checkbox from '../components/ui/Checkbox';
+import { m, getLocale } from '../lib/i18n';
 
 // ---- helpers ----
 
 function formatBytes(bytes: number): string {
+  // SQEM-607 — the decimal separator follows the app language ("1,5 MB" in German).
+  const one = (n: number) => n.toLocaleString(getLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024) return `${one(bytes / 1024)} KB`;
+  return `${one(bytes / (1024 * 1024))} MB`;
 }
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
   const sameYear = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleDateString(getLocale(), {
     month: 'short',
     day: 'numeric',
     ...(sameYear ? {} : { year: 'numeric' }),
@@ -141,7 +144,7 @@ const FileRow = ({
       await updateWorkspaceFile(file.id, { tags: next });
     } catch {
       patchWorkspaceFile(file.id, { tags }); // revert
-      showToast('Failed to update tags', 'error');
+      showToast(m.fi_tags_failed(), 'error');
     }
   }, [tags, file.id, patchWorkspaceFile, showToast]);
 
@@ -152,7 +155,7 @@ const FileRow = ({
       await updateWorkspaceFile(file.id, { tags: next });
     } catch {
       patchWorkspaceFile(file.id, { tags }); // revert
-      showToast('Failed to update tags', 'error');
+      showToast(m.fi_tags_failed(), 'error');
     }
   }, [tags, file.id, patchWorkspaceFile, showToast]);
 
@@ -162,7 +165,7 @@ const FileRow = ({
       const url = await getWorkspaceFileSignedUrl(file.storagePath);
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch {
-      showToast('Could not open file', 'error');
+      showToast(m.fi_open_failed(), 'error');
     } finally {
       setOpening(false);
     }
@@ -179,7 +182,7 @@ const FileRow = ({
     } catch {
       patchWorkspaceFile(file.id, { name: prev }); // revert
       setNameVal(prev);
-      showToast('Failed to rename file', 'error');
+      showToast(m.fi_rename_failed(), 'error');
     }
   }, [nameVal, file.id, file.name, patchWorkspaceFile, showToast]);
 
@@ -191,7 +194,7 @@ const FileRow = ({
           <button
             onClick={handleOpen}
             className="w-10 h-10 rounded-xl overflow-hidden ring-1 ring-line-strong hover:ring-accent/50 transition-all"
-            title="Preview image"
+            title={m.fi_preview_image()}
           >
             <img src={thumbUrl} alt={file.name} loading="lazy" className="w-10 h-10 object-cover" />
           </button>
@@ -213,7 +216,7 @@ const FileRow = ({
             checked={selected}
             onChange={() => onToggleSelect(file.id)}
             align="center"
-            aria-label={`Select ${file.name}`}
+            aria-label={m.pb_select({ title: file.name })}
             className="bg-surface-raised shadow"
           />
         </label>
@@ -241,7 +244,7 @@ const FileRow = ({
             <button
               onClick={() => { setNameVal(file.name); setEditingName(true); }}
               className="relative hit-24 reveal-on-hover transition-opacity text-ink-subtle hover:text-accent shrink-0"
-              title="Rename file"
+              title={m.fi_rename()}
             >
               <Pencil className="w-3.5 h-3.5" />
             </button>
@@ -264,15 +267,15 @@ const FileRow = ({
                   ? 'bg-accent-soft text-accent hover:bg-accent/15 cursor-pointer'
                   : 'bg-surface-sunken text-ink-subtle cursor-default'
               }`}
-              title={usageCount > 0 ? `Referenced by ${usageCount} playbook${usageCount === 1 ? '' : 's'} — click to see which` : 'Not used by any playbook'}
+              title={usageCount > 0 ? m.fi_used_title({ count: usageCount }) : m.fi_unused_title()}
             >
-              {usageCount > 0 ? `Used in ${usageCount}` : 'Unused'}
+              {usageCount > 0 ? m.fi_used_in({ count: usageCount }) : m.fi_unused()}
             </button>
             {showUsage && usageCount > 0 && (
               <div className="absolute left-0 top-full mt-1 z-20 w-56 max-h-64 overflow-y-auto bg-surface-raised rounded-xl shadow-xl border border-line py-1 animate-scale-up origin-top-left">
                 <div className="px-3 py-1.5 border-b border-line">
                   <p className="text-2xs font-bold text-ink-subtle uppercase tracking-wider">
-                    Used in {usageCount} playbook{usageCount === 1 ? '' : 's'}
+                    {m.fi_used_in_heading({ count: usageCount })}
                   </p>
                 </div>
                 {usedBy.map(t => (
@@ -295,7 +298,7 @@ const FileRow = ({
                   <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-ink-subtle">
                     <Lock className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate italic">
-                      {restrictedCount} restricted playbook{restrictedCount === 1 ? '' : 's'}
+                      {m.fi_restricted({ count: restrictedCount })}
                     </span>
                   </div>
                 )}
@@ -318,13 +321,13 @@ const FileRow = ({
               onClick={() => onDelete(file.id)}
               className="text-xs font-bold text-danger hover:opacity-80 px-2 py-1 rounded-lg hover:bg-danger-soft transition-colors"
             >
-              Delete
+              {m.pb_delete()}
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
               className="text-xs text-ink-muted hover:text-ink-strong px-2 py-1 rounded-lg hover:bg-surface-sunken transition-colors"
             >
-              Cancel
+              {m.pb_cancel()}
             </button>
           </>
         ) : (
@@ -333,7 +336,7 @@ const FileRow = ({
               onClick={handleOpen}
               disabled={opening}
               className="p-1.5 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors disabled:opacity-50"
-              title="Open in new tab"
+              title={m.fi_open_tab()}
             >
               {opening ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
             </button>
@@ -347,8 +350,8 @@ const FileRow = ({
             <span
               title={
                 usageCount > 0
-                  ? `Cannot be deleted — this file is in use by ${usageCount} playbook${usageCount === 1 ? '' : 's'}`
-                  : 'Delete file'
+                  ? m.fi_in_use_title({ count: usageCount })
+                  : m.fi_delete()
               }
               className="inline-flex"
             >
@@ -360,7 +363,7 @@ const FileRow = ({
                     ? 'text-ink-subtle opacity-40 cursor-not-allowed'
                     : 'text-ink-subtle hover:text-danger hover:bg-danger-soft'
                 }`}
-                aria-label={usageCount > 0 ? 'Delete file (unavailable — file is in use)' : 'Delete file'}
+                aria-label={usageCount > 0 ? m.fi_delete_unavailable() : m.fi_delete()}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -446,7 +449,7 @@ export default function Files() {
     for (const list of templatesByFile.values()) for (const t of list) byId.set(t.id, t.title);
     return [
       ...[...byId].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label)),
-      { value: UNUSED, label: 'Not used yet' },
+      { value: UNUSED, label: m.fi_not_used_yet() },
     ];
   }, [templatesByFile]);
 
@@ -508,7 +511,7 @@ export default function Files() {
   const handleBulkDelete = async () => {
     setBulkDeleting(true);
     if (selectedDeletable.length > 0) await removeWorkspaceFiles(selectedDeletable);
-    else showToast('Nothing deleted — every selected file is still used by a playbook', 'info');
+    else showToast(m.fi_nothing_deleted(), 'info');
     setBulkDeleting(false);
     setBulkConfirm(false);
     setSelectedIds(new Set());
@@ -552,9 +555,9 @@ export default function Files() {
         const uploaded = await uploadWorkspaceFile(workspace.id, file);
         addWorkspaceFile(uploaded);
       }
-      showToast(files.length === 1 ? 'File uploaded' : `${files.length} files uploaded`, 'success');
+      showToast(m.fi_uploaded({ count: files.length }), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Upload failed', 'error');
+      showToast(err.message || m.fi_upload_failed(), 'error');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -568,9 +571,9 @@ export default function Files() {
   }, [handleFiles]);
 
   const tabs: SegmentedTab<TypeFilter>[] = [
-    { value: 'all', label: 'All' },
-    { value: 'media', label: 'Media' },
-    { value: 'documents', label: 'Documents' },
+    { value: 'all', label: m.pb_tab_all() },
+    { value: 'media', label: m.fi_tab_media() },
+    { value: 'documents', label: m.fi_tab_documents() },
   ];
 
   return (
@@ -582,8 +585,8 @@ export default function Files() {
     >
       {/* Header */}
       <PageHeader
-        title="Files"
-        subtitle={<>Upload files to use as context in your playbooks · Max {MAX_FILE_SIZE_MB} MB per file</>}
+        title={m.fi_title()}
+        subtitle={m.fi_subtitle({ size: MAX_FILE_SIZE_MB })}
         actions={<>
         <button
           onClick={() => fileInputRef.current?.click()}
@@ -593,7 +596,7 @@ export default function Files() {
           {uploading
             ? <Loader2 className="w-4 h-4 animate-spin" />
             : <Upload className="w-4 h-4" />}
-          {uploading ? 'Uploading…' : 'Upload file'}
+          {uploading ? m.fi_uploading() : m.fi_upload()}
         </button>
         <input
           ref={fileInputRef}
@@ -611,7 +614,7 @@ export default function Files() {
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Search files or tags…"
+          placeholder={m.fi_search()}
           containerClassName="flex-1"
         />
         <SegmentedTabs<TypeFilter> value={typeFilter} onChange={setTypeFilter} tabs={tabs} />
@@ -621,8 +624,8 @@ export default function Files() {
         {usageOptions.length > 1 && (
           <SelectFilter
             icon={Link2}
-            ariaLabel="Filter by the playbook using the file"
-            allLabel="All files"
+            ariaLabel={m.fi_filter_usage()}
+            allLabel={m.fi_all_files()}
             options={usageOptions}
             value={usedIn}
             onChange={setUsedIn}
@@ -634,14 +637,14 @@ export default function Files() {
           <select
             value={sort}
             onChange={e => setSort(e.target.value as SortKey)}
-            aria-label="Sort files"
+            aria-label={m.fi_sort()}
             className="pl-8 pr-7 self-stretch w-full sm:w-auto text-sm font-medium outline-none appearance-none bg-transparent cursor-pointer text-ink"
           >
-            <option value="newest">Newest</option>
-            <option value="name">Name</option>
-            <option value="largest">Largest</option>
-            <option value="mostused">Most used</option>
-            <option value="leastused">Least used</option>
+            <option value="newest">{m.fi_sort_newest()}</option>
+            <option value="name">{m.fi_sort_name()}</option>
+            <option value="largest">{m.fi_sort_largest()}</option>
+            <option value="mostused">{m.fi_sort_most_used()}</option>
+            <option value="leastused">{m.fi_sort_least_used()}</option>
           </select>
           <ChevronDown className="absolute right-2 w-3.5 h-3.5 text-ink-subtle pointer-events-none" />
         </div>
@@ -651,7 +654,7 @@ export default function Files() {
       {dragOver && (
         <div className="border-2 border-dashed border-accent rounded-2xl p-12 text-center mb-6">
           <Upload className="w-10 h-10 text-accent mx-auto mb-3" />
-          <p className="text-accent font-semibold">Drop files to upload</p>
+          <p className="text-accent font-semibold">{m.fi_drop()}</p>
         </div>
       )}
 
@@ -679,23 +682,23 @@ export default function Files() {
           <EmptyState
             icon={<Upload className="w-8 h-8" />}
             tone="brand"
-            title="No files yet"
-            description="Upload PDFs, documents, and images to use as context in your playbooks."
+            title={m.fi_empty_title()}
+            description={m.fi_empty_desc()}
             action={
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-strong hover:opacity-90 text-white text-sm font-bold rounded-xl transition-all shadow-lg"
               >
                 <Upload className="w-4 h-4" />
-                Upload your first file
+                {m.fi_upload_first()}
               </button>
             }
           />
         ) : (
           <EmptyState
             icon={<Search className="w-8 h-8" />}
-            title="No files match"
-            description="Try adjusting your search or filter."
+            title={m.fi_no_match_title()}
+            description={m.fi_no_match_desc()}
           />
         )
       ) : (
@@ -717,10 +720,10 @@ export default function Files() {
 
       <Modal open={bulkConfirm} onClose={() => !bulkDeleting && setBulkConfirm(false)} size="sm" className="p-6">
         <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">
-          Delete {selectedDeletable.length} file{selectedDeletable.length === 1 ? '' : 's'}?
+          {m.fi_bulk_title({ count: selectedDeletable.length })}
         </h3>
         <p className="text-sm text-ink-muted mb-2">
-          This permanently removes {selectedDeletable.length === 1 ? 'it' : 'them'}. This action cannot be undone.
+          {m.fi_bulk_body({ count: selectedDeletable.length })}
         </p>
         {/* SQEM-234 — say which of the selection is being kept and why, before the click rather than
             as a failure count afterwards. Some of those templates may not be visible to this user.
@@ -730,8 +733,7 @@ export default function Files() {
           <p className="text-sm text-ink mb-2 flex items-start gap-2">
             <Lock className="w-4 h-4 shrink-0 mt-0.5 text-warning" />
             <span>
-              {selectedInUse.length} of the selected file{selectedInUse.length === 1 ? ' is' : 's are'} still
-              used by a playbook and will be kept. Detach {selectedInUse.length === 1 ? 'it' : 'them'} there first.
+              {m.fi_bulk_kept({ count: selectedInUse.length })}
             </span>
           </p>
         )}
@@ -742,7 +744,7 @@ export default function Files() {
             disabled={bulkDeleting}
             className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors disabled:opacity-50"
           >
-            Cancel
+            {m.pb_cancel()}
           </button>
           <button
             onClick={handleBulkDelete}
@@ -750,7 +752,7 @@ export default function Files() {
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-danger hover:opacity-90 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
           >
             {bulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-            {bulkDeleting ? 'Deleting…' : 'Delete'}
+            {bulkDeleting ? m.fi_deleting() : m.pb_delete()}
           </button>
         </div>
       </Modal>

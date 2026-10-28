@@ -3,6 +3,7 @@ import { useUI, useWorkspace, usePrompts, useData } from '../store';
 import { collectWorkspaceTags } from '../lib/workspaceTags';
 import { can } from '../lib/permissions';
 import { IS_SELF_HOSTED } from '../lib/env';
+import { m } from '../lib/i18n';
 import { fetchRestrictedTemplateIds, setTemplateAccess } from '../lib/api/templateAccess';
 import { fetchCanEditMany } from '../lib/api/editors';
 import { fetchGroups } from '../lib/api/groups';
@@ -15,7 +16,8 @@ import { exportTemplatesToZip, downloadBlob, readBundle, importBundle, type Bund
 import { importErrorMessage, readSkillZip, toSlug, type SkillBundle } from '../lib/skillBundle';
 import { importSkillBundle } from '../lib/skillBundleIo';
 import { publishToMarketplace, submitToMarketplaceViaProxy, fetchCanPublish } from '../lib/api/library';
-import { TEMPLATE_CATEGORIES, KIND_HELP } from '../constants';
+import { TEMPLATE_CATEGORIES } from '../constants';
+import { categoryLabel, kindHelp } from '../lib/labels';
 import type JSZip from 'jszip';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Search, Plus, Trash2, Star, PenTool, Wand2, Sparkles, Loader2, Store, Upload, Package, FolderDown } from 'lucide-react';
@@ -34,6 +36,7 @@ import PlaybookPreview, { type LoadedBy } from '../components/PlaybookPreview';
 import { fetchPersonas } from '../lib/api/personas';
 import { brandIsComplete } from '../lib/brand';
 import { errorMessage } from '../lib/errorMessage';
+import Select from '../components/ui/Select';
 
 const PromptSkeleton = () => (
   <div className="animate-pulse flex items-center gap-3 px-3 py-3">
@@ -74,7 +77,7 @@ const PlaybookRow = memo(function PlaybookRow({
     <li className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-control transition-colors ${active ? 'bg-accent-soft' : 'hover:bg-surface-sunken'}`}>
       {canEdit && (
         // SQEM-168 — padded label gives the 16px checkbox a hit margin over the stretched row button.
-        <label aria-label={`Select ${prompt.title}`} className="relative z-10 p-1 -m-1 cursor-pointer">
+        <label aria-label={m.pb_select({ title: prompt.title })} className="relative z-10 p-1 -m-1 cursor-pointer">
           <Checkbox
             checked={selected}
             onChange={() => onToggleSelect(prompt.id)}
@@ -88,7 +91,7 @@ const PlaybookRow = memo(function PlaybookRow({
         type="button"
         onClick={() => onSelect(prompt.id)}
         aria-current={active ? 'true' : undefined}
-        title={KIND_HELP[prompt.kind]}
+        title={kindHelp(prompt.kind)}
         className="flex-1 min-w-0 text-left after:absolute after:inset-0 after:rounded-control focus:outline-none"
       >
         <span className="block text-sm font-semibold text-ink-strong truncate">{prompt.title}</span>
@@ -99,7 +102,7 @@ const PlaybookRow = memo(function PlaybookRow({
         type="button"
         onClick={() => onFavorite(prompt)}
         aria-pressed={!!prompt.isFavorite}
-        aria-label={prompt.isFavorite ? `Remove ${prompt.title} from favourites` : `Add ${prompt.title} to favourites`}
+        aria-label={prompt.isFavorite ? m.pb_unfavourite({ title: prompt.title }) : m.pb_favourite({ title: prompt.title })}
         className="hit-24 relative z-10 p-1 text-ink-subtle hover:text-amber-400 transition-colors"
       >
         <Star className={`w-4 h-4 ${prompt.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`} />
@@ -194,7 +197,7 @@ const Templates = () => {
         onClick={() => setWizardOpen(true)}
         className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 px-5 py-2.5 rounded-xl font-medium text-sm transition-all"
       >
-        <Sparkles className="w-4 h-4" /> Playbook Wizard
+        <Sparkles className="w-4 h-4" /> {m.pb_wizard()}
       </button>
     ) : (
       /* The same slot, saying what is missing rather than sitting there disabled. A disabled button
@@ -202,10 +205,10 @@ const Templates = () => {
       <Link
         to="/settings"
         state={{ initialTab: 'brand' }}
-        title="The Playbook Wizard writes in your brand's voice — it needs the brand set up first"
+        title={m.pb_wizard_needs_brand()}
         className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 px-5 py-2.5 rounded-xl font-medium text-sm transition-all"
       >
-        <Sparkles className="w-4 h-4" /> Set up brand
+        <Sparkles className="w-4 h-4" /> {m.pb_set_up_brand()}
       </Link>
     )
   ) : null;
@@ -282,7 +285,7 @@ const Templates = () => {
     setBulkBusy(true);
     try {
       const outcome = await setTagMany(ids, tag);
-      const { message, type } = bulkSummary(outcome, 'playbook', tag ? `Tag “${tag}” set` : 'Tag removed');
+      const { message, type } = bulkSummary(outcome, 'playbook', tag ? m.pb_tag_set({ tag }) : m.pb_tag_removed());
       showToast(message, type);
     } finally {
       setBulkBusy(false);
@@ -315,7 +318,7 @@ const Templates = () => {
         id => setTemplateAccess(id, workspace.id, accessValueToAccess(bulkAccess, byId.get(id)?.createdBy || null)),
       );
       fetchRestrictedTemplateIds(workspace.id).then(setRestrictedIds).catch(() => {});
-      const { message, type } = bulkSummary(outcome, 'playbook', 'Access changed');
+      const { message, type } = bulkSummary(outcome, 'playbook', m.pb_access_changed());
       showToast(message, type);
       setBulkAccessOpen(false);
     } finally {
@@ -333,21 +336,21 @@ const Templates = () => {
 
   const confirmDelete = () => {
     if (promptToDelete) {
-      deletePrompt(promptToDelete);
+      // SQEM-606 — the store reports the outcome once the server has answered; a toast here came
+      // first, said success before anything happened, and was then replaced by the store's own.
+      void deletePrompt(promptToDelete);
       setIsDeleteModalOpen(false);
       setPromptToDelete(null);
-      showToast("Prompt deleted", "success");
     }
   };
 
   const handleDuplicate = useCallback((prompt: Prompt) => {
-    duplicatePrompt(prompt);
-    showToast("Prompt duplicated", "success");
-  }, [duplicatePrompt, showToast]);
+    void duplicatePrompt(prompt); // SQEM-606 — the store reports the outcome
+  }, [duplicatePrompt]);
 
   const toggleFavorite = useCallback((prompt: Prompt) => {
     storeFavorite(prompt);
-    showToast(prompt.isFavorite ? "Removed from favorites" : "Added to favorites", "success");
+    showToast(prompt.isFavorite ? m.pb_unfavourited_toast() : m.pb_favourited_toast(), "success");
   }, [storeFavorite, showToast]);
 
   const handleSetTag = useCallback((prompt: Prompt, tag: string | null) => {
@@ -365,9 +368,9 @@ const Templates = () => {
         ? selected[0].title.replace(/[^\w.-]+/g, '_').slice(0, 60) || 'playbook'
         : `sqemes-playbooks-${selected.length}`;
       downloadBlob(blob, `${base}.sqemes.zip`);
-      showToast(`Exported ${selected.length} playbook${selected.length === 1 ? '' : 's'}`, 'success');
+      showToast(m.pb_exported({ count: selected.length }), 'success');
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Export failed', 'error');
+      showToast(e instanceof Error ? e.message : m.pb_export_failed(), 'error');
     } finally {
       setExporting(false);
     }
@@ -379,9 +382,9 @@ const Templates = () => {
     setExporting(true);
     try {
       downloadBlob(await exportTemplatesToZip([template], workspaceFiles), `${toSlug(template.title)}.sqemes.zip`);
-      showToast('Playbook downloaded', 'success');
+      showToast(m.pb_downloaded(), 'success');
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Export failed', 'error');
+      showToast(e instanceof Error ? e.message : m.pb_export_failed(), 'error');
     } finally {
       setExporting(false);
     }
@@ -418,10 +421,10 @@ const Templates = () => {
     try {
       const { files } = await importSkillBundle(importSkillData, workspace.id, currentUser.id);
       files.forEach(addWorkspaceFile); // the skill itself arrives via the store's realtime subscription
-      showToast(`Imported “${importSkillData.title}” with ${files.length} file${files.length === 1 ? '' : 's'}`, 'success');
+      showToast(m.pb_imported_skill({ title: importSkillData.title, count: files.length }), 'success');
       setImportSkillData(null);
     } catch (e) {
-      showToast(errorMessage(e, 'Import failed'), 'error');
+      showToast(errorMessage(e, m.pb_import_failed()), 'error');
     } finally {
       setImporting(false);
     }
@@ -446,10 +449,10 @@ const Templates = () => {
       } else {
         await publishToMarketplace({ workspaceId: workspace.id, template: publishTarget, allFiles: workspaceFiles, userId: currentUser.id, category: publishCategory });
       }
-      showToast('Submitted to the Marketplace — pending review', 'success');
+      showToast(m.pb_submitted(), 'success');
       setPublishTarget(null);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Publish failed', 'error');
+      showToast(e instanceof Error ? e.message : m.pb_publish_failed(), 'error');
     } finally {
       setPublishing(false);
     }
@@ -464,13 +467,13 @@ const Templates = () => {
       // SQEM-330 — personas only appear in the count when the bundle carried any, so an ordinary
       // template import reads exactly as it did before.
       showToast(
-        `Imported ${templates} playbook${templates === 1 ? '' : 's'}` +
-        (personas ? ` and ${personas} persona${personas === 1 ? '' : 's'}` : ''),
+        m.pb_imported_playbooks({ count: templates }) +
+        (personas ? m.pb_imported_and_personas({ count: personas }) : ''),
         'success',
       );
       setImportBundleData(null);
     } catch (e) {
-      showToast(errorMessage(e, 'Import failed'), 'error');
+      showToast(errorMessage(e, m.pb_import_failed()), 'error');
     } finally {
       setImporting(false);
     }
@@ -479,21 +482,21 @@ const Templates = () => {
   return (
     <div className="p-4 md:p-8 pb-16 md:pb-20 max-w-7xl mx-auto">
       <PageHeader
-        title="Playbooks"
-        subtitle="Your team's playbooks — prompts for tasks, skills for knowledge."
+        title={m.pb_title()}
+        subtitle={m.pb_subtitle()}
         actions={canEdit && (
           <>
             <input ref={importInputRef} type="file" accept=".zip,.sqemes" onChange={handleImportFile} className="hidden" />
             <button
               onClick={() => importInputRef.current?.click()}
-              title="Import a .sqemes.zip bundle or an Agent Skill folder (.zip)"
+              title={m.pb_import_title()}
               className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 px-4 py-2.5 rounded-xl font-medium text-sm transition-all justify-center"
             >
-              <Upload className="w-4 h-4" /> Import
+              <Upload className="w-4 h-4" /> {m.pb_import()}
             </button>
             {wizardButton}
             <Link to="/playbooks/new" className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-brand-200 hover:shadow-brand-300 dark:shadow-none dark:hover:shadow-none flex-1 sm:flex-none justify-center">
-              <Plus className="w-5 h-5" /> New Playbook
+              <Plus className="w-5 h-5" /> {m.pb_new()}
             </Link>
           </>
         )}
@@ -504,7 +507,7 @@ const Templates = () => {
         <SearchInput
           value={searchTerm}
           onChange={setSearchTerm}
-          placeholder="Search playbooks..."
+          placeholder={m.pb_search()}
         />
         {/* Favorites */}
         <button
@@ -512,7 +515,7 @@ const Templates = () => {
           className={`flex items-center gap-1.5 self-stretch px-3.5 py-2 rounded-xl text-sm font-medium border transition-all ${showFavoritesOnly ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-700 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
         >
           <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-current' : ''}`} />
-          Favorites
+          {m.pb_favorites()}
         </button>
 
         {/* Kind tabs */}
@@ -521,10 +524,10 @@ const Templates = () => {
           onChange={setSelectedKind}
           className="self-stretch"
           tabs={[
-            { value: 'all', label: 'All' },
+            { value: 'all', label: m.pb_tab_all() },
             // SQEM-384 — the same one-liners the cards show on hover, at the place people filter.
-            { value: 'prompt', label: 'Prompts', icon: <PenTool className="w-3 h-3" />, title: KIND_HELP.prompt },
-            { value: 'skill', label: 'Skills', icon: <Wand2 className="w-3 h-3" />, title: KIND_HELP.skill },
+            { value: 'prompt', label: m.pb_tab_prompts(), icon: <PenTool className="w-3 h-3" />, title: kindHelp('prompt') },
+            { value: 'skill', label: m.pb_tab_skills(), icon: <Wand2 className="w-3 h-3" />, title: kindHelp('skill') },
           ]}
         />
 
@@ -549,7 +552,7 @@ const Templates = () => {
           exporting={exporting}
           addableTags={allTags}
           removableTags={removableTags}
-          addTagLabel="Set tag"
+          addTagLabel={m.bulk_set_tag()}
           onAddTag={tag => void handleBulkTag(tag, selectedPrompts.map(p => p.id))}
           onRemoveTag={tag => void handleBulkTag(null, selectedPrompts.filter(p => p.tag === tag).map(p => p.id))}
           tagBusy={bulkBusy}
@@ -573,14 +576,14 @@ const Templates = () => {
         <EmptyState
           icon={<Plus className="w-8 h-8" />}
           tone="brand"
-          title="No playbooks yet"
-          description="Two kinds, depending on what you need:"
+          title={m.pb_empty_title()}
+          description={m.pb_empty_description()}
           extra={
             <dl className="mt-4 space-y-2 text-left max-w-md mx-auto">
               {(['prompt', 'skill'] as const).map(k => (
                 <div key={k} className="flex gap-2.5">
                   <dt className="text-xs font-bold text-slate-700 dark:text-slate-200 w-[4.5rem] shrink-0 capitalize pt-px">{k}</dt>
-                  <dd className="text-xs text-slate-500 dark:text-slate-400">{KIND_HELP[k]}</dd>
+                  <dd className="text-xs text-slate-500 dark:text-slate-400">{kindHelp(k)}</dd>
                 </div>
               ))}
             </dl>
@@ -588,10 +591,10 @@ const Templates = () => {
           action={canEdit ? (
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link to="/playbooks/new" className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-brand-200 dark:shadow-none">
-                <Plus className="w-4 h-4" /> Create your first playbook
+                <Plus className="w-4 h-4" /> {m.pb_create_first()}
               </Link>
               <Link to="/library" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">
-                <Store className="w-4 h-4" /> Browse Marketplace
+                <Store className="w-4 h-4" /> {m.pb_browse_marketplace()}
               </Link>
               {wizardButton}
             </div>
@@ -602,8 +605,8 @@ const Templates = () => {
       {!isLoading && prompts.length > 0 && filteredPrompts.length === 0 && (
         <EmptyState
           icon={showFavoritesOnly ? <Star className="w-8 h-8 text-amber-300" /> : <Search className="w-8 h-8" />}
-          title={showFavoritesOnly ? 'No favourite playbooks' : 'No playbooks found'}
-          description={showFavoritesOnly ? 'Star playbooks to see them here.' : 'Try adjusting your search or filters.'}
+          title={showFavoritesOnly ? m.pb_no_favourites() : m.pb_none_found()}
+          description={showFavoritesOnly ? m.pb_star_hint() : m.pb_adjust_filters()}
         />
       )}
 
@@ -611,7 +614,7 @@ const Templates = () => {
           `lg` one at a time: the list, or (with ?id=) the preview with a way back. */}
       {!isLoading && filteredPrompts.length > 0 && (
         <div className="lg:grid lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-6 lg:items-start">
-          <ul aria-label="Playbooks" className={`rounded-card border border-line bg-surface-raised p-2 space-y-0.5 ${showPreviewOnMobile ? 'hidden lg:block' : ''}`}>
+          <ul aria-label={m.pb_list_label()} className={`rounded-card border border-line bg-surface-raised p-2 space-y-0.5 ${showPreviewOnMobile ? 'hidden lg:block' : ''}`}>
             {filteredPrompts.map(prompt => (
               <PlaybookRow
                 key={prompt.id}
@@ -651,21 +654,21 @@ const Templates = () => {
 
       {/* Delete Confirmation Modal */}
       <Modal open={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} size="sm" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Delete Playbook?</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Are you sure you want to delete this playbook? This action cannot be undone.</p>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">{m.pb_delete_title()}</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">{m.pb_delete_body()}</p>
         <div className="flex gap-2">
-          <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
-          <Button variant="danger" onClick={confirmDelete} className="flex-1 py-2.5 text-xs shadow-lg hover:shadow-red-200">Yes, Delete</Button>
+          <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">{m.pb_cancel()}</button>
+          <Button variant="danger" onClick={confirmDelete} className="flex-1 py-2.5 text-xs shadow-lg hover:shadow-red-200">{m.pb_yes_delete()}</Button>
         </div>
       </Modal>
 
       {/* Bulk Delete Confirmation Modal */}
       <Modal open={bulkConfirm} onClose={() => !bulkDeleting && setBulkConfirm(false)} size="sm" className="p-6">
         <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
-          Delete {selectedIds.size} playbook{selectedIds.size === 1 ? '' : 's'}?
+          {m.pb_bulk_delete_title({ count: selectedIds.size })}
         </h3>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-          This permanently deletes the selected playbook{selectedIds.size === 1 ? '' : 's'}. This action cannot be undone.
+          {m.pb_bulk_delete_body({ count: selectedIds.size })}
         </p>
         <div className="flex gap-2">
           <button
@@ -673,7 +676,7 @@ const Templates = () => {
             disabled={bulkDeleting}
             className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50"
           >
-            Cancel
+            {m.pb_cancel()}
           </button>
           <button
             onClick={handleBulkDelete}
@@ -681,7 +684,7 @@ const Templates = () => {
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
           >
             {bulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-            {bulkDeleting ? 'Deleting…' : 'Delete'}
+            {bulkDeleting ? m.pb_deleting() : m.pb_delete()}
           </button>
         </div>
       </Modal>
@@ -689,32 +692,31 @@ const Templates = () => {
       {/* SQEM-564 — access for several playbooks at once. Replaces what each of them had; no "Only me". */}
       <Modal open={bulkAccessOpen} onClose={() => !bulkBusy && setBulkAccessOpen(false)} size="md" className="p-6">
         <h3 className="font-display text-xl font-semibold text-ink-strong mb-1">
-          Set access for {selectedIds.size} playbook{selectedIds.size === 1 ? '' : 's'}
+          {m.pb_bulk_access_title({ count: selectedIds.size })}
         </h3>
         <p className="text-sm text-ink-muted mb-5">
-          This replaces the current access of every selected playbook you may change. Personas that use
-          these playbooks load them only for people who can see them.
+          {m.pb_bulk_access_body()}
         </p>
         <TemplateAccessControl
           value={bulkAccess}
           onChange={setBulkAccess}
-          hint="Who can see & use these playbooks"
+          hint={m.pb_bulk_access_hint()}
           members={workspace?.members}
           groups={accessGroups}
           multiSeat={isMultiSeat(workspace)}
         />
         {bulkAccessIncomplete && (
-          <p className="mt-3 text-xs text-ink-muted">Pick at least one person or group.</p>
+          <p className="mt-3 text-xs text-ink-muted">{m.pb_pick_someone()}</p>
         )}
         {!bulkAccessIncomplete && loseSight > 0 && (
           <p className="mt-3 text-xs text-ink">
-            You are not named, so you will no longer see {loseSight} of these playbook{loseSight === 1 ? '' : 's'} — the ones you did not create.
+            {m.pb_lose_sight({ count: loseSight })}
           </p>
         )}
         <div className="flex gap-2 mt-6">
-          <Button variant="secondary" className="flex-1" onClick={() => setBulkAccessOpen(false)} disabled={bulkBusy}>Cancel</Button>
+          <Button variant="secondary" className="flex-1" onClick={() => setBulkAccessOpen(false)} disabled={bulkBusy}>{m.pb_cancel()}</Button>
           <Button className="flex-1" onClick={() => void handleBulkAccess()} disabled={bulkAccessIncomplete} loading={bulkBusy}>
-            {bulkBusy ? 'Applying…' : 'Apply'}
+            {bulkBusy ? m.pb_applying() : m.pb_apply()}
           </Button>
         </div>
       </Modal>
@@ -725,22 +727,22 @@ const Templates = () => {
           <>
             <div className="flex items-center gap-2.5 mb-2">
               <Store className="w-6 h-6 text-brand-500" />
-              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Publish to Marketplace</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{m.pb_publish_title()}</h3>
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-              Publish <span className="font-semibold">{publishTarget.title}</span> (incl. its context files) as a
-              snapshot others can copy. It&apos;s <span className="font-semibold">submitted for review</span> and goes live once approved.
-              {publishTarget.kind === 'skill' && <span className="block mt-1 text-amber-600 dark:text-amber-400">Skills get extra review before they go live.</span>}
+              {m.pb_publish_1()} <span className="font-semibold">{publishTarget.title}</span> {m.pb_publish_2()}{' '}
+              <span className="font-semibold">{m.pb_publish_3()}</span> {m.pb_publish_4()}
+              {publishTarget.kind === 'skill' && <span className="block mt-1 text-amber-600 dark:text-amber-400">{m.pb_publish_skill_review()}</span>}
             </p>
-            <label htmlFor="templates-category" className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Category</label>
-            <select id="templates-category" value={publishCategory} onChange={e => setPublishCategory(e.target.value as TemplateCategory)}
-              className="w-full p-3 mb-5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all">
-              {TEMPLATE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <label htmlFor="templates-category" className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">{m.pb_category()}</label>
+            <Select id="templates-category" value={publishCategory} onChange={e => setPublishCategory(e.target.value as TemplateCategory)}
+              className="mb-5">
+              {TEMPLATE_CATEGORIES.map(c => <option key={c} value={c}>{categoryLabel(c)}</option>)}
+            </Select>
             <div className="flex gap-2">
-              <button onClick={() => setPublishTarget(null)} disabled={publishing} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={() => setPublishTarget(null)} disabled={publishing} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50">{m.pb_cancel()}</button>
               <button onClick={confirmPublish} disabled={publishing} className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                {publishing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Submitting…</> : 'Submit for review'}
+                {publishing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {m.pb_submitting()}</> : m.pb_submit_review()}
               </button>
             </div>
           </>
@@ -751,15 +753,15 @@ const Templates = () => {
       <Modal open={showApplyModal} onClose={() => setShowApplyModal(false)} size="sm" className="p-6">
         <div className="flex items-center gap-2.5 mb-2">
           <Store className="w-6 h-6 text-brand-500" />
-          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">You need a publisher key</h3>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{m.pb_need_key_title()}</h3>
         </div>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-          Submitting your playbooks to the sqemes community marketplace requires a <span className="font-semibold">publisher key</span>. Request one, then add it in <span className="font-semibold">Settings → General → Marketplace Publisher</span>.
+          {m.pb_need_key_1()} <span className="font-semibold">{m.pb_need_key_2()}</span>{m.pb_need_key_3()} <span className="font-semibold">{m.pb_need_key_4()}</span>.
         </p>
         <div className="flex gap-2">
-          <button onClick={() => setShowApplyModal(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
+          <button onClick={() => setShowApplyModal(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">{m.pb_cancel()}</button>
           <a href="https://sqemes.com/publisher" target="_blank" rel="noopener noreferrer" onClick={() => setShowApplyModal(false)} className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2">
-            More info
+            {m.pb_more_info()}
           </a>
         </div>
       </Modal>
@@ -776,15 +778,14 @@ const Templates = () => {
             <>
               <div className="flex items-center gap-2.5 mb-2">
                 <Package className="w-6 h-6 text-brand-500" />
-                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Import playbooks</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{m.pb_import_bundle_title()}</h3>
               </div>
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                This bundle will be added to <span className="font-semibold">{workspace.name}</span>. Imported playbooks
-                come from another source — review what lands before continuing.
+                {m.pb_import_bundle_1()} <span className="font-semibold">{workspace.name}</span>{m.pb_import_bundle_2()}
               </p>
               <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 p-4 mb-4 text-sm">
-                <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Playbooks</span><span className="font-bold text-slate-800 dark:text-slate-100">{(templates || []).length}</span></div>
-                <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Context files</span><span className="font-bold text-slate-800 dark:text-slate-100">{(files || []).length}{totalBytes ? ` · ${mb < 0.1 ? '<0.1' : mb.toFixed(1)} MB` : ''}</span></div>
+                <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">{m.pb_import_playbooks()}</span><span className="font-bold text-slate-800 dark:text-slate-100">{(templates || []).length}</span></div>
+                <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">{m.pb_import_context_files()}</span><span className="font-bold text-slate-800 dark:text-slate-100">{(files || []).length}{totalBytes ? ` · ${mb < 0.1 ? '<0.1' : mb.toFixed(1)} MB` : ''}</span></div>
                 {/* ⛔ SQEM-330 — this row was missing, and its absence was the bug. `importBundle`
                     has created personas since SQEM-330 and the success toast counts them, but this
                     dialog — whose entire job is "review what lands before continuing" — listed only
@@ -792,21 +793,21 @@ const Templates = () => {
                     worse than no preview: it was *read* as complete. Shown only when the bundle
                     carries any, so an ordinary template import looks exactly as it did. */}
                 {(personas || []).length > 0 && (
-                  <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Personas</span><span className="font-bold text-slate-800 dark:text-slate-100">{(personas || []).length}</span></div>
+                  <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">{m.pb_import_personas()}</span><span className="font-bold text-slate-800 dark:text-slate-100">{(personas || []).length}</span></div>
                 )}
               </div>
               {(templates || []).length > 0 && (
                 <ul className="mb-5 max-h-32 overflow-y-auto text-sm text-slate-700 dark:text-slate-200 space-y-1">
                   {(templates || []).slice(0, 8).map((t, i) => (
-                    <li key={i} className="flex items-center gap-2 truncate"><span className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" />{t.title || 'Untitled'}</li>
+                    <li key={i} className="flex items-center gap-2 truncate"><span className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" />{t.title || m.pb_untitled()}</li>
                   ))}
-                  {(templates || []).length > 8 && <li className="text-slate-400 text-xs">+ {(templates || []).length - 8} more…</li>}
+                  {(templates || []).length > 8 && <li className="text-slate-400 text-xs">{m.pb_more({ count: (templates || []).length - 8 })}</li>}
                 </ul>
               )}
               <div className="flex gap-2">
-                <button onClick={() => setImportBundleData(null)} disabled={importing} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50">Cancel</button>
+                <button onClick={() => setImportBundleData(null)} disabled={importing} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50">{m.pb_cancel()}</button>
                 <button onClick={confirmImport} disabled={importing || !((templates || []).length || (personas || []).length)} className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                  {importing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importing…</> : 'Import'}
+                  {importing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {m.pb_importing()}</> : m.pb_import()}
                 </button>
               </div>
             </>
@@ -826,17 +827,16 @@ const Templates = () => {
             <>
               <div className="flex items-center gap-2.5 mb-2">
                 <FolderDown className="w-6 h-6 text-brand-500" />
-                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Import Agent Skill</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{m.pb_import_skill_title()}</h3>
               </div>
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                This adds a skill to <span className="font-semibold">{workspace.name}</span> with its files.
-                Sqemes stores and distributes them — it does not run anything they contain.
+                {m.pb_import_skill_1()} <span className="font-semibold">{workspace.name}</span> {m.pb_import_skill_2()}
               </p>
               <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 p-4 mb-4 text-sm">
-                <div className="flex justify-between py-1 gap-4"><span className="text-slate-500 dark:text-slate-400 shrink-0">Skill</span><span className="font-bold text-slate-800 dark:text-slate-100 truncate">{importSkillData.title}</span></div>
-                <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">Files</span><span className="font-bold text-slate-800 dark:text-slate-100">{importSkillData.files.length}{bytes ? ` · ${mb < 0.1 ? '<0.1' : mb.toFixed(1)} MB` : ''}</span></div>
+                <div className="flex justify-between py-1 gap-4"><span className="text-slate-500 dark:text-slate-400 shrink-0">{m.pb_import_skill()}</span><span className="font-bold text-slate-800 dark:text-slate-100 truncate">{importSkillData.title}</span></div>
+                <div className="flex justify-between py-1"><span className="text-slate-500 dark:text-slate-400">{m.pb_import_files()}</span><span className="font-bold text-slate-800 dark:text-slate-100">{importSkillData.files.length}{bytes ? ` · ${mb < 0.1 ? '<0.1' : mb.toFixed(1)} MB` : ''}</span></div>
                 {dirs.size > 0 && (
-                  <div className="flex justify-between py-1 gap-4"><span className="text-slate-500 dark:text-slate-400 shrink-0">Folders</span><span className="font-bold text-slate-800 dark:text-slate-100 truncate">{Array.from(dirs).sort().join(' · ')}</span></div>
+                  <div className="flex justify-between py-1 gap-4"><span className="text-slate-500 dark:text-slate-400 shrink-0">{m.pb_import_folders()}</span><span className="font-bold text-slate-800 dark:text-slate-100 truncate">{Array.from(dirs).sort().join(' · ')}</span></div>
                 )}
               </div>
               {importSkillData.files.length > 0 && (
@@ -844,13 +844,13 @@ const Templates = () => {
                   {importSkillData.files.slice(0, 8).map((f, i) => (
                     <li key={i} className="flex items-center gap-2 truncate"><span className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" />{f.name}</li>
                   ))}
-                  {importSkillData.files.length > 8 && <li className="text-slate-400 text-xs">+ {importSkillData.files.length - 8} more…</li>}
+                  {importSkillData.files.length > 8 && <li className="text-slate-400 text-xs">{m.pb_more({ count: importSkillData.files.length - 8 })}</li>}
                 </ul>
               )}
               <div className="flex gap-2">
-                <button onClick={() => setImportSkillData(null)} disabled={importing} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50">Cancel</button>
+                <button onClick={() => setImportSkillData(null)} disabled={importing} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50">{m.pb_cancel()}</button>
                 <button onClick={confirmSkillImport} disabled={importing} className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                  {importing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importing…</> : 'Import'}
+                  {importing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {m.pb_importing()}</> : m.pb_import()}
                 </button>
               </div>
             </>

@@ -20,10 +20,12 @@ import { createAdminClient } from '../_shared/supabase-admin.ts';
 import {
   workspaceOfPath, MAX_PATHS_PER_CALL, clampExpiry, onPublicHost, dailyLimitMessage,
 } from '../_shared/fileLinks.ts';
+import { m as txt, requestLocale } from '../_shared/locale.ts';
 
 const SELF_HOSTED = Deno.env.get('SELF_HOSTED') === 'true';
 
 Deno.serve(async (req) => {
+  const locale = requestLocale(req); // SQEM-612 — refusals in the person's language
   const cors = getCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -38,7 +40,7 @@ Deno.serve(async (req) => {
     const admin = createAdminClient();
     const token = authHeader.replace(/^Bearer\s+/i, '');
     const { data: { user }, error: authError } = await admin.auth.getUser(token);
-    if (authError || !user) return json({ error: 'Unauthorized' }, 401);
+    if (authError || !user) return json({ error: txt.srv_unauthorized({}, { locale }) }, 401);
 
     // The caller's own view of the database: RLS decides what they may see.
     const asUser = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
@@ -53,7 +55,7 @@ Deno.serve(async (req) => {
       const ws = String(body.workspaceId ?? '');
       const { data: m } = await admin.from('workspace_members').select('role')
         .eq('workspace_id', ws).eq('user_id', user.id).maybeSingle();
-      if (!m || (m.role !== 'admin' && m.role !== 'editor')) return json({ error: 'Not allowed' }, 403);
+      if (!m || (m.role !== 'admin' && m.role !== 'editor')) return json({ error: txt.srv_not_allowed({}, { locale }) }, 403);
       if (SELF_HOSTED) return json({ used: null, limit: null });
       const { data, error } = await admin.rpc('workspace_storage_usage', { p_ws: ws });
       if (error) return json({ error: error.message }, 500);

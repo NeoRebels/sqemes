@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import CardSaveBar from '../../components/ui/CardSaveBar';
 import ConfirmModal from '../../components/ui/ConfirmModal';
+import { en } from './i18nText';
 
 /**
  * SQEM-539 — settings save on a click, and deleting a workspace takes its name.
@@ -101,12 +102,15 @@ describe('SQEM-539 — the wiring', () => {
 
   it('deleting the workspace names what goes and takes the name', () => {
     expect(settings).not.toMatch(/prompts, history, results/);
-    expect(settings.match(/all playbooks, personas, files, chats and members/g)?.length).toBe(2);
+    expect(settings).toMatch(/\? m\.stg_delete_body_sub\(\)\s*: m\.stg_delete_body\(\)/); // SQEM-608 — the words live in messages/
+    for (const k of ['stg_delete_body_sub', 'stg_delete_body'] as const) expect(en[k]).toMatch(/all playbooks, personas, files, chats and members/);
     expect(settings).toMatch(/confirmText: workspace\.name,/);
   });
 
   it('both editors use the same verbs', () => {
-    expect(read('pages/TemplateEditor.tsx')).toMatch(/const saveLabel = isLibrary \? 'Save playbook' : id \? 'Save changes' : 'Create playbook';/);
-    expect(read('pages/PersonaEditor.tsx')).toMatch(/\{id \? 'Save changes' : 'Create persona'\}/);
+    expect(read('pages/TemplateEditor.tsx')).toMatch(/const saveLabel = isLibrary \? txt\.ed_save_playbook\(\) : id \? txt\.ed_save_changes\(\) : txt\.ed_create_playbook\(\);/);
+    expect([en.ed_save_playbook, en.ed_save_changes, en.ed_create_playbook]).toEqual(['Save playbook', 'Save changes', 'Create playbook']); // SQEM-605
+    expect(read('pages/PersonaEditor.tsx')).toMatch(/\{id \? m\.ed_save_changes\(\) : m\.pe_create\(\)\}/);
+    expect(en.pe_create).toBe('Create persona'); // SQEM-605
   });
 });

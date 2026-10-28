@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Tag, Plus } from 'lucide-react';
 import PickerDropdown from './ui/PickerDropdown';
+import { m } from '../lib/i18n';
 
 // SQEM-074 — single-select tag picker for the template editor, styled like the
 // context-file picker (searchable dropdown). Picks from the workspace tag
@@ -45,7 +46,7 @@ export function TagPicker({ value, tags, onChange, disabled = false, onCreate }:
       <PickerDropdown
         disabled={disabled}
         triggerIcon={<Tag className="w-3.5 h-3.5 shrink-0" />}
-        triggerLabel={value ? 'Change tag...' : 'Select a tag...'}
+        triggerLabel={value ? m.tag_change() : m.tag_select()}
         search={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search tags..."
@@ -56,14 +57,14 @@ export function TagPicker({ value, tags, onChange, disabled = false, onCreate }:
             className="w-full text-left px-3 py-2 flex items-center gap-2 text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
           >
             <Plus className="w-4 h-4 shrink-0" />
-            <span className="text-sm font-semibold">Create &ldquo;{trimmed}&rdquo;</span>
+            <span className="text-sm font-semibold">{m.tag_create({ tag: trimmed })}</span>
           </button>
         ) : undefined}
       >
         {(close) => (
           available.length === 0 ? (
             <div className="px-3 py-4 text-xs text-slate-400 text-center">
-              {tags.length === 0 ? 'No tags in workspace' : search ? 'No tags match your search' : 'No other tags'}
+              {tags.length === 0 ? m.tag_none() : search ? m.tag_no_match() : m.tag_no_other()}
             </div>
           ) : (
             available.map(t => (

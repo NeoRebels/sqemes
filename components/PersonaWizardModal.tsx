@@ -27,6 +27,8 @@ import { usePrompts, useWorkspace, useUI } from '../store';
 import { runAuthoringAI, authoringModelId } from '../lib/authoringAI';
 import { createPersona } from '../lib/api/personas';
 import type { Persona, PromptKind } from '../types';
+import { Textarea } from './ui/Input';
+import { m } from '../lib/i18n';
 
 /** Defensively parse a JSON object out of an LLM response (tolerates fences and surrounding prose). */
 function parseJsonObject(raw: string): any {
@@ -73,9 +75,9 @@ export default function PersonaWizardModal({
   const reset = () => { setGoal(''); setPicked([]); setSearch(''); setKind('all'); setStage(''); };
 
   const handleGenerate = async () => {
-    if (!goal.trim()) { showToast('Describe the role first.', 'error'); return; }
+    if (!goal.trim()) { showToast(m.pwiz_describe_first(), 'error'); return; }
     setBusy(true);
-    setStage(pickedTemplates.length ? 'Reading your playbooks' : 'Writing the role');
+    setStage(pickedTemplates.length ? m.pwiz_stage_reading() : m.pwiz_stage_writing());
     try {
       // The model is given the templates it may route to, by index. Asking it to echo ids invites
       // invented ones; an index it can only get wrong within a range we control.
@@ -102,7 +104,7 @@ Rules for "routes":
 - The condition completes "load this playbook when …". One short clause, naming the SITUATION.
 - ⚠️ A template's own description is already used when no condition is given, so a condition that merely restates it is worthless. Write what this template means **for this persona specifically** — and if the description truly is the whole answer, return "" for that entry rather than padding it.`;
 
-      setStage('Writing the role and choosing its playbooks');
+      setStage(m.pwiz_stage_choosing());
       const raw = await runAuthoringAI({
         workspaceId: workspace.id,
         modelId: authoringModelId(workspace),
@@ -113,7 +115,7 @@ Rules for "routes":
       const parsed = parseJsonObject(raw);
       const title = String(parsed.title || '').trim() || goal.trim().split(/\s+/).slice(0, 3).join(' ');
       const content = String(parsed.content || '').trim();
-      if (!content) throw new Error('The model returned no role description. Try again, or describe the role in a little more detail.');
+      if (!content) throw new Error(m.pwiz_no_content());
 
       // ⚠️ Routes are rebuilt from OUR list, not from the model's. A returned index outside the
       // range is dropped, and a template the model forgot still becomes a route — with an empty
@@ -127,7 +129,7 @@ Rules for "routes":
         }
       }
 
-      setStage('Saving');
+      setStage(m.pwiz_stage_saving());
       const created = await createPersona(
         workspace.id,
         {
@@ -151,7 +153,7 @@ Rules for "routes":
       reset();
       onCreated(created);
     } catch (err: any) {
-      showToast(err?.message || 'Could not generate the persona', 'error');
+      showToast(err?.message || m.pwiz_failed(), 'error');
     } finally {
       setBusy(false);
       setStage('');
@@ -162,7 +164,7 @@ Rules for "routes":
     <Modal open={open} onClose={busy ? undefined : onClose} size="lg" className="flex flex-col max-h-[85vh]">
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700 shrink-0">
         <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-brand-500" /> Persona Wizard
+          <Sparkles className="w-4 h-4 text-brand-500" /> {m.pwiz_title()}
         </h2>
         {!busy && (
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
@@ -174,30 +176,29 @@ Rules for "routes":
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
         <div>
           <label htmlFor="persona-wizard-modal-what-should-this-persona-be" className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
-            What should this persona be?
+            {m.pwiz_goal_label()}
           </label>
-          <textarea id="persona-wizard-modal-what-should-this-persona-be"
+          <Textarea id="persona-wizard-modal-what-should-this-persona-be"
             value={goal}
             onChange={e => setGoal(e.target.value)}
             disabled={busy}
             rows={4}
-            placeholder="A sales role that writes offers, proposes workshops and finds AI use cases for a customer. It always asks for the customer context first and never invents prices."
-            className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all resize-none"
+            placeholder={m.pwiz_goal_placeholder()}
+            className="resize-none"
           />
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-2">
             <p className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-              Playbooks it may reach for
+              {m.pwiz_playbooks_label()}
             </p>
-            <span className="text-2xs text-slate-400">{picked.length} selected</span>
+            <span className="text-2xs text-slate-400">{m.pwiz_selected({ count: picked.length })}</span>
           </div>
 
           {prompts.length === 0 ? (
             <div className="text-xs text-slate-500 dark:text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
-              This workspace has no playbooks yet. A persona without routes is only a role
-              description — you can still create one and attach playbooks later.
+              {m.pwiz_no_playbooks()}
             </div>
           ) : (
             <>
@@ -209,7 +210,7 @@ Rules for "routes":
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     disabled={busy}
-                    placeholder="Search playbooks..."
+                    placeholder={m.pb_search()}
                     className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500"
                   />
                 </div>
@@ -217,9 +218,9 @@ Rules for "routes":
                   value={kind}
                   onChange={setKind}
                   tabs={[
-                    { value: 'all', label: 'All' },
-                    { value: 'prompt', label: 'Prompts' },
-                    { value: 'skill', label: 'Skills' },
+                    { value: 'all', label: m.pb_tab_all() },
+                    { value: 'prompt', label: m.pb_tab_prompts() },
+                    { value: 'skill', label: m.pb_tab_skills() },
                   ]}
                 />
               </div>
@@ -238,7 +239,7 @@ Rules for "routes":
                   />
                 ))}
                 {visible.length === 0 && (
-                  <p className="text-xs text-slate-400 py-4 text-center">Nothing matches.</p>
+                  <p className="text-xs text-slate-400 py-4 text-center">{m.pwiz_nothing_matches()}</p>
                 )}
               </div>
             </>
@@ -248,8 +249,7 @@ Rules for "routes":
         {picked.length === 0 && prompts.length > 0 && (
           <p className="text-2xs text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-            Without playbooks this persona can load nothing — it will be a role description only. You
-            can attach them afterwards.
+            {m.pwiz_none_warning()}
           </p>
         )}
       </div>
@@ -260,7 +260,7 @@ Rules for "routes":
         </span>
         <Button onClick={handleGenerate} loading={busy} disabled={busy || !goal.trim()}>
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-          Generate Persona
+          {m.pwiz_generate()}
         </Button>
       </div>
     </Modal>

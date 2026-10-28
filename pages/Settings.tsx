@@ -3,7 +3,7 @@ import { useUI, useWorkspace, useData } from '../store';
 import DocumentStyleCard from '../components/DocumentStyleCard';
 import { can } from '../lib/permissions';
 import { useLocation, useNavigate } from 'react-router';
-import { PLANS, ROLE_LABELS, TRIAL_DAYS, VAT_NOTE } from '../constants';
+import { PLANS, ROLE_LABELS, TRIAL_DAYS } from '../constants';
 import PlanStorageUsage from '../components/PlanStorageUsage';
 import { LIBRARY_SYSTEM_PROMPT } from '../lib/libraryPrompt';
 import { hasActiveSubscription, isTrialing } from '../lib/subscription';
@@ -37,6 +37,10 @@ import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import CardSaveBar from '../components/ui/CardSaveBar';
+import LanguageCard, { WORKSPACE_LANGUAGE_OPTIONS, PROFILE_LANGUAGE_OPTIONS } from '../components/LanguageCard';
+import { m, canChooseLanguage, getLocale } from '../lib/i18n';
+import { roleLabel, planFeature, planTagline, planMonthly, planMonthlyAmount, formatEuro } from '../lib/labels';
+import { authErrorText } from '../lib/authErrors';
 import AboutSection from '../components/AboutSection';
 import Avatar, { randomAvatarDataUri } from '../components/ui/Avatar';
 import McpClientGuide from '../components/McpClientGuide';
@@ -85,6 +89,7 @@ import {
   ArrowUpRight,
   Globe,
 } from 'lucide-react';
+import Select from '../components/ui/Select';
 
 // SQEM-539 — the Content Governance switches, saved together by their card's Save button.
 type GovernanceKey = 'blockEmails' | 'blockIban' | 'blockPhone';
@@ -125,10 +130,10 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
       <div className="mb-6">
         <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
           <McpIcon className="w-5 h-5 text-accent" />
-          MCP Server
+          {m.mcp_title()}
         </h2>
         <p className="text-sm text-ink-muted mt-1">
-          Connect Claude, ChatGPT, Claude Code, Codex, Cursor, VS Code or any other MCP client to your full playbook library — prompts and skills — and to your personas.
+          {m.mcp_desc()}
         </p>
       </div>
       {locked ? (
@@ -137,27 +142,27 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
             <Lock className="w-5 h-5 text-ink-subtle" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-ink">MCP access requires Team or Business</p>
-            <p className="text-xs text-ink-subtle mt-1">Upgrade your plan to connect Claude, ChatGPT, Cursor and other MCP clients.</p>
+            <p className="text-sm font-semibold text-ink">{m.mcp_locked_title()}</p>
+            <p className="text-xs text-ink-subtle mt-1">{m.mcp_locked_body()}</p>
           </div>
           <button
             onClick={onUpgrade}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-accent-strong hover:opacity-90 text-white rounded-control text-sm font-bold transition-opacity"
           >
-            Upgrade plan
+            {m.mcp_upgrade()}
           </button>
         </div>
       ) : (
         <ol className="space-y-6">
-          <McpStep n={1} title="Copy the endpoint">
+          <McpStep n={1} title={m.mcp_step1()}>
             <div className="flex items-center gap-2 bg-surface-sunken border border-line-strong rounded-control px-3 py-2.5 overflow-hidden">
               <span className="text-xs font-mono text-ink truncate flex-1 min-w-0">{mcpUrl}</span>
               <button
                 type="button"
                 onClick={async () => { await copyToClipboard(mcpUrl); setMcpUrlCopied(true); setTimeout(() => setMcpUrlCopied(false), 2000); }}
                 className="shrink-0 text-ink-subtle hover:text-accent transition-colors"
-                title="Copy URL"
-                aria-label="Copy endpoint URL"
+                title={m.mcp_copy_url()}
+                aria-label={m.mcp_copy_url_label()}
               >
                 {mcpUrlCopied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
@@ -166,7 +171,7 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
 
           {/* SQEM-533 — one tab per client instead of one JSON block for all of them; the steps and
               snippets live in lib/mcpClients.ts, shared with the setup wizard. */}
-          <McpStep n={2} title="Connect your AI tool">
+          <McpStep n={2} title={m.mcp_step2()}>
             <McpClientGuide url={mcpUrl} />
           </McpStep>
 
@@ -182,16 +187,13 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
               SQEM-554 (c): therefore NOT collapsed away (the audit's first idea). The step, its
               "paste this too" and the Copy button always show; only the long text is cut to a few
               lines until "Show full text". */}
-          <McpStep n={3} title="Paste the system prompt too">
+          <McpStep n={3} title={m.mcp_step3()}>
             {/* SQEM-378 — the same text the Sqemes chat works under. SQEM-526: the MCP server no longer
                 hands it out (MCP client guidelines), so pasting it is the only way it reaches a client. Saying so matters: it is the difference between "a snippet we offer" and
                 "the rule this product already follows", and the second is what makes someone paste
                 it. One source, so this claim cannot quietly stop being true. */}
             <p className="text-xs text-ink-muted mb-2">
-              This is the same instruction the sqemes chat already works under. A connected AI tool
-              follows it only when it is in your own standing instructions &mdash; without it, the tool
-              checks your playbooks when you ask it to, and rarely on its own. Add it where your AI tool
-              keeps its instructions, and it applies to everyone at once.
+              {m.mcp_prompt_body()}
             </p>
             <div className="relative bg-surface-sunken border border-line-strong rounded-control p-4">
               {/* Collapsed: exactly five lines (text-xs = 1rem lines), fading out, so the cut never lands mid-line. */}
@@ -200,9 +202,9 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
                 type="button"
                 onClick={async () => { await copyToClipboard(LIBRARY_SYSTEM_PROMPT); setPromptCopied(true); setTimeout(() => setPromptCopied(false), 2000); }}
                 className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-1 rounded-control bg-surface-raised border border-line text-xs font-semibold text-ink hover:text-accent transition-colors"
-                title="Copy system prompt"
+                title={m.mcp_copy_prompt()}
               >
-                {promptCopied ? <><Check className="w-3.5 h-3.5 text-success" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+                {promptCopied ? <><Check className="w-3.5 h-3.5 text-success" /> {m.mcp_copied()}</> : <><Copy className="w-3.5 h-3.5" /> {m.mcp_copy()}</>}
               </button>
               <button
                 type="button"
@@ -211,23 +213,23 @@ const McpServerCard = ({ locked, onUpgrade }: { locked: boolean; onUpgrade?: () 
                 aria-controls="mcp-system-prompt"
                 className="mt-2 text-xs font-semibold text-accent hover:underline"
               >
-                {promptOpen ? 'Show less' : 'Show full text'}
+                {promptOpen ? m.mcp_show_less() : m.mcp_show_full()}
               </button>
             </div>
             {/* Two places, not one — and they are genuinely different settings, so naming only the
                 personal one would leave a team lead to discover the other by accident. */}
             <dl className="mt-2.5 space-y-1.5 text-xs text-ink-subtle">
               <div>
-                <dt className="inline font-bold text-ink-muted">Just for you: </dt>
-                <dd className="inline">ChatGPT → Settings → Personalization → Custom instructions. Claude → Settings → your own instructions.</dd>
+                <dt className="inline font-bold text-ink-muted">{m.mcp_just_you()}</dt>
+                <dd className="inline">{m.mcp_just_you_where()}</dd>
               </div>
               <div>
-                <dt className="inline font-bold text-ink-muted">Everyone at once: </dt>
+                <dt className="inline font-bold text-ink-muted">{m.mcp_everyone()}</dt>
                 {/* Checked against both vendors' own documentation on 2026-08-31. Claude states that
                     organization instructions apply "in every conversation across your organization";
                     OpenAI documents nothing equivalent, so this says what its nearest option actually
                     does — applied when judged relevant — rather than implying it is the same thing. */}
-                <dd className="inline">on Claude Team or Enterprise an admin can set it under Organization and access, and it then applies to every conversation in the organisation. ChatGPT has no documented setting that reaches every chat; a shared Skill is the closest, and it is applied when the model judges it relevant.</dd>
+                <dd className="inline">{m.mcp_everyone_where()}</dd>
               </div>
             </dl>
           </McpStep>
@@ -308,9 +310,9 @@ const Settings = () => {
       await setPublisherToken(t);
       setPubConfigured(!!t);
       setPubToken('');
-      showToast(t ? 'Publisher token saved' : 'Publisher token cleared', 'success');
+      showToast(t ? m.st_pub_saved() : m.st_pub_cleared(), 'success');
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not save the token', 'error');
+      showToast(e instanceof Error ? e.message : m.st_pub_failed(), 'error');
     } finally {
       setPubSaving(false);
     }
@@ -378,8 +380,8 @@ const Settings = () => {
       const denied = /row-level security/i.test(err?.message ?? '');
       showToast(
         denied
-          ? 'Could not create the key — your role does not allow it here. Ask a workspace admin.'
-          : (err.message || 'Failed to generate key'),
+          ? m.stk_denied()
+          : (err.message || m.stk_generate_failed()),
         'error',
       );
     } finally {
@@ -393,7 +395,7 @@ const Settings = () => {
     if (error) {
       // SQEM-287 — the key is still there, and that is the part worth saying: somebody who wanted
       // it gone needs to know it is not.
-      showToast('Could not delete the key — it is still active. Try again.', 'error');
+      showToast(m.stk_delete_active(), 'error');
     } else {
       setSqemesApiKeys(prev => prev.filter(k => k.id !== id));
     }
@@ -412,7 +414,7 @@ const Settings = () => {
     if (!editingKey) return;
     const trimmedName = editKeyName.trim();
     if (!trimmedName) {
-      showToast('Name cannot be empty', 'error');
+      showToast(m.stk_name_empty(), 'error');
       return;
     }
     setIsSavingScope(true);
@@ -439,9 +441,9 @@ const Settings = () => {
       .update(updates)
       .eq('id', editingKey.id);
     if (error) {
-      showToast(error.message || 'Failed to update connection', 'error');
+      showToast(error.message || m.stk_update_failed(), 'error');
     } else {
-      showToast('Connection updated', 'success');
+      showToast(m.stk_updated(), 'success');
       setEditingKey(null);
       await loadSqemesApiKeys();
     }
@@ -472,7 +474,7 @@ const Settings = () => {
     // SQEM-310 — the four other save buttons on this page confirm; this one did not. It matters more
     // here than elsewhere: the Template Wizard button reads "Set up brand" until the required fields
     // are filled, so somebody who saves and sees nothing cannot tell whether it was enough.
-    showToast('Brand updated successfully', 'success');
+    showToast(m.st_brand_saved(), 'success');
   };
 
   // Buffered profile fields (only saved on button click)
@@ -583,7 +585,7 @@ const Settings = () => {
     } catch (err: any) {
       // ⚠️ Demote anyway rather than blocking on a failed count: a role change the admin asked for is
       // not something to refuse because a follow-up question could not be prepared. Say so, though.
-      showToast(err?.message || 'Could not check this member\'s restricted content — demoting anyway', 'error');
+      showToast(err?.message || m.st_demote_check_failed(), 'error');
       updateMemberRole(member.id, next);
     }
   };
@@ -599,7 +601,7 @@ const Settings = () => {
       updateMemberRole(demoteTarget.id, 'member');
       setDemoteTarget(null);
     } catch (err: any) {
-      showToast(err?.message || 'Could not apply that choice — the role is unchanged', 'error');
+      showToast(err?.message || m.st_demote_failed(), 'error');
     } finally {
       setIsDemoting(false);
     }
@@ -617,6 +619,8 @@ const Settings = () => {
    * being refused.
    */
   const IDLE_LIMIT_DAYS = 90;
+  // SQEM-609 — the stored scope values stay English (the server checks them); only the badge is translated.
+  const SCOPE_LABEL: Record<string, () => string> = { create: m.ks_scope_create, update: m.ks_scope_update, delete: m.ks_scope_delete };
   const idleDays = (k: SqemesApiKey): number => {
     const since = k.last_used_at ?? k.created_at;
     if (!since) return 0;
@@ -633,20 +637,21 @@ const Settings = () => {
     getWorkspaceStorageUsage(workspace.id).then(u => { if (!cancelled) setStorageUsage(u); }).catch(() => {});
     return () => { cancelled = true; };
   }, [activeTab, workspace.id, currentUser, workspace]);
-  const fmtBytes = (n: number) => n >= 1073741824 ? `${(n / 1073741824).toFixed(n % 1073741824 ? 1 : 0)} GB` : `${Math.round(n / 1048576)} MB`;
+  const fmtBytes = (n: number) => n >= 1073741824 ? `${(n / 1073741824).toLocaleString(getLocale(), { maximumFractionDigits: n % 1073741824 ? 1 : 0, minimumFractionDigits: n % 1073741824 ? 1 : 0 })} GB` : `${Math.round(n / 1048576)} MB`; // SQEM-608 — decimal separator in the app language
   // SQEM-119 — self-host has no subscription model: unlimited seats + all features (like managed).
   const isLimitReached = !workspace.isManaged && !IS_SELF_HOSTED && memberCount >= memberLimit;
   const hasMcpAccess = workspace.isManaged || IS_SELF_HOSTED || currentPlan.mcpAccess;
 
   const tabs: { id: TabId; label: string; icon: any }[] = [
-    { id: 'general', label: 'General', icon: Building },
-    { id: 'brand', label: 'Brand', icon: Sparkles },
-    { id: 'team', label: 'Team Members', icon: Users },
-    { id: 'security', label: 'Security', icon: Shield },
-    { id: 'plans', label: 'Plans & Billing', icon: CreditCard },
-    { id: 'api', label: 'API & MCP', icon: Key },
-    { id: 'connectors', label: 'Connectors', icon: Plug },
-    { id: 'profile', label: 'My Profile', icon: User },
+    // SQEM-608 — the id is the deep-link key (`initialTab`) and stays; only the label is translated.
+    { id: 'general', label: m.st_tab_general(), icon: Building },
+    { id: 'brand', label: m.st_tab_brand(), icon: Sparkles },
+    { id: 'team', label: m.st_tab_team(), icon: Users },
+    { id: 'security', label: m.st_tab_security(), icon: Shield },
+    { id: 'plans', label: m.st_tab_plans(), icon: CreditCard },
+    { id: 'api', label: m.st_tab_api(), icon: Key },
+    { id: 'connectors', label: m.st_tab_connectors(), icon: Plug },
+    { id: 'profile', label: m.st_tab_profile(), icon: User },
   ];
 
   // SQEM-480 — the Security tab holds only cards with their own conditions; it is shown when one of
@@ -760,9 +765,9 @@ const Settings = () => {
       }
       updateWorkspace({ apiKeys: updatedKeys, fundedAvailable, webSearchHosted });
       setApiKeys(prev => { const next = { ...prev }; delete next[providerId]; return next; });
-      showToast('Key removed', 'success');
+      showToast(m.stk_removed(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to remove key', 'error');
+      showToast(err.message || m.stk_remove_failed(), 'error');
     }
   };
 
@@ -773,13 +778,13 @@ const Settings = () => {
         .filter(([_, value]) => value.length > 0);
 
       if (entries.length === 0) {
-        showToast('Enter at least one new key before saving.', 'info');
+        showToast(m.stk_enter_new(), 'info');
         return;
       }
 
       for (const [provider, key] of entries) {
         if (isPlaceholderKey(key)) {
-          throw new Error(`Invalid key for ${provider}. Paste the original provider key.`);
+          throw new Error(m.stk_invalid({ provider }));
         }
         await saveApiKey(workspace.id, provider, key);
       }
@@ -792,11 +797,11 @@ const Settings = () => {
       }
       updateWorkspace({ apiKeys: updatedKeys, fundedAvailable, webSearchHosted });
 
-      showToast('API Configuration updated successfully', 'success');
+      showToast(m.stk_saved(), 'success');
       // Clear the local key inputs after saving (keys are now server-side)
       setApiKeys({});
     } catch (err: any) {
-      showToast(err.message || 'Failed to save API keys', 'error');
+      showToast(err.message || m.stk_save_failed(), 'error');
     }
   };
 
@@ -804,8 +809,8 @@ const Settings = () => {
   // workspace never has two.
   const handleSaveSearchKey = async () => {
     const key = searchKey.trim();
-    if (!key) { showToast('Paste a search key before saving.', 'info'); return; }
-    if (isPlaceholderKey(key)) { showToast('Paste the original key from your search provider.', 'error'); return; }
+    if (!key) { showToast(m.stk_search_paste(), 'info'); return; }
+    if (isPlaceholderKey(key)) { showToast(m.stk_search_original(), 'error'); return; }
     try {
       await saveApiKey(workspace.id, `search_${searchProvider}`, key);
       const { keys: status, fundedAvailable, webSearchHosted } = await getApiKeyStatus(workspace.id);
@@ -815,9 +820,9 @@ const Settings = () => {
       }
       updateWorkspace({ apiKeys: updatedKeys, fundedAvailable, webSearchHosted });
       setSearchKey('');
-      showToast('Search key saved', 'success');
+      showToast(m.stk_search_saved(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to save the search key', 'error');
+      showToast(err.message || m.stk_search_failed(), 'error');
     }
   };
 
@@ -825,17 +830,17 @@ const Settings = () => {
     setCheckoutLoadingTier(tier);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      if (!session) throw new Error(m.ov_not_authenticated());
       const res = await fetch(functionCallUrl('create-checkout-session'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
         body: JSON.stringify({ workspaceId: workspace.id, plan: tier, billingCycle }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to create checkout session');
+      if (!res.ok) throw new Error(data.error || m.stl_checkout_failed());
       window.location.href = data.url;
     } catch (err: any) {
-      showToast(err.message || 'Failed to start checkout', 'error');
+      showToast(err.message || m.stl_start_failed(), 'error');
       setCheckoutLoadingTier(null);
     }
   };
@@ -844,17 +849,17 @@ const Settings = () => {
     setIsPortalLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      if (!session) throw new Error(m.ov_not_authenticated());
       const res = await fetch(functionCallUrl('create-portal-session'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
         body: JSON.stringify({ workspaceId: workspace.id }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to open billing portal');
+      if (!res.ok) throw new Error(data.error || m.ov_portal_failed());
       window.location.href = data.url;
     } catch (err: any) {
-      showToast(err.message || 'Failed to open billing portal', 'error');
+      showToast(err.message || m.ov_portal_failed(), 'error');
       setIsPortalLoading(false);
     }
   };
@@ -885,7 +890,7 @@ const Settings = () => {
   const addOrModel = () => {
     const id = newOrModelId.trim();
     if (!id) return;
-    if (!id.includes('/')) { showToast('OpenRouter model ids look like "vendor/model".', 'error'); return; }
+    if (!id.includes('/')) { showToast(m.stk_or_format(), 'error'); return; }
     if (!workspace.openrouterModels.includes(id)) {
       updateWorkspace({ openrouterModels: [...workspace.openrouterModels, id] });
     }
@@ -895,7 +900,7 @@ const Settings = () => {
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail) {
-      showToast("Email address is required", "error");
+      showToast(m.stp_email_required(), "error");
       return;
     }
     setIsInviteSending(true);
@@ -910,7 +915,7 @@ const Settings = () => {
 
   const handleUpdateProfile = async () => {
     if (passwords.new && passwords.new !== passwords.confirm) {
-      showToast("Passwords do not match", "error");
+      showToast(m.stp_passwords_mismatch(), "error");
       return;
     }
 
@@ -936,29 +941,36 @@ const Settings = () => {
       );
       setProfileEmail(currentUser.email);
       if (error) {
-        showToast(error.message || 'Could not start the email change', 'error');
+        showToast(authErrorText(error) || m.stp_email_change_failed(), 'error');
       } else {
-        showToast(`Confirm the change in both inboxes — ${currentUser.email} and ${newEmail}. Your sign-in email changes once both are confirmed.`, 'info');
+        showToast(m.stp_email_change_sent({ old: currentUser.email, new: newEmail }), 'info');
       }
     }
 
     if (passwords.new) {
-      await supabase.auth.updateUser({ password: passwords.new });
+      // SQEM-608 — the result used to be ignored: a password GoTrue refused (too weak, same as before)
+      // was reported as "Profile updated". Now the refusal is shown, in the user's language, and the
+      // fields keep their values so the person can correct them.
+      const { error } = await supabase.auth.updateUser({ password: passwords.new });
+      if (error) {
+        showToast(authErrorText(error), 'error');
+        return;
+      }
       setPasswords({ new: '', confirm: '' });
     }
 
     setProfileDirty(false);
     // The email toast above says more than "updated" — and "updated" would be untrue for the email.
-    if (!emailChangeRequested) showToast("Profile updated successfully", "success");
+    if (!emailChangeRequested) showToast(m.stp_saved(), "success");
   };
 
   const handleLogout = () => {
     setConfirmDialog({
-      title: 'Sign out',
-      message: 'Are you sure you want to sign out?',
+      title: m.stp_signout_title(),
+      message: m.stp_signout_body(),
       onConfirm: async () => {
         await supabase.auth.signOut();
-        showToast('Signed out successfully', 'info');
+        showToast(m.stp_signed_out(), 'info');
       },
     });
   };
@@ -984,9 +996,9 @@ const Settings = () => {
     try {
       const blob = await buildAccountExport(workspace, currentUser, p => setExportStep(p.step));
       downloadBlob(blob, accountExportFilename(workspace.name));
-      showToast('Your data has been downloaded.', 'success');
+      showToast(m.stp_export_done(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Could not build the export. Please try again.', 'error');
+      showToast(err.message || m.stp_export_failed(), 'error');
     } finally {
       setExporting(false);
       setExportStep('');
@@ -1015,7 +1027,7 @@ const Settings = () => {
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto min-h-screen">
       {/* SQEM-554 (d1) — the page head every other page has (display face). */}
-      <PageHeader title="Workspace Settings" subtitle="Manage your workspace preferences and team" />
+      <PageHeader title={m.st_title()} subtitle={m.st_subtitle()} />
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Sidebar Navigation — sticky on md+ (SQEM-147). Sticky must live on this wrapper flex-item,
@@ -1027,7 +1039,7 @@ const Settings = () => {
               to say there was more. Two things answer that now: the active tab is always scrolled into
               view, and the row ends in a half-visible tab, which says there is more. */}
           <div ref={mobileTabsRef} className="lg:hidden overflow-x-auto -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div role="group" aria-label="Settings sections" className="flex gap-1 w-max bg-surface-sunken rounded-xl p-1">
+            <div role="group" aria-label={m.st_sections()} className="flex gap-1 w-max bg-surface-sunken rounded-xl p-1">
               {visibleTabs.map(tab => (
                 <button
                   key={tab.id}
@@ -1071,11 +1083,11 @@ const Settings = () => {
           {activeTab === 'general' && can(currentUser, workspace, 'settings:general') && (
             <div className="space-y-6 animate-fade-in">
               <Card className="p-6 md:p-8">
-                <SettingsCardHeader title="Workspace Details" />
+                <SettingsCardHeader title={m.stg_details()} />
                 <div className="space-y-6">
                   {can(currentUser, workspace, 'team:manage') && (
                     <div>
-                      <label htmlFor="settings-workspace-name" className={SETTINGS_FIELD_LABEL}>Workspace Name</label>
+                      <label htmlFor="settings-workspace-name" className={SETTINGS_FIELD_LABEL}>{m.stg_name()}</label>
                       <div className="flex gap-2">
                         <Input id="settings-workspace-name"
                           className="flex-1 !w-auto min-w-0"
@@ -1087,7 +1099,7 @@ const Settings = () => {
                           disabled={!wsNameDirty || !wsName.trim()}
                           className="px-5"
                         >
-                          <Save className="w-4 h-4" /> Save
+                          <Save className="w-4 h-4" /> {m.st_save()}
                         </Button>
                       </div>
                     </div>
@@ -1097,8 +1109,8 @@ const Settings = () => {
                       <div className="flex items-center gap-3">
                         <Shield className="w-5 h-5 text-accent" />
                         <div>
-                          <p id="settings-managed-label" className="text-sm font-bold text-ink-strong">Managed Workspace</p>
-                          <p id="settings-managed-hint" className="text-xs text-accent mt-0.5">Unlimited seats, no plan restrictions</p>
+                          <p id="settings-managed-label" className="text-sm font-bold text-ink-strong">{m.stg_managed()}</p>
+                          <p id="settings-managed-hint" className="text-xs text-accent mt-0.5">{m.stg_managed_hint()}</p>
                         </div>
                       </div>
                       {/* SQEM-554 (d1) — the shared Switch (SQEM-545) instead of a hand-built one: same
@@ -1113,16 +1125,16 @@ const Settings = () => {
                   )}
 
                   <div>
-                    <label htmlFor="settings-workspace-tags" className={SETTINGS_FIELD_LABEL}>Workspace Tags</label>
+                    <label htmlFor="settings-workspace-tags" className={SETTINGS_FIELD_LABEL}>{m.stg_tags()}</label>
                     <div className="flex gap-2 mb-3">
                       <Input id="settings-workspace-tags"
                         className="flex-1 !w-auto min-w-0"
-                        placeholder="Add a tag…"
+                        placeholder={m.stg_add_tag_placeholder()}
                         value={newTag}
                         onChange={e => setNewTag(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleAddTag()}
                       />
-                      <Button variant="secondary" onClick={handleAddTag} aria-label="Add tag" className="px-4">
+                      <Button variant="secondary" onClick={handleAddTag} aria-label={m.tag_add()} className="px-4">
                         <Plus className="w-5 h-5" />
                       </Button>
                     </div>
@@ -1130,13 +1142,26 @@ const Settings = () => {
                       {workspace.tags.map(tag => (
                         <span key={tag} className="inline-flex items-center gap-1 px-3 py-1 bg-surface-sunken text-ink rounded-lg text-sm font-medium">
                           {tag}
-                          <button onClick={() => removeTag(tag)} aria-label={`Remove tag ${tag}`} className="p-0.5 hover:text-danger rounded-full transition-colors"><X className="w-3 h-3" /></button>
+                          <button onClick={() => removeTag(tag)} aria-label={m.stg_remove_tag({ tag })} className="p-0.5 hover:text-danger rounded-full transition-colors"><X className="w-3 h-3" /></button>
                         </span>
                       ))}
                     </div>
                   </div>
                 </div>
               </Card>
+
+              {/* SQEM-600 — the workspace's default language. Admins only, enforced twice: hidden here for
+                  everyone else, and guard_workspace_language keeps the old value for any other writer.
+                  Until German shipped (GERMAN_RELEASED, SQEM-613), only sqemes admins saw it at all. */}
+              {canChooseLanguage(isSqemesAdmin) && can(currentUser, workspace, 'team:manage') && (
+                <LanguageCard
+                  title={m.settings_language_workspace_title()}
+                  description={m.settings_language_workspace_description()}
+                  value={workspace.language ?? 'en'}
+                  options={WORKSPACE_LANGUAGE_OPTIONS}
+                  onSave={async language => { await updateWorkspace({ language }); }}
+                />
+              )}
 
               {/* SQEM-311 — which model does the writing. Deliberately NOT gated on Cloud: self-host is
                   BYOK-only, so there is no funded fallback there and the choice matters more, not less. */}
@@ -1155,24 +1180,24 @@ const Settings = () => {
                 <Card className="p-6 md:p-8">
                   <SettingsCardHeader
                     className="mb-4"
-                    title="Marketplace Publisher"
+                    title={m.stg_pub_title()}
                     description={<>
-                      A publisher token lets this instance <span className="font-semibold">submit</span> playbooks to the sqemes community marketplace (browsing + copying works without one). It&apos;s stored encrypted and never shown again.{' '}
-                      <a href="https://sqemes.com/publisher" target="_blank" rel="noopener noreferrer" className="text-accent font-semibold hover:underline">Apply for a publisher key →</a>
+                      {m.stg_pub_desc_1()} <span className="font-semibold">{m.stg_pub_desc_submit()}</span> {m.stg_pub_desc_2()}{' '}
+                      <a href="https://sqemes.com/publisher" target="_blank" rel="noopener noreferrer" className="text-accent font-semibold hover:underline">{m.stg_pub_apply()}</a>
                     </>}
                   />
                   <div className="mb-2">
                     <span className={`text-xs font-bold px-2 py-1 rounded-lg ${pubConfigured ? 'bg-success-soft text-success' : 'bg-surface-sunken text-ink-muted'}`}>
-                      {pubConfigured ? 'Configured' : 'Not configured'}
+                      {pubConfigured ? m.stg_pub_configured() : m.stg_pub_not_configured()}
                     </span>
                   </div>
                   <div className="flex gap-2">
                     <Input
                       type="password"
-                      aria-label="Publisher token"
+                      aria-label={m.stg_pub_token()}
                       value={pubToken}
                       onChange={e => setPubToken(e.target.value)}
-                      placeholder={pubConfigured ? 'Enter a new token to replace it…' : 'smp_…'}
+                      placeholder={pubConfigured ? m.stg_pub_replace() : 'smp_…'}
                       autoComplete="off"
                       className="flex-1 !w-auto min-w-0 font-mono"
                     />
@@ -1181,12 +1206,12 @@ const Settings = () => {
                       disabled={pubSaving || !pubToken.trim()}
                       className="px-5"
                     >
-                      {pubSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
+                      {pubSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} {m.st_save()}
                     </Button>
                   </div>
                   {pubConfigured && (
                     <button onClick={() => savePublisherToken('')} disabled={pubSaving} className="mt-3 text-xs font-semibold text-danger hover:underline disabled:opacity-50">
-                      Clear token
+                      {m.stg_pub_clear()}
                     </button>
                   )}
                 </Card>
@@ -1201,25 +1226,25 @@ const Settings = () => {
               {/* SQEM-121 — self-host is a single-instance deployment: no deleting the workspace */}
               {!IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
                 <div className="bg-danger-soft rounded-card border border-danger/30 p-6 md:p-8">
-                  <SettingsCardHeader tone="danger" title="Danger Zone" description="Permanently delete this workspace and all associated data. This action cannot be undone." />
+                  <SettingsCardHeader tone="danger" title={m.stg_danger()} description={m.stg_danger_desc()} />
                   <button
                     onClick={() => setConfirmDialog({
-                      title: `Delete workspace "${workspace.name}"?`,
+                      title: m.stg_delete_title({ name: workspace.name }),
                       // SQEM-213 — the subscription part belongs in the dialog, not in the small
                       // print afterwards: this is the moment the money decision is actually made.
                       // Keyed on the subscription id, not `hasActiveSubscription` — that is also
                       // true for managed workspaces, which have no Stripe subscription to cancel.
                       message: workspace.stripeSubscriptionId
-                        ? 'This will permanently delete all playbooks, personas, files, chats and members. The subscription is cancelled immediately — the rest of the paid period is not refunded. This action cannot be undone.'
-                        : 'This will permanently delete all playbooks, personas, files, chats and members. This action cannot be undone.',
+                        ? m.stg_delete_body_sub()
+                        : m.stg_delete_body(),
                       // SQEM-539 — typed, because this one cannot be undone at any scale; a playbook is not.
                       confirmText: workspace.name,
-                      confirmLabel: 'Delete workspace',
+                      confirmLabel: m.stg_delete_confirm(),
                       onConfirm: async () => { await deleteWorkspace(workspace.id); navigate('/'); },
                     })}
                     className="px-4 py-2 bg-surface-raised border border-danger/40 text-danger font-bold text-sm rounded-control hover:bg-danger hover:text-surface-raised hover:border-danger transition-all shadow-sm"
                   >
-                    Delete Workspace
+                    {m.stg_delete_button()}
                   </button>
                 </div>
               )}
@@ -1244,10 +1269,10 @@ const Settings = () => {
                       who may use them. Who may use a template is chosen in the template itself, by
                       name; a workspace-wide list of people would be a second place to maintain the
                       same thing and would drift from the first. */}
-                  <SettingsCardHeader title="Playbook Access" description="How newly-created playbooks start. Who may use one is chosen in the playbook itself." />
+                  <SettingsCardHeader title={m.sts_access_title()} description={m.sts_access_desc()} />
                   <TemplateAccessControl
-                    label="Default for new playbooks"
-                    hint="Applies to playbooks created after this is saved"
+                    label={m.sts_access_label()}
+                    hint={m.sts_access_hint()}
                     value={accessDraft ?? workspaceDefaultToValue(workspace.defaultTemplateAccess ?? [])}
                     onChange={v => {
                       const same = sameRoles(valueToWorkspaceDefault(v), workspace.defaultTemplateAccess ?? []);
@@ -1270,17 +1295,17 @@ const Settings = () => {
                   change it — this card is the one place it is chosen, not the place it is enforced. */}
               {!IS_SELF_HOSTED && isMultiSeat(workspace) && can(currentUser, workspace, 'team:manage') && (
                 <Card className="p-6 md:p-8">
-                  <SettingsCardHeader title="Who can edit new playbooks and personas" description="How newly-created ones start. Who may change one is chosen in the playbook or persona itself, under “Who can edit”. Applies to ones created after this is saved, also over MCP." />
-                  <div role="radiogroup" aria-label="Who can edit new playbooks and personas" className="space-y-3">
+                  <SettingsCardHeader title={m.sts_edit_title()} description={m.sts_edit_desc()} />
+                  <div role="radiogroup" aria-label={m.sts_edit_title()} className="space-y-3">
                     {([
-                      [false, 'Anyone who may edit', 'Every admin, and every editor who can see it.'],
-                      [true, 'Only the creator and admins', 'Other editors can use it, and duplicate it into a copy of their own, but not change it.'],
+                      [false, m.sts_edit_anyone(), m.sts_edit_anyone_desc()],
+                      [true, m.sts_edit_creator(), m.sts_edit_creator_desc()],
                     ] as const).map(([value, label, description]) => {
                       const saved = workspace.defaultEditRestricted ?? false;
                       const selected = (editDraft ?? saved) === value;
                       return (
                         <button
-                          key={label}
+                          key={String(value)}
                           type="button"
                           role="radio"
                           aria-checked={selected}
@@ -1345,7 +1370,7 @@ const Settings = () => {
                   says what is missing leaves the actual rule unsaid. */}
               {IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
                 <Card className="p-6 md:p-8">
-                  <SettingsCardHeader icon={<Lock />} title="Playbook Access" description="Every playbook in this workspace is available to all of its members." />
+                  <SettingsCardHeader icon={<Lock />} title={m.sts_access_title()} description={m.sts_selfhost_desc()} />
                   {/* SQEM-554 (d2) — a plain accent surface instead of the brand gradient (C uses no gradients). */}
                   <div className="rounded-card border border-accent/20 bg-accent-soft p-6 text-center">
                     <div className="flex items-center justify-center gap-1.5 mb-4">
@@ -1355,10 +1380,9 @@ const Settings = () => {
                         </div>
                       ))}
                     </div>
-                    <h3 className="text-base font-bold text-ink-strong">Access control and groups</h3>
+                    <h3 className="text-base font-bold text-ink-strong">{m.sts_selfhost_title()}</h3>
                     <p className="text-sm text-ink-muted mt-1.5 max-w-md mx-auto">
-                      Decide per playbook who may see and use it: everyone, only you, or named people
-                      and groups that keep following your team as it changes. Available on sqemes Cloud.
+                      {m.sts_selfhost_body()}
                     </p>
                     <a
                       href="https://sqemes.com"
@@ -1366,7 +1390,7 @@ const Settings = () => {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-lg"
                     >
-                      Explore sqemes Cloud <ArrowUpRight className="w-4 h-4" />
+                      {m.sts_selfhost_cta()} <ArrowUpRight className="w-4 h-4" />
                     </a>
                   </div>
                 </Card>
@@ -1377,37 +1401,37 @@ const Settings = () => {
               <Card className="p-8">
                 <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2 mb-6">
                   <ShieldAlert className="w-5 h-5 text-danger" />
-                  Content Governance
+                  {m.sts_governance()}
                 </h2>
                 <div className="mb-6">
-                  <label htmlFor="settings-blacklisted-terms" className={SETTINGS_FIELD_LABEL}>Blacklisted Terms</label>
+                  <label htmlFor="settings-blacklisted-terms" className={SETTINGS_FIELD_LABEL}>{m.sts_blacklist()}</label>
                   <div className="flex gap-3 max-w-xl mb-4">
-                     <input id="settings-blacklisted-terms"
-                       className="flex-1 p-3 bg-surface-field border border-line-strong text-ink-strong placeholder:text-ink-subtle rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
-                       placeholder="e.g. secret_project"
+                     <Input id="settings-blacklisted-terms"
+                       className="flex-1"
+                       placeholder={m.sts_blacklist_placeholder()}
                        value={blacklistedTerm}
                        onChange={e => setBlacklistedTerm(e.target.value)}
                        onKeyDown={e => e.key === 'Enter' && addTerm()}
                      />
-                     <button onClick={addTerm} className="px-6 bg-surface-sunken text-ink hover:bg-line-strong rounded-xl text-sm font-bold transition-colors">Add</button>
+                     <button onClick={addTerm} className="px-6 bg-surface-sunken text-ink hover:bg-line-strong rounded-xl text-sm font-bold transition-colors">{m.sts_add()}</button>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {workspace.blacklistedTerms.map(term => (
                       <span key={term} className="bg-danger-soft text-danger border border-danger/20 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2">
                         {term}
-                        <button onClick={() => removeTerm(term)} aria-label={`Remove ${term}`} className="hover:opacity-70"><X className="w-3 h-3" /></button>
+                        <button onClick={() => removeTerm(term)} aria-label={m.sts_remove_term({ term })} className="hover:opacity-70"><X className="w-3 h-3" /></button>
                       </span>
                     ))}
-                    {workspace.blacklistedTerms.length === 0 && <span className="text-sm text-ink-subtle italic">No restricted terms added.</span>}
+                    {workspace.blacklistedTerms.length === 0 && <span className="text-sm text-ink-subtle italic">{m.sts_no_terms()}</span>}
                   </div>
                 </div>
 
                 <div className="border-t border-line pt-6 space-y-4">
-                  <p className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-4">PII Blocking</p>
+                  <p className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-4">{m.sts_pii()}</p>
                   {([
-                    { key: 'blockEmails', label: 'Email Addresses', description: 'Block submissions containing email addresses' },
-                    { key: 'blockIban',   label: 'IBAN Numbers',    description: 'Block submissions containing IBAN bank account numbers' },
-                    { key: 'blockPhone',  label: 'Telephone Numbers', description: 'Block submissions containing phone numbers' },
+                    { key: 'blockEmails', label: m.sts_pii_email(), description: m.sts_pii_email_desc() },
+                    { key: 'blockIban',   label: m.sts_pii_iban(),  description: m.sts_pii_iban_desc() },
+                    { key: 'blockPhone',  label: m.sts_pii_phone(), description: m.sts_pii_phone_desc() },
                   ] as const).map(({ key, label, description }) => (
                     <div key={key} className="flex items-center justify-between max-w-xl">
                       <div>
@@ -1446,11 +1470,11 @@ const Settings = () => {
               {!IS_SELF_HOSTED && (
               <Card className="p-6 md:p-8">
                 <SettingsCardHeader
-                  title="Brand Profile"
-                  description="Captured during onboarding. Used to tailor AI generation and to adapt marketplace playbooks to your brand."
+                  title={m.stb_title()}
+                  description={m.stb_desc()}
                   actions={
                     <Button onClick={handleSaveBrand} disabled={!bpDirty} className="px-5">
-                      <Save className="w-4 h-4" /> Save
+                      <Save className="w-4 h-4" /> {m.st_save()}
                     </Button>
                   }
                 />
@@ -1467,7 +1491,7 @@ const Settings = () => {
                 canEdit={can(currentUser, workspace, 'team:manage')}
                 onSave={async (style) => {
                   await updateWorkspace({ documentStyle: style });
-                  showToast('Document style saved', 'success');
+                  showToast(m.stb_doc_saved(), 'success');
                 }}
               />
             </div>
@@ -1478,13 +1502,13 @@ const Settings = () => {
             <Card overflow className="animate-fade-in">
               <div className="p-6 md:p-8 border-b border-line flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h2 className="font-display text-xl font-semibold text-ink-strong">Team Members</h2>
+                  <h2 className="font-display text-xl font-semibold text-ink-strong">{m.st_tab_team()}</h2>
                   <p className="text-sm text-ink-muted mt-1">
-                    {memberCount} active member{memberCount === 1 ? '' : 's'}{(workspace.isManaged || IS_SELF_HOSTED) ? ' · Unlimited seats' : ` of ${memberLimit} seats`}
+                    {m.stt_active_members({ count: memberCount })}{(workspace.isManaged || IS_SELF_HOSTED) ? m.stt_unlimited_seats() : m.stt_of_seats({ limit: memberLimit })}
                   </p>
                   {storageUsage && (
                     <p className="text-sm text-ink-muted mt-0.5" data-testid="storage-usage">
-                      Storage: {fmtBytes(storageUsage.used)}{storageUsage.limit == null ? ' · unlimited' : ` of ${fmtBytes(storageUsage.limit)}`}
+                      {m.stt_storage({ used: fmtBytes(storageUsage.used) })}{storageUsage.limit == null ? m.stt_storage_unlimited() : m.stt_storage_of({ limit: fmtBytes(storageUsage.limit) })}
                     </p>
                   )}
                 </div>
@@ -1493,14 +1517,14 @@ const Settings = () => {
                      onClick={() => requestTab('plans')}
                      className="flex items-center gap-2 bg-warning hover:opacity-90 text-white px-4 py-2 rounded-control font-medium text-sm transition-all shadow-raised w-full md:w-auto justify-center"
                    >
-                     <Zap className="w-4 h-4" /> Upgrade to Invite
+                     <Zap className="w-4 h-4" /> {m.stt_upgrade_invite()}
                    </button>
                 ) : (
                    <Button
                      onClick={() => setIsInviteModalOpen(true)}
                      className="shadow-lg w-full md:w-auto justify-center"
                    >
-                     <Mail className="w-4 h-4" /> Invite Member
+                     <Mail className="w-4 h-4" /> {m.stt_invite()}
                    </Button>
                 ))}
               </div>
@@ -1509,9 +1533,9 @@ const Settings = () => {
                 <table className="w-full text-left text-sm min-w-[600px]">
                   <thead className="bg-surface-sunken text-ink-muted font-medium border-b border-line">
                     <tr>
-                      <th className="px-6 py-4 w-1/2">User</th>
-                      <th className="px-6 py-4">Role</th>
-                      {can(currentUser, workspace, 'team:manage') && <th className="px-6 py-4 text-right">Actions</th>}
+                      <th className="px-6 py-4 w-1/2">{m.stt_col_user()}</th>
+                      <th className="px-6 py-4">{m.stt_col_role()}</th>
+                      {can(currentUser, workspace, 'team:manage') && <th className="px-6 py-4 text-right">{m.stt_col_actions()}</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
@@ -1535,12 +1559,12 @@ const Settings = () => {
                               disabled={member.id === currentUser.id}
                             >
                               {(Object.keys(ROLE_LABELS) as UserRole[]).map(r => (
-                                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                                <option key={r} value={r}>{roleLabel(r)}</option>
                               ))}
                             </select>
                           ) : (
                             <span className="text-xs font-bold uppercase tracking-wider text-ink-muted bg-surface-sunken px-2.5 py-1 rounded-lg">
-                              {member.role}
+                              {roleLabel(member.role)}
                             </span>
                           )}
                         </td>
@@ -1548,8 +1572,8 @@ const Settings = () => {
                           {can(currentUser, workspace, 'team:manage') && member.id !== currentUser.id && (
                             <button
                               onClick={() => setConfirmDialog({
-                                title: `Remove ${member.name}?`,
-                                message: `${member.name} will lose access to this workspace immediately.`,
+                                title: m.stt_remove_title({ name: member.name }),
+                                message: m.stt_remove_body({ name: member.name }),
                                 onConfirm: () => removeMember(member.id),
                               })}
                               className="text-ink-subtle hover:text-danger p-2 hover:bg-danger-soft rounded-lg transition-colors"
@@ -1571,17 +1595,17 @@ const Settings = () => {
                 <div className="p-6 md:p-8 border-b border-line">
                   <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
                     <Clock className="w-5 h-5 text-warning" />
-                    Pending Invitations ({pendingInvitations.length})
+                    {m.stt_pending({ count: pendingInvitations.length })}
                   </h2>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm min-w-[600px]">
                     <thead className="bg-surface-sunken text-ink-muted font-medium border-b border-line">
                       <tr>
-                        <th className="px-6 py-4 w-1/2">Email</th>
-                        <th className="px-6 py-4">Role</th>
-                        <th className="px-6 py-4">Expires</th>
-                        <th className="px-6 py-4 text-right">Actions</th>
+                        <th className="px-6 py-4 w-1/2">{m.stt_col_email()}</th>
+                        <th className="px-6 py-4">{m.stt_col_role()}</th>
+                        <th className="px-6 py-4">{m.stt_col_expires()}</th>
+                        <th className="px-6 py-4 text-right">{m.stt_col_actions()}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line">
@@ -1597,11 +1621,11 @@ const Settings = () => {
                           </td>
                           <td className="px-6 py-4">
                             <span className="text-xs font-bold uppercase tracking-wider text-ink-muted bg-surface-sunken px-2.5 py-1 rounded-lg">
-                              {inv.role}
+                              {roleLabel(inv.role)}
                             </span>
                           </td>
                           <td className="px-6 py-4 text-ink-muted text-sm">
-                            {new Date(inv.expiresAt).toLocaleDateString()}
+                            {new Date(inv.expiresAt).toLocaleDateString(getLocale())}
                           </td>
                           <td className="px-6 py-4 text-right">
                             {can(currentUser, workspace, 'team:manage') && (
@@ -1611,13 +1635,13 @@ const Settings = () => {
                                     // SQEM-112 — share the invite link directly (esp. when email delivery fails).
                                     const link = `${window.location.origin}/#/invite/${inv.token}?email=${encodeURIComponent(inv.email)}`;
                                     const ok = await copyToClipboard(link);
-                                    showToast(ok ? 'Invite link copied' : 'Could not copy link', ok ? 'success' : 'error');
+                                    showToast(ok ? m.stt_link_copied() : m.stt_link_copy_failed(), ok ? 'success' : 'error');
                                   }}
                                   className="flex items-center gap-1.5 whitespace-nowrap shrink-0 text-ink-muted hover:text-accent px-2.5 py-1.5 hover:bg-accent-soft rounded-lg transition-colors text-xs font-medium"
-                                  title="Copy invite link"
+                                  title={m.stt_copy_link_title()}
                                 >
                                   <Copy className="w-3.5 h-3.5" />
-                                  Copy link
+                                  {m.stt_copy_link()}
                                 </button>
                                 <button
                                   onClick={async () => {
@@ -1627,19 +1651,19 @@ const Settings = () => {
                                   }}
                                   disabled={resendingIds.has(inv.id)}
                                   className="flex items-center gap-1.5 text-ink-muted hover:text-accent px-2.5 py-1.5 hover:bg-accent-soft rounded-lg transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                  title="Resend invitation"
+                                  title={m.stt_resend_title()}
                                 >
                                   <RotateCw className={`w-3.5 h-3.5 ${resendingIds.has(inv.id) ? 'animate-spin' : ''}`} />
-                                  Resend
+                                  {m.stt_resend()}
                                 </button>
                                 <button
                                   onClick={() => setConfirmDialog({
-                                    title: 'Cancel invitation?',
-                                    message: `The invitation for ${inv.email} will be cancelled and the link will stop working.`,
+                                    title: m.stt_cancel_inv_title(),
+                                    message: m.stt_cancel_inv_body({ email: inv.email }),
                                     onConfirm: () => cancelInvitation(inv.id),
                                   })}
                                   className="text-ink-subtle hover:text-danger p-2 hover:bg-danger-soft rounded-lg transition-colors"
-                                  title="Cancel invitation"
+                                  title={m.stt_cancel_inv()}
                                 >
                                   <X className="w-4 h-4" />
                                 </button>
@@ -1664,26 +1688,26 @@ const Settings = () => {
                   <div className="w-16 h-16 bg-accent-soft rounded-2xl flex items-center justify-center mb-4">
                     <Shield className="w-8 h-8 text-accent" />
                   </div>
-                  <h2 className="font-display text-xl font-semibold text-ink-strong mb-2">Managed Workspace</h2>
+                  <h2 className="font-display text-xl font-semibold text-ink-strong mb-2">{m.stg_managed()}</h2>
                   <p className="text-sm text-ink-muted max-w-sm">
-                    This workspace is managed by sqemes. You have unlimited seats and full access to all features — no subscription required.
+                    {m.stl_managed_body()}
                   </p>
                   <div className="mt-6 flex gap-6 text-center">
                     <div className="bg-accent-soft border border-accent/20 rounded-xl px-6 py-4">
                       <p className="text-2xl font-bold text-accent">∞</p>
-                      <p className="text-xs text-ink-muted mt-1 font-medium">Team Members</p>
+                      <p className="text-xs text-ink-muted mt-1 font-medium">{m.st_tab_team()}</p>
                     </div>
                     <div className="bg-accent-soft border border-accent/20 rounded-xl px-6 py-4">
-                      <p className="text-2xl font-bold text-accent">€0</p>
-                      <p className="text-xs text-ink-muted mt-1 font-medium">Monthly Cost</p>
+                      <p className="text-2xl font-bold text-accent">{formatEuro(0)}</p>
+                      <p className="text-xs text-ink-muted mt-1 font-medium">{m.stl_monthly_cost()}</p>
                     </div>
                   </div>
                 </div>
               ) : (<>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                  <div>
-                    <h2 className="font-display text-xl font-semibold text-ink-strong">Subscription Plan</h2>
-                    <p className="text-sm text-ink-muted mt-1">Current Plan: <span className="font-bold text-accent">{workspace.plan}</span></p>
+                    <h2 className="font-display text-xl font-semibold text-ink-strong">{m.stl_title()}</h2>
+                    <p className="text-sm text-ink-muted mt-1">{m.stl_current()} <span className="font-bold text-accent">{workspace.plan}</span></p>
                  </div>
 
                  {/* Only show billing cycle toggle for Solo — paid users manage billing via portal */}
@@ -1693,14 +1717,14 @@ const Settings = () => {
                           onClick={() => setBillingCycle('monthly')}
                           className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-surface-raised shadow-sm text-ink-strong' : 'text-ink-muted hover:text-ink-strong'}`}
                       >
-                          Monthly
+                          {m.stl_monthly()}
                       </button>
                       <button
                           onClick={() => setBillingCycle('yearly')}
                           className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-surface-raised shadow-sm text-ink-strong' : 'text-ink-muted hover:text-ink-strong'}`}
                       >
-                          Yearly
-                          <span className="text-2xs bg-success-soft text-ink-strong px-1.5 py-0.5 rounded-md uppercase tracking-wide hidden sm:inline-block">Save 20%</span>
+                          {m.stl_yearly()}
+                          <span className="text-2xs bg-success-soft text-ink-strong px-1.5 py-0.5 rounded-md uppercase tracking-wide hidden sm:inline-block">{m.stl_save20()}</span>
                       </button>
                    </div>
                  )}
@@ -1714,13 +1738,15 @@ const Settings = () => {
                   // tier changes go through the Stripe portal.
                   const canSubscribe = !hasActiveSub;
 
-                  let displayPrice = PLANS[tier].price;
-                  let billingText = 'Billed monthly';
+                  // SQEM-609 — the amounts come from constants (display only — Stripe charges), the format
+                  // from the app language: "€12/mo" in English, "12 €/Monat" in German.
+                  let displayPrice = planMonthly(planMonthlyAmount(PLANS[tier].price));
+                  let billingText = m.stl_billed_monthly();
 
                   if (billingCycle === 'yearly') {
                     const yearlyMonthly = PLANS[tier].priceYearly;
-                    displayPrice = `€${yearlyMonthly}/mo`;
-                    billingText = `Billed €${yearlyMonthly * 12} yearly`;
+                    displayPrice = planMonthly(yearlyMonthly);
+                    billingText = m.stl_billed_yearly({ amount: formatEuro(yearlyMonthly * 12) });
                   }
 
                   const isLoading = checkoutLoadingTier === tier;
@@ -1738,25 +1764,25 @@ const Settings = () => {
                     >
                       {isActivePlan && (
                         <span className="absolute top-3 right-3 text-2xs font-bold uppercase tracking-wider text-accent bg-surface-raised border border-accent/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <Check className="w-2.5 h-2.5" /> {isTrialing(workspace) ? 'Trial' : 'Active'}
+                          <Check className="w-2.5 h-2.5" /> {isTrialing(workspace) ? m.stl_trial_badge() : m.stl_active()}
                         </span>
                       )}
 
                       <h3 className="font-bold text-lg text-ink-strong">{tier}</h3>
-                      <p className="text-xs mt-0.5 mb-4 text-ink-muted">{PLANS[tier].tagline}</p>
+                      <p className="text-xs mt-0.5 mb-4 text-ink-muted">{planTagline(tier, PLANS[tier].tagline)}</p>
 
                       <div className="mb-6">
                         <p className="text-3xl font-bold text-ink-strong">{displayPrice}</p>
                         <p className="text-xs text-ink-muted font-medium mt-1">{billingText}</p>
-                        {/* SQEM-283 — see VAT_NOTE: the Terms promise consumers a shown price includes VAT. */}
-                        <p className="text-2xs text-ink-subtle mt-1">{VAT_NOTE}</p>
+                        {/* SQEM-283 — see VAT_NOTE: the Terms promise consumers a shown price includes VAT. SQEM-609: the text is stl_vat, held equal to VAT_NOTE by planLabels.test.ts. */}
+                        <p className="text-2xs text-ink-subtle mt-1">{m.stl_vat()}</p>
                       </div>
 
                       <ul className="space-y-2.5 text-sm flex-1 text-ink">
                         {PLANS[tier].features.map(feature => (
                           <li key={feature} className="flex items-center gap-2.5">
                             <Check className={`w-3.5 h-3.5 shrink-0 ${isActivePlan ? 'text-accent' : 'text-ink-subtle'}`} />
-                            {feature}
+                            {planFeature(feature)}
                           </li>
                         ))}
                       </ul>
@@ -1780,7 +1806,7 @@ const Settings = () => {
                         }`}
                       >
                         {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                        {isActivePlan ? 'Current Plan' : canSubscribe ? (isLoading ? 'Redirecting...' : `Start ${TRIAL_DAYS}-day trial`) : 'Change in billing portal'}
+                        {isActivePlan ? m.stl_current_plan() : canSubscribe ? (isLoading ? m.stl_redirecting() : m.stl_start_trial({ days: TRIAL_DAYS })) : m.stl_change_portal()}
                       </button>
                     </div>
                   );
@@ -1789,15 +1815,15 @@ const Settings = () => {
                 {/* SQEM-095 — Enterprise: not a Stripe plan; contact-sales card linking out. */}
                 <div className="relative p-6 rounded-2xl border transition-all flex flex-col border-line-strong bg-surface-raised hover:border-accent/50 hover:shadow-soft-lg">
                   <h3 className="font-bold text-lg text-ink-strong">Enterprise</h3>
-                  <p className="text-xs mt-0.5 mb-4 text-ink-muted">For organisations with custom needs</p>
+                  <p className="text-xs mt-0.5 mb-4 text-ink-muted">{m.stl_enterprise_tagline()}</p>
 
                   <div className="mb-6">
-                    <p className="text-3xl font-bold text-ink-strong">Let&apos;s talk</p>
-                    <p className="text-xs text-ink-muted font-medium mt-1">Custom pricing for your team</p>
+                    <p className="text-3xl font-bold text-ink-strong">{m.stl_lets_talk()}</p>
+                    <p className="text-xs text-ink-muted font-medium mt-1">{m.stl_custom_pricing()}</p>
                   </div>
 
                   <ul className="space-y-2.5 text-sm flex-1 text-ink">
-                    {['Everything in Business', '30+ team members', 'Custom AI credit volume', 'Dedicated support & SLA', 'Custom onboarding'].map(feature => (
+                    {[m.stl_ent_1(), m.stl_ent_2(), m.stl_ent_3(), m.stl_ent_4(), m.stl_ent_5()].map(feature => (
                       <li key={feature} className="flex items-center gap-2.5">
                         <Check className="w-3.5 h-3.5 shrink-0 text-ink-subtle" />
                         {feature}
@@ -1811,7 +1837,7 @@ const Settings = () => {
                     rel="noopener noreferrer"
                     className="w-full mt-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 bg-ink-strong text-surface-raised hover:opacity-90"
                   >
-                    Talk to us <ExternalLink className="w-4 h-4" />
+                    {m.stl_talk()} <ExternalLink className="w-4 h-4" />
                   </a>
                 </div>
               </div>
@@ -1820,8 +1846,8 @@ const Settings = () => {
               {hasActiveSub && !workspace.isManaged && (
                 <div className="mt-6 p-5 bg-surface-sunken border border-line-strong rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-bold text-ink-strong">Manage Subscription</p>
-                    <p className="text-xs text-ink-muted mt-0.5">Change plan, update payment method, cancel, or view invoices via the Stripe billing portal.</p>
+                    <p className="text-sm font-bold text-ink-strong">{m.stl_manage_sub()}</p>
+                    <p className="text-xs text-ink-muted mt-0.5">{m.stl_manage_sub_desc()}</p>
                   </div>
                   <button
                     onClick={handleManageSubscription}
@@ -1829,7 +1855,7 @@ const Settings = () => {
                     className="flex items-center gap-2 px-5 py-2.5 bg-ink-strong text-surface-raised text-sm font-bold rounded-xl hover:opacity-90 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                   >
                     {isPortalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
-                    {isPortalLoading ? 'Opening...' : 'Open Billing Portal'}
+                    {isPortalLoading ? m.stl_opening() : m.stl_open_portal()}
                   </button>
                 </div>
               )}
@@ -1861,17 +1887,17 @@ const Settings = () => {
                           for one thing — the Dashboard says "Provider keys", the setup wizard says
                           "AI provider key". Somebody sent here by the wizard arrived at a heading
                           that did not match what sent them. One name now, and it is the plain one. */}
-                      AI provider keys
+                      {m.sta_provider_title()}
                     </h2>
                     <p className="text-sm text-ink-muted mt-1">
-                      Your own keys for OpenAI, Anthropic, Google and others. Stored encrypted, used only for your requests.
+                      {m.sta_provider_desc()}
                     </p>
                   </div>
                   <Button onClick={handleSaveKeys} className="px-5 py-2 shadow-lg">
                     {/* SQEM-301 — "Save", and the label is no longer hidden on small screens. It
                         was `hidden sm:inline` because "Save Changes" did not fit; at four characters
                         it does, and an icon-only button had no accessible name at all. */}
-                    <Save className="w-4 h-4" /> Save
+                    <Save className="w-4 h-4" /> {m.st_save()}
                   </Button>
                 </div>
                 
@@ -1886,28 +1912,29 @@ const Settings = () => {
                         {provider.name}
                         {hasExistingKey && !localValue && (
                           <>
-                            <span className="text-2xs bg-success-soft text-ink-strong px-1.5 py-0.5 rounded-md font-bold">Configured</span>
+                            <span className="text-2xs bg-success-soft text-ink-strong px-1.5 py-0.5 rounded-md font-bold">{m.sta_configured()}</span>
                             <button
                               type="button"
                               onClick={() => setConfirmDialog({
-                                title: `Remove ${provider.name} key?`,
-                                message: `The saved ${provider.name} key will be deleted. You can re-enter it anytime.`,
+                                title: m.sta_remove_key_title({ provider: provider.name }),
+                                message: m.sta_remove_key_body({ provider: provider.name }),
                                 onConfirm: () => handleRemoveKey(provider.id),
                               })}
                               className="ml-auto text-2xs font-bold text-ink-subtle hover:text-danger normal-case transition-colors"
                             >
-                              Remove
+                              {m.sta_remove()}
                             </button>
                           </>
                         )}
                       </label>
                       <div className="relative">
-                         <input id={`provider-key-${provider.id}`}
+                         <Input id={`provider-key-${provider.id}`}
                            type={provider.id === 'ollama' ? "text" : "password"}
                            value={localValue}
                            onChange={(e) => setApiKeys({...apiKeys, [provider.id]: e.target.value})}
-                           placeholder={hasExistingKey ? '••••••••  (enter new key to replace)' : provider.placeholder}
-                           className={`w-full p-3 border rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all font-mono text-ink-strong placeholder:text-ink-subtle ${hasExistingKey && !localValue ? 'border-success/40 bg-success-soft' : 'border-line-strong bg-surface-field'}`}
+                           placeholder={hasExistingKey ? m.sta_replace_placeholder() : provider.placeholder}
+                           className="font-mono"
+                           tone={hasExistingKey && !localValue ? 'success' : 'default'}
                          />
                          {provider.id === 'ollama' && (
                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -1923,18 +1950,18 @@ const Settings = () => {
                                 rel="noopener noreferrer"
                                 className="text-2xs text-accent hover:opacity-80 font-bold hover:underline inline-flex items-center gap-1 group/link"
                               >
-                                Get API Key <ExternalLink className="w-3 h-3 transition-transform group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5" />
+                                {m.sta_get_key()} <ExternalLink className="w-3 h-3 transition-transform group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5" />
                               </a>
                           </div>
                       )}
                       {provider.id === 'ollama' && (
                         <p className="text-2xs text-ink-subtle mt-1.5 ml-1">
-                           Enter the Base URL (e.g. http://localhost:11434)
+                           {m.sta_ollama_hint()}
                         </p>
                       )}
                       {provider.id === 'openrouter' && (
                         <div className="mt-3 pt-3 border-t border-line">
-                          <p className="text-2xs font-bold text-ink-muted uppercase tracking-wider mb-2">Models</p>
+                          <p className="text-2xs font-bold text-ink-muted uppercase tracking-wider mb-2">{m.sta_models()}</p>
                           {workspace.openrouterModels.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 mb-2">
                               {workspace.openrouterModels.map(mid => (
@@ -1952,15 +1979,15 @@ const Settings = () => {
                               value={newOrModelId}
                               onChange={e => setNewOrModelId(e.target.value)}
                               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addOrModel(); } }}
-                              placeholder="vendor/model — e.g. anthropic/claude-3.7-sonnet"
+                              placeholder={m.sta_or_placeholder()}
                               className="flex-1 p-2 border border-line-strong bg-surface-field rounded-lg text-2xs font-mono outline-none focus:border-accent text-ink-strong placeholder:text-ink-subtle"
                             />
-                            <button type="button" onClick={addOrModel} className="px-3 py-2 bg-ink-strong text-surface-raised rounded-lg text-2xs font-bold shrink-0">Add</button>
+                            <button type="button" onClick={addOrModel} className="px-3 py-2 bg-ink-strong text-surface-raised rounded-lg text-2xs font-bold shrink-0">{m.sts_add()}</button>
                           </div>
                           <p className="text-2xs text-ink-subtle mt-1.5">
                             {/* SQEM-573 — no built-in OpenRouter models: only what is added here appears in the picker. */}
-                            Only the models you add here appear in the model picker (needs the key above).{' '}
-                            <a href="https://openrouter.ai/models" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Browse models</a>
+                            {m.sta_or_hint()}{' '}
+                            <a href="https://openrouter.ai/models" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{m.sta_browse_models()}</a>
                           </p>
                         </div>
                       )}
@@ -1986,68 +2013,68 @@ const Settings = () => {
                   <div>
                     <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
                       <Globe className="w-5 h-5 text-accent" />
-                      Web search
+                      {m.sta_search_title()}
                     </h2>
                     <p className="text-sm text-ink-muted mt-1">
                       {workspace.webSearchHosted
-                        ? 'Web search in Chat is included in your plan, with a monthly allowance. Add your own search key to use your own account instead — it always takes priority.'
-                        : 'Add a search key to switch on web search in Chat.'}
+                        ? m.sta_search_hosted()
+                        : m.sta_search_add()}
                     </p>
                   </div>
                   <Button onClick={handleSaveSearchKey} className="px-5 py-2 shadow-lg shrink-0">
-                    <Save className="w-4 h-4" /> Save
+                    <Save className="w-4 h-4" /> {m.st_save()}
                   </Button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-[12rem_1fr] gap-4 items-start">
                   <div>
-                    <label htmlFor="search-provider" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-2">Provider</label>
-                    <select
+                    <label htmlFor="search-provider" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-2">{m.sta_provider()}</label>
+                    <Select
                       id="search-provider"
                       value={searchProvider}
                       onChange={(e) => setSearchProvider(e.target.value as 'linkup' | 'brave')}
-                      className="w-full p-3 border border-line-strong bg-surface-field rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 text-ink-strong"
                     >
                       <option value="linkup">Linkup</option>
                       <option value="brave">Brave Search</option>
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label htmlFor="search-key" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-2 flex items-center gap-2">
-                      Key
+                      {m.sta_key()}
                       {configured && !searchKey && (
                         <>
-                          <span className="text-2xs bg-success-soft text-ink-strong px-1.5 py-0.5 rounded-md font-bold normal-case">{SEARCH[configured].name} configured</span>
+                          <span className="text-2xs bg-success-soft text-ink-strong px-1.5 py-0.5 rounded-md font-bold normal-case">{m.sta_search_configured({ name: SEARCH[configured].name })}</span>
                           <button
                             type="button"
                             onClick={() => setConfirmDialog({
-                              title: 'Remove the search key?',
+                              title: m.sta_search_remove_title(),
                               message: workspace.webSearchHosted
-                                ? 'Web search falls back to the included allowance.'
-                                : 'Web search in Chat stops working until a new key is added.',
+                                ? m.sta_search_remove_hosted()
+                                : m.sta_search_remove_stops(),
                               onConfirm: () => handleRemoveKey(`search_${configured}`),
                             })}
                             className="ml-auto text-2xs font-bold text-ink-subtle hover:text-danger normal-case transition-colors"
                           >
-                            Remove
+                            {m.sta_remove()}
                           </button>
                         </>
                       )}
                     </label>
-                    <input
+                    <Input
                       id="search-key"
                       type="password"
                       value={searchKey}
                       onChange={(e) => setSearchKey(e.target.value)}
-                      placeholder={configured ? '••••••••  (enter a new key to replace it)' : `${SEARCH[searchProvider].name} API key`}
-                      className={`w-full p-3 border rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all font-mono text-ink-strong placeholder:text-ink-subtle ${configured && !searchKey ? 'border-success/40 bg-success-soft' : 'border-line-strong bg-surface-field'}`}
+                      placeholder={configured ? m.sta_search_replace() : m.sta_search_key_placeholder({ name: SEARCH[searchProvider].name })}
+                      className="font-mono"
+                      tone={configured && !searchKey ? 'success' : 'default'}
                     />
                     <div className="mt-1.5 ml-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                       <a href={SEARCH[searchProvider].link} target="_blank" rel="noopener noreferrer" className="text-2xs text-accent hover:opacity-80 font-bold hover:underline inline-flex items-center gap-1">
-                        Get API Key <ExternalLink className="w-3 h-3" />
+                        {m.sta_get_key()} <ExternalLink className="w-3 h-3" />
                       </a>
                       <span className="text-2xs text-ink-subtle">
-                        One search key per workspace — saving a key for one provider removes the other.
-                        {searchProvider === 'brave' && ' With your own Brave key, Brave’s terms apply between your workspace and Brave.'}
+                        {m.sta_search_one()}
+                        {searchProvider === 'brave' && m.sta_brave_terms()}
                       </span>
                     </div>
                   </div>
@@ -2062,27 +2089,27 @@ const Settings = () => {
                   <div>
                     <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
                       <Zap className="w-5 h-5 text-accent" />
-                      Public API Keys
+                      {m.sta_public_title()}
                     </h2>
                     <p className="text-sm text-ink-muted mt-1">
-                      Generate keys to access your playbooks via the API or MCP clients.
+                      {m.sta_public_desc()}
                     </p>
                   </div>
                   <button
                     onClick={() => { setNewKeyName(''); setNewKeyScope(defaultScopeFor(canWriteContent)); setShowGenerateKeyModal(true); }}
                     disabled={!hasMcpAccess}
-                    title={!hasMcpAccess ? 'Upgrade to Team or Business to generate MCP keys' : undefined}
+                    title={!hasMcpAccess ? m.sta_upgrade_for_keys() : undefined}
                     className="flex items-center gap-2 px-4 py-2 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                   >
-                    <Plus className="w-4 h-4" /> Generate Key
+                    <Plus className="w-4 h-4" /> {m.sta_generate()}
                   </button>
                 </div>
 
                 {sqemesApiKeys.length === 0 ? (
                   <div className="text-center py-10 border-2 border-dashed border-line-strong rounded-2xl">
                     <Zap className="w-8 h-8 text-ink-subtle mx-auto mb-3" />
-                    <p className="text-sm font-semibold text-ink-muted">No API keys yet</p>
-                    <p className="text-xs text-ink-subtle mt-1">Generate a key to start using the public API.</p>
+                    <p className="text-sm font-semibold text-ink-muted">{m.sta_no_keys()}</p>
+                    <p className="text-xs text-ink-subtle mt-1">{m.sta_no_keys_hint()}</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -2107,33 +2134,33 @@ const Settings = () => {
                             {k.user_id
                               ? (
                                 <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-success-soft text-ink-strong">
-                                  {k.user_id === currentUser.id ? 'You' : (workspace.members?.find(m => m.id === k.user_id)?.name || 'Member')}
+                                  {k.user_id === currentUser.id ? m.sta_you() : (workspace.members?.find(member => member.id === k.user_id)?.name || m.sta_member())}
                                 </span>
                               )
                               : (
-                                <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-warning-soft text-ink-strong">Workspace-wide</span>
+                                <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-warning-soft text-ink-strong">{m.sta_workspace_wide()}</span>
                               )}
-                            <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-line-strong text-ink">read</span>
+                            <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-line-strong text-ink">{m.ks_scope_read()}</span>
                             {writeScopes.map(s => (
-                              <span key={s} className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-accent-soft text-accent">{s}</span>
+                              <span key={s} className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-accent-soft text-accent">{SCOPE_LABEL[s]?.() ?? s}</span>
                             ))}
                             {displayExpiry && (
                               <span className={`text-2xs font-bold px-1.5 py-0.5 rounded-md ${expired ? 'bg-danger-soft text-danger' : 'bg-warning-soft text-ink-strong'}`}>
-                                {expired ? 'Expired' : `Expires ${new Date(displayExpiry).toLocaleDateString()}`}
+                                {expired ? m.sta_expired() : m.sta_expires({ date: new Date(displayExpiry).toLocaleDateString(getLocale()) })}
                               </span>
                             )}
                           </div>
                         </div>
                         <div className="text-right shrink-0 hidden sm:block">
-                          <p className="text-xs text-ink-subtle">Created {new Date(k.created_at).toLocaleDateString()}</p>
+                          <p className="text-xs text-ink-subtle">{m.sta_created({ date: new Date(k.created_at).toLocaleDateString(getLocale()) })}</p>
                           <p className="text-xs text-ink-subtle mt-0.5">
-                            {k.last_used_at ? `Last used ${new Date(k.last_used_at).toLocaleDateString()}` : 'Never used'}
+                            {k.last_used_at ? m.sta_last_used({ date: new Date(k.last_used_at).toLocaleDateString(getLocale()) }) : m.sta_never_used()}
                           </p>
                           {idleDays(k) >= 60 && (
                             <p className={`text-2xs font-bold mt-0.5 ${idleDays(k) >= IDLE_LIMIT_DAYS ? 'text-danger' : 'text-warning'}`}>
                               {idleDays(k) >= IDLE_LIMIT_DAYS
-                                ? 'Idle — stopped working'
-                                : `Idle ${idleDays(k)} days — stops at ${IDLE_LIMIT_DAYS}`}
+                                ? m.sta_idle_stopped()
+                                : m.sta_idle({ days: idleDays(k), limit: IDLE_LIMIT_DAYS })}
                             </p>
                           )}
                         </div>
@@ -2141,7 +2168,7 @@ const Settings = () => {
                           <button
                             onClick={() => openEditKeyScope(k)}
                             className="p-2 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors"
-                            title="Edit connection"
+                            title={m.sta_edit_connection()}
                           >
                             <SlidersHorizontal className="w-4 h-4" />
                           </button>
@@ -2149,7 +2176,7 @@ const Settings = () => {
                             onClick={() => handleDeleteApiKey(k.id)}
                             disabled={deletingKeyId === k.id}
                             className="p-2 text-ink-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors"
-                            title="Revoke key"
+                            title={m.sta_revoke()}
                           >
                             {deletingKeyId === k.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                           </button>
@@ -2175,11 +2202,11 @@ const Settings = () => {
           {activeTab === 'profile' && (
             <div className="space-y-6 animate-fade-in max-w-2xl">
               <Card className="p-6 md:p-8">
-                <h2 className="font-display text-xl font-semibold text-ink-strong mb-6">My Profile</h2>
+                <h2 className="font-display text-xl font-semibold text-ink-strong mb-6">{m.stp_title()}</h2>
                 
                 <div className="flex flex-col sm:flex-row items-start gap-8 mb-8 border-b border-line pb-8">
                    {/* SQEM-538 — a button, so the picture can be changed by keyboard and is announced. */}
-                   <button type="button" aria-label="Change profile picture" className="shrink-0 relative group cursor-pointer mx-auto sm:mx-0 rounded-full" onClick={() => fileInputRef.current?.click()}>
+                   <button type="button" aria-label={m.stp_change_picture()} className="shrink-0 relative group cursor-pointer mx-auto sm:mx-0 rounded-full" onClick={() => fileInputRef.current?.click()}>
                      <Avatar src={profileAvatar} name={profileName} className="w-24 h-24 ring-4 ring-surface-sunken" />
                      <div className="absolute inset-0 bg-ink-strong/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity">
                         <Camera className="w-8 h-8 text-white" />
@@ -2194,46 +2221,43 @@ const Settings = () => {
                      />
                    <div className="flex-1 space-y-5 w-full">
                      <div>
-                        <label htmlFor="settings-full-name" className={SETTINGS_FIELD_LABEL}>Full Name</label>
-                        <input id="settings-full-name"
-                          className="w-full p-3 bg-surface-field border border-line-strong text-ink-strong placeholder:text-ink-subtle rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                        <label htmlFor="settings-full-name" className={SETTINGS_FIELD_LABEL}>{m.stp_full_name()}</label>
+                        <Input id="settings-full-name"
                           value={profileName}
                           onChange={e => { setProfileName(e.target.value); setProfileDirty(true); }}
                         />
                      </div>
                      <div>
-                        <label htmlFor="settings-email-address" className={SETTINGS_FIELD_LABEL}>Email Address</label>
-                        <input id="settings-email-address"
-                          className="w-full p-3 bg-surface-field border border-line-strong text-ink-strong placeholder:text-ink-subtle rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                        <label htmlFor="settings-email-address" className={SETTINGS_FIELD_LABEL}>{m.stp_email()}</label>
+                        <Input id="settings-email-address"
                           type="email"
                           value={profileEmail}
                           onChange={e => { setProfileEmail(e.target.value); setProfileDirty(true); }}
                         />
-                        <p className="text-xs text-ink-muted mt-1.5">This is your sign-in email. A change is confirmed from both the old and the new address.</p>
+                        <p className="text-xs text-ink-muted mt-1.5">{m.stp_email_hint()}</p>
                      </div>
 
                      <div>
-                        <p className={SETTINGS_FIELD_LABEL}>Avatar Actions</p>
+                        <p className={SETTINGS_FIELD_LABEL}>{m.stp_avatar_actions()}</p>
                         <div className="flex gap-2">
                           <button
                             onClick={() => fileInputRef.current?.click()}
                             className="px-4 py-2 bg-surface-sunken hover:bg-line-strong text-ink rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-line-strong flex-1 justify-center"
                           >
-                            <Upload className="w-3 h-3" /> Upload
+                            <Upload className="w-3 h-3" /> {m.stp_upload()}
                           </button>
                           <button
                             onClick={handleRandomizeAvatar}
                             className="px-4 py-2 bg-surface-sunken hover:bg-line-strong text-ink rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-line-strong flex-1 justify-center"
                           >
-                            <RefreshCw className="w-3 h-3" /> Randomize
+                            <RefreshCw className="w-3 h-3" /> {m.stp_randomize()}
                           </button>
                         </div>
                      </div>
 
                       <div>
-                        <label htmlFor="settings-avatar-url-optional" className={SETTINGS_FIELD_LABEL}>Avatar URL (Optional)</label>
-                        <input id="settings-avatar-url-optional"
-                          className="w-full p-3 bg-surface-field border border-line-strong text-ink-strong placeholder:text-ink-subtle rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+                        <label htmlFor="settings-avatar-url-optional" className={SETTINGS_FIELD_LABEL}>{m.stp_avatar_url()}</label>
+                        <Input id="settings-avatar-url-optional"
                           value={profileAvatar}
                           onChange={e => { setProfileAvatar(e.target.value); setProfileDirty(true); }}
                           placeholder="https://..."
@@ -2245,23 +2269,21 @@ const Settings = () => {
                 <div className="space-y-5">
                    <h3 className="text-sm font-bold text-ink-strong flex items-center gap-2">
                      <Lock className="w-4 h-4 text-ink-subtle" />
-                     Change Password
+                     {m.stp_change_password()}
                    </h3>
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div>
-                        <label htmlFor="settings-new-password" className={SETTINGS_FIELD_LABEL}>New Password</label>
-                        <input id="settings-new-password" autoComplete="new-password" 
+                        <label htmlFor="settings-new-password" className={SETTINGS_FIELD_LABEL}>{m.stp_new_password()}</label>
+                        <Input id="settings-new-password" autoComplete="new-password" 
                           type="password"
-                          className="w-full p-3 bg-surface-field border border-line-strong text-ink-strong placeholder:text-ink-subtle rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all" 
                           value={passwords.new}
                           onChange={e => setPasswords({...passwords, new: e.target.value})}
                         />
                      </div>
                      <div>
-                        <label htmlFor="settings-confirm-password" className={SETTINGS_FIELD_LABEL}>Confirm Password</label>
-                        <input id="settings-confirm-password" autoComplete="new-password" 
+                        <label htmlFor="settings-confirm-password" className={SETTINGS_FIELD_LABEL}>{m.stp_confirm_password()}</label>
+                        <Input id="settings-confirm-password" autoComplete="new-password" 
                           type="password"
-                          className="w-full p-3 bg-surface-field border border-line-strong text-ink-strong placeholder:text-ink-subtle rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all" 
                           value={passwords.confirm}
                           onChange={e => setPasswords({...passwords, confirm: e.target.value})}
                         />
@@ -2275,21 +2297,21 @@ const Settings = () => {
                       onClick={handleLogout}
                       className="px-4 py-2 text-ink bg-surface-sunken border border-line-strong rounded-xl text-sm font-bold hover:bg-line-strong transition-colors flex items-center justify-center gap-2 flex-1 sm:flex-none"
                     >
-                      <LogOut className="w-4 h-4" /> Sign Out
+                      <LogOut className="w-4 h-4" /> {m.stp_sign_out()}
                     </button>
                     <button
                       onClick={() => setConfirmDialog({
-                        title: 'Leave workspace?',
+                        title: m.stp_leave_title(),
                         // SQEM-214 — alone in the workspace, leaving takes it with you. That has to
                         // be said *before* the click, not discovered after it.
                         message: workspace.members.length === 1
-                          ? `You are the only member of "${workspace.name}". Leaving deletes the workspace and everything in it${workspace.stripeSubscriptionId ? ', and cancels its subscription immediately — the rest of the paid period is not refunded' : ''}. This action cannot be undone.`
-                          : `You will lose access to "${workspace.name}". You can be re-invited later.`,
+                          ? (workspace.stripeSubscriptionId ? m.stp_leave_only_sub({ name: workspace.name }) : m.stp_leave_only({ name: workspace.name }))
+                          : m.stp_leave_body({ name: workspace.name }),
                         onConfirm: leaveWorkspace,
                       })}
                       className="px-4 py-2 text-ink bg-surface-sunken border border-line-strong rounded-xl text-sm font-bold hover:bg-danger-soft hover:text-danger hover:border-danger/30 transition-colors flex items-center justify-center gap-2 flex-1 sm:flex-none"
                     >
-                      <DoorOpen className="w-4 h-4" /> Leave
+                      <DoorOpen className="w-4 h-4" /> {m.stp_leave()}
                     </button>
                   </div>
 
@@ -2297,20 +2319,31 @@ const Settings = () => {
                     onClick={handleUpdateProfile}
                     className="w-full sm:w-auto px-6 py-3 shadow-lg"
                   >
-                    Save Changes
+                    {m.stp_save_changes()}
                   </Button>
                 </div>
               </Card>
+
+              {/* SQEM-600 — the personal override; "Workspace default" (null) follows the workspace. */}
+              {canChooseLanguage(isSqemesAdmin) && (
+                <LanguageCard
+                  title={m.settings_language_profile_title()}
+                  description={m.settings_language_profile_description()}
+                  value={currentUser.language ?? null}
+                  options={PROFILE_LANGUAGE_OPTIONS}
+                  workspaceLanguage={workspace.language}
+                  onSave={async language => { await updateUser({ language }); }}
+                />
+              )}
 
               {/* SQEM-205 — deliberately directly above the Danger Zone. The product could delete an
                   account but not hand the data over first, and deletion is the half of that pair
                   which costs the user something. Whoever is about to leave passes this on the way. */}
               <Card className="p-8">
-                <h2 className="font-display text-xl font-semibold text-ink-strong mb-2">Your data</h2>
+                <h2 className="font-display text-xl font-semibold text-ink-strong mb-2">{m.stp_your_data()}</h2>
                 <p className="text-sm text-ink-muted mb-6">
-                  Download everything in <strong>{workspace.name}</strong> as a ZIP — playbooks, chats, files and your
-                  profile. The archive includes a README listing exactly what is and isn&apos;t in it.
-                  {(workspace.members?.length ?? 0) > 0 && ' Belong to several workspaces? Switch workspace and export again.'}
+                  {m.stp_data_1()} <strong>{workspace.name}</strong> {m.stp_data_2()}
+                  {(workspace.members?.length ?? 0) > 0 && m.stp_data_several()}
                 </p>
                 <button
                   onClick={handleExportAccount}
@@ -2318,28 +2351,28 @@ const Settings = () => {
                   className="inline-flex items-center gap-2 px-4 py-2 bg-surface-field border border-line-strong text-ink font-bold text-sm rounded-xl hover:bg-surface-sunken transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {exporting
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> {exportStep || 'Preparing…'}</>
-                    : <><Download className="w-4 h-4" /> Download my data</>}
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> {exportStep || m.stp_preparing()}</>
+                    : <><Download className="w-4 h-4" /> {m.stp_download_data()}</>}
                 </button>
               </Card>
 
               <div className="bg-danger-soft rounded-card border border-danger/30 p-6 md:p-8">
-                <h2 className="font-display text-xl font-semibold text-danger mb-2">Danger Zone</h2>
-                <p className="text-sm text-danger mb-6">Permanently delete your account and remove access to all workspaces. This action cannot be undone.</p>
+                <h2 className="font-display text-xl font-semibold text-danger mb-2">{m.stp_danger()}</h2>
+                <p className="text-sm text-danger mb-6">{m.stp_danger_desc()}</p>
                 <button
                   onClick={() => setConfirmDialog({
-                    title: 'Delete your account?',
+                    title: m.stp_delete_title(),
                     // SQEM-214 — this used to *warn* that workspaces would be left without an
                     // admin. That state is dead (nobody can manage members or reach billing, and
                     // the subscription keeps running), so it is refused now instead of announced.
                     // The server does the refusing and names the workspaces; saying "will be
                     // blocked" here would be a second, weaker copy of that rule.
-                    message: 'This will permanently delete your account and all your data. Workspaces where you are the only member are deleted with it. This action cannot be undone.',
+                    message: m.stp_delete_body(),
                     onConfirm: deleteAccount,
                   })}
                   className="px-4 py-2 bg-surface-raised border border-danger/40 text-danger font-bold text-sm rounded-xl hover:bg-danger hover:text-surface-raised hover:border-danger transition-all shadow-sm"
                 >
-                  Delete Account
+                  {m.stp_delete()}
                 </button>
               </div>
             </div>
@@ -2351,36 +2384,33 @@ const Settings = () => {
       {/* SQEM-343 — demoting to member, when it would strand something. */}
       <Modal open={!!demoteTarget} onClose={() => !isDemoting && setDemoteTarget(null)} size="md" className="p-6">
         <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">
-          Make {demoteTarget?.name} a member?
+          {m.stt_demote_title({ name: demoteTarget?.name ?? '' })}
         </h3>
         <p className="text-sm text-ink-muted mb-5">
-          Members can use the library but not change it. {demoteTarget?.name} has{' '}
+          {m.stt_demote_intro({ name: demoteTarget?.name ?? '' })}{' '}
           <span className="font-semibold text-ink">
-            {demoteTarget?.templates ?? 0} restricted playbook{(demoteTarget?.templates ?? 0) === 1 ? '' : 's'}
-            {(demoteTarget?.personas ?? 0) > 0
-              ? ` and ${demoteTarget?.personas} restricted persona${demoteTarget?.personas === 1 ? '' : 's'}`
-              : ''}
+            {m.stt_demote_playbooks({ count: demoteTarget?.templates ?? 0 })}
+            {(demoteTarget?.personas ?? 0) > 0 ? m.stt_demote_personas({ count: demoteTarget?.personas ?? 0 }) : ''}
           </span>
-          . After the change nobody will be able to edit {(demoteTarget?.templates ?? 0) + (demoteTarget?.personas ?? 0) === 1 ? 'it' : 'them'} —
-          they can see {(demoteTarget?.templates ?? 0) + (demoteTarget?.personas ?? 0) === 1 ? 'it' : 'them'} but not write, and editors can write but not see.
+          {m.stt_demote_after({ count: (demoteTarget?.templates ?? 0) + (demoteTarget?.personas ?? 0) })}
         </p>
 
         <div className="space-y-2 mb-5">
           {([
             {
               key: 'handover' as const,
-              title: 'Hand over custody',
-              body: `Gives them to the longest-standing admin, the same way as when someone leaves. ${demoteTarget?.name} loses sight of their own work — and their uploaded files change custody too, though everyone can already see those.`,
+              title: m.stt_handover(),
+              body: m.stt_handover_body({ name: demoteTarget?.name ?? '' }),
             },
             {
               key: 'release' as const,
-              title: 'Release them',
-              body: 'Drops the "only me" marker, so the workspace can see and edit them. This breaks a promise to someone who is still here.',
+              title: m.stt_release(),
+              body: m.stt_release_body(),
             },
             {
               key: 'leave' as const,
-              title: 'Leave as is',
-              body: `${demoteTarget?.name} keeps seeing them and nobody can edit them, including ${demoteTarget?.name}. Fine for now — you can hand them over later.`,
+              title: m.stt_leave_as_is(),
+              body: m.stt_leave_as_is_body({ name: demoteTarget?.name ?? '' }),
             },
           ]).map(opt => (
             <button
@@ -2401,7 +2431,7 @@ const Settings = () => {
             disabled={isDemoting}
             className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors disabled:opacity-50"
           >
-            Cancel
+            {m.pb_cancel()}
           </button>
           {/* ⛔ Disabled until a choice is made. No preselection: "leave as is" is the cheapest to
               click and the one that quietly builds the dead end, so it must be picked deliberately. */}
@@ -2410,42 +2440,40 @@ const Settings = () => {
             disabled={!demoteChoice || isDemoting}
             className="flex-1 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isDemoting ? 'Applying...' : 'Make member'}
+            {isDemoting ? m.stt_applying() : m.stt_make_member()}
           </button>
         </div>
       </Modal>
 
       <Modal open={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} size="md" className="p-6 md:p-8">
-        <h3 className="font-display text-xl font-semibold text-ink-strong mb-6">Invite Team Member</h3>
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-6">{m.stt_invite_title()}</h3>
         <form onSubmit={handleInvite} className="space-y-5">
           <div>
-            <label htmlFor="settings-invite-email" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Email Address</label>
-            <input id="settings-invite-email"
+            <label htmlFor="settings-invite-email" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">{m.stp_email()}</label>
+            <Input id="settings-invite-email"
               type="email"
               required
-              className="w-full p-3 bg-surface-field border border-line-strong text-ink-strong placeholder:text-ink-subtle rounded-xl text-sm outline-none focus:border-accent transition-colors"
-              placeholder="colleague@company.com"
+              placeholder={m.stt_invite_placeholder()}
               value={inviteEmail}
               onChange={e => setInviteEmail(e.target.value)}
             />
           </div>
           <div>
-            <label htmlFor="settings-role" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Role</label>
-            <select id="settings-role"
-              className="w-full p-3 bg-surface-field border border-line-strong text-ink-strong rounded-xl text-sm outline-none focus:border-accent transition-colors appearance-none"
+            <label htmlFor="settings-role" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">{m.stt_col_role()}</label>
+            <Select id="settings-role"
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as UserRole)}
             >
-              {/* ⚠️ SQEM-432 — the label comes from ROLE_LABELS, the explanation stays here. */}
-              <option value="admin">{ROLE_LABELS.admin} (Full Access)</option>
-              <option value="editor">{ROLE_LABELS.editor} (Can Create)</option>
-              <option value="member">{ROLE_LABELS.member} (Read Only)</option>
-            </select>
+              {/* ⚠️ SQEM-432 — the label comes from roleLabel (SQEM-608: translated), the explanation stays here. */}
+              <option value="admin">{m.stt_role_admin_hint({ role: roleLabel('admin') })}</option>
+              <option value="editor">{m.stt_role_editor_hint({ role: roleLabel('editor') })}</option>
+              <option value="member">{m.stt_role_member_hint({ role: roleLabel('member') })}</option>
+            </Select>
           </div>
           <div className="flex gap-3 mt-8">
-            <button type="button" onClick={() => setIsInviteModalOpen(false)} disabled={isInviteSending} className="flex-1 px-4 py-3 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed">Cancel</button>
+            <button type="button" onClick={() => setIsInviteModalOpen(false)} disabled={isInviteSending} className="flex-1 px-4 py-3 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed">{m.pb_cancel()}</button>
             <Button type="submit" loading={isInviteSending} className="flex-1 px-4 py-3 shadow-lg">
-              {!isInviteSending && 'Send Invite'}
+              {!isInviteSending && m.stt_send_invite()}
             </Button>
           </div>
         </form>
@@ -2454,15 +2482,15 @@ const Settings = () => {
       {/* Generic Confirm Dialog */}
       {/* Generate API Key Modal */}
       <Modal open={showGenerateKeyModal} onClose={() => setShowGenerateKeyModal(false)} size="sm" className="p-6">
-        <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">Generate API Key</h3>
-        <p className="text-sm text-ink-muted mb-5">Give this key a name so you can identify it later.</p>
-        <input
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">{m.stk_gen_title()}</h3>
+        <p className="text-sm text-ink-muted mb-5">{m.stk_gen_desc()}</p>
+        <Input
           type="text"
           value={newKeyName}
           onChange={e => setNewKeyName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleGenerateKey()}
-          placeholder="e.g. Production, Zapier, n8n"
-          className="w-full p-3 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all mb-5 placeholder:text-ink-subtle"
+          placeholder={m.stk_name_placeholder()}
+          className="mb-5"
           autoFocus
         />
         <div className="mb-5">
@@ -2473,56 +2501,56 @@ const Settings = () => {
             ⚠️ Its own label was already wrong — it promised "every template, ignoring per-template
             restrictions", which stopped being true with SQEM-210 three months before it was removed. */}
         <div className="mb-5">
-          <p className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-2">Playbook access</p>
-          <p className="text-xs text-ink-subtle">This key inherits your playbook access — it can only reach playbooks you can access, and it is removed if you leave the workspace.</p>
+          <p className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-2">{m.stk_access()}</p>
+          <p className="text-xs text-ink-subtle">{m.stk_access_body()}</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setShowGenerateKeyModal(false)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">Cancel</button>
+          <button onClick={() => setShowGenerateKeyModal(false)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">{m.pb_cancel()}</button>
           <button
             onClick={handleGenerateKey}
             disabled={!newKeyName.trim() || isGeneratingKey}
             className="flex-1 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {isGeneratingKey ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</> : 'Generate Key'}
+            {isGeneratingKey ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {m.stk_generating()}</> : m.sta_generate()}
           </button>
         </div>
       </Modal>
 
       {/* Edit Connection Permissions Modal (SQEM-064) */}
       <Modal open={!!editingKey} onClose={() => setEditingKey(null)} size="sm" className="p-6">
-        <h3 className="font-display text-xl font-semibold text-ink-strong mb-1">Edit connection</h3>
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-1">{m.stk_edit_title()}</h3>
         <p className="text-sm font-mono text-ink-muted mb-5 truncate">{editingKey?.key_prefix}</p>
-        <label htmlFor="settings-name" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-2">Name</label>
-        <input id="settings-name"
+        <label htmlFor="settings-name" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-2">{m.stk_name()}</label>
+        <Input id="settings-name"
           type="text"
           value={editKeyName}
           onChange={e => setEditKeyName(e.target.value)}
-          placeholder="e.g. Production, Zapier, n8n"
-          className="w-full p-3 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all mb-5 placeholder:text-ink-subtle"
+          placeholder={m.stk_name_placeholder()}
+          className="mb-5"
         />
         <ApiKeyScopeFields value={editKeyScope} onChange={setEditKeyScope} canWrite={canWriteContent} />
         <div className="flex gap-2 mt-6">
-          <button onClick={() => setEditingKey(null)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">Cancel</button>
+          <button onClick={() => setEditingKey(null)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">{m.pb_cancel()}</button>
           <button
             onClick={handleSaveKeyScope}
             disabled={isSavingScope || !editKeyName.trim()}
             className="flex-1 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {isSavingScope ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...</> : 'Save changes'}
+            {isSavingScope ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {m.stk_saving()}</> : m.stk_save_changes()}
           </button>
         </div>
       </Modal>
 
       {/* New Key — Show Once Modal */}
       <Modal open={!!generatedKeyValue} onClose={() => { setGeneratedKeyValue(null); setKeyCopied(false); }} size="sm" className="p-6">
-        <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">Copy your API key</h3>
-        <p className="text-sm text-ink-muted mb-4">This key will only be shown once. Store it somewhere safe.</p>
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">{m.stk_copy_title()}</h3>
+        <p className="text-sm text-ink-muted mb-4">{m.stk_copy_desc()}</p>
         <div className="flex items-center gap-2 p-3 bg-surface-sunken border border-line-strong rounded-xl mb-5">
           <code className="text-xs font-mono text-ink flex-1 break-all">{generatedKeyValue}</code>
           <button
             onClick={() => { navigator.clipboard.writeText(generatedKeyValue || ''); setKeyCopied(true); }}
             className="shrink-0 p-1.5 text-ink-subtle hover:text-accent transition-colors"
-            title="Copy"
+            title={m.mcp_copy()}
           >
             {keyCopied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
           </button>
@@ -2531,7 +2559,7 @@ const Settings = () => {
           onClick={() => { setGeneratedKeyValue(null); setKeyCopied(false); }}
           className="w-full py-2.5 bg-ink-strong text-surface-raised rounded-xl text-xs font-bold transition-colors hover:opacity-90"
         >
-          I&apos;ve saved my key
+          {m.stk_saved_key()}
         </button>
       </Modal>
 
@@ -2549,13 +2577,13 @@ const Settings = () => {
       {/* SQEM-539 — a tab change with an unsaved card. Same words as the editor's leave guard. */}
       <ConfirmModal
         open={pendingTab !== null}
-        title="Unsaved changes"
-        confirmLabel="Discard"
-        cancelLabel="Keep editing"
+        title={m.st_unsaved_title()}
+        confirmLabel={m.ed_discard()}
+        cancelLabel={m.pe_keep_editing()}
         onClose={() => setPendingTab(null)}
         onConfirm={() => { discardDrafts(); if (pendingTab) setActiveTab(pendingTab); setPendingTab(null); }}
       >
-        <p>A card on this tab has changes that are not saved. Leave without saving them?</p>
+        <p>{m.st_unsaved_body()}</p>
       </ConfirmModal>
     </div>
   );

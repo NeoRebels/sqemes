@@ -1,3 +1,5 @@
+import { m } from './i18n';
+
 /**
  * SQEM-536 — what Chat says when the workspace has no model to talk to.
  *
@@ -17,8 +19,8 @@ export interface NoKeyHint {
 
 export function noKeyHint(canManageKeys: boolean): NoKeyHint {
   return canManageKeys
-    ? { text: 'No AI provider key yet. Add one to start chatting.', actionLabel: 'Add an AI provider key' }
-    : { text: 'No AI provider key yet. Ask a workspace admin or editor to add one.', actionLabel: null };
+    ? { text: m.keyhint_text_manage(), actionLabel: m.keyhint_action() }
+    : { text: m.keyhint_text_member(), actionLabel: null };
 }
 
 /** Where the button goes: the tab that holds "AI provider keys". */

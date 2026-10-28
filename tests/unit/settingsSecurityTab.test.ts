@@ -18,7 +18,7 @@ const CARDS: [string, string][] = [
   ['Playbook Access (workspace default)', "{!IS_SELF_HOSTED && isMultiSeat(workspace) && can(currentUser, workspace, 'team:manage') && ("],
   ['Access groups', "{!IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (\n                <AccessGroupsCard"],
   // Same condition as General's Marketplace Publisher card, so pinned by its heading as well.
-  ['self-host access card', 'Access control and groups</h3>'],
+  ['self-host access card', '{m.sts_selfhost_title()}</h3>'], // SQEM-608 — the words live in messages/
   ['Content Governance', '{/* SQEM-170 — Content Governance is a Cloud-only feature */}\n              {!IS_SELF_HOSTED && ('],
 ];
 
@@ -26,13 +26,13 @@ describe('SQEM-480 — the Security tab', () => {
   for (const [name, condition] of CARDS) {
     it(`${name}: in Security with its old condition, and gone from General`, () => {
       expect(security, name).toContain(condition);
-      if (name === 'self-host access card') expect(security).toMatch(/\{IS_SELF_HOSTED && can\(currentUser, workspace, 'team:manage'\) && \(\s*<Card className="p-6 md:p-8">\s*<SettingsCardHeader icon=\{<Lock \/>\} title="Playbook Access"/); // SQEM-554 (d2) — shared head
+      if (name === 'self-host access card') expect(security).toMatch(/\{IS_SELF_HOSTED && can\(currentUser, workspace, 'team:manage'\) && \(\s*<Card className="p-6 md:p-8">\s*<SettingsCardHeader icon=\{<Lock \/>\} title=\{m\.sts_access_title\(\)\}/); // SQEM-554 (d2) — shared head
       expect(general, name).not.toContain(condition);
     });
   }
 
   it('General keeps the workspace basics', () => {
-    for (const keep of ['Workspace Details', '<AuthoringModelCard', 'Marketplace Publisher', '<AboutSection />', 'Danger Zone']) {
+    for (const keep of ['m.stg_details()', '<AuthoringModelCard', 'm.stg_pub_title()', '<AboutSection />', 'm.stg_danger()']) { // SQEM-608
       expect(general, keep).toContain(keep);
     }
   });

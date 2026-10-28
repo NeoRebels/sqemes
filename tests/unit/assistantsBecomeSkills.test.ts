@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { KIND_HELP } from '../../constants';
+import { en } from './i18nText';
 
 /**
  * SQEM-390 — assistants became skills. Two template kinds: prompt (a task) and skill (knowledge).
@@ -152,7 +153,8 @@ describe('SQEM-390 — the surfaces', () => {
   });
 
   it('the Sidebar shows Personas with the Bot icon, and the old /assistants link lands on skills', () => {
-    expect(code(read('components/Sidebar.tsx'))).toMatch(/\{ to: "\/personas", icon: Bot, label: "Personas" \}/);
+    expect(code(read('components/Sidebar.tsx'))).toMatch(/\{ to: "\/personas", icon: Bot, label: m\.nav_personas\(\) \}/);
+    expect(JSON.parse(read('messages/en.json')).nav_personas).toBe('Personas'); // SQEM-599 — the word lives in messages/
     expect(code(read('App.tsx'))).toMatch(/path="\/assistants" element=\{<Navigate to="\/playbooks\?kind=skill" replace \/>\}/); // SQEM-394 moved the list
   });
 
@@ -161,7 +163,8 @@ describe('SQEM-390 — the surfaces', () => {
     expect(step).not.toMatch(/assistant:/);
     // SQEM-413 — the promise is no longer a fixed "four prompts and four skills": it is the brand
     // voice plus one prompt and one skill per chosen area. Two kinds, counted differently.
-    expect(step).toMatch(/one prompt and one skill for each area/);
+    expect(en.wc_create_body).toMatch(/one prompt and one skill for each area/); // SQEM-610 — the words live in messages/
+    expect(step).toMatch(/m\.wc_create_body\(\)/);
   });
 });
 

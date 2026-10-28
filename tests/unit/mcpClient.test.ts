@@ -157,8 +157,8 @@ describe('wiring', () => {
     expect(fn).toMatch(/const connectors = \(Array\.isArray\(connectorIds\) && connectorIds\.length > 0\)/);
     // SQEM-594 — `base` is the library runtime plus, for a web message, the web tools.
     expect(fn).toMatch(/if \(base && connectors\?\.length && provider !== 'claude' && provider !== 'openai'\)/);
-    expect(fn).toMatch(/callGemini\(apiKey, modelId, instruction, messages, false, onDelta, runtime, cancel\.signal\)/);
-    expect([...fn.matchAll(/onDelta, runtime, cancel\.signal\)\)/g)]).toHaveLength(4);
-    expect(fn).toMatch(/if \(unreachable\.length\) result \+= connectorRefusedNotice\(unreachable\);/);
+    expect(fn).toMatch(/callGemini\(apiKey, modelId, instruction, messages, false, onDelta, runtime, cancel\.signal, locale\)/); // SQEM-604 — + locale
+    expect([...fn.matchAll(/onDelta, runtime, cancel\.signal, locale\)\)/g)]).toHaveLength(4);
+    expect(fn).toMatch(/if \(unreachable\.length\) result \+= connectorRefusedNotice\(unreachable, locale\);/);
   });
 });

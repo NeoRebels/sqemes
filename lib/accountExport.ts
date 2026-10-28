@@ -17,6 +17,7 @@ import type { Prompt, WorkspaceFile, Workspace, User } from '../types';
 import { fetchAllTemplates } from './api/prompts';
 import { fetchWorkspaceFiles, getWorkspaceFileSignedUrl } from './api/files';
 import { fetchChatSessions, fetchChatMessages } from './api/chatSessions';
+import { m } from './i18n'; // SQEM-608 — only the progress labels; the README in the archive stays English
 
 export interface AccountExportProgress {
   /** Human-readable step, for a status line while the archive is built. */
@@ -40,7 +41,7 @@ export async function buildAccountExport(
   const report = (step: string) => onProgress?.({ step });
 
   // ---- Templates -------------------------------------------------------------------------------
-  report('Collecting playbooks…');
+  report(m.exp_playbooks());
   // ⚠️ SQEM-267 — this used `fetchPrompts`, which filters `kind = 'prompt'`. So `templates.json`
   // contained the prompts and **silently omitted every assistant and every skill**, while the README
   // three functions below promised "every template you can see in this workspace". A data export that
@@ -56,7 +57,7 @@ export async function buildAccountExport(
   zip.file('templates.json', JSON.stringify(templates, null, 2));
 
   // ---- Chats -----------------------------------------------------------------------------------
-  report('Collecting chats…');
+  report(m.exp_chats());
   const chats: unknown[] = [];
   try {
     const sessions = await fetchChatSessions(workspace.id, currentUser.id);
@@ -75,7 +76,7 @@ export async function buildAccountExport(
   zip.file('chats.json', JSON.stringify(chats, null, 2));
 
   // ---- Files -----------------------------------------------------------------------------------
-  report('Collecting files…');
+  report(m.exp_files());
   let files: WorkspaceFile[] = [];
   try {
     files = await fetchWorkspaceFiles(workspace.id);
@@ -91,7 +92,7 @@ export async function buildAccountExport(
       skipped.push(`${file.name} (${Math.round(file.sizeBytes / 1024 / 1024)} MB)`);
       continue;
     }
-    report(`Downloading ${file.name}…`);
+    report(m.exp_file({ name: file.name }));
     try {
       const url = await getWorkspaceFileSignedUrl(file.storagePath);
       const res = await fetch(url);
@@ -103,7 +104,7 @@ export async function buildAccountExport(
   }
 
   // ---- Profile & workspace ---------------------------------------------------------------------
-  report('Collecting profile…');
+  report(m.exp_profile());
   zip.file(
     'profile.json',
     JSON.stringify(
@@ -146,7 +147,7 @@ export async function buildAccountExport(
     ].join('\n'),
   );
 
-  report('Packing the archive…');
+  report(m.exp_packing());
   return zip.generateAsync({ type: 'blob' });
 }
 

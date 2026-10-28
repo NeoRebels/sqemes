@@ -9,6 +9,8 @@
 // "access changed" for playbooks it never touched. So every id is checked with `can_edit_*` first and
 // only the allowed ones are written; the rest are reported as skipped.
 
+import { m } from './i18n';
+
 export type BulkOutcome = { changed: string[]; skipped: string[]; failed: string[] };
 
 /** Run `fn` over `items` with at most `limit` in flight; results keep the input order. */
@@ -53,19 +55,23 @@ export async function applyToEditable(
   return { changed, skipped, failed };
 }
 
-const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`;
+/** SQEM-605 — the nouns bulk actions speak of, each with its own plural text ("3 playbooks" / "3 Playbooks"). */
+export type BulkNoun = 'playbook' | 'persona' | 'file' | 'chat';
+export const COUNT_NOUN: Record<BulkNoun, (i: { count: number }) => string> = {
+  playbook: m.count_playbook, persona: m.count_persona, file: m.count_file, chat: m.count_chat,
+};
 
 /** One toast for the whole action: what changed, what was skipped and why, what failed. */
 export function bulkSummary(
   o: BulkOutcome,
-  noun: string,
+  noun: BulkNoun,
   done: string,
 ): { message: string; type: 'success' | 'info' | 'error' } {
   const parts: string[] = [];
-  if (o.changed.length) parts.push(`${done} for ${plural(o.changed.length, noun)}`);
-  if (o.skipped.length) parts.push(`${o.skipped.length} skipped — you may not change ${o.skipped.length === 1 ? 'it' : 'them'}`);
-  if (o.failed.length) parts.push(`${o.failed.length} failed`);
-  if (!parts.length) return { message: `Nothing to change`, type: 'info' };
+  if (o.changed.length) parts.push(m.bulksum_done({ done, things: COUNT_NOUN[noun]({ count: o.changed.length }) }));
+  if (o.skipped.length) parts.push(m.bulksum_skipped({ count: o.skipped.length }));
+  if (o.failed.length) parts.push(m.bulksum_failed({ count: o.failed.length }));
+  if (!parts.length) return { message: m.bulksum_nothing(), type: 'info' };
   const type = o.failed.length ? 'error' : o.changed.length ? 'success' : 'info';
   const message = parts.join(' · ');
   return { message: message.charAt(0).toUpperCase() + message.slice(1), type };

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { en } from './i18nText';
 
 /**
  * SQEM-554 (d) — Settings in redesign C, tab by tab. Each part removes the old Tailwind colour classes
@@ -39,14 +40,15 @@ describe('SQEM-554 (d) — the shared head', () => {
 
 describe('SQEM-554 (d1) — page head, tab bar, General, Brand', () => {
   it('the page uses PageHeader, the tab bar the tokens', () => {
-    expect(settings).toMatch(/<PageHeader title="Workspace Settings" subtitle="Manage your workspace preferences and team" \/>/);
+    expect(settings).toMatch(/<PageHeader title=\{m\.st_title\(\)\} subtitle=\{m\.st_subtitle\(\)\} \/>/);
+    expect([en.st_title, en.st_subtitle]).toEqual(['Workspace Settings', 'Manage your workspace preferences and team']); // SQEM-608
     expect(settings).toMatch(/\? 'bg-accent-soft text-accent shadow-sm'\s*: 'text-ink-muted hover:bg-surface-sunken hover:text-ink-strong'/);
   });
   it('General has no old colour class left, and its heads are the shared one', () => {
     const general = tab('General', 'Security');
     expect(general.match(OLD)).toBeNull();
-    expect(general).toMatch(/<SettingsCardHeader title="Workspace Details" \/>/);
-    expect(general).toMatch(/<SettingsCardHeader tone="danger" title="Danger Zone"/);
+    expect(general).toMatch(/<SettingsCardHeader title=\{m\.stg_details\(\)\} \/>/);
+    expect(general).toMatch(/<SettingsCardHeader tone="danger" title=\{m\.stg_danger\(\)\}/);
     expect(general).not.toMatch(/<h2 className="text-lg font-bold/);
   });
   it('the managed toggle is the shared Switch, named by its visible label', () => {
@@ -55,7 +57,8 @@ describe('SQEM-554 (d1) — page head, tab bar, General, Brand', () => {
   it('Brand has no old colour class left; the form (shared with the wizard) neither', () => {
     const brand = settings.slice(settings.indexOf("{activeTab === 'brand'"), settings.indexOf('{/* --- Team Tab --- */}'));
     expect(brand.match(OLD)).toBeNull();
-    expect(brand).toMatch(/<SettingsCardHeader\s+title="Brand Profile"/);
+    expect(brand).toMatch(/<SettingsCardHeader\s+title=\{m\.stb_title\(\)\}/);
+    expect(en.stb_title).toBe('Brand Profile');
     expect(read('components/BrandProfileForm.tsx').match(OLD)).toBeNull();
   });
 });
@@ -148,7 +151,8 @@ describe('SQEM-554 (e2) — Marketplace', () => {
     expect(read('constants.ts')).not.toMatch(/export const CATEGORY_COLORS/);
   });
   it('the card ends in a quiet "Details →" link, not a filled button', () => {
-    expect(lib).toMatch(/className="ml-auto inline-flex items-center gap-1 text-sm font-semibold text-accent hover:underline"\s*>\s*Details <ArrowRight/);
+    expect(lib).toMatch(/className="ml-auto inline-flex items-center gap-1 text-sm font-semibold text-accent hover:underline"\s*>\s*\{txt\.mk_details\(\)\} <ArrowRight/);
+    expect(en.mk_details).toBe('Details'); // SQEM-607
     expect(lib).not.toMatch(/See playbook details<\/|> See playbook details/);
   });
   it('the temperature keeps its meaning: hot is danger, cold stays sky', () => {

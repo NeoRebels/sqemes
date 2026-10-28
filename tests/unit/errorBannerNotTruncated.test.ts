@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { en } from './i18nText';
 
 /**
  * SQEM-465 — the chat error banner must never clip a provider's message.
@@ -55,6 +56,7 @@ describe('SQEM-465 — a provider error is shown in full', () => {
 
   it('⭐ the out-of-credits branch keeps its own shape — it was already right', () => {
     // It never truncated. The fix was not to rewrite both, only to make the other one agree.
-    expect(errorBanner()).toMatch(/Upgrade or add a key/);
+    expect(errorBanner()).toMatch(/txt\.chat_upgrade_or_key\(\)/);
+    expect(en.chat_upgrade_or_key).toBe('Upgrade or add a key'); // SQEM-604
   });
 });

@@ -4,6 +4,7 @@ import Modal from './ui/Modal';
 import { SUPPORTED_MIME_TYPES, isImageType, fileTypeLabel } from '../lib/uploadTypes';
 import type { WorkspaceFile } from '../types';
 import Checkbox from './ui/Checkbox';
+import { m } from '../lib/i18n';
 
 // SQEM-080 — pick workspace files to attach to a chat message. Only shows files
 // chat can attach inline; the caller fetches + attaches the chosen ones.
@@ -57,7 +58,7 @@ export function WorkspaceFilePickerModal({
     <Modal open onClose={attaching ? undefined : onClose} size="md">
       <div className="p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Attach workspace files</h3>
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">{m.filepick_title()}</h3>
           <button type="button" onClick={onClose} disabled={attaching} className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-40 rounded-lg transition-colors">
             <X className="w-4 h-4" />
           </button>
@@ -69,7 +70,7 @@ export function WorkspaceFilePickerModal({
             autoFocus
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search files…"
+            placeholder={m.filepick_search()}
             className="flex-1 text-sm bg-transparent outline-none text-slate-700 dark:text-slate-200 placeholder-slate-400"
           />
         </div>
@@ -77,7 +78,7 @@ export function WorkspaceFilePickerModal({
         <div className="max-h-72 overflow-y-auto -mx-1 px-1">
           {filtered.length === 0 ? (
             <div className="py-10 text-center text-sm text-slate-400">
-              {attachable.length === 0 ? 'No attachable files in this workspace' : 'No files match your search'}
+              {attachable.length === 0 ? m.filepick_none() : m.filepick_no_match()}
             </div>
           ) : (
             <div className="space-y-1">
@@ -114,7 +115,7 @@ export function WorkspaceFilePickerModal({
             disabled={attaching}
             className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-50"
           >
-            Cancel
+            {m.filepick_cancel()}
           </button>
           <button
             onClick={handleAttach}
@@ -122,7 +123,7 @@ export function WorkspaceFilePickerModal({
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
           >
             {attaching && <Loader2 className="w-4 h-4 animate-spin" />}
-            {attaching ? 'Attaching…' : `Attach${selected.size > 0 ? ` (${selected.size})` : ''}`}
+            {attaching ? m.filepick_attaching() : selected.size > 0 ? m.filepick_attach_count({ count: selected.size }) : m.filepick_attach()}
           </button>
         </div>
       </div>

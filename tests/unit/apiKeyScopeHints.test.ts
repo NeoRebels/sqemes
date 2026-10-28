@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { en } from './i18nText';
 
 /**
  * The checkbox list in the connection dialog is the ONLY place a person sees what a permission
@@ -82,6 +83,7 @@ describe('the permission checkboxes list every tool they grant (SQEM-348)', () =
   it('read is described as covering personas and files, not templates alone', () => {
     // `read` has no checkbox — it is the always-included line, so it cannot be compared tool by tool.
     // Pinning the wording is the most this test can honestly do, and it is what went stale.
-    expect(FIELDS).toMatch(/Read playbooks, files &amp; personas/); // SQEM-394 — the word
+    expect(FIELDS).toMatch(/\{m\.ks_read_always\(\)\}/); // SQEM-609 — the words live in messages/
+    expect(en.ks_read_always).toMatch(/Read playbooks, files & personas/); // SQEM-394 — the word
   });
 });

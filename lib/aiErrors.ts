@@ -1,3 +1,4 @@
+import { m as txt } from './i18n'; // `m` is a local name in parse()
 // SQEM-310 — turning a provider's error into something a person can act on.
 //
 // The chain that produces these: `execute-step` throws `` `Gemini API error (503): ${body}` ``,
@@ -29,7 +30,9 @@
  * hunting through Settings for a control that was never built, and they end up doubting the product
  * rather than the message. So each line below is the *most* that can honestly be offered.
  */
-function meaning(status: number): { headline: string; nextStep: string } | null {
+// SQEM-604 — whole sentences with the provider as a placeholder: German word order differs, so a
+// headline glued after the name ("Anthropic is busy") would not translate.
+function meaning(status: number): { headline: (i: { provider: string }) => string; nextStep: string } | null {
   if (status === 429 || status === 503) {
     // ⛔ **No next step here, and the emptiness is the fix (SQEM-320).** It used to add "this usually
     // clears in a moment — try again shortly", which said, in our words, exactly what the provider
@@ -38,24 +41,24 @@ function meaning(status: number): { headline: string; nextStep: string } | null 
     //
     // Where a real alternative exists, the caller supplies it (`alternativesAvailable` below);
     // repeating "wait" is not an alternative.
-    return { headline: 'is busy right now', nextStep: '' };
+    return { headline: txt.aierr_busy, nextStep: '' };
   }
   if (status === 401 || status === 403) {
     // The one case with a real control behind it: provider keys do live in Settings.
     return {
-      headline: 'refused the key',
-      nextStep: 'Check the API key for this provider in Settings — it may be wrong, revoked, or out of quota.',
+      headline: txt.aierr_refused_key,
+      nextStep: txt.aierr_refused_key_next(),
     };
   }
   if (status === 404) {
     // The model was picked from the key, not by the person — so the lever is the key, not a model list.
     return {
-      headline: 'does not know this model',
-      nextStep: 'It has probably been retired. Sqemes picks the model from your provider keys, so removing that provider’s key in Settings will make it use another.',
+      headline: txt.aierr_unknown_model,
+      nextStep: txt.aierr_unknown_model_next(),
     };
   }
   if (status >= 500) {
-    return { headline: 'had a problem', nextStep: 'Not something you can fix — try again shortly.' };
+    return { headline: txt.aierr_problem, nextStep: txt.aierr_problem_next() };
   }
   return null;
 }
@@ -70,7 +73,7 @@ function parse(message: string): { provider: string; status: number; detail: str
   const m = message.match(/^(.*?)\s*API error \((\d{3})\):\s*([\s\S]*)$/);
   if (!m) return null;
   const [, rawProvider, rawStatus, body] = m;
-  const provider = rawProvider.trim() || 'The AI provider';
+  const provider = rawProvider.trim() || txt.aierr_provider_fallback();
   // The body is usually JSON with the readable sentence nested somewhere. Reach for it, and fall
   // back to the raw body — a long line is still better than dropping what they told us.
   let detail = body.trim();
@@ -112,15 +115,15 @@ export function describeAIError(
   if (!parsed) return raw;
 
   const sense = meaning(parsed.status);
-  const who = parsed.provider === 'The AI provider' ? parsed.provider : parsed.provider;
-  const head = sense ? `${who} ${sense.headline}.` : `${who} returned an error (${parsed.status}).`;
+  const who = parsed.provider;
+  const head = sense ? sense.headline({ provider: who }) : txt.aierr_generic({ provider: who, status: parsed.status });
   // The provider's sentence, verbatim and marked as theirs — so nobody wonders whose wording it is.
-  const quoted = parsed.detail ? ` They said: “${parsed.detail}”` : '';
+  const quoted = parsed.detail ? txt.aierr_quoted({ detail: parsed.detail }) : '';
   const next = sense?.nextStep ? ` ${sense.nextStep}` : '';
   // Only for the transient cases, and only when there is genuinely something else to run on.
   const transient = parsed.status === 429 || parsed.status === 503;
   const alternative = transient && opts?.alternativesAvailable
-    ? ' You can switch the model under Settings → General → Default AI model.'
+    ? txt.aierr_alternative()
     : '';
   return `${head}${quoted}${next}${alternative}`;
 }

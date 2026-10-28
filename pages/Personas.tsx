@@ -32,6 +32,7 @@ import ConfirmModal from '../components/ui/ConfirmModal';
 import PersonaWizardModal from '../components/PersonaWizardModal';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { errorMessage } from '../lib/errorMessage';
+import { m } from '../lib/i18n';
 
 const toSlug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'persona';
 
@@ -65,7 +66,7 @@ const PersonaRow = memo(function PersonaRow({
     <li className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-control transition-colors ${active ? 'bg-accent-soft' : 'hover:bg-surface-sunken'}`}>
       {canEdit && (
         // SQEM-168 — padded label gives the 16px checkbox a hit margin over the stretched row button.
-        <label aria-label={`Select ${persona.title}`} className="relative z-10 p-1 -m-1 cursor-pointer">
+        <label aria-label={m.pb_select({ title: persona.title })} className="relative z-10 p-1 -m-1 cursor-pointer">
           <Checkbox
             checked={selected}
             onChange={() => onToggleSelect(persona.id)}
@@ -83,7 +84,7 @@ const PersonaRow = memo(function PersonaRow({
       >
         <span className="block text-sm font-semibold text-ink-strong truncate">{persona.title}</span>
         <span className={`block text-xs truncate ${n === 0 ? 'text-ink-subtle italic' : 'text-ink-muted'}`}>
-          {n === 0 ? 'Loads nothing yet' : `${n} playbook${n === 1 ? '' : 's'}`}{persona.tags[0] ? ` · ${persona.tags[0]}` : ''}
+          {n === 0 ? m.ps_loads_nothing() : m.count_playbook({ count: n })}{persona.tags[0] ? ` · ${persona.tags[0]}` : ''}
         </span>
       </button>
       {accessMode && <span className="relative z-10"><AccessBadge mode={accessMode} /></span>}
@@ -91,7 +92,7 @@ const PersonaRow = memo(function PersonaRow({
         type="button"
         onClick={() => onFavorite(persona)}
         aria-pressed={!!persona.isFavorite}
-        aria-label={persona.isFavorite ? `Remove ${persona.title} from favourites` : `Add ${persona.title} to favourites`}
+        aria-label={persona.isFavorite ? m.pb_unfavourite({ title: persona.title }) : m.pb_favourite({ title: persona.title })}
         className="hit-24 relative z-10 p-1 text-ink-subtle hover:text-amber-400 transition-colors"
       >
         <Star className={`w-4 h-4 ${persona.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`} />
@@ -150,7 +151,7 @@ export default function Personas() {
       } catch (err: any) {
         if (!cancelled) {
           setPersonas([]);
-          showToast(err?.message || 'Could not load personas', 'error');
+          showToast(err?.message || m.ps_load_failed(), 'error');
         }
       }
     })();
@@ -184,10 +185,10 @@ export default function Personas() {
     setPersonas(prev => (prev ?? []).map(p => p.id === persona.id ? { ...p, isFavorite: next } : p));
     try {
       await setPersonaFavorite(persona.id, currentUser.id, next);
-      showToast(next ? 'Added to favorites' : 'Removed from favorites', 'success');
+      showToast(next ? m.pb_favourited_toast() : m.pb_unfavourited_toast(), 'success');
     } catch (err: any) {
       setPersonas(prev => (prev ?? []).map(p => p.id === persona.id ? { ...p, isFavorite: persona.isFavorite } : p));
-      showToast(err?.message || 'Failed to update favourite', 'error');
+      showToast(err?.message || m.ps_fav_failed(), 'error');
     }
   };
 
@@ -199,7 +200,7 @@ export default function Personas() {
       await updatePersona(persona.id, { tags });
     } catch (err: any) {
       setPersonas(prev => (prev ?? []).map(p => p.id === persona.id ? { ...p, tags: persona.tags } : p));
-      showToast(err?.message || 'Failed to update tag', 'error');
+      showToast(err?.message || m.ps_tag_failed(), 'error');
     }
   };
 
@@ -214,7 +215,7 @@ export default function Personas() {
         const changed = new Set(outcome.changed);
         setPersonas(prev => (prev ?? []).map(p => changed.has(p.id) ? { ...p, tags } : p));
       }
-      const { message, type } = bulkSummary(outcome, 'persona', tag ? `Tag “${tag}” set` : 'Tag removed');
+      const { message, type } = bulkSummary(outcome, 'persona', tag ? m.pb_tag_set({ tag }) : m.pb_tag_removed());
       showToast(message, type);
     } finally {
       setTagBusy(false);
@@ -243,9 +244,9 @@ export default function Personas() {
     try {
       const copy = await duplicatePersona(persona, currentUser.id || null);
       setPersonas(prev => [copy, ...(prev ?? [])]);
-      showToast('Persona duplicated', 'success');
+      showToast(m.ps_duplicated(), 'success');
     } catch (err: any) {
-      showToast(err?.message || 'Could not duplicate the persona', 'error');
+      showToast(err?.message || m.ps_duplicate_failed(), 'error');
     }
   };
 
@@ -271,12 +272,12 @@ export default function Personas() {
       downloadBlob(blob, name);
       showToast(
         templates.length
-          ? `Downloaded ${toExport.length} persona${toExport.length === 1 ? '' : 's'} with ${templates.length} playbook${templates.length === 1 ? '' : 's'}`
-          : 'Downloaded — this persona uses no playbooks, so none travelled with it',
+          ? m.ps_downloaded_with({ personas: m.count_persona({ count: toExport.length }), playbooks: m.count_playbook({ count: templates.length }) })
+          : m.ps_downloaded_alone(),
         'success',
       );
     } catch (err: any) {
-      showToast(err?.message || 'Export failed', 'error');
+      showToast(err?.message || m.pb_export_failed(), 'error');
     } finally {
       setExporting(false);
     }
@@ -301,7 +302,7 @@ export default function Personas() {
     try {
       setImportData(await readBundle(file));
     } catch (err: any) {
-      showToast(err?.message || 'Not a sqemes bundle', 'error');
+      showToast(err?.message || m.ps_not_bundle(), 'error');
     }
   };
 
@@ -316,11 +317,13 @@ export default function Personas() {
       // what the query already answers.
       setPersonas(await fetchPersonas(workspace.id, currentUser.id));
       showToast(
-        `Imported ${created} persona${created === 1 ? '' : 's'}` + (templates ? ` and ${templates} playbook${templates === 1 ? '' : 's'}` : ''),
+        templates
+          ? m.ps_imported_with({ personas: m.count_persona({ count: created }), playbooks: m.count_playbook({ count: templates }) })
+          : m.ps_imported({ personas: m.count_persona({ count: created }) }),
         'success',
       );
     } catch (err: any) {
-      showToast(errorMessage(err, 'Import failed'), 'error');
+      showToast(errorMessage(err, m.pb_import_failed()), 'error');
     } finally {
       setImporting(false);
     }
@@ -335,8 +338,8 @@ export default function Personas() {
       setPersonas(prev => (prev ?? []).filter(p => !okIds.has(p.id)));
       setSelectedIds(prev => { const next = new Set(prev); okIds.forEach(id => next.delete(id)); return next; });
       const failed = targets.length - okIds.size;
-      if (failed === 0) showToast(`Deleted ${okIds.size} persona${okIds.size === 1 ? '' : 's'}`, 'success');
-      else showToast(`Deleted ${okIds.size} of ${targets.length} — ${failed} failed`, 'error');
+      if (failed === 0) showToast(m.ps_deleted({ personas: m.count_persona({ count: okIds.size }) }), 'success');
+      else showToast(m.ps_deleted_partial({ done: okIds.size, total: targets.length, failed }), 'error');
       setPendingDelete(null);
     } finally {
       setDeleting(false);
@@ -351,7 +354,7 @@ export default function Personas() {
       onClick={() => setWizardOpen(true)}
       className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 px-5 py-2.5 rounded-xl font-medium text-sm transition-all justify-center"
     >
-      <Sparkles className="w-4 h-4" /> Persona Wizard
+      <Sparkles className="w-4 h-4" /> {m.pwiz_title()}
     </button>
   ) : null;
 
@@ -362,8 +365,8 @@ export default function Personas() {
           ⛔ NOT the extension — it inserts templates into ChatGPT & Co. and knows nothing of
           personas. The first cut said "the extension" here; the owner caught it on staging. */}
       <PageHeader
-        title="Personas"
-        subtitle="A working role that knows which of your playbooks to reach for, and when — an AI role, not a team member. Works in Chat and via MCP."
+        title={m.nav_personas()}
+        subtitle={m.ps_subtitle()}
         actions={canEdit && (
           <>
             {/* SQEM-325 — Cloud-only, like the Template Wizard. ⚠️ Not for want of model access:
@@ -375,17 +378,17 @@ export default function Personas() {
             <input ref={importInputRef} type="file" accept=".zip,.sqemes" onChange={handleImportFile} className="hidden" />
             <button
               onClick={() => importInputRef.current?.click()}
-              title="Import a .sqemes.zip bundle — personas arrive with the playbooks they use"
+              title={m.ps_import_title()}
               className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 px-4 py-2.5 rounded-xl font-medium text-sm transition-all justify-center"
             >
-              <Upload className="w-4 h-4" /> Import
+              <Upload className="w-4 h-4" /> {m.pb_import()}
             </button>
             {wizardButton}
             <Link
               to="/personas/new"
               className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg shadow-brand-200 hover:shadow-brand-300 dark:shadow-none flex-1 sm:flex-none justify-center"
             >
-              <Plus className="w-5 h-5" /> New Persona
+              <Plus className="w-5 h-5" /> {m.ps_new()}
             </Link>
           </>
         )}
@@ -393,14 +396,14 @@ export default function Personas() {
 
       {(personas?.length ?? 0) > 0 && (
         <div className="flex items-center gap-2 mb-8 flex-wrap">
-          <SearchInput value={search} onChange={setSearch} placeholder="Search personas..." />
+          <SearchInput value={search} onChange={setSearch} placeholder={m.ps_search()} />
           {/* SQEM-393 — the same toggle and the same filter as the Playbooks archive. */}
           <button
             onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
             className={`flex items-center gap-1.5 self-stretch px-3.5 py-2 rounded-xl text-sm font-medium border transition-all ${showFavoritesOnly ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-700 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
           >
             <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-current' : ''}`} />
-            Favorites
+            {m.pb_favorites()}
           </button>
           {allTags.length > 0 && (
             <TagFilter tags={allTags} value={selectedTag} onChange={setSelectedTag} />
@@ -423,7 +426,7 @@ export default function Personas() {
           exporting={exporting}
           addableTags={allTags}
           removableTags={[...new Set((personas ?? []).filter(p => selectedIds.has(p.id)).map(p => p.tags[0]).filter((t): t is string => !!t))].sort()}
-          addTagLabel="Set tag"
+          addTagLabel={m.bulk_set_tag()}
           onAddTag={tag => void bulkSetTag(tag, [...selectedIds])}
           onRemoveTag={tag => void bulkSetTag(null, (personas ?? []).filter(p => selectedIds.has(p.id) && p.tags[0] === tag).map(p => p.id))}
           tagBusy={tagBusy}
@@ -432,7 +435,7 @@ export default function Personas() {
 
       {personas === null && (
         <div className="flex items-center gap-2 text-ink-subtle text-sm py-20 justify-center">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading personas…
+          <Loader2 className="w-4 h-4 animate-spin" /> {m.ps_loading()}
         </div>
       )}
 
@@ -443,25 +446,23 @@ export default function Personas() {
         <EmptyState
           icon={<Bot className="w-8 h-8" />}
           tone="brand"
-          title="No personas yet"
-          description="A persona bundles the playbooks one role needs, with a condition for each."
+          title={m.ps_empty_title()}
+          description={m.ps_empty_desc()}
           extra={
             <div className="max-w-md mx-auto mt-4 text-left text-sm text-ink-muted space-y-2">
               <p>
-                <span className="font-semibold text-ink">Example — “Sales”:</span>{' '}
-                the offer-layout skill when a quote is being written, the workshop playbook when a
-                workshop is offered, the use-case generator when somebody asks what AI could do for them.
+                <span className="font-semibold text-ink">{m.ps_example_label()}</span>{' '}
+                {m.ps_example_text()}
               </p>
               <p>
-                Chat or your MCP client loads the persona, then fetches a playbook only once its
-                condition applies — so the knowledge arrives when it is needed instead of all at once.
+                {m.ps_example_how()}
               </p>
             </div>
           }
           action={canEdit ? (
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link to="/personas/new" className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-all">
-                <Plus className="w-4 h-4" /> Create your first persona
+                <Plus className="w-4 h-4" /> {m.ps_create_first()}
               </Link>
               {wizardButton}
             </div>
@@ -472,8 +473,8 @@ export default function Personas() {
       {personas !== null && personas.length > 0 && visible.length === 0 && (
         <EmptyState
           icon={showFavoritesOnly ? <Star className="w-8 h-8 text-amber-300" /> : <Bot className="w-8 h-8" />}
-          title={showFavoritesOnly ? 'No favourite personas' : 'Nothing matches'}
-          description={showFavoritesOnly ? 'Star personas to see them here.' : 'No persona matches your search or filters.'}
+          title={showFavoritesOnly ? m.ps_no_favourites() : m.ps_nothing_matches()}
+          description={showFavoritesOnly ? m.ps_star_hint() : m.ps_no_match()}
         />
       )}
 
@@ -481,7 +482,7 @@ export default function Personas() {
           Playbooks page. Below `lg` one at a time: the list, or (with ?id=) the preview with a way back. */}
       {visible.length > 0 && (
         <div className="lg:grid lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-6 lg:items-start">
-          <ul aria-label="Personas" className={`rounded-card border border-line bg-surface-raised p-2 space-y-0.5 ${showPreviewOnMobile ? 'hidden lg:block' : ''}`}>
+          <ul aria-label={m.nav_personas()} className={`rounded-card border border-line bg-surface-raised p-2 space-y-0.5 ${showPreviewOnMobile ? 'hidden lg:block' : ''}`}>
             {visible.map(persona => (
               <PersonaRow
                 key={persona.id}
@@ -525,7 +526,7 @@ export default function Personas() {
         onCreated={persona => {
           setWizardOpen(false);
           setPersonas(prev => [persona, ...(prev ?? [])]);
-          showToast('Persona generated — review its playbooks before using it', 'success');
+          showToast(m.ps_generated(), 'success');
           navigate(`/personas/${persona.id}/edit`);
         }}
       />
@@ -536,41 +537,39 @@ export default function Personas() {
           afterwards on the Templates page. */}
       <ConfirmModal
         open={!!importData}
-        title="Import this bundle?"
-        confirmLabel={importing ? 'Importing…' : 'Import'}
+        title={m.ps_import_bundle_title()}
+        confirmLabel={importing ? m.pb_importing() : m.pb_import()}
         variant="primary"
         busy={importing}
         onConfirm={() => void confirmImport()}
         onClose={() => setImportData(null)}
       >
+        {/* SQEM-605 — one sentence per case, so German can order it; the counts are no longer bold. */}
         <p>
-          Adds{' '}
-          <span className="font-semibold text-ink">
-            {(importData?.manifest.personas || []).length} persona{(importData?.manifest.personas || []).length === 1 ? '' : 's'}
-          </span>{' '}
-          and{' '}
-          <span className="font-semibold text-ink">
-            {(importData?.manifest.templates || []).length} playbook{(importData?.manifest.templates || []).length === 1 ? '' : 's'}
-          </span>
-          {(importData?.manifest.files || []).length ? ` plus ${(importData?.manifest.files || []).length} context file${(importData?.manifest.files || []).length === 1 ? '' : 's'}` : ''} to {workspace?.name}.
+          {(() => {
+            const counts = {
+              personas: m.count_persona({ count: (importData?.manifest.personas || []).length }),
+              playbooks: m.count_playbook({ count: (importData?.manifest.templates || []).length }),
+              workspace: workspace?.name ?? '',
+            };
+            const files = (importData?.manifest.files || []).length;
+            return files ? m.ps_import_adds_files({ ...counts, files: m.count_context_file({ count: files }) }) : m.ps_import_adds(counts);
+          })()}
         </p>
-        <p>
-          The playbooks are created as copies — a persona&apos;s routes must point at something, so they
-          travel with it. Access rules do not: an imported persona starts under this workspace&apos;s own rule.
-        </p>
+        <p>{m.ps_import_note()}</p>
       </ConfirmModal>
 
       <ConfirmModal
         open={!!pendingDelete}
-        title={pendingDelete && pendingDelete.length > 1 ? `Delete ${pendingDelete.length} personas?` : 'Delete this persona?'}
-        confirmLabel={pendingDelete && pendingDelete.length > 1 ? 'Delete personas' : 'Delete persona'}
+        title={pendingDelete && pendingDelete.length > 1 ? m.ps_delete_title_many({ count: pendingDelete.length }) : m.ps_delete_title_one()}
+        confirmLabel={pendingDelete && pendingDelete.length > 1 ? m.ps_delete_many() : m.ps_delete_one()}
         busy={deleting}
         onConfirm={() => void confirmDelete()}
         onClose={() => setPendingDelete(null)}
       >
         <p>
-          {pendingDelete && pendingDelete.length > 1 ? 'The personas are removed, with the lists of playbooks they use.' : 'The persona is removed, with the list of playbooks it uses.'}{' '}
-          <span className="font-semibold text-ink">The playbooks themselves are not touched</span> — they keep working on their own.
+          {pendingDelete && pendingDelete.length > 1 ? m.ps_delete_body_many() : m.ps_delete_body_one()}{' '}
+          <span className="font-semibold text-ink">{m.ps_delete_untouched()}</span> {m.ps_delete_untouched_rest()}
         </p>
       </ConfirmModal>
     </div>

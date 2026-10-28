@@ -6,6 +6,7 @@ import {
   messagePlaybookFields, MAX_REF_FIELDS, MAX_FIELD_NAME, MAX_FIELD_VALUE, MAX_REF_TITLE, MAX_LOADED_IDS,
 } from '../../lib/playbookRef';
 import { jobEventFor } from '../../supabase/functions/_shared/jobEvents';
+import { en } from './i18nText';
 
 /**
  * SQEM-551 — the playbook card on a user message and the "Used" chips under an answer.
@@ -131,7 +132,8 @@ describe('SQEM-551 — wiring', () => {
 
   it('the card keeps the text (collapsed) and links only what the viewer can open', () => {
     const card = read('components/ChatPlaybookCard.tsx');
-    expect(card).toMatch(/<summary[^>]*>Text sent<\/summary>/);
+    expect(card).toMatch(/<summary[^>]*>\{m\.chatcard_text_sent\(\)\}<\/summary>/);
+    expect(en.chatcard_text_sent).toBe('Text sent'); // SQEM-604
     expect(card).toMatch(/\{content\}<\/p>/);
     expect(read('pages/Chat.tsx')).toMatch(/linkable=\{playbookTitles\.has\(msg\.playbookRef\.id\)\}/);
   });

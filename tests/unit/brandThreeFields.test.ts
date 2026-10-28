@@ -32,9 +32,12 @@ describe('SQEM-395 — the form and the type', () => {
   it('the shared form has the three fields and the website, and nothing else', () => {
     const form = code(read('components/BrandProfileForm.tsx'));
     // SQEM-538 — each input now carries an id first (bound to its label), so allow attributes before `value`.
-    expect(form.match(/<input (?:id="[^"]*" )?value=\{value\.\w+\}/g)?.length).toBe(3);
+    // SQEM-602 — the fields are ui/Input (`<Input …>`) now.
+    expect(form.match(/<Input (?:id="[^"]*" )?value=\{value\.\w+\}/g)?.length).toBe(3);
     expect(form).toMatch(/type="url"/);
-    expect(form).not.toMatch(/tone|useCase|<select/i);
+    // No tone-of-voice field: no `value.tone`, no `tone:` key, no "Tone" label. (SQEM-602 — `tone=` is
+    // the field-state prop of ui/Input, the app's name for a primitive's variant; that is not this.)
+    expect(form).not.toMatch(/value\.tone|\btone:|>\s*Tone\b|useCase|<select/i);
   });
 
   it('BrandProfile, BrandFormValue and BrandInput carry neither tone nor useCase', () => {

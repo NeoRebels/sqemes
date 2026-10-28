@@ -10,6 +10,7 @@ import { FUNDED_MODEL } from '../_shared/funded.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
 import { imageGenEndpoint } from '../_shared/imageModels.ts';
 import { openRouterImageModel, callOpenRouterImage } from '../_shared/openrouterImage.ts';
+import { m as txt, requestLocale } from '../_shared/locale.ts';
 
 // SQEM-082 — Sqemes-funded authoring. Keyless Enhance/Generate route through a
 // server-side Mistral credential (GDPR/EU: direct api.mistral.ai, no US hop) on a
@@ -19,6 +20,7 @@ import { openRouterImageModel, callOpenRouterImage } from '../_shared/openrouter
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 
 Deno.serve(async (req) => {
+  const locale = requestLocale(req); // SQEM-612 — refusals in the person's language
   const cors = getCorsHeaders(req);
 
   // Handle CORS preflight
@@ -30,7 +32,7 @@ Deno.serve(async (req) => {
   const MAX_BODY_BYTES = 20 * 1024 * 1024;
   const contentLength = Number(req.headers.get('content-length') ?? 0);
   if (contentLength > MAX_BODY_BYTES) {
-    return new Response(JSON.stringify({ error: 'Request body too large. Maximum is 20 MB.' }), {
+    return new Response(JSON.stringify({ error: txt.srv_body_too_large({}, { locale }) }), {
       status: 413,
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
@@ -50,7 +52,7 @@ Deno.serve(async (req) => {
     const token = authHeader.replace(/^Bearer\s+/i, '');
     const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: txt.srv_unauthorized({}, { locale }) }), {
         status: 401,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -79,7 +81,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (!membership) {
-      return new Response(JSON.stringify({ error: 'Not a member of this workspace' }), {
+      return new Response(JSON.stringify({ error: txt.srv_not_member({}, { locale }) }), {
         status: 403,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -87,7 +89,7 @@ Deno.serve(async (req) => {
 
     // SQEM-083 — server-side paywall: reject when the workspace has no active subscription.
     if (!(await isWorkspaceSubscriptionActive(adminClient, workspaceId))) {
-      return new Response(JSON.stringify({ error: 'This workspace has no active subscription.', code: 'subscription_inactive' }), {
+      return new Response(JSON.stringify({ error: txt.srv_no_subscription({}, { locale }), code: 'subscription_inactive' }), {
         status: 402,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -97,7 +99,7 @@ Deno.serve(async (req) => {
     // SQEM-501 — per person, with a per-workspace ceiling (was: 60/min for the whole workspace).
     const budget = await checkChatBudget(workspaceId, user.id);
     if (!budget.ok) {
-      return new Response(JSON.stringify({ error: budgetMessage(budget), code: 'rate_limited', scope: budget.scope }), {
+      return new Response(JSON.stringify({ error: budgetMessage(budget, locale), code: 'rate_limited', scope: budget.scope }), {
         status: 429,
         headers: { ...cors, 'Content-Type': 'application/json', 'Retry-After': '60' },
       });
@@ -114,7 +116,7 @@ Deno.serve(async (req) => {
       // Cloud-only — absent on self-host → tell the user to bring their own key.
       const fundedKey = Deno.env.get('MISTRAL_API_KEY');
       if (!fundedKey) {
-        return new Response(JSON.stringify({ error: 'AI credits are not available here. Add your own API key in Settings to use AI.', code: 'funded_unavailable' }), {
+        return new Response(JSON.stringify({ error: txt.srv_funded_unavailable({}, { locale }), code: 'funded_unavailable' }), {
           status: 400,
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
@@ -122,7 +124,7 @@ Deno.serve(async (req) => {
       // Roll the monthly period if due, then refuse before spending if the allowance is gone.
       const state = await ensureCreditPeriod(adminClient, workspaceId);
       if (!hasCredits(state)) {
-        return new Response(JSON.stringify({ error: "You've used all your AI credits this month. Add your own API key (BYOK) or upgrade your plan.", code: 'out_of_credits' }), {
+        return new Response(JSON.stringify({ error: txt.srv_out_of_credits({}, { locale }), code: 'out_of_credits' }), {
           status: 402,
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
@@ -150,7 +152,7 @@ Deno.serve(async (req) => {
       } else if (modelLower.includes('mistral') || modelLower.includes('codestral') || modelLower.includes('ministral') || modelLower.includes('magistral') || modelLower.includes('pixtral')) {
         provider = 'mistral';
       } else {
-        return new Response(JSON.stringify({ error: `Unsupported model: ${modelId}` }), {
+        return new Response(JSON.stringify({ error: txt.srv_unsupported_model({ model: modelId }, { locale }) }), {
           status: 400,
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
@@ -164,7 +166,7 @@ Deno.serve(async (req) => {
         .single();
 
       if (!keyRow?.encrypted_key) {
-        return new Response(JSON.stringify({ error: `No API key configured for ${provider}. Add it in Settings > LLM API Keys.` }), {
+        return new Response(JSON.stringify({ error: txt.srv_no_key({ provider }, { locale }) }), {
           status: 400,
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
@@ -247,7 +249,7 @@ Deno.serve(async (req) => {
       : message.includes('API_KEY_ENCRYPTION_KEY') ? 503
       : 500;
     const body = status === 503
-      ? { error: 'Server encryption key not configured. Contact your administrator.' }
+      ? { error: txt.srv_encryption_missing({}, { locale }) }
       : { error: message };
     console.error('execute-step error:', message);
     return new Response(JSON.stringify(body), {

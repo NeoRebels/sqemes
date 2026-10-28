@@ -1,3 +1,4 @@
+import { m, type Locale } from './locale.ts';
 /**
  * SQEM-501 — the chat/AI budget, per PERSON with a per-workspace ceiling.
  *
@@ -46,8 +47,9 @@ export function budgetVerdict(personOk: boolean, workspaceOk: boolean,
 }
 
 /** The 429 text. Says which budget ran out and that it resets within the minute. */
-export function budgetMessage(v: Exclude<BudgetVerdict, { ok: true }>): string {
+export function budgetMessage(v: Exclude<BudgetVerdict, { ok: true }>, locale: Locale = 'en'): string {
+  // SQEM-612 — in the person's language; without a locale (tests, other callers) English.
   return v.scope === 'person'
-    ? `You have sent more than ${v.limit} requests in the last minute. It resets within 60 seconds — please try again then.`
-    : `This workspace has sent more than ${v.limit} requests in the last minute. It resets within 60 seconds — please try again then.`;
+    ? m.srv_budget_person({ limit: v.limit }, { locale })
+    : m.srv_budget_workspace({ limit: v.limit }, { locale });
 }

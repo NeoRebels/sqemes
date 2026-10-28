@@ -12,6 +12,7 @@ import type { WorkspaceFile } from '../types';
 import { getWorkspaceFileSignedUrl } from './api/files';
 import type { LogoImage } from './fileExport';
 import { findLogoFile } from './logoMatch';
+import { m } from './i18n';
 
 const IMAGE_TYPES: Record<string, 'png' | 'jpg'> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg' };
 
@@ -19,9 +20,9 @@ export type LogoResult = { logo: LogoImage } | { missing: string };
 
 export async function loadLogo(name: string, files: WorkspaceFile[]): Promise<LogoResult> {
   const file = findLogoFile(name, files);
-  if (!file) return { missing: `Logo "${name}" was not found in Files.` };
+  if (!file) return { missing: m.logo_not_found({ name }) };
   const type = IMAGE_TYPES[file.mimeType.toLowerCase()];
-  if (!type) return { missing: `Logo "${file.name}" is not a PNG or JPEG.` };
+  if (!type) return { missing: m.logo_wrong_type({ name: file.name }) };
   try {
     const url = await getWorkspaceFileSignedUrl(file.storagePath);
     const data = new Uint8Array(await (await fetch(url)).arrayBuffer());
@@ -50,6 +51,6 @@ export async function loadLogo(name: string, files: WorkspaceFile[]): Promise<Lo
     bitmap.close();
     return { logo };
   } catch {
-    return { missing: `Logo "${file.name}" could not be loaded.` };
+    return { missing: m.logo_load_failed({ name: file.name }) };
   }
 }

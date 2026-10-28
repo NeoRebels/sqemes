@@ -13,6 +13,7 @@ import { discoverAuthServer } from '../_shared/mcpOauth.ts';
 import { TOKEN_APPS } from '../_shared/connectorApps.ts';
 import { fetchShopifyToken, shopFromMcpUrl } from '../_shared/shopifyToken.ts';
 import { fetchWithTimeout } from '../_shared/fetchWithTimeout.ts';
+import { m as txt, requestLocale } from '../_shared/locale.ts';
 
 const MCP_PROTOCOL = '2024-11-05';
 /**
@@ -105,6 +106,7 @@ async function whyUnreachable(url: string, token: string | null): Promise<string
 }
 
 Deno.serve(async (req) => {
+  const locale = requestLocale(req); // SQEM-612 — refusals in the person's language
   const cors = getCorsHeaders(req);
   const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -115,7 +117,7 @@ Deno.serve(async (req) => {
     if (!authHeader) return json({ error: 'Missing authorization header' }, 401);
     const admin = createAdminClient();
     const { data: { user }, error: authErr } = await admin.auth.getUser(authHeader.replace(/^Bearer\s+/i, ''));
-    if (authErr || !user) return json({ error: 'Unauthorized' }, 401);
+    if (authErr || !user) return json({ error: txt.srv_unauthorized({}, { locale }) }, 401);
 
     const body = await req.json().catch(() => ({}));
 
@@ -127,14 +129,14 @@ Deno.serve(async (req) => {
         const { data: row } = await admin.from('workspace_connectors')
           .select('id, workspace_id, user_id, mcp_url, provider, auth_token_encrypted, refresh_token_encrypted, token_expires_at, oauth_client_id, oauth_client_secret_encrypted')
           .eq('id', body.connectorId).single();
-        if (!row) return json({ error: 'Connector not found' }, 404);
+        if (!row) return json({ error: txt.srv_connector_not_found({}, { locale }) }, 404);
         const { data: mem } = await admin.from('workspace_members').select('role')
           .eq('workspace_id', row.workspace_id).eq('user_id', user.id).single();
-        if (!mem || (row.user_id && row.user_id !== user.id)) return json({ error: 'Forbidden' }, 403);
+        if (!mem || (row.user_id && row.user_id !== user.id)) return json({ error: txt.srv_forbidden({}, { locale }) }, 403);
         url = row.mcp_url;
         token = await getFreshConnectorToken(admin, row); // decrypts; refreshes an expired Google token
       }
-      if (!url || !/^https:\/\//i.test(url)) return json({ error: 'A https:// mcpUrl is required' }, 400);
+      if (!url || !/^https:\/\//i.test(url)) return json({ error: txt.srv_https_required({}, { locale }) }, 400);
       try {
         return json({ ok: true, ...(await probeMcp(url, token)) });
       } catch (e) {
@@ -162,7 +164,7 @@ Deno.serve(async (req) => {
      */
     if (body.action === 'inspect') {
       const url: string | undefined = body.mcpUrl;
-      if (!url || !/^https:\/\//i.test(url)) return json({ error: 'A https:// mcpUrl is required' }, 400);
+      if (!url || !/^https:\/\//i.test(url)) return json({ error: txt.srv_https_required({}, { locale }) }, 400);
       try {
         const open = await probeMcp(url, null);
         return json({ ok: true, kind: 'none', serverName: open.serverName, tools: open.tools });
@@ -210,14 +212,14 @@ Deno.serve(async (req) => {
       const { data: row } = await admin.from('workspace_connectors')
         .select('id, workspace_id, user_id')
         .eq('id', connectorId).single();
-      if (!row) return json({ error: 'Connector not found' }, 404);
+      if (!row) return json({ error: txt.srv_connector_not_found({}, { locale }) }, 404);
       const { data: mem } = await admin.from('workspace_members').select('role')
         .eq('workspace_id', row.workspace_id).eq('user_id', user.id).single();
-      if (!mem) return json({ error: 'Not a member of this workspace' }, 403);
+      if (!mem) return json({ error: txt.srv_not_member({}, { locale }) }, 403);
       const mayEdit = row.user_id
         ? row.user_id === user.id
         : ['admin', 'editor'].includes(mem.role);
-      if (!mayEdit) return json({ error: 'Forbidden' }, 403);
+      if (!mayEdit) return json({ error: txt.srv_forbidden({}, { locale }) }, 403);
       // An empty array would mean "no tools at all", which nothing in the product can express and
       // which reads exactly like "all of them" in the UI. It collapses to null on purpose.
       const allowed = Array.isArray(tools) && tools.length ? tools.map(String) : null;
@@ -231,12 +233,12 @@ Deno.serve(async (req) => {
     if (body.action === 'create') {
       const { workspaceId, name, mcpUrl, token, shared, allowedTools } = body;
       if (!workspaceId || !name?.trim() || !mcpUrl) return json({ error: 'workspaceId, name, mcpUrl are required' }, 400);
-      if (!/^https:\/\//i.test(mcpUrl)) return json({ error: 'mcpUrl must be https://' }, 400);
+      if (!/^https:\/\//i.test(mcpUrl)) return json({ error: txt.srv_https_only({}, { locale }) }, 400);
       const { data: mem } = await admin.from('workspace_members').select('role')
         .eq('workspace_id', workspaceId).eq('user_id', user.id).single();
-      if (!mem) return json({ error: 'Not a member of this workspace' }, 403);
+      if (!mem) return json({ error: txt.srv_not_member({}, { locale }) }, 403);
       if (shared && !['admin', 'editor'].includes(mem.role)) {
-        return json({ error: 'Only admins or editors can add workspace-shared connectors' }, 403);
+        return json({ error: txt.srv_shared_connector_role({}, { locale }) }, 403);
       }
       const row = {
         workspace_id: workspaceId,
@@ -249,7 +251,7 @@ Deno.serve(async (req) => {
       };
       // SQEM-467 — this is the path every broken row on production came through. Probe first.
       const why = await whyUnreachable(mcpUrl, token ?? null);
-      if (why) return json({ error: `The server did not accept this connection: ${why}` }, 400);
+      if (why) return json({ error: txt.srv_server_refused({ why }, { locale }) }, 400);
 
       const { data: created, error } = await admin.from('workspace_connectors')
         .insert(row).select('id, name, mcp_url, user_id, allowed_tools, created_at').single();
@@ -265,22 +267,22 @@ Deno.serve(async (req) => {
       const app = TOKEN_APPS[appId as string];
       if (!app) return json({ error: 'Unsupported app' }, 400);
       if (!workspaceId) return json({ error: 'workspaceId required' }, 400);
-      if (!token?.trim()) return json({ error: app.needsSecret ? 'A client ID is required' : 'An access token is required' }, 400);
-      if (app.needsSecret && !String(body.secret ?? '').trim()) return json({ error: 'A client secret is required' }, 400);
+      if (!token?.trim()) return json({ error: app.needsSecret ? txt.srv_client_id_required({}, { locale }) : txt.srv_token_required({}, { locale }) }, 400);
+      if (app.needsSecret && !String(body.secret ?? '').trim()) return json({ error: txt.srv_secret_required({}, { locale }) }, 400);
 
       let mcpUrl = app.mcpUrl;
       if (app.needsShop) {
         let shop = String(body.shop || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
         if (!/\.myshopify\.com$/.test(shop) && /^[a-z0-9][a-z0-9-]*$/.test(shop)) shop = `${shop}.myshopify.com`;
-        if (!SHOP_RE.test(shop)) return json({ error: 'Enter your shop as {store}.myshopify.com' }, 400);
+        if (!SHOP_RE.test(shop)) return json({ error: txt.srv_shop_format({ example: '{store}.myshopify.com' }, { locale }) }, 400);
         mcpUrl = `${mcpUrl}?shop=${encodeURIComponent(shop)}`;
       }
 
       const { data: mem } = await admin.from('workspace_members').select('role')
         .eq('workspace_id', workspaceId).eq('user_id', user.id).single();
-      if (!mem) return json({ error: 'Not a member of this workspace' }, 403);
+      if (!mem) return json({ error: txt.srv_not_member({}, { locale }) }, 403);
       if (shared && !['admin', 'editor'].includes(mem.role)) {
-        return json({ error: 'Only admins or editors can add workspace-shared connectors' }, 403);
+        return json({ error: txt.srv_shared_connector_role({}, { locale }) }, 403);
       }
       const userId = shared ? null : user.id;
       // Reconnect replaces the caller's existing connector for this app (null-safe on the shared slot).
@@ -301,7 +303,7 @@ Deno.serve(async (req) => {
       let tokenExpiresAt: string | null = null;
       if (app.needsSecret) {
         const shop = shopFromMcpUrl(mcpUrl);
-        if (!shop) return json({ error: 'Enter your shop as {store}.myshopify.com' }, 400);
+        if (!shop) return json({ error: txt.srv_shop_format({ example: '{store}.myshopify.com' }, { locale }) }, 400);
         try {
           const grant = await fetchShopifyToken(shop, storedToken, String(body.secret).trim());
           storedToken = grant.accessToken;
@@ -314,7 +316,7 @@ Deno.serve(async (req) => {
       // SQEM-467 — the tile path. A pasted string that looks like a token is not a token: a customer
       // pasted his app's `shpss_` client secret here and the tile reported "Connected".
       const whyToken = await whyUnreachable(mcpUrl, storedToken);
-      if (whyToken) return json({ error: `The server did not accept this token: ${whyToken}` }, 400);
+      if (whyToken) return json({ error: txt.srv_token_refused({ why: whyToken }, { locale }) }, 400);
 
       const { data: created, error } = await admin.from('workspace_connectors').insert({
         workspace_id: workspaceId,

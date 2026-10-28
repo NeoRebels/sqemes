@@ -42,18 +42,26 @@ const auth = read('pages/Auth.tsx');
 const authCode = code(auth);
 
 describe('SQEM-458 — sign-up says only what it can know', () => {
+  // SQEM-603 — the texts live in messages/*.json now; the rule holds in EVERY language: a translation
+  // may not say more than the English does.
+  const en = JSON.parse(read('messages/en.json')) as Record<string, string>;
+  const de = JSON.parse(read('messages/de.json')) as Record<string, string>;
+
   it('⛔ does not claim a mail was sent', () => {
-    expect(authCode).not.toMatch(/we just emailed you/i);
-    expect(authCode).not.toMatch(/Almost there/i);
+    for (const text of [authCode, JSON.stringify(en), JSON.stringify(de)]) {
+      expect(text).not.toMatch(/we just emailed you|Almost there|wir haben dir (gerade )?eine (E-Mail|Mail) geschickt|Fast geschafft/i);
+    }
   });
 
   it('⛔ the message holds under both causes and names a next step for each', () => {
-    const msg = authCode.match(/setMessage\('Check your inbox[^']*'\)/)?.[0] ?? '';
-    expect(msg, 'the sign-up message is gone or was reworded').not.toBe('');
+    expect(authCode, 'the sign-up message is gone or was reworded').toMatch(/setMessage\(m\.auth_signup_check_inbox\(\)\)/);
     // "if this address is new" — the confirmation case; "already have an account" — the other one.
-    expect(msg).toMatch(/if this address is new/i);
-    expect(msg).toMatch(/already have an account/i);
-    expect(msg).toMatch(/sign in/i);
+    expect(en.auth_signup_check_inbox).toMatch(/if this address is new/i);
+    expect(en.auth_signup_check_inbox).toMatch(/already have an account/i);
+    expect(en.auth_signup_check_inbox).toMatch(/sign in/i);
+    expect(de.auth_signup_check_inbox).toMatch(/ist diese Adresse neu/i);
+    expect(de.auth_signup_check_inbox).toMatch(/schon ein Konto/i);
+    expect(de.auth_signup_check_inbox).toMatch(/melde dich/i);
   });
 
   it('⛔ `identities` is never read — that path is the enumeration leak, not the fix', () => {

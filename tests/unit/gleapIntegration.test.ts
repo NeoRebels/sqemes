@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ROLE_LABELS } from '../../constants';
+import { en } from './i18nText';
 
 /**
  * SQEM-261 — Gleap, and the four things about it that are promises rather than preferences.
@@ -88,9 +89,11 @@ describe('SQEM-261 — how Gleap is allowed to be wired', () => {
   it('the invite dialog keeps its explanations', () => {
     // "Admin (Full Access)" — the label is shared, the parenthetical is not. Folding it into the map
     // would delete an explanation somebody wrote on purpose.
-    expect(SETTINGS).toMatch(/\{ROLE_LABELS\.admin\} \(Full Access\)/);
-    expect(SETTINGS).toMatch(/\{ROLE_LABELS\.editor\} \(Can Create\)/);
-    expect(SETTINGS).toMatch(/\{ROLE_LABELS\.member\} \(Read Only\)/);
+    // SQEM-608 — the label is roleLabel (translated), the explanation its own message.
+    expect(SETTINGS).toMatch(/m\.stt_role_admin_hint\(\{ role: roleLabel\('admin'\) \}\)/);
+    expect(SETTINGS).toMatch(/m\.stt_role_editor_hint\(\{ role: roleLabel\('editor'\) \}\)/);
+    expect(SETTINGS).toMatch(/m\.stt_role_member_hint\(\{ role: roleLabel\('member'\) \}\)/);
+    expect([en.stt_role_admin_hint, en.stt_role_editor_hint, en.stt_role_member_hint]).toEqual(['{role} (Full Access)', '{role} (Can Create)', '{role} (Read Only)']);
   });
 
   it('⚠️ the CSP names what Gleap needs — otherwise it fails silently', () => {

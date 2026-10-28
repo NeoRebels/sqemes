@@ -1,5 +1,8 @@
 import React from 'react';
 import { Check, Clock } from 'lucide-react';
+import Select from './ui/Select';
+import { Input } from './ui/Input';
+import { m } from '../lib/i18n';
 
 // SQEM-064 — scope + expiry controls for an MCP/API connection.
 // `read` is always granted (a key with no read is useless), so it is implied
@@ -102,20 +105,21 @@ export function valueFromKey(scopes: string[] | null, expiresAt: string | null):
  * and fails when a tool is missing — the same shape as `mcpToolCapability.test.ts`. **Adding a tool
  * to the map without listing it here is a red build, not a silent promise.**
  */
-const CAPS: { key: 'create' | 'update' | 'delete'; label: string; hint: string }[] = [
+// SQEM-609 — `label` is a message, called at render; `hint` lists MCP tool names and stays as it is.
+const CAPS: { key: 'create' | 'update' | 'delete'; label: () => string; hint: string }[] = [
   {
     key: 'create',
-    label: 'Create playbooks & personas, upload files',
+    label: m.ks_create,
     hint: 'create_template, create_persona, import_skill_from_url, upload_file, create_upload_url, finalize_upload',
   },
   {
     key: 'update',
-    label: 'Update playbooks & personas, change which playbooks a persona uses',
+    label: m.ks_update,
     hint: 'update_template, update_persona, attach_template, detach_template',
   },
   {
     key: 'delete',
-    label: 'Delete playbooks, personas & files',
+    label: m.ks_delete,
     hint: 'delete_template, delete_persona, delete_file',
   },
 ];
@@ -145,15 +149,14 @@ export function ApiKeyScopeFields({
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Permissions</p>
+        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{m.ks_permissions()}</p>
         <div className="flex items-center gap-2 text-sm text-slate-400 dark:text-slate-500 mb-2">
           <Check className="w-4 h-4 text-emerald-500" />
-          Read playbooks, files &amp; personas — always included
+          {m.ks_read_always()}
         </div>
         {!canWrite && (
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-            Members can read the library but not change it, so these cannot be granted here. A
-            workspace admin can make you an editor.
+            {m.ks_member_note()}
           </p>
         )}
         <div className="space-y-2">
@@ -170,7 +173,7 @@ export function ApiKeyScopeFields({
                 className={`mt-0.5 w-4 h-4 rounded accent-brand-600 ${canWrite ? 'cursor-pointer' : 'cursor-not-allowed'}`}
               />
               <span className="text-sm text-slate-700 dark:text-slate-200 leading-tight">
-                {cap.label}
+                {cap.label()}
                 <span className="block text-2xs font-mono text-slate-400 dark:text-slate-500">{cap.hint}</span>
               </span>
             </label>
@@ -180,25 +183,24 @@ export function ApiKeyScopeFields({
 
       <div>
         <label htmlFor="api-key-scope-fields-expires" className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <Clock className="w-3.5 h-3.5" /> Expires
+          <Clock className="w-3.5 h-3.5" /> {m.ks_expires()}
         </label>
-        <select id="api-key-scope-fields-expires"
+        <Select id="api-key-scope-fields-expires"
           value={value.expiry}
           onChange={e => set({ expiry: e.target.value as KeyScopeValue['expiry'] })}
-          className="w-full p-2.5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
         >
-          <option value="never">Never</option>
-          <option value="30">In 30 days</option>
-          <option value="90">In 90 days</option>
-          <option value="custom">Custom date…</option>
-        </select>
+          <option value="never">{m.ks_never()}</option>
+          <option value="30">{m.ks_30()}</option>
+          <option value="90">{m.ks_90()}</option>
+          <option value="custom">{m.ks_custom()}</option>
+        </Select>
         {value.expiry === 'custom' && (
-          <input
+          <Input
             type="date"
             value={value.customDate}
             min={new Date().toISOString().slice(0, 10)}
             onChange={e => set({ customDate: e.target.value })}
-            className="w-full mt-2 p-2.5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+            className="mt-2"
           />
         )}
       </div>

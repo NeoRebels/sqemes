@@ -23,6 +23,7 @@
  */
 import { isFetchableHost } from './connectorIcon.ts';
 import type { ToolDefinition, ToolRuntime } from './libraryTools.ts';
+import { m, type Locale } from './locale.ts';
 
 export type SearchProvider = 'linkup' | 'brave';
 
@@ -40,7 +41,15 @@ export interface WebSources { queries: string[]; pages: { url: string; title?: s
 /** Set by the web tools when the plan's allowance stopped a search — the caller says so under the answer. */
 export interface WebState { allowanceExhausted: boolean }
 
-export const ALLOWANCE_NOTICE = '\n\n---\n_The web searches included in your plan are used up for this month. A workspace admin can add an own search key in Settings → API & MCP → Web search, or upgrade the plan._';
+/** SQEM-604 — a function now, in the user's language (was the constant ALLOWANCE_NOTICE). */
+export function allowanceNotice(locale: Locale = 'en'): string {
+  return `\n\n---\n_${m.server_web_allowance({}, { locale })}_`;
+}
+
+/** SQEM-604 — said once under the answer when web search was asked for but no key exists anywhere. */
+export function webNotSetUpNotice(locale: Locale = 'en'): string {
+  return `\n\n---\n_${m.server_web_not_setup({}, { locale })}_`;
+}
 
 export const MAX_RESULTS = 8;
 /** Per result. Linkup returns near-whole pages; eight of those would be ~100k characters per search. */

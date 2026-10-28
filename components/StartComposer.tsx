@@ -5,6 +5,7 @@ import PickerDropdown from './ui/PickerDropdown';
 import { fetchPersonas } from '../lib/api/personas';
 import { handOffToChat } from '../lib/chatHandoff';
 import type { Persona } from '../types';
+import { m } from '../lib/i18n';
 
 /**
  * SQEM-550 (a) — the composer on the Start page (redesign C): describe the task, optionally pick the
@@ -41,7 +42,7 @@ export default function StartComposer({ workspaceId }: { workspaceId: string }) 
 
   return (
     <div className="w-full max-w-3xl rounded-3xl border border-line bg-surface-raised shadow-raised p-4 md:p-5">
-      <label htmlFor="start-composer" className="sr-only">Describe the task</label>
+      <label htmlFor="start-composer" className="sr-only">{m.start_composer_label()}</label>
       <textarea
         id="start-composer"
         value={text}
@@ -52,7 +53,7 @@ export default function StartComposer({ workspaceId }: { workspaceId: string }) 
           setText(e.target.value);
         }}
         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}
-        placeholder="Describe the task — or start from a playbook with /"
+        placeholder={m.start_composer_placeholder()}
         className="w-full resize-none bg-transparent text-base md:text-lg text-ink-strong placeholder:text-ink-subtle focus:outline-none"
       />
       <div className="mt-3 flex items-center justify-between gap-3">
@@ -60,7 +61,7 @@ export default function StartComposer({ workspaceId }: { workspaceId: string }) 
           <PickerDropdown
             wide
             triggerIcon={<Bot className="w-4 h-4" />}
-            triggerLabel={persona ? persona.title : 'No persona'}
+            triggerLabel={persona ? persona.title : m.start_no_persona()}
             search={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search personas…"
@@ -72,7 +73,7 @@ export default function StartComposer({ workspaceId }: { workspaceId: string }) 
                   onClick={() => { setPersona(null); close(); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-ink hover:bg-surface-sunken rounded-control"
                 >
-                  {persona === null ? <Check className="w-4 h-4 text-accent" /> : <span className="w-4" />} No persona
+                  {persona === null ? <Check className="w-4 h-4 text-accent" /> : <span className="w-4" />} {m.start_no_persona()}
                 </button>
                 {shown.map(p => (
                   <button
@@ -93,14 +94,14 @@ export default function StartComposer({ workspaceId }: { workspaceId: string }) 
             onClick={openPlaybooks}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-line text-sm font-medium text-ink-muted hover:text-ink-strong hover:bg-surface-sunken transition-colors"
           >
-            <BookMarked className="w-4 h-4" /> Playbook
+            <BookMarked className="w-4 h-4" /> {m.start_playbook_button()}
           </button>
         </div>
         <button
           type="button"
           onClick={send}
           disabled={!text.trim()}
-          aria-label="Send"
+          aria-label={m.start_send()}
           className="shrink-0 w-10 h-10 rounded-control bg-accent-strong text-white flex items-center justify-center hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
         >
           <ArrowUp className="w-5 h-5" />

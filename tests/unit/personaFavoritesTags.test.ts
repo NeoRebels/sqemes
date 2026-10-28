@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { collectWorkspaceTags } from '../../lib/workspaceTags';
 import type { Prompt, WorkspaceFile } from '../../types';
+import { en } from './i18nText';
 
 /**
  * SQEM-393 — the Personas archive gets what the Playbooks archive has had since SQEM-071/087: a star
@@ -81,7 +82,8 @@ describe('SQEM-393 — the archive and the editor', () => {
     expect(page).toMatch(/if \(selectedTag && !p\.tags\.includes\(selectedTag\)\) return false;/);
     expect(page).toMatch(/<TagFilter tags=\{allTags\} value=\{selectedTag\} onChange=\{setSelectedTag\} \/>/);
     expect(page).toMatch(/collectWorkspaceTags\(prompts, workspaceFiles, personas \?\? \[\]\)/);
-    expect(page).toMatch(/No favourite personas/);
+    expect(page).toMatch(/m\.ps_no_favourites\(\)/);
+    expect(en.ps_no_favourites).toBe('No favourite personas'); // SQEM-605
   });
 
   // SQEM-554 (b) — the card became a row + preview: the star is on both, the tag editor in the preview.

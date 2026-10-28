@@ -18,10 +18,12 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { workspaceOfPath } from '../_shared/fileLinks.ts';
+import { m as txt, requestLocale } from '../_shared/locale.ts';
 
 const BUCKET = 'workspace-files';
 
 Deno.serve(async (req) => {
+  const locale = requestLocale(req); // SQEM-612 — refusals in the person's language
   const cors = getCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -36,7 +38,7 @@ Deno.serve(async (req) => {
     const admin = createAdminClient();
     const token = authHeader.replace(/^Bearer\s+/i, '');
     const { data: { user }, error: authError } = await admin.auth.getUser(token);
-    if (authError || !user) return json({ error: 'Unauthorized' }, 401);
+    if (authError || !user) return json({ error: txt.srv_unauthorized({}, { locale }) }, 401);
 
     const asUser = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
       global: { headers: { Authorization: `Bearer ${token}` } },
@@ -60,8 +62,8 @@ Deno.serve(async (req) => {
       if (!workspaceOfPath(path)) return json({ error: 'Invalid path' }, 400);
       const { data: ok, error } = await admin.rpc('can_delete_orphan_object', { p_path: path, p_uid: user.id });
       if (error) return json({ error: error.message }, 500);
-      if (!ok) return json({ error: 'Not found' }, 404);
-      return (await removeObject(path)) ? json({ removed: true }) : json({ error: 'Could not remove the stored object' }, 500);
+      if (!ok) return json({ error: txt.srv_not_found({}, { locale }) }, 404);
+      return (await removeObject(path)) ? json({ removed: true }) : json({ error: txt.srv_remove_failed({}, { locale }) }, 500);
     }
 
     // ---- delete a file ---------------------------------------------------------------------------
@@ -69,14 +71,14 @@ Deno.serve(async (req) => {
     if (!/^[0-9a-f-]{36}$/i.test(fileId)) return json({ error: 'Missing fileId' }, 400);
 
     const { data: row } = await admin.from('workspace_files').select('id, workspace_id, storage_path').eq('id', fileId).maybeSingle();
-    if (!row) return json({ error: 'Not found' }, 404);
+    if (!row) return json({ error: txt.srv_not_found({}, { locale }) }, 404);
 
     // The caller's own delete: RLS and the SQEM-234 guard decide, as they always did.
     const { error: delErr } = await asUser.from('workspace_files').delete().eq('id', fileId);
     if (delErr) return json({ error: delErr.message, code: delErr.code }, 409);
 
     const { data: still } = await admin.from('workspace_files').select('id').eq('id', fileId).maybeSingle();
-    if (still) return json({ error: 'Not found' }, 404); // RLS refused it — answered like a missing file
+    if (still) return json({ error: txt.srv_not_found({}, { locale }) }, 404); // RLS refused it — answered like a missing file
 
     // The row is gone; the object goes with it. Only a path inside the row's own workspace is touched.
     if (!row.storage_path || workspaceOfPath(row.storage_path) !== row.workspace_id) {

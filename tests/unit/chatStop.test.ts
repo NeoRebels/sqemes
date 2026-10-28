@@ -4,16 +4,19 @@ import { resolve } from 'node:path';
 import { stoppedContent, STOPPED_NOTE } from '../../lib/chatStop';
 import { watchForCancel } from '../../supabase/functions/_shared/chatCancel';
 import { fetchWithTimeout } from '../../supabase/functions/_shared/fetchWithTimeout';
+import { en } from './i18nText';
 
 /** SQEM-583 — Stop: the client keeps what was written, the server really stops. */
 const read = (p: string) => readFileSync(resolve(__dirname, '../..', p), 'utf8');
 
 describe('the kept text', () => {
   it('keeps what was written and says it ends there', () => {
-    expect(stoppedContent('Half an answer  \n')).toBe(`Half an answer\n\n${STOPPED_NOTE}`);
+    expect(stoppedContent('Half an answer  \n')).toBe(`Half an answer\n\n${STOPPED_NOTE()}`);
+    expect(STOPPED_NOTE()).toBe(en.chat_stopped); // SQEM-611 — '_Stopped._', in the app language
   });
   it('says so when nothing was written yet', () => {
     expect(stoppedContent('')).toBe('_Stopped before an answer._');
+    expect(en.chat_stopped_empty).toBe('_Stopped before an answer._'); // SQEM-611
   });
 });
 
@@ -81,7 +84,8 @@ describe('wiring', () => {
   });
   it('Chat: Stop replaces Send while an answer runs, and New chat stops the job too', () => {
     const chat = read('pages/Chat.tsx');
-    expect(chat).toMatch(/isLoading \? \(\s*<button onClick=\{handleStop\} aria-label="Stop generating"/);
+    expect(chat).toMatch(/isLoading \? \(\s*<button onClick=\{handleStop\} aria-label=\{txt\.chat_stop_label\(\)\}/);
+    expect(en.chat_stop_label).toBe('Stop generating'); // SQEM-604
     expect(chat).toMatch(/const handleNewChat = \(\) => \{\s*\/\/[^\n]*\n\s*if \(runningJobRef\.current\) requestChatJobCancel/);
   });
   it('the migration lets clients insert only, and only their own row', () => {

@@ -11,6 +11,8 @@ import KindBadge from '../ui/KindBadge';
 import FullScreenExit from '../ui/FullScreenExit';
 import sqemesIcon from '../../assets/sqemes-icon.svg';
 import { FilePlus, Flag, Loader2, FileText, ArrowUpRight, Sparkles, Flame, Snowflake, Download } from 'lucide-react';
+import { m } from '../../lib/i18n';
+import { categoryLabel } from '../../lib/labels';
 
 export type ListingViewProps = {
   listing: LibraryTemplate;
@@ -54,7 +56,6 @@ export default function ListingView({
   const summary = listing.copySummary;
   const needsConfirm = !!summary && (summary.scripts > 0 || summary.binaries > 0 || summary.hosts.length > 0);
   const [confirming, setConfirming] = useState(false);
-  const n = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
   return (
     // Owns its scroll (SQEM-191): this route renders outside Layout, and index.css sets
@@ -65,7 +66,7 @@ export default function ListingView({
     <div className="h-dvh overflow-y-auto bg-surface">
       <div className="max-w-3xl mx-auto px-6 pt-6 flex items-center justify-between">
         {onExit
-          ? <FullScreenExit label="Back to Marketplace" onExit={onExit} escapeEnabled />
+          ? <FullScreenExit label={m.lv_back()} onExit={onExit} escapeEnabled />
           : <span />}
         <div className="flex items-center gap-2 text-ink-subtle">
           <img src={sqemesIcon} alt="sqemes" className="w-5 h-5" />
@@ -77,8 +78,8 @@ export default function ListingView({
         {/* Hero */}
         <div className="flex flex-wrap items-center gap-2 mb-4">
           <KindBadge kind={listing.kind} />
-          <span className="text-2xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-surface-sunken text-ink-muted">{listing.category}</span>
-          {listing.status === 'pending' && <span className="text-2xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-warning-soft text-ink-strong">Pending review</span>}
+          <span className="text-2xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-surface-sunken text-ink-muted">{categoryLabel(listing.category)}</span>
+          {listing.status === 'pending' && <span className="text-2xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-warning-soft text-ink-strong">{m.lv_pending()}</span>}
         </div>
         <h1 className="font-display text-3xl font-semibold text-ink-strong tracking-tight">{listing.title}</h1>
         {/* SQEM-258 — was text-lg; the description is supporting text, not a second headline. */}
@@ -92,28 +93,28 @@ export default function ListingView({
         <div className="flex flex-wrap items-center gap-3 mt-5">
           {onVote ? (
             <div className="inline-flex items-center rounded-xl border border-line-strong overflow-hidden">
-              <button onClick={() => onVote(1)} title="Hot" className={`inline-flex items-center px-3 py-2 transition-colors ${myVote === 1 ? 'text-danger bg-danger-soft' : 'text-ink-subtle hover:bg-surface-sunken'}`}>
+              <button onClick={() => onVote(1)} title={m.mk_hot()} className={`inline-flex items-center px-3 py-2 transition-colors ${myVote === 1 ? 'text-danger bg-danger-soft' : 'text-ink-subtle hover:bg-surface-sunken'}`}>
                 <Flame className="w-4 h-4" />
               </button>
               <span className={`px-2 text-sm font-bold tabular-nums ${score > 0 ? 'text-danger' : score < 0 ? 'text-sky-500' : 'text-ink-subtle'}`}>{score > 0 ? `+${score}` : score}°</span>
-              <button onClick={() => onVote(-1)} title="Cold" className={`inline-flex items-center px-3 py-2 transition-colors ${myVote === -1 ? 'text-sky-500 bg-sky-50 dark:bg-sky-900/20' : 'text-ink-subtle hover:bg-surface-sunken'}`}>
+              <button onClick={() => onVote(-1)} title={m.mk_cold()} className={`inline-flex items-center px-3 py-2 transition-colors ${myVote === -1 ? 'text-sky-500 bg-sky-50 dark:bg-sky-900/20' : 'text-ink-subtle hover:bg-surface-sunken'}`}>
                 <Snowflake className="w-4 h-4" />
               </button>
             </div>
           ) : (
             // Read-only: the number is worth showing, the buttons need an identity to attach a vote to.
-            <span className={`inline-flex items-center gap-1.5 text-sm font-bold tabular-nums ${score > 0 ? 'text-danger' : score < 0 ? 'text-sky-500' : 'text-ink-subtle'}`} title="Community rating">
+            <span className={`inline-flex items-center gap-1.5 text-sm font-bold tabular-nums ${score > 0 ? 'text-danger' : score < 0 ? 'text-sky-500' : 'text-ink-subtle'}`} title={m.lv_rating()}>
               {score < 0 ? <Snowflake className="w-4 h-4" /> : <Flame className="w-4 h-4" />} {score > 0 ? `+${score}` : score}°
             </span>
           )}
 
           {fileNames.length > 0 && (
-            <span className="inline-flex items-center gap-1.5 text-sm text-ink-subtle"><FileText className="w-4 h-4" /> {fileNames.length} file{fileNames.length === 1 ? '' : 's'}</span>
+            <span className="inline-flex items-center gap-1.5 text-sm text-ink-subtle"><FileText className="w-4 h-4" /> {m.count_file({ count: fileNames.length })}</span>
           )}
 
           {onReport && (
             <button onClick={onReport} className="inline-flex items-center gap-1.5 text-sm text-ink-subtle hover:text-danger font-semibold transition-colors">
-              <Flag className="w-4 h-4" /> Report
+              <Flag className="w-4 h-4" /> {m.lv_report()}
             </button>
           )}
         </div>
@@ -122,7 +123,7 @@ export default function ListingView({
         <div className="flex flex-wrap items-center gap-3 mt-6">
           {onCopy && (
             <button onClick={needsConfirm ? () => setConfirming(true) : onCopy} disabled={copying || adapting || confirming} className="inline-flex items-center gap-2 px-6 py-3 bg-accent-strong hover:opacity-90 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50">
-              {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <FilePlus className="w-4 h-4" />} Add to playbooks
+              {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <FilePlus className="w-4 h-4" />} {m.lv_add()}
             </button>
           )}
           {onAdapt && (
@@ -143,31 +144,31 @@ export default function ListingView({
             <button
               onClick={onDownload}
               disabled={downloading}
-              title={fileNames.length ? `A .sqemes.zip with ${fileNames.length} file${fileNames.length === 1 ? '' : 's'}` : 'A .sqemes.zip — this listing carries no files'}
+              title={fileNames.length ? m.lv_download_title_files({ files: m.count_file({ count: fileNames.length }) }) : m.lv_download_title_none()}
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border border-line-strong text-ink hover:border-accent hover:text-accent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Download Playbook
+              {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} {m.lv_download()}
             </button>
           )}
         </div>
 
         {onCopy && confirming && summary && (
           <div className="mt-4 rounded-2xl border border-warning/40 bg-warning-soft p-5 text-sm text-ink" data-testid="copy-summary">
-            <h2 className="font-bold mb-2">Before you add it</h2>
+            <h2 className="font-bold mb-2">{m.lv_before_add()}</h2>
             <p>
-              This playbook brings {n(summary.scripts, 'script', 'scripts')}, {n(summary.binaries, 'other file', 'other files')} and {n(summary.textFiles, 'text file', 'text files')}.
+              {m.lv_brings({ scripts: m.count_script({ count: summary.scripts }), binaries: m.count_other_file({ count: summary.binaries }), texts: m.count_text_file({ count: summary.textFiles }) })}
             </p>
             {summary.scripts > 0 && (
-              <p className="mt-2">Scripts do nothing on their own. An AI agent that can run code may run them when it uses this playbook, so read them before you use it there.</p>
+              <p className="mt-2">{m.lv_scripts_note()}</p>
             )}
             {summary.hosts.length > 0 && (
-              <p className="mt-2 break-words">It names these web addresses: <span className="font-mono text-xs">{summary.hosts.join(', ')}</span></p>
+              <p className="mt-2 break-words">{m.lv_hosts()} <span className="font-mono text-xs">{summary.hosts.join(', ')}</span></p>
             )}
             <div className="flex flex-wrap gap-2 mt-4">
               <button onClick={() => { setConfirming(false); onCopy(); }} disabled={copying} className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-50">
-                <FilePlus className="w-4 h-4" /> Add to playbooks
+                <FilePlus className="w-4 h-4" /> {m.lv_add()}
               </button>
-              <button onClick={() => setConfirming(false)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-ink hover:bg-surface-raised/60">Cancel</button>
+              <button onClick={() => setConfirming(false)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-ink hover:bg-surface-raised/60">{m.pb_cancel()}</button>
             </div>
           </div>
         )}
@@ -179,7 +180,7 @@ export default function ListingView({
           <div className="mt-8 rounded-2xl bg-surface-raised border border-line shadow-soft p-5">
             {/* SQEM-415 — "this copy" was read as a copy of something else; the word everywhere
                 else on this page is playbook. */}
-            <h2 className="text-sm font-bold text-ink mb-3">What comes with this playbook</h2>
+            <h2 className="text-sm font-bold text-ink mb-3">{m.lv_what_comes()}</h2>
             {fileNames.length > 0 && (
               // SQEM-258 — the list is capped and scrolls: a skill import can bring 151 files, and
               // an uncapped chip list pushes the preview and everything below it off the page. The
@@ -198,7 +199,7 @@ export default function ListingView({
         {/* Body preview */}
         {body && (
           <div className="mt-6">
-            <h2 className="text-sm font-bold text-ink mb-2">Preview</h2>
+            <h2 className="text-sm font-bold text-ink mb-2">{m.lv_preview()}</h2>
             <pre className="rounded-2xl bg-surface-raised border border-line shadow-soft p-5 text-sm text-ink whitespace-pre-wrap break-words max-h-96 overflow-y-auto font-sans leading-relaxed">{body}</pre>
           </div>
         )}
@@ -206,7 +207,7 @@ export default function ListingView({
         {/* Variables */}
         {listing.variables?.length > 0 && (
           <div className="mt-6">
-            <h2 className="text-sm font-bold text-ink mb-2">Variables</h2>
+            <h2 className="text-sm font-bold text-ink mb-2">{m.lv_variables()}</h2>
             <div className="flex flex-wrap gap-1.5">
               {(listing.variables as Variable[]).map(v => <span key={v.id} className="text-xs font-mono bg-accent-soft text-accent rounded-lg px-2 py-1">{`{{${v.name}}}`}</span>)}
             </div>
@@ -216,7 +217,7 @@ export default function ListingView({
         {/* Footer — soft growth loop */}
         <div className="mt-14 pt-6 border-t border-line flex items-center justify-center">
           <a href="https://sqemes.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-ink-subtle hover:text-accent transition-colors">
-            <img src={sqemesIcon} alt="" className="w-4 h-4 opacity-70" /> Made with sqemes <ArrowUpRight className="w-3.5 h-3.5" />
+            <img src={sqemesIcon} alt="" className="w-4 h-4 opacity-70" /> {m.lv_made_with()} <ArrowUpRight className="w-3.5 h-3.5" />
           </a>
         </div>
       </div>
@@ -230,11 +231,11 @@ export default function ListingView({
 export function ListingUnavailable({ onExit }: { onExit?: () => void }) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-surface text-center px-6">
-      <p className="text-ink-muted">This playbook isn&apos;t available.</p>
+      <p className="text-ink-muted">{m.lv_unavailable()}</p>
       {/* SQEM-208 — the dead-end state needs the exit most of all: there is nothing else here.
           Except when there is nowhere to send them: a signed-out visitor has no marketplace to go
           back to, and an exit into the sign-in wall is not an exit (SQEM-258). */}
-      {onExit && <FullScreenExit label="Back to Marketplace" onExit={onExit} escapeEnabled />}
+      {onExit && <FullScreenExit label={m.lv_back()} onExit={onExit} escapeEnabled />}
     </div>
   );
 }

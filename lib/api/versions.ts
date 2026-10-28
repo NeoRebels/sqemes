@@ -2,6 +2,7 @@
 // and decides who may see, restore or delete them (RLS, the edit right of SQEM-473); this module only
 // reads them and calls the two actions.
 import { supabase } from '../supabase';
+import { m } from '../i18n';
 
 // Not in the generated database.types (same as template_editors); a thin cast keeps call sites typed.
 type Client = {
@@ -83,5 +84,5 @@ export async function restoreVersion(versionId: string): Promise<{ version: numb
 export async function deleteVersion(versionId: string): Promise<void> {
   const { data, error } = await client.from('template_versions').delete().eq('id', versionId).select('id');
   if (error) throw error;
-  if (!data || data.length === 0) throw new Error('You may use this playbook but not change it.');
+  if (!data || data.length === 0) throw new Error(m.api_playbook_read_only());
 }

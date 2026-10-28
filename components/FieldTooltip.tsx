@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { HelpCircle } from 'lucide-react';
+import { m } from '../lib/i18n';
 
 interface FieldTooltipProps {
   text: string;
@@ -26,7 +27,7 @@ const FieldTooltip = ({ text, position = 'top' }: FieldTooltipProps) => {
         onFocus={() => setVisible(true)}
         onBlur={() => setVisible(false)}
         className="text-slate-300 hover:text-slate-500 transition-colors focus:outline-none"
-        aria-label="More information"
+        aria-label={m.tooltip_more_info()}
       >
         <HelpCircle className="w-3.5 h-3.5" />
       </button>

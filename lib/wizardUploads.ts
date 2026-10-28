@@ -7,6 +7,8 @@
 // deleting afterwards leaves the file behind on every path that does not reach the delete (cancel,
 // a failed generation, a closed tab).
 
+import { m } from './i18n';
+
 /**
  * Extensions we treat as text when the browser gives us nothing useful.
  *
@@ -48,7 +50,7 @@ export function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(String(r.result ?? ''));
-    r.onerror = () => reject(new Error(`${file.name} could not be read.`));
+    r.onerror = () => reject(new Error(m.wu_not_readable({ name: file.name })));
     r.readAsText(file);
   });
 }
@@ -139,10 +141,10 @@ export function classifyUpload(
   const isPdf = mime === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
   const isImage = mime.startsWith(IMAGE_MIME_PREFIX);
   if (!isPdf && !isImage) {
-    return { ok: false, reason: `${file.name} isn't a text document, a PDF or an image, so there is no way to read it here.` };
+    return { ok: false, reason: m.wu_wrong_type({ name: file.name }) };
   }
   if ((file.size ?? 0) > MAX_BINARY_BYTES) {
-    return { ok: false, reason: `${file.name} is larger than ${Math.round(MAX_BINARY_BYTES / 1024 / 1024)} MB, which is more than the model request can carry.` };
+    return { ok: false, reason: m.wu_too_large({ name: file.name, size: Math.round(MAX_BINARY_BYTES / 1024 / 1024) }) };
   }
   if (isPdf && !(PDF_CAPABLE_PROVIDERS as readonly string[]).includes(provider ?? '')) {
     return {
@@ -150,7 +152,7 @@ export function classifyUpload(
       // ⛔ The one place in the product where "choose a different model" is honest advice: the limit
       // is structural — this provider has no way to accept a document at all — not a passing 503.
       // SQEM-310 had to withdraw that sentence because the setting did not exist; SQEM-311 built it.
-      reason: `${file.name} is a PDF, and ${provider ?? 'the selected provider'} has no way to accept a document — it would be dropped without a word and the playbook written as if you had attached nothing. Pick a Gemini, OpenAI, Claude, Mistral or OpenRouter model under Settings → General → Default AI model.`,
+      reason: m.wu_pdf_provider({ name: file.name, provider: provider ?? m.wu_selected_provider() }),
     };
   }
   return { ok: true, binary: true };
@@ -165,7 +167,7 @@ export function readFileAsBase64(file: File): Promise<string> {
       const comma = res.indexOf(',');
       resolve(comma >= 0 ? res.slice(comma + 1) : res);
     };
-    r.onerror = () => reject(new Error(`${file.name} could not be read.`));
+    r.onerror = () => reject(new Error(m.wu_not_readable({ name: file.name })));
     r.readAsDataURL(file);
   });
 }

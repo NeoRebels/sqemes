@@ -1,5 +1,6 @@
 import { ProviderIcon } from './ProviderIcon';
 import { AI_TOOLS } from '../lib/aiTools';
+import { m } from '../lib/i18n';
 
 /**
  * SQEM-557 — quick links from Start to the AI tools a team already works in.
@@ -13,7 +14,7 @@ export default function AiToolLinks() {
   return (
     <nav aria-labelledby="start-ai-tools" className="w-full max-w-4xl">
       {/* SQEM-578 — visible and centred; still the nav's accessible name. */}
-      <h2 id="start-ai-tools" className="mb-2 text-center text-xs font-semibold text-ink-subtle uppercase tracking-wider">Work in</h2>
+      <h2 id="start-ai-tools" className="mb-2 text-center text-xs font-semibold text-ink-subtle uppercase tracking-wider">{m.start_work_in()}</h2>
       <ul className="flex flex-wrap justify-center gap-1.5">
         {AI_TOOLS.map(tool => (
           <li key={tool.id}>
@@ -21,7 +22,7 @@ export default function AiToolLinks() {
               href={tool.url}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={`${tool.name} (opens in a new tab)`}
+              aria-label={m.start_tool_new_tab({ name: tool.name })}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-line bg-surface-raised text-sm font-medium text-ink hover:border-line-strong hover:text-ink-strong transition-colors"
             >
               <ProviderIcon provider={tool.icon} alt="" className={`w-4 h-4${tool.mono ? ' dark:invert' : ''}`} />
@@ -30,7 +31,7 @@ export default function AiToolLinks() {
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-xs text-ink-subtle">Your playbooks come along through the sqemes extension or MCP.</p>
+      <p className="mt-3 text-xs text-ink-subtle">{m.start_tools_note()}</p>
     </nav>
   );
 }

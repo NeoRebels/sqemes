@@ -1,3 +1,4 @@
+import { m, type Locale } from './locale.ts';
 /**
  * SQEM-466 — one connector the remote server turns away must not take the whole message with it.
  *
@@ -43,11 +44,14 @@ export function refusedConnectorLabels(status: number, body: string): string[] {
  * answer. The notice is not politeness; it is the difference between a degraded answer and a wrong
  * one.
  */
-export function connectorRefusedNotice(names: string[]): string {
+export function connectorRefusedNotice(names: string[], locale: Locale = 'en'): string {
   if (!names.length) return '';
   const list = names.join(', ');
-  const which = names.length === 1 ? 'connector' : 'connectors';
-  return `\n\n---\n_Answered without ${list}: the ${which} refused the connection. Reconnect ${names.length === 1 ? 'it' : 'them'} in Settings → Connectors._`;
+  // SQEM-604 — in the user's language; one text each for one and several (the pronoun changes too).
+  const text = names.length === 1
+    ? m.server_connector_refused_one({ list }, { locale })
+    : m.server_connector_refused_many({ list }, { locale });
+  return `\n\n---\n_${text}_`;
 }
 
 /**

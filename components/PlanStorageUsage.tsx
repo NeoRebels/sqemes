@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import UsageBar, { formatStorage } from './ui/UsageBar';
 import { getWorkspaceStorageUsage } from '../lib/api/files';
 import { IS_SELF_HOSTED } from '../lib/env';
+import { m } from '../lib/i18n';
 
 /**
  * SQEM-556 — the storage bar on the current plan's card (Settings → Plans & Billing). Fetches its own
@@ -17,5 +18,5 @@ export default function PlanStorageUsage({ workspaceId }: { workspaceId: string 
     return () => { cancelled = true; };
   }, [workspaceId]);
   if (!usage) return null;
-  return <UsageBar label="Storage used" used={usage.used} limit={usage.limit} format={formatStorage} />;
+  return <UsageBar label={m.psu_storage_used()} used={usage.used} limit={usage.limit} format={formatStorage} />;
 }

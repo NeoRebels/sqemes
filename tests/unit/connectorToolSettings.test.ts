@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { en } from './i18nText';
 
 /**
  * SQEM-438 — choosing which tools a connector brings.
@@ -40,14 +41,16 @@ describe('SQEM-438 — connector tool settings', () => {
     // "all" in the UI and as "none" in the data, so it collapses to null.
     expect(FN).toMatch(/const allowed = Array\.isArray\(tools\) && tools\.length \? tools\.map\(String\) : null;/);
     expect(CARD).toMatch(/checked=\{toolsPick === null\}/);
-    expect(CARD).toMatch(/New tools are included automatically/);
-    expect(CARD).toMatch(/a tool added later stays off until you come back/);
+    expect(CARD).toMatch(/m\.cc_all_tools_hint\(\)/); // SQEM-609 — the words live in messages/
+    expect(en.cc_all_tools_hint).toMatch(/New tools are included automatically/);
+    expect(en.cc_pick_hint).toMatch(/a tool added later stays off until you come back/);
   });
 
   it('⚠️ a failed probe does not read as "this connector has no tools"', () => {
     // The saved selection is still in force and still editable; only the live list is missing.
-    expect(CARD).toMatch(/Could not load the live tool list/);
-    expect(CARD).toMatch(/Your saved selection is unchanged and can still be edited/);
+    expect(CARD).toMatch(/m\.cc_live_failed\(\{ error: toolsError \}\)/);
+    expect(en.cc_live_failed).toMatch(/Could not load the live tool list/);
+    expect(en.cc_live_failed).toMatch(/Your saved selection is unchanged and can still be edited/);
     // …and the checkbox list falls back to the saved names rather than rendering empty.
     expect(CARD).toMatch(/toolsList \?\? \(toolsPick\.map\(name => \(\{ name, description: undefined \}\)\)\)/);
   });
@@ -55,6 +58,6 @@ describe('SQEM-438 — connector tool settings', () => {
   it('the action validates its input before touching the row', () => {
     expect(FN).toMatch(/if \(!connectorId\) return json\(\{ error: 'connectorId required' \}, 400\)/);
     expect(FN).toMatch(/tools !== null && !Array\.isArray\(tools\)/);
-    expect(FN).toMatch(/if \(!row\) return json\(\{ error: 'Connector not found' \}, 404\)/);
+    expect(FN).toMatch(/if \(!row\) return json\(\{ error: txt\.srv_connector_not_found\(\{\}, \{ locale \}\) \}, 404\)/); // SQEM-612
   });
 });

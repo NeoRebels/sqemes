@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import SecretInput from '../../components/ui/SecretInput';
+import { en, withEnglish } from './i18nText';
 
 /**
  * SQEM-386 — the setup wizard: one order, a why, an end.
@@ -18,8 +19,10 @@ import SecretInput from '../../components/ui/SecretInput';
 
 const ROOT = resolve(__dirname, '../../');
 const read = (p: string) => readFileSync(resolve(ROOT, p), 'utf8');
-const WIZARD = read('components/SetupWizard.tsx');
-const CREATE = read('components/WizardCreateStep.tsx');
+// SQEM-610 — the words live in messages/ now; withEnglish puts them back where they stand, so the
+// assertions below keep pinning the sentence AND its place.
+const WIZARD = withEnglish(read('components/SetupWizard.tsx'));
+const CREATE = withEnglish(read('components/WizardCreateStep.tsx'));
 /** Source minus comments — the comments deliberately quote the OLD labels as history. */
 const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 const WIZARD_CODE = code(WIZARD);
@@ -44,7 +47,7 @@ describe('⛔ SQEM-386 — one order everywhere: Welcome → Templates → Where
     expect(WIZARD_CODE).toMatch(/const WORK_STEPS = useMemo\(\(\) => STEPS\.filter\(s => s\.id !== 'welcome' && s\.id !== 'done'\)/);
     expect(WIZARD_CODE).toMatch(/WORK_STEPS\.map\(/);
     // Welcome sits at index 0, so the visible step number is the index itself.
-    expect(WIZARD_CODE).toMatch(/Step \{step\} of \{WORK_STEPS\.length\}/);
+    expect(WIZARD_CODE).toMatch(/m\.sw_step_of\(\{ step, total: WORK_STEPS\.length, label: STEPS\[step\]\.label \}\)|'Step \{step\} of \{total\} · \{label\}'/); // SQEM-610
   });
 
   it('⛔ round 2 — a welcome screen carries the why and the outcome; the header no longer does', () => {
@@ -53,7 +56,7 @@ describe('⛔ SQEM-386 — one order everywhere: Welcome → Templates → Where
     // SQEM-420 — the why and the outcome stay; the step COUNT is gone, see the SQEM-420 block below.
     expect(WIZARD_CODE).toMatch(/A few minutes, and your first playbooks are ready/);
     expect(WIZARD_CODE).toMatch(/A few minutes, and your playbooks work where you already do/);
-    expect(WIZARD_CODE).toMatch(/Let&apos;s go/);
+    expect(WIZARD_CODE).toMatch(/Let's go/);
     // The first cut's header sentence is gone — it crowded the first step ("cold water").
     expect(WIZARD_CODE).not.toMatch(/At the end your first templates are ready — in Chat/);
   });
@@ -111,13 +114,13 @@ describe('⛔ SQEM-386 — the end is a ledger with one button', () => {
     // a run that created none. "You're set" survives as the step's label in STEPS, which is what the
     // progress line reads out. The rule this test guards is unchanged: the last screen says the run is
     // over, and exactly one button ends it.
-    expect(WIZARD_CODE).toMatch(/playbook\{createdCount === 1 \? '' : 's'\} ready/);
+    expect(WIZARD_CODE).toMatch(/'\{count\} playbooks ready'/); // SQEM-610 — plural in the message
     expect(WIZARD_CODE).toMatch(/Your workspace is ready/);
-    expect(WIZARD_CODE).toMatch(/label: "You're set"/);
+    expect(WIZARD_CODE).toMatch(/label: 'You\\'re set'/); // SQEM-610 — resolved from m.sw_step_done()
     expect(WIZARD_CODE).toMatch(/<button onClick=\{finish\} className=\{PRIMARY_BTN\}>Done<\/button>/);
   });
   it('it reports the real count and the three states, and offers no "try it" action', () => {
-    expect(WIZARD_CODE).toMatch(/\{createdCount\} playbook\{createdCount === 1 \? '' : 's'\} created/);
+    expect(WIZARD_CODE).toMatch(/\{count\} playbooks created/);
     expect(WIZARD_CODE).toMatch(/No playbooks yet/);
     // SQEM-423 — the three key states are still all reported, now inside the single sqemes Chat row
     // (credits · included · a key of your own) instead of a second row repeating the subject.
@@ -142,7 +145,8 @@ describe('SQEM-386 — the words that confused people', () => {
     expect(CREATE_CODE).toMatch(/Generate my starter playbooks/);
   });
   it('the review step says whose templates these are', () => {
-    expect(CREATE_CODE).toMatch(/Generated for \{brand\.brandName\.trim\(\) \|\| 'your brand'\} from what you told us/);
+    expect(CREATE_CODE).toMatch(/Generated for \{brand\} from what you told us/);
+    expect(read('components/WizardCreateStep.tsx')).toMatch(/m\.wc_review_1\(\{ brand: brand\.brandName\.trim\(\) \|\| m\.wc_your_brand\(\) \}\)/);
   });
   it('the extension step leads with the benefit, names what is missing without it, and that it can wait', () => {
     // SQEM-423 — the title is now the channel card's ("In your browser"); the benefit moved into the
@@ -176,8 +180,9 @@ describe('SQEM-386 — the words that confused people', () => {
     expect(usage).not.toMatch(/collapsible/);
     const form = code(read('components/BrandProfileForm.tsx'));
     // Round 3: two exclusive views with a link each way; the analysis lands on the fields.
-    expect(form).toMatch(/Or fill in the details yourself/);
-    expect(form).toMatch(/← Analyze a website instead/);
+    expect(form).toMatch(/m\.bp_manual\(\)/);
+    expect(form).toMatch(/m\.bp_back_to_site\(\)/);
+    expect([en.bp_manual, en.bp_back_to_site]).toEqual(['Or fill in the details yourself', '← Analyze a website instead']); // SQEM-608
     expect(form).toMatch(/onChange\(patch\);\s*setView\('manual'\);/);
     expect(form).toMatch(/\(!collapsible \|\| view === 'website'\) && \(/);
     expect(form).toMatch(/\(!collapsible \|\| view === 'manual'\) && \(/);
@@ -192,13 +197,12 @@ describe('SQEM-386 — the words that confused people', () => {
     // SQEM-386 had relabelled it "Tone of your playbooks"; SQEM-395 removed it (and the use-case field).
     const form = code(read('components/BrandProfileForm.tsx'));
     expect(form).not.toMatch(/Tone of your playbooks|use AI for/);
-    expect(form).toMatch(/Brand name/);
-    expect(form).toMatch(/What does your brand do\?/);
-    expect(form).toMatch(/Who is your audience\?/);
+    expect([en.bp_name, en.bp_what, en.bp_audience]).toEqual(['Brand name', 'What does your brand do?', 'Who is your audience?']); // SQEM-608
+    for (const k of ['bp_name', 'bp_what', 'bp_audience']) expect(form).toMatch(new RegExp(`m\\.${k}\\(\\)`));
   });
   it('"Finish setup" stretches across on a phone', () => {
     const dash = read('pages/Overview.tsx') /* SQEM-555 — the banners moved from Start to the Overview */;
-    const i = dash.indexOf('Finish setup <ArrowRight');
+    const i = dash.indexOf('{m.ov_finish()} <ArrowRight'); // SQEM-607 — the words live in messages/
     expect(i).toBeGreaterThan(-1);
     // SQEM-419 restyled the button (white on the brand band); the phone rule survives it.
     expect(dash.slice(Math.max(0, i - 600), i)).toMatch(/w-full sm:w-auto justify-center/);
@@ -210,7 +214,7 @@ describe('SQEM-419 — the dashboard banners', () => {
   const dash = read('pages/Overview.tsx') /* SQEM-555 — the banners moved from Start to the Overview */;
 
   it('the setup banner is the wizard’s brand band, and survives dark mode', () => {
-    const i = dash.indexOf('Finish setting up your workspace');
+    const i = dash.indexOf('{m.ov_finish_title()}');
     expect(i).toBeGreaterThan(-1);
     const banner = dash.slice(Math.max(0, i - 900), i);
     expect(banner).toMatch(/from-brand-900 via-brand-800 to-brand-700/);
@@ -220,11 +224,12 @@ describe('SQEM-419 — the dashboard banners', () => {
   });
 
   it('⛔ the trial banner stays light — two dark bands would fight for the same attention', () => {
-    const i = dash.indexOf('Your card is on file');
+    const i = dash.indexOf('{m.ov_trial_body(');
     const banner = dash.slice(Math.max(0, i - 2400), i);
     expect(banner).not.toMatch(/from-brand-900/);
     // The days left are a chip, not a clause inside a sentence.
-    expect(banner).toMatch(/day left' : `\$\{d\} days left`/);
+    expect(banner).toMatch(/\{m\.ov_days_left\(\{ count: d \}\)\}/);
+    expect(JSON.stringify(en.ov_days_left)).toMatch(/\{count\} day left.*\{count\} days left/);
   });
 
   it('the cancelled state keeps its amber — it is a warning, not an invitation', () => {
@@ -261,7 +266,7 @@ describe('SQEM-386 — SecretInput reveals and hides', () => {
 // read as "edit colours and logo" and never used; the footer's Back left the whole step instead.
 describe('SQEM-413 — Back belongs to the step while its review is open', () => {
   const wizard = readFileSync(resolve(__dirname, '../../components/SetupWizard.tsx'), 'utf8');
-  const step = readFileSync(resolve(__dirname, '../../components/WizardCreateStep.tsx'), 'utf8');
+  const step = withEnglish(readFileSync(resolve(__dirname, '../../components/WizardCreateStep.tsx'), 'utf8'));
 
   it('the wizard asks the step first and only then walks back a step', () => {
     expect(wizard).toMatch(/if \(stepBack\) \{ stepBack\(\); return; \}/);
@@ -331,14 +336,15 @@ describe('SQEM-424 — what the copy promises and in which order', () => {
 
   it('⛔ the dashboard banner no longer advertises the pre-SQEM-386 order', () => {
     // Key first, playbooks last is the order three UX tests rejected.
-    expect(dash).not.toMatch(/Add a provider key, install the extension, and let AI build your first playbooks/);
-    expect(dash).toMatch(/Let AI write your first playbooks, choose where you want to use them/);
+    expect(JSON.stringify(en)).not.toMatch(/Add a provider key, install the extension, and let AI build your first playbooks/);
+    expect(dash).toMatch(/m\.ov_finish_cloud\(\)/);
+    expect(en.ov_finish_cloud).toMatch(/^Let AI write your first playbooks, choose where you want to use them/);
   });
 
   it('⚠️ and it does not promise playbook generation on self-host', () => {
-    const i = dash.indexOf('Let AI write your first playbooks');
+    const i = dash.indexOf('m.ov_finish_cloud()');
     expect(dash.slice(Math.max(0, i - 400), i)).toMatch(/IS_SELF_HOSTED/);
-    expect(dash).toMatch(/Choose where you want to use your playbooks — and set up only that/);
+    expect(en.ov_finish_selfhost).toBe('Choose where you want to use your playbooks — and set up only that.');
   });
 
   it('the step chips are the owner\'s names', () => {
@@ -350,7 +356,10 @@ describe('SQEM-424 — what the copy promises and in which order', () => {
 
   it('the dashboard says the same words as the step it leads to', () => {
     // SQEM-552 — the Connections rows moved from Start to the Manage Overview; the words came along.
-    expect(readFileSync(resolve(ROOT, 'pages/Overview.tsx'), 'utf8')).toMatch(/'AI provider keys' : 'Add AI provider key'/);
+    expect(readFileSync(resolve(ROOT, 'pages/Overview.tsx'), 'utf8')).toMatch(/m\.ov_provider_keys\(\) : m\.ov_add_provider_key\(\)/);
+    // SQEM-607 — the wizard (step 6 of the German UI) still has the literal; the words must stay equal.
+    expect(WIZARD_CODE).toContain(`label: '${en.ov_provider_keys}'`);
+    expect(en.ov_add_provider_key).toBe('Add AI provider key');
   });
 });
 
@@ -446,7 +455,7 @@ describe('SQEM-420 — the wizard only promises what it delivers', () => {
   });
 
   it('the ledger does not claim "not yet" where it cannot know', () => {
-    expect(WIZARD_CODE).toMatch(/Can&apos;t be checked from a self-hosted instance/);
+    expect(WIZARD_CODE).toMatch(/Can't be checked from a self-hosted instance/);
   });
 
   it('the extension step knows MCP exists (SQEM-414)', () => {
@@ -490,7 +499,7 @@ describe('SQEM-418 — the key step exists when it has something to do', () => {
 // SQEM-417 — the wizard is the first screen a new customer sees, and it looked like a settings dialog.
 describe('SQEM-417 — the first impression', () => {
   const css = readFileSync(resolve(__dirname, '../../index.css'), 'utf8');
-  const step = readFileSync(resolve(__dirname, '../../components/WizardCreateStep.tsx'), 'utf8');
+  const step = withEnglish(readFileSync(resolve(__dirname, '../../components/WizardCreateStep.tsx'), 'utf8'));
 
   // SQEM-554 (f1) — still a strong band for the first impression, but flat: C uses no gradients.
   it('the header is a strong accent band (flat, no gradient), and the progress sits inside it', () => {
@@ -535,7 +544,7 @@ describe('SQEM-417 — the first impression', () => {
 // wizard and found the generate button sitting under the website field, before anything had asked what
 // the playbooks were for.
 describe('SQEM-416 — brand → areas → review', () => {
-  const step = readFileSync(resolve(__dirname, '../../components/WizardCreateStep.tsx'), 'utf8');
+  const step = withEnglish(readFileSync(resolve(__dirname, '../../components/WizardCreateStep.tsx'), 'utf8'));
 
   it('there are three phases and the brand form is the first', () => {
     expect(step).toMatch(/useState<'brand' \| 'areas' \| 'review'>\('brand'\)/);

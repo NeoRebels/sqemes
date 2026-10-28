@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { toLocale, m as txt } from '../lib/i18n'; // `m` is a member in this file's callbacks
 import { supabase } from '../lib/supabase';
 import { setMonitoringUser, clearMonitoringUser, logError } from '../lib/monitoring';
 import * as workspacesApi from '../lib/api/workspaces';
@@ -73,6 +74,7 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
         email: profile.email,
         avatar: profile.avatar,
         role: 'member',
+        language: toLocale((profile as unknown as { language?: unknown }).language), // SQEM-600
       });
       setMonitoringUser(profile.id, profile.email);
       ws.setIsSqemesAdmin(!!profile.is_sqemes_admin);
@@ -97,7 +99,7 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
           localStorage.removeItem('pendingInviteToken');
           localStorage.removeItem('pendingInviteEmail');
           localStorage.removeItem('pendingInviteTokenAt');
-          ui.showToast('Open your invitation link again to join the workspace.', 'error');
+          ui.showToast(txt.init_invite_reopen(), 'error');
         } else {
           try {
             await invitationsApi.acceptInvitation(pendingToken);
@@ -110,7 +112,7 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
               msg.includes('expired');
             if (!isTerminal) {
               logError(err instanceof Error ? err : new Error(String(err)), { context: 'init:acceptInvitation' });
-              ui.showToast('Failed to accept invitation. Try visiting the invite link again.', 'error');
+              ui.showToast(txt.init_invite_failed(), 'error');
             }
           } finally {
             localStorage.removeItem('pendingInviteToken');
@@ -120,7 +122,7 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
         }
       } else if (wsRowsResult.error) {
         logError(wsRowsResult.error instanceof Error ? wsRowsResult.error : new Error(String(wsRowsResult.error)), { context: 'init:fetchWorkspaces' });
-        ui.showToast((wsRowsResult.error as any).message || 'Failed to load workspaces', 'error');
+        ui.showToast((wsRowsResult.error as any).message || txt.init_workspaces_failed(), 'error');
         return;
       }
 
@@ -150,7 +152,7 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
       workspaceDataWillLoad = true;
     } catch (err: any) {
       logError(err instanceof Error ? err : new Error(String(err)), { context: 'init' });
-      ui.showToast(err.message || 'Failed to initialize', 'error');
+      ui.showToast(err.message || txt.init_failed(), 'error');
     } finally {
       if (!workspaceDataWillLoad) ui.setIsLoading(false);
     }
@@ -251,7 +253,7 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
       } catch (err) {
         ui.setIsBackgroundFetching(false);
         logError(err instanceof Error ? err : new Error(String(err)), { context: 'loadWorkspaceData' });
-        ui.showToast('Failed to load workspace data', 'error');
+        ui.showToast(txt.init_data_failed(), 'error');
         if (!initialDataLoaded.current) {
           initialDataLoaded.current = true;
           ui.setIsLoading(false);

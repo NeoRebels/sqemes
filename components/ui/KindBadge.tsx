@@ -1,7 +1,7 @@
 import React from 'react';
 import { PenTool, Wand2 } from 'lucide-react';
 import type { PromptKind } from '../../types';
-import { KIND_HELP } from '../../constants';
+import { kindHelp } from '../../lib/labels';
 
 // SQEM-050 — the template "kind" pill (Prompt / Skill) with icon.
 // Shared by the Templates page cards and the Chat template modal so they look
@@ -33,7 +33,7 @@ export default function KindBadge({ kind }: { kind: PromptKind }) {
   const { label, Icon, className } = CONFIG[kind];
   return (
     <span
-      title={KIND_HELP[kind]}
+      title={kindHelp(kind)}
       className={`text-2xs font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0 ${className}`}
     >
       <Icon className="w-3 h-3" /> {label}

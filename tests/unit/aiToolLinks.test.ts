@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { AI_TOOLS } from '../../lib/aiTools';
+import { en } from './i18nText';
 
 /**
  * SQEM-557 — Start links to eight AI tools with their real logos. The list is pure data and tested
@@ -38,12 +39,15 @@ describe('SQEM-557 — AI tool quick links', () => {
   it('links open in a new tab safely, say so to screen readers, and the logo is decorative', () => {
     const src = read('components/AiToolLinks.tsx');
     expect(src).toMatch(/target="_blank"\s+rel="noopener noreferrer"/);
-    expect(src).toMatch(/aria-label=\{`\$\{tool\.name\} \(opens in a new tab\)`\}/);
+    // SQEM-604 — the words live in messages/; the code passes the tool's name in.
+    expect(src).toMatch(/aria-label=\{m\.start_tool_new_tab\(\{ name: tool\.name \}\)\}/);
+    expect(en.start_tool_new_tab).toBe('{name} (opens in a new tab)');
     expect(src).toMatch(/\{tool\.short \?\? tool\.name\}/);
     expect(src).toMatch(/<ProviderIcon provider=\{tool\.icon\} alt=""/);
     expect(src).toMatch(/tool\.mono \? ' dark:invert'/);
     // The brand is lowercase except at the start of a sentence.
-    expect(src).toMatch(/through the sqemes extension or MCP\./);
+    expect(src).toMatch(/\{m\.start_tools_note\(\)\}/);
+    expect(en.start_tools_note).toMatch(/through the sqemes extension or MCP\./); // SQEM-604
   });
 
   it('Start renders them under the composer', () => {

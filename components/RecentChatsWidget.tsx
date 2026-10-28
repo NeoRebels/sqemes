@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useChatSessions } from '../store';
+import { m } from '../lib/i18n';
 import { ProviderIcon } from './ProviderIcon';
 import Card from './ui/Card';
 import { fetchExternalChatHistory, setExternalChatPinned, type ExternalChat } from '../lib/api/externalChatHistory';
@@ -76,24 +77,24 @@ const RecentChatsWidget = () => {
   return (
     <Card className="p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold text-ink-strong">History</h2>
+        <h2 className="font-semibold text-ink-strong">{m.recent_history()}</h2>
         {all.length > 0 && (
           <Link to="/history" className="text-xs font-medium text-accent hover:underline">
-            View all ({all.length}) →
+            {m.recent_view_all({ count: all.length })}
           </Link>
         )}
       </div>
       {loading && all.length === 0 ? (
-        <div className="flex items-center justify-center gap-2 py-8 text-sm text-ink-subtle"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
+        <div className="flex items-center justify-center gap-2 py-8 text-sm text-ink-subtle"><Loader2 className="w-4 h-4 animate-spin" /> {m.recent_loading()}</div>
       ) : all.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-8 text-center">
           <MessageSquare className="w-6 h-6 text-ink-subtle" />
-          <p className="text-sm text-ink-muted">No chats yet.</p>
+          <p className="text-sm text-ink-muted">{m.recent_no_chats()}</p>
         </div>
       ) : pinned.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-8 text-center">
           <Pin className="w-6 h-6 text-ink-subtle" />
-          <p className="text-sm text-ink-muted">Pin a chat in History to keep it here.</p>
+          <p className="text-sm text-ink-muted">{m.recent_pin_hint()}</p>
         </div>
       ) : (
         <div className="space-y-1">{pinned.map(renderItem)}</div>

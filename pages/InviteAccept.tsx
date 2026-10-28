@@ -4,6 +4,7 @@ import { acceptInvitation } from '../lib/api/invitations';
 import { useAuth } from '../hooks/useAuth';
 import { CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import ScrollScreen from '../components/ScrollScreen';
+import { m } from '../lib/i18n';
 
 const InviteAccept = () => {
   const { token } = useParams<{ token: string }>();
@@ -19,7 +20,7 @@ const InviteAccept = () => {
   useEffect(() => {
     if (!token) {
       setStatus('error');
-      setErrorMessage('Invalid invitation link.');
+      setErrorMessage(m.invite_invalid_link());
       return;
     }
 
@@ -67,7 +68,7 @@ const InviteAccept = () => {
           return;
         }
         setStatus('error');
-        setErrorMessage(msg || 'Failed to accept invitation.');
+        setErrorMessage(msg || m.invite_failed());
       }
     };
 
@@ -80,29 +81,29 @@ const InviteAccept = () => {
         {status === 'loading' && (
           <>
             <Loader2 className="w-12 h-12 text-accent animate-spin mx-auto mb-4" />
-            <h1 className="font-display text-xl font-semibold text-ink-strong mb-2">Accepting Invitation</h1>
-            <p className="text-ink-muted text-sm">Please wait while we add you to the workspace...</p>
+            <h1 className="font-display text-xl font-semibold text-ink-strong mb-2">{m.invite_accepting_title()}</h1>
+            <p className="text-ink-muted text-sm">{m.invite_accepting_body()}</p>
           </>
         )}
 
         {status === 'success' && (
           <>
             <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
-            <h1 className="font-display text-xl font-semibold text-ink-strong mb-2">Invitation Accepted!</h1>
-            <p className="text-ink-muted text-sm">Redirecting you to the workspace...</p>
+            <h1 className="font-display text-xl font-semibold text-ink-strong mb-2">{m.invite_accepted_title()}</h1>
+            <p className="text-ink-muted text-sm">{m.invite_redirecting()}</p>
           </>
         )}
 
         {status === 'error' && (
           <>
             <AlertTriangle className="w-12 h-12 text-danger mx-auto mb-4" />
-            <h1 className="font-display text-xl font-semibold text-ink-strong mb-2">Something went wrong</h1>
+            <h1 className="font-display text-xl font-semibold text-ink-strong mb-2">{m.invite_error_title()}</h1>
             <p className="text-ink-muted text-sm mb-4">{errorMessage}</p>
             <button
               onClick={() => navigate('/', { replace: true })}
               className="px-6 py-3 bg-accent-strong text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all"
             >
-              Go to Start
+              {m.invite_go_to_start()}
             </button>
           </>
         )}

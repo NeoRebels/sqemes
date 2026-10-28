@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runLimited, applyToEditable, bulkSummary, wouldLoseSight } from '../../lib/bulkApply';
+import { en } from './i18nText';
 
 /**
  * SQEM-564 — access for several playbooks at once, one tag for several playbooks or personas.
@@ -83,7 +84,8 @@ describe('SQEM-564 — the wiring', () => {
   const editors = read('lib/api/editors.ts');
 
   it('Playbooks: "Set tag", "Remove tag" only for tags the selection carries, and "Access…"', () => {
-    expect(templates).toMatch(/addTagLabel="Set tag"/);
+    expect(templates).toMatch(/addTagLabel=\{m\.bulk_set_tag\(\)\}/);
+    expect(en.bulk_set_tag).toBe('Set tag'); // SQEM-605
     expect(templates).toMatch(/onRemoveTag=\{tag => void handleBulkTag\(null, selectedPrompts\.filter\(p => p\.tag === tag\)/);
     expect(templates).toMatch(/onAccess=\{canBulkAccess \? openBulkAccess : undefined\}/);
   });
@@ -93,7 +95,8 @@ describe('SQEM-564 — the wiring', () => {
   });
 
   it('⛔ no "Only me" in bulk — no allowPrivate, and Apply waits until someone is named', () => {
-    const dialog = templates.slice(templates.indexOf('Set access for {selectedIds.size}'), templates.indexOf('Publish to Marketplace (SQEM-163)'));
+    // SQEM-604/605 — the dialog is found by its key now; the words live in messages/.
+    const dialog = templates.slice(templates.indexOf('m.pb_bulk_access_title({ count: selectedIds.size })'), templates.indexOf('Publish to Marketplace (SQEM-163)'));
     expect(dialog).toMatch(/<TemplateAccessControl/);
     expect(dialog).not.toMatch(/allowPrivate/);
     expect(dialog).toMatch(/disabled=\{bulkAccessIncomplete\}/);
@@ -101,8 +104,10 @@ describe('SQEM-564 — the wiring', () => {
   });
 
   it('the dialog says it replaces, and how many playbooks the person would stop seeing', () => {
-    expect(templates).toMatch(/This replaces the current access of every selected playbook you may change/);
-    expect(templates).toMatch(/you will no longer see \{loseSight\}/);
+    expect(templates).toMatch(/m\.pb_bulk_access_body\(\)/);
+    expect(en.pb_bulk_access_body).toMatch(/^This replaces the current access of every selected playbook you may change/);
+    expect(templates).toMatch(/m\.pb_lose_sight\(\{ count: loseSight \}\)/);
+    expect(JSON.stringify(en.pb_lose_sight)).toMatch(/you will no longer see \{count\}/);
   });
 
   it('access is written per playbook through the edit-right check, each with its own owner stripped', () => {
@@ -111,13 +116,14 @@ describe('SQEM-564 — the wiring', () => {
   });
 
   it('Personas: the same tag actions, through can_edit_persona', () => {
-    expect(personas).toMatch(/addTagLabel="Set tag"/);
+    expect(personas).toMatch(/addTagLabel=\{m\.bulk_set_tag\(\)\}/); // SQEM-605
     expect(personas).toMatch(/fetchCanEditMany\('persona', list\)/);
     expect(personas).not.toMatch(/onAccess=/); // by design: no bulk access for personas
   });
 
   it('the bar keeps "Add tag" for Files and only shows "Access…" when asked to', () => {
-    expect(bar).toMatch(/addTagLabel = 'Add tag'/);
+    expect(bar).toMatch(/addTagLabel = m\.bulk_add_tag\(\)/);
+    expect(en.bulk_add_tag).toBe('Add tag');
     expect(bar).toMatch(/\{onAccess && \(/);
   });
 

@@ -1,3 +1,4 @@
+import { m } from './i18n'; // SQEM-605
 /**
  * SQEM-400 — one word per access state, for the badges on playbook and persona cards.
  *
@@ -47,12 +48,12 @@ export function accessBadgeModes<K extends string>(
 
 /** The badge's word — the same one the access control uses for the state (`mode: 'private'` = Only me). */
 export const ACCESS_BADGE_LABEL: Record<AccessBadgeMode, string> = {
-  private: 'Only me',
-  restricted: 'Restricted',
+  private: m.access_badge_private(),
+  restricted: m.access_badge_restricted(),
 };
 
 /** The card badge's tooltip. "Only me" is the creator alone — admins and editors included since SQEM-292. */
 export const ACCESS_BADGE_TITLE: Record<AccessBadgeMode, string> = {
-  private: 'Only me — visible to its creator alone',
-  restricted: 'Restricted — not visible to everyone in this workspace',
+  private: m.access_badge_private_title(),
+  restricted: m.access_badge_restricted_title(),
 };

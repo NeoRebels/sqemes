@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { en } from './i18nText';
 
 /**
  * SQEM-589 — self-host ships NO one-click apps; one line points to sqemes Cloud instead.
@@ -24,7 +25,8 @@ describe('SQEM-589 — no apps on self-host', () => {
 
   it('…and says it in one line, on design tokens, with a link to Cloud', () => {
     const line = CARD.slice(CARD.indexOf('SQEM-589 — on self-host the apps'), CARD.indexOf('{VISIBLE_APPS.map'));
-    expect(line).toContain('are available on sqemes Cloud.');
+    expect(line).toContain('{m.cc_apps_selfhost()}'); // SQEM-609
+    expect(en.cc_apps_selfhost).toMatch(/are available on sqemes Cloud\.$/);
     expect(line).toMatch(/bg-surface-sunken border border-line/);
     expect(line).toMatch(/href="https:\/\/sqemes\.com"/);
     expect(line).not.toMatch(/\b(?:bg|text|border)-(?:slate|brand|white|red|emerald)-?\d*\b/);

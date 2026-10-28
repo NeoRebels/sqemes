@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { en } from './i18nText';
 
 /**
  * SQEM-444 — any MCP server, not only the ones we shipped a tile for.
@@ -65,8 +66,9 @@ describe('SQEM-444 — the dialog asks the server', () => {
     // …and the redirect URI appears only where a client has to be registered by hand.
     // The rule, not the distance between two strings: a server that registers its own client says so,
     // and only the other branch asks for anything.
-    expect(CARD).toMatch(/this server issues its own credentials/);
-    expect(CARD).toMatch(/Redirect URI — register this in/);
+    expect(CARD).toMatch(/m\.cc_nothing_to_enter\(\)/); // SQEM-609 — the words live in messages/
+    expect(en.cc_nothing_to_enter).toMatch(/this server issues its own credentials/);
+    expect(en.cc_redirect_nifty).toMatch(/Redirect URI — register this in/);
   });
 
   it('⛔ an OAuth server is connected, not added — two endings, two buttons', () => {

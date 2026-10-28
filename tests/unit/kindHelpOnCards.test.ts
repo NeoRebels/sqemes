@@ -7,6 +7,7 @@ import KindBadge from '../../components/ui/KindBadge';
 import SegmentedTabs from '../../components/ui/SegmentedTabs';
 import { KIND_HELP } from '../../constants';
 import type { PromptKind } from '../../types';
+import { en } from './i18nText';
 
 /**
  * SQEM-384 — the kind explains itself where the kind is shown.
@@ -82,8 +83,9 @@ describe('SQEM-384 — SegmentedTabs passes a tab title through to its button', 
     // tab and this reads it. If the tabs move to another primitive, move this assertion with them.
     const src = readFileSync(resolve(ROOT, 'pages/Templates.tsx'), 'utf8');
     for (const kind of KINDS) {
-      expect(src, `kind tab '${kind}' must carry KIND_HELP.${kind}`).toMatch(
-        new RegExp(`value: '${kind}'[^}]*title: KIND_HELP\\.${kind}`),
+      // SQEM-605 — the help text is kindHelp() from lib/labels.ts (translated); KIND_HELP stays English in constants.ts.
+      expect(src, `kind tab '${kind}' must carry kindHelp('${kind}')`).toMatch(
+        new RegExp(`value: '${kind}'[^}]*title: kindHelp\\('${kind}'\\)`),
       );
     }
   });
@@ -92,7 +94,8 @@ describe('SQEM-384 — SegmentedTabs passes a tab title through to its button', 
 describe('SQEM-384 — the Personas page says where a persona works, and only where', () => {
   it('⛔ Chat and MCP — not the extension, which inserts templates and knows no personas', () => {
     const src = readFileSync(resolve(ROOT, 'pages/Personas.tsx'), 'utf8');
-    const subtitle = src.match(/subtitle="([^"]*)"/)?.[1] ?? '';
+    expect(src).toMatch(/subtitle=\{m\.ps_subtitle\(\)\}/); // SQEM-605 — the words live in messages/
+    const subtitle = en.ps_subtitle;
     expect(subtitle).toContain('Works in Chat and via MCP');
     expect(subtitle).not.toMatch(/extension/i);
   });

@@ -3,14 +3,53 @@
   "specVersion": "1.5",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-26T23:09:59.002Z",
+    "timestamp": "2026-10-28T08:00:36.700Z",
     "component": {
       "type": "application",
       "name": "sqemes",
-      "version": "1.11.33"
+      "version": "1.11.34"
     }
   },
   "components": [
+    {
+      "type": "library",
+      "name": "@emnapi/core",
+      "version": "1.11.1",
+      "purl": "pkg:npm/%40emnapi/core@1.11.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@emnapi/runtime",
+      "version": "1.11.1",
+      "purl": "pkg:npm/%40emnapi/runtime@1.11.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@emnapi/wasi-threads",
+      "version": "1.2.2",
+      "purl": "pkg:npm/%40emnapi/wasi-threads@1.2.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
     {
       "type": "library",
       "name": "@floating-ui/core",
@@ -98,6 +137,19 @@
         {
           "license": {
             "id": "OFL-1.1"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@napi-rs/wasm-runtime",
+      "version": "1.2.5",
+      "purl": "pkg:npm/%40napi-rs/wasm-runtime@1.2.5",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
           }
         }
       ]
@@ -358,6 +410,19 @@
         {
           "license": {
             "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@tybys/wasm-util",
+      "version": "0.10.4",
+      "purl": "pkg:npm/%40tybys/wasm-util@0.10.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
           }
         }
       ]

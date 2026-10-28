@@ -6,11 +6,12 @@ import { IS_SELF_HOSTED } from '../lib/env';
 import { Prompt, Variable, VariableType, PromptKind, WorkspaceFile, TemplateCategory, LibraryTemplate, Step, UserRole } from '../types';
 import { fetchPromptDetail } from '../lib/api/prompts';
 import { fetchLibraryTemplateDetail } from '../lib/api/library';
-import { TEMPLATE_CATEGORIES, KIND_HELP } from '../constants';
+import { TEMPLATE_CATEGORIES } from '../constants';
+import { categoryLabel, kindHelp } from '../lib/labels';
 import { buildEnabledModels } from '../lib/enabledModels';
 import { runAuthoringAI, authoringModelId } from '../lib/authoringAI';
 import { enhancePrompt, enhanceInput, describePrompt } from '../supabase/functions/_shared/authoringPrompts.ts';
-import { Save, Plus, Trash2, Settings, Edit, ChevronDown, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Wand2, FlaskConical, History, UserRound, Users, Lock } from 'lucide-react';
+import { Save, Plus, Trash2, Settings, Edit, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Wand2, FlaskConical, History, UserRound, Users, Lock } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import FieldTooltip from '../components/FieldTooltip';
@@ -29,6 +30,9 @@ import EditorTestPanel from '../components/EditorTestPanel';
 import VersionHistoryPanel from '../components/VersionHistoryPanel';
 import KindBadge from '../components/ui/KindBadge';
 import FullScreenExit from '../components/ui/FullScreenExit';
+import Select from '../components/ui/Select';
+import { Input, Textarea } from '../components/ui/Input';
+import { m as txt } from '../lib/i18n'; // SQEM-605 — `m` is a local name in this file
 
 // Marketplace library templates store their body as a single rich-text step;
 // normalise to plain text when loading into the unified content editor.
@@ -93,7 +97,7 @@ const TemplateEditor = () => {
   // SQEM-581 — Test first and the default: testing is what one does while editing;
   // History is looked up. A new playbook or a marketplace template has no history to show.
   const hasHistory = !!id && !isLibrary;
-  const saveLabel = isLibrary ? 'Save playbook' : id ? 'Save changes' : 'Create playbook';
+  const saveLabel = isLibrary ? txt.ed_save_playbook() : id ? txt.ed_save_changes() : txt.ed_create_playbook();
   const [rightTab, setRightTab] = useState<'history' | 'test'>('test');
   const [historyKey, setHistoryKey] = useState(0);
   // SQEM-142 — per-template role access. New templates inherit the workspace default; existing
@@ -234,28 +238,33 @@ const TemplateEditor = () => {
 
   const handleSave = async () => {
     if (!formData.title.trim()) {
-      showToast('Playbook title is required.', 'error');
+      showToast(txt.ed_title_required(), 'error');
       return;
     }
     const saveData = formData;
     if (isLibrary) {
       const tpl = formToLibrary(saveData);
+      // SQEM-606 — as for workspace playbooks below: a failed save stops before "saved".
       if (id) {
-        await updateLibraryTemplate(tpl);
+        if (!(await updateLibraryTemplate(tpl))) return;
       } else {
         const created = await addLibraryTemplate(tpl);
-        if (created) navigate(`/library/${created.id}/edit`, { replace: true });
+        if (!created) return;
+        navigate(`/library/${created.id}/edit`, { replace: true });
       }
-      showToast('Playbook saved', 'success');
+      showToast(txt.ed_saved(), 'success');
       setIsDirty(false);
       return;
     }
     let savedId = id;
     if (id) {
-      await updatePrompt(saveData);
+      // SQEM-606 — a failed save stops here: the store has shown the error, and the "saved" toast and
+      // the dirty reset below used to cover it, so leaving the editor dropped the changes unasked.
+      if (!(await updatePrompt(saveData))) return;
     } else {
       const created = await addPrompt(saveData);
-      savedId = created?.id;
+      if (!created) return;
+      savedId = created.id;
     }
     // SQEM-142 / SQEM-143 — persist the access rules (roles + users; empty = open). Non-fatal.
     if (savedId) {
@@ -265,7 +274,7 @@ const TemplateEditor = () => {
         // warning about a rule that no longer exists.
         setLegacyRoles([]);
       } catch {
-        showToast('Saved, but updating access failed — try again.', 'error');
+        showToast(txt.ed_access_failed(), 'error');
       }
       // SQEM-473 — the editor list, only by someone who may set it (owner or admin; RLS enforces it).
       // ⛔ "Only selected people" with nobody ticked must still RESTRICT: no row means "no restriction"
@@ -280,12 +289,12 @@ const TemplateEditor = () => {
           await setEditors('template', savedId, workspace.id, editors.mode === 'restricted' ? named : { userIds: [], groupIds: [] });
           setEditorsDirty(false);
         } catch {
-          showToast('Saved, but updating who can edit failed — try again.', 'error');
+          showToast(txt.ed_editors_failed(), 'error');
         }
       }
     }
     if (!id && savedId) navigate(`/playbooks/${savedId}/edit`, { replace: true });
-    showToast('Prompt successfully saved', 'success');
+    showToast(txt.ed_saved(), 'success');
     setIsDirty(false);
     setHistoryKey(k => k + 1);
   };
@@ -294,7 +303,7 @@ const TemplateEditor = () => {
   const handleRestored = async ({ version, missingFiles }: { version: number | null; missingFiles: string[] }) => {
     if (!id) return;
     if (version === null) {
-      showToast('That version is already the current state — nothing changed.', 'info');
+      showToast(txt.ed_version_current(), 'info');
       return;
     }
     try {
@@ -305,8 +314,8 @@ const TemplateEditor = () => {
     setHistoryKey(k => k + 1);
     showToast(
       missingFiles.length
-        ? `Restored as version ${version}. Left out because deleted: ${missingFiles.join(', ')}.`
-        : `Restored as version ${version}.`,
+        ? txt.ed_restored_missing({ version, files: missingFiles.join(', ') })
+        : txt.ed_restored({ version }),
       missingFiles.length ? 'info' : 'success',
     );
   };
@@ -327,22 +336,19 @@ const TemplateEditor = () => {
   const confirmDelete = () => {
     if (id) {
       if (isLibrary) {
-        deleteLibraryTemplate(id);
+        void deleteLibraryTemplate(id); // SQEM-606 — the store reports the outcome
         navigate('/library');
-        showToast('Playbook deleted', 'success');
       } else {
-        deletePrompt(id);
+        void deletePrompt(id); // SQEM-606 — the store reports the outcome
         navigate('/playbooks');
-        showToast('Prompt deleted', 'success');
       }
     }
   };
 
   const handleDuplicate = () => {
     if (id) {
-      duplicatePrompt(formData);
+      void duplicatePrompt(formData); // SQEM-606 — the store reports the outcome
       navigate('/playbooks');
-      showToast('Prompt duplicated', 'success');
     }
   };
 
@@ -352,17 +358,17 @@ const TemplateEditor = () => {
     if (!newVar.name || !newVar.label) return;
     const normalizedName = newVar.name.replace(/\s+/g, '_').toLowerCase();
     if (!VAR_NAME_REGEX.test(normalizedName)) {
-      setVarNameError('Name must start with a letter or underscore and contain only letters, numbers, and underscores.');
+      setVarNameError(txt.ed_var_name_invalid());
       return;
     }
     const RESERVED_NAMES = ['previous_result'];
     if (RESERVED_NAMES.includes(normalizedName)) {
-      setVarNameError(`"${normalizedName}" is a reserved name.`);
+      setVarNameError(txt.ed_var_reserved({ name: normalizedName }));
       return;
     }
     const isDuplicate = formData.variables.some(v => v.name === normalizedName && v.id !== editingVarId);
     if (isDuplicate) {
-      setVarNameError(`A variable named "${normalizedName}" already exists.`);
+      setVarNameError(txt.ed_var_exists({ name: normalizedName }));
       return;
     }
     setVarNameError(null);
@@ -480,7 +486,7 @@ const TemplateEditor = () => {
   const handleEnhance = async () => {
     const textContent = formData.content.trim();
     if (!textContent) {
-      showToast('Please enter some text to enhance.', 'error');
+      showToast(txt.ed_enhance_empty(), 'error');
       return;
     }
     setIsEnhancing(true);
@@ -501,11 +507,11 @@ const TemplateEditor = () => {
       });
       if (enhanced) {
         setFormData(prev => ({ ...prev, content: enhanced }));
-        showToast(formData.kind === 'skill' ? 'Skill enhanced with AI magic! ✨' : 'Prompt enhanced with AI magic! ✨', 'success');
+        showToast(formData.kind === 'skill' ? txt.ed_enhanced_skill() : txt.ed_enhanced_prompt(), 'success');
         setIsDirty(true);
       }
     } catch (err: any) {
-      showToast(err.message || 'Failed to enhance prompt', 'error');
+      showToast(err.message || txt.ed_enhance_failed(), 'error');
     } finally {
       setIsEnhancing(false);
     }
@@ -530,7 +536,7 @@ const TemplateEditor = () => {
         setIsDirty(true);
       }
     } catch (err: any) {
-      showToast(err.message || 'Failed to generate description', 'error');
+      showToast(err.message || txt.ed_description_failed(), 'error');
     } finally {
       setIsGeneratingDescription(false);
     }
@@ -549,9 +555,9 @@ const TemplateEditor = () => {
               knowable and complete; an editor's are not. Flip `escapeEnabled` if that changes. */}
           <img src="/logo-favicon-V2.png" alt="sqemes" className="w-8 h-8 rounded-lg shrink-0" />
           {/* SQEM-544 — the page's h1, for screen readers; the visible title is the field below. */}
-          <h1 className="sr-only">{formData.title || (id ? 'Edit playbook' : 'New playbook')}</h1>
+          <h1 className="sr-only">{formData.title || (id ? txt.ed_edit_playbook() : txt.ed_new_playbook())}</h1>
           <FullScreenExit
-            label={isLibrary ? 'Back to Marketplace' : 'Back to Playbooks'}
+            label={isLibrary ? txt.ed_back_marketplace() : txt.ed_back_playbooks()}
             onExit={handleBack}
           />
         </div>
@@ -560,12 +566,12 @@ const TemplateEditor = () => {
             <>
               {/* SQEM-473 — a copy is a new playbook of your own, so it needs the role, not this one's edit right. */}
               {!isLibrary && (
-                <button onClick={handleDuplicate} className="p-2 text-slate-400 dark:text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors hidden sm:block" title="Duplicate">
+                <button onClick={handleDuplicate} className="p-2 text-slate-400 dark:text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors hidden sm:block" title={txt.ed_duplicate()}>
                   <Copy className="w-5 h-5" />
                 </button>
               )}
               {canEdit && (
-                <button onClick={handleDeleteClick} className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors hidden sm:block" title="Delete">
+                <button onClick={handleDeleteClick} className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors hidden sm:block" title={txt.ed_delete()}>
                   <Trash2 className="w-5 h-5" />
                 </button>
               )}
@@ -587,8 +593,8 @@ const TemplateEditor = () => {
         <div className="flex items-start gap-2.5 border-b border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 px-4 md:px-6 py-2.5">
           <Lock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
           <p className="text-xs text-amber-800 dark:text-amber-200">
-            <span className="font-semibold">You can use this playbook but not change it.</span>{' '}
-            Editing is limited to the people its owner{owner ? ` (${owner.name || owner.email})` : ''} chose. Ask them or a workspace admin.
+            <span className="font-semibold">{txt.ed_readonly_1()}</span>{' '}
+            {owner ? txt.ed_readonly_2_named({ owner: owner.name || owner.email }) : txt.ed_readonly_2()}
           </p>
         </div>
       )}
@@ -599,19 +605,19 @@ const TemplateEditor = () => {
           onClick={() => setMobileTab('editor')}
           className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${mobileTab === 'editor' ? 'text-ink-strong border-b-2 border-accent' : 'text-ink-muted'}`}
         >
-          <PenTool className="w-4 h-4" /> Editor
+          <PenTool className="w-4 h-4" /> {txt.ed_tab_editor()}
         </button>
         <button
           onClick={() => setMobileTab('test')}
           className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${mobileTab === 'test' ? 'text-ink-strong border-b-2 border-accent' : 'text-ink-muted'}`}
         >
-          {hasHistory ? <><History className="w-4 h-4" /> History · Test</> : <><FlaskConical className="w-4 h-4" /> Test</>}
+          {hasHistory ? <><History className="w-4 h-4" /> {txt.ed_tab_history_test()}</> : <><FlaskConical className="w-4 h-4" /> {txt.ed_tab_test()}</>}
         </button>
         <button
           onClick={() => setMobileTab('settings')}
           className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${mobileTab === 'settings' ? 'text-ink-strong border-b-2 border-accent' : 'text-ink-muted'}`}
         >
-          <Settings className="w-4 h-4" /> Settings
+          <Settings className="w-4 h-4" /> {txt.ed_tab_settings()}
         </button>
       </div>
 
@@ -624,8 +630,8 @@ const TemplateEditor = () => {
             {/* Kind selector */}
             {canEdit && (
               <div>
-                <p className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Type</p>
-                <div role="group" aria-label="Type" className="grid grid-cols-2 gap-1 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
+                <p className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">{txt.ed_type()}</p>
+                <div role="group" aria-label={txt.ed_type()} className="grid grid-cols-2 gap-1 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
                   {([
                     { kind: 'prompt' as PromptKind, label: 'Prompt', icon: <PenTool className="w-3.5 h-3.5" /> },
                     { kind: 'skill' as PromptKind, label: 'Skill', icon: <Wand2 className="w-3.5 h-3.5" /> },
@@ -656,7 +662,7 @@ const TemplateEditor = () => {
                     examples are real marketplace listings, so what a reader sees here and there agrees.
                     `aria-describedby` points every tab at this line so it is read out too. */}
                 <p id="kind-help" className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-                  {KIND_HELP[formData.kind]}
+                  {kindHelp(formData.kind)}
                 </p>
               </div>
             )}
@@ -667,51 +673,48 @@ const TemplateEditor = () => {
                 thing was called three different things in three screens. */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <label htmlFor="template-editor-description" className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Description</label>
+                <label htmlFor="template-editor-description" className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{txt.ed_description()}</label>
                 {canEdit && (
                   <button
                     type="button"
                     onClick={handleGenerateDescription}
                     disabled={isGeneratingDescription || !formData.content.trim() || !canUseAI}
                     title={
-                      !formData.content.trim() ? 'Enter content first' :
-                      !canUseAI ? 'Add an API key in Settings' :
-                      'Generate description with AI'
+                      !formData.content.trim() ? txt.ed_enter_content_first() :
+                      !canUseAI ? txt.ed_add_api_key() :
+                      txt.ed_generate_description()
                     }
                     className="flex items-center gap-1 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     {isGeneratingDescription
-                      ? <><Loader2 className="w-3 h-3 animate-spin" />Generating...</>
-                      : <><Sparkles className="w-3 h-3" />Generate with AI</>
+                      ? <><Loader2 className="w-3 h-3 animate-spin" />{txt.ed_generating()}</>
+                      : <><Sparkles className="w-3 h-3" />{txt.ed_generate()}</>
                     }
                   </button>
                 )}
               </div>
-              <textarea id="template-editor-description"
-                className={`w-full p-3 border bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm h-24 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all outline-none resize-none placeholder:text-slate-400 dark:placeholder:text-slate-500 ${
-                  formData.kind === 'skill' && !formData.description.trim()
-                    ? 'border-amber-300 dark:border-amber-600'
-                    : 'border-slate-200 dark:border-slate-600'
-                }`}
+              <Textarea id="template-editor-description"
+                className="h-24 resize-none"
+                tone={formData.kind === 'skill' && !formData.description.trim() ? 'warning' : 'default'}
                 value={formData.description}
                 onChange={e => { setFormData(prev => ({ ...prev, description: e.target.value })); setIsDirty(true); }}
-                placeholder={formData.kind === 'skill' ? 'Describe when and how to use this skill — AI agents use this for discovery...' : 'Describe what this playbook does...'}
+                placeholder={formData.kind === 'skill' ? txt.ed_desc_placeholder_skill() : txt.ed_desc_placeholder_prompt()}
                 readOnly={!canEdit}
               />
               {formData.kind === 'skill' && !formData.description.trim() && (
                 <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1">
                   <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                  Description needed for AI agent discovery
+                  {txt.ed_desc_needed()}
                 </p>
               )}
               {formData.kind === 'skill' && formData.description.trim() && (
-                <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">AI agents use this description to decide when to apply this skill</p>
+                <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">{txt.ed_desc_used()}</p>
               )}
 
               {/* Tag — workspace templates only */}
               {!isLibrary && (
                 <div className="mt-3">
-                  <p className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Tag</p>
+                  <p className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{txt.ed_tag()}</p>
                   <TagPicker
                     value={formData.tag ?? null}
                     tags={workspace.tags}
@@ -726,20 +729,16 @@ const TemplateEditor = () => {
             {/* Category — marketplace templates only */}
             {isLibrary && (
               <div>
-                <label htmlFor="template-editor-category" className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Category</label>
-                <div className="relative">
-                  <select id="template-editor-category"
-                    className="w-full p-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none appearance-none"
-                    value={libraryCategory}
-                    onChange={e => { setLibraryCategory(e.target.value as TemplateCategory); setIsDirty(true); }}
-                    disabled={!canEdit}
-                  >
-                    {TEMPLATE_CATEGORIES.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                </div>
+                <label htmlFor="template-editor-category" className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">{txt.ed_category()}</label>
+                <Select id="template-editor-category"
+                  value={libraryCategory}
+                  onChange={e => { setLibraryCategory(e.target.value as TemplateCategory); setIsDirty(true); }}
+                  disabled={!canEdit}
+                >
+                  {TEMPLATE_CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>{categoryLabel(cat)}</option>
+                  ))}
+                </Select>
               </div>
             )}
 
@@ -754,7 +753,7 @@ const TemplateEditor = () => {
                 different table and means something else entirely: listed in the marketplace or not. */}
             {isLibrary && canEdit && (
               <div>
-                <p className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Status</p>
+                <p className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{txt.ed_status()}</p>
                 <button
                   onClick={() => { setFormData(prev => ({ ...prev, published: !prev.published })); setIsDirty(true); }}
                   aria-pressed={formData.published}
@@ -766,10 +765,10 @@ const TemplateEditor = () => {
                 >
                   <span className="flex items-center gap-2 shrink-0">
                     {formData.published ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                    {formData.published ? 'Listed' : 'Draft'}
+                    {formData.published ? txt.ed_listed() : txt.ed_draft()}
                   </span>
                   <span className="text-xs opacity-70 text-right">
-                    {formData.published ? 'Shown in the marketplace' : 'Not listed yet — only admins see it'}
+                    {formData.published ? txt.ed_listed_hint() : txt.ed_draft_hint()}
                   </span>
                 </button>
               </div>
@@ -810,7 +809,7 @@ const TemplateEditor = () => {
                 legacyRoles={legacyRoles}
                 privateDisabledReason={
                   id && !formData.createdBy
-                    ? 'Unavailable — this playbook has no owner recorded, so "only me" would hide it from everyone'
+                    ? txt.ed_only_me_unavailable()
                     : undefined
                 }
               />
@@ -821,8 +820,8 @@ const TemplateEditor = () => {
             {!isLibrary && canEdit && !IS_SELF_HOSTED && accessAppliesTo(workspace, editors.mode !== 'everyone') && (
               <TemplateAccessControl
                 variant="edit"
-                label="Who can edit"
-                hint="Who may change this playbook. Everyone who can see it can still use it."
+                label={txt.ed_who_can_edit()}
+                hint={txt.ed_who_can_edit_hint()}
                 value={editors}
                 onChange={v => { setEditorsValue(v); setEditorsDirty(true); setIsDirty(true); }}
                 members={workspace?.members}
@@ -830,7 +829,7 @@ const TemplateEditor = () => {
                 ownerId={formData.createdBy || null}
                 multiSeat={isMultiSeat(workspace)}
                 readOnly={!canManageEditors}
-                readOnlyReason="Only the owner or a workspace admin can change who may edit this playbook."
+                readOnlyReason={txt.ed_who_can_edit_readonly()}
               />
             )}
 
@@ -846,12 +845,12 @@ const TemplateEditor = () => {
                 belongs in Settings (see the CTA there) — this only has to be true. */}
             {!isLibrary && canEdit && IS_SELF_HOSTED && (
               <div>
-                <p className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Access</p>
+                <p className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">{txt.ed_access()}</p>
                 <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/40 px-3 py-2.5">
                   <Users className="w-4 h-4 shrink-0 mt-0.5 text-slate-400" />
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    <span className="font-semibold text-slate-600 dark:text-slate-300">Everyone in this workspace</span>{' '}
-                    can see and use this playbook. Restricting one to people or groups is available on{' '}
+                    <span className="font-semibold text-slate-600 dark:text-slate-300">{txt.ed_selfhost_access_1()}</span>{' '}
+                    {txt.ed_selfhost_access_2()}{' '}
                     <a href="https://sqemes.com" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-600 dark:text-brand-400 hover:underline">sqemes Cloud</a>.
                   </p>
                 </div>
@@ -862,8 +861,8 @@ const TemplateEditor = () => {
             {!isLibrary && (
               <div>
                 <div className="flex items-center gap-1.5 mb-3">
-                  <p className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Context Files</p>
-                  <FieldTooltip text="Workspace files attached to this playbook. Their content is prepended as context when the playbook runs." />
+                  <p className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{txt.ed_context_files()}</p>
+                  <FieldTooltip text={txt.ed_context_files_tip()} />
                 </div>
                 <ContextFilePicker
                   selectedIds={formData.contextFileIds}
@@ -883,11 +882,11 @@ const TemplateEditor = () => {
             {formData.kind === 'prompt' && <div>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-1.5">
-                  <p className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Variables</p>
-                  <FieldTooltip text="Dynamic placeholders filled in at run time. Use {{variable_name}} in your prompt to insert them." />
+                  <p className="block text-xs font-bold text-slate-400 uppercase tracking-wider">{txt.ed_variables()}</p>
+                  <FieldTooltip text={txt.ed_variables_tip({ token: '{{variable_name}}' })} />
                 </div>
                 {canEdit && (
-                  <button onClick={openNewVariableModal} aria-label="Add variable" className="p-1 text-brand-600 hover:bg-brand-50 rounded transition-colors">
+                  <button onClick={openNewVariableModal} aria-label={txt.ed_add_variable()} className="p-1 text-brand-600 hover:bg-brand-50 rounded transition-colors">
                     <Plus className="w-4 h-4" />
                   </button>
                 )}
@@ -911,8 +910,8 @@ const TemplateEditor = () => {
                       {canEdit && (
                         <div className="flex items-center gap-1 reveal-on-hover transition-opacity">
                           <MoveButtons label={v.label || v.name} index={vi} count={formData.variables.length} onMove={to => moveVariable(vi, to)} />
-                          <button onClick={e => { e.stopPropagation(); openEditVariable(v); }} aria-label={`Edit variable ${v.name}`} className="text-slate-400 hover:text-brand-600 p-1.5"><Edit className="w-3 h-3" /></button>
-                          <button onClick={e => { e.stopPropagation(); setFormData(prev => ({ ...prev, variables: prev.variables.filter(x => x.id !== v.id) })); setIsDirty(true); }} aria-label={`Delete variable ${v.name}`} className="text-slate-400 hover:text-red-500 p-1.5"><Trash2 className="w-3 h-3" /></button>
+                          <button onClick={e => { e.stopPropagation(); openEditVariable(v); }} aria-label={txt.ed_edit_variable_label({ name: v.name })} className="text-slate-400 hover:text-brand-600 p-1.5"><Edit className="w-3 h-3" /></button>
+                          <button onClick={e => { e.stopPropagation(); setFormData(prev => ({ ...prev, variables: prev.variables.filter(x => x.id !== v.id) })); setIsDirty(true); }} aria-label={txt.ed_delete_variable_label({ name: v.name })} className="text-slate-400 hover:text-red-500 p-1.5"><Trash2 className="w-3 h-3" /></button>
                         </div>
                       )}
                     </div>
@@ -923,7 +922,7 @@ const TemplateEditor = () => {
                           onClick={() => { insertVariableToken(v.name); setMobileTab('editor'); }}
                           className="flex items-center gap-1.5 text-2xs font-bold text-brand-600 bg-white px-2 py-1.5 rounded-lg border border-brand-200 shadow-sm hover:bg-brand-50 hover:border-brand-300 transition-all whitespace-nowrap"
                         >
-                          <Plus className="w-3 h-3" /> Add
+                          <Plus className="w-3 h-3" /> {txt.ed_add()}
                         </button>
                       )}
                     </div>
@@ -931,7 +930,7 @@ const TemplateEditor = () => {
                 ))}
                 {formData.variables.length === 0 && (
                   <div className="text-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-xl">
-                    <p className="text-xs text-slate-400">No variables defined.</p>
+                    <p className="text-xs text-slate-400">{txt.ed_no_variables()}</p>
                   </div>
                 )}
               </div>
@@ -947,7 +946,7 @@ const TemplateEditor = () => {
                 would dress up an absence as somebody. */}
             {!isLibrary && id && (
               <div>
-                <p className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Owner</p>
+                <p className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{txt.ed_owner()}</p>
                 {owner ? (
                   <PersonCard
                     name={owner.name || owner.email}
@@ -960,12 +959,12 @@ const TemplateEditor = () => {
                     <UserRound className="w-4 h-4 shrink-0 mt-0.5 text-slate-400" />
                     <span className="min-w-0">
                       <span className="block text-sm font-semibold text-slate-700 dark:text-slate-200">
-                        {formData.createdBy ? 'No longer in this workspace' : 'None recorded'}
+                        {formData.createdBy ? txt.ed_owner_gone() : txt.ed_owner_none()}
                       </span>
                       <span className="block text-xs text-slate-500 dark:text-slate-400">
                         {formData.createdBy
-                          ? 'The playbook stays where it is'
-                          : '“Only me” needs an owner to mean anything'}
+                          ? txt.ed_owner_gone_hint()
+                          : txt.ed_owner_none_hint()}
                       </span>
                     </span>
                   </div>
@@ -992,12 +991,12 @@ const TemplateEditor = () => {
               <KindBadge kind={formData.kind} />
               {formData.tag && <span className="text-2xs font-bold uppercase tracking-wider px-2 py-1 rounded-chip bg-surface-sunken text-ink-muted">{formData.tag}</span>}
             </div>
-            <label htmlFor="template-editor-title" className="sr-only">Title</label>
+            <label htmlFor="template-editor-title" className="sr-only">{txt.ed_title_label()}</label>
             <input id="template-editor-title"
               className="w-full bg-transparent font-display text-2xl md:text-3xl font-semibold tracking-tight text-ink-strong outline-none placeholder:text-ink-subtle"
               value={formData.title}
               onChange={e => { setFormData(prev => ({ ...prev, title: e.target.value })); setIsDirty(true); }}
-              placeholder="Untitled"
+              placeholder={txt.ed_untitled()}
               readOnly={!canEdit}
             />
           </div>
@@ -1006,7 +1005,7 @@ const TemplateEditor = () => {
           {formData.hadMultipleSteps && (
             <div className="flex items-center gap-2 px-6 py-3 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800/40 text-sm text-amber-700 dark:text-amber-400 shrink-0">
               <AlertTriangle className="w-4 h-4 shrink-0" />
-              This prompt had multiple steps. Only the first step was kept — please review and update the content.
+              {txt.ed_legacy_steps()}
             </div>
           )}
 
@@ -1015,7 +1014,7 @@ const TemplateEditor = () => {
           {/* Toolbar + content textarea */}
           <div className="flex items-center justify-between px-6 md:px-10 py-2 shrink-0">
             <span className="text-2xs font-bold text-ink-subtle uppercase tracking-wider">
-              {formData.kind === 'skill' ? 'Skill Content' : 'Prompt Content'}
+              {formData.kind === 'skill' ? txt.ed_skill_content() : txt.ed_prompt_content()}
             </span>
             {canEdit && (
               <button
@@ -1023,20 +1022,20 @@ const TemplateEditor = () => {
                 disabled={isEnhancing}
                 className="flex items-center gap-1 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                {isEnhancing ? <><Loader2 className="w-3 h-3 animate-spin" />Enhancing...</> : <><Sparkles className="w-3 h-3" />Enhance with AI</>}
+                {isEnhancing ? <><Loader2 className="w-3 h-3 animate-spin" />{txt.ed_enhancing()}</> : <><Sparkles className="w-3 h-3" />{txt.ed_enhance()}</>}
               </button>
             )}
           </div>
           <textarea
             ref={textareaRef}
             // SQEM-538 — the editor's main field has no visible label of its own.
-            aria-label={formData.kind === 'skill' ? 'Skill content' : 'Prompt content'}
+            aria-label={formData.kind === 'skill' ? txt.ed_skill_content_label() : txt.ed_prompt_content_label()}
             value={formData.content}
             onChange={e => { setFormData(prev => ({ ...prev, content: e.target.value })); setIsDirty(true); }}
             placeholder={
               formData.kind === 'skill'
-                ? 'Write the skill knowledge or context here...'
-                : 'Write your prompt here. Use {{variable_name}} to insert variables.'
+                ? txt.ed_skill_placeholder()
+                : txt.ed_prompt_placeholder({ token: '{{variable_name}}' })
             }
             readOnly={!canEdit}
             className="flex-1 mx-4 md:mx-8 mb-4 md:mb-6 p-5 md:p-6 rounded-card border border-line bg-surface-raised text-sm md:text-base text-ink resize-none outline-none leading-relaxed placeholder:text-ink-subtle focus:border-line-strong"
@@ -1048,7 +1047,7 @@ const TemplateEditor = () => {
         <div className={`w-full xl:w-[420px] flex-1 min-h-0 xl:flex-none overflow-hidden ${mobileTab === 'test' ? 'flex flex-col' : 'hidden xl:flex xl:flex-col'}`}>
           {hasHistory && (
             <div role="tablist" className="flex border-b border-line bg-surface-raised shrink-0">
-              {([['test', 'Test', FlaskConical], ['history', 'History', History]] as const).map(([key, label, Icon]) => (
+              {([['test', txt.ed_tab_test(), FlaskConical], ['history', txt.vh_history_tab(), History]] as const).map(([key, label, Icon]) => (
                 <button
                   key={key}
                   role="tab"
@@ -1092,13 +1091,14 @@ const TemplateEditor = () => {
 
       {/* Variable Modal */}
       <Modal open={showVarModal} onClose={() => setShowVarModal(false)} size="md" className="p-6 md:p-8 overflow-y-auto max-h-[90vh]">
-        <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6">{editingVarId ? 'Edit Variable' : 'Add Variable'}</h3>
+        <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6">{editingVarId ? txt.ed_var_edit_title() : txt.ed_var_add_title()}</h3>
         <div className="space-y-5">
           <div>
-            <label htmlFor="template-editor-name-id" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Name (ID)</label>
-            <input id="template-editor-name-id"
-              className={`w-full p-3 border rounded-xl text-sm outline-none focus:border-brand-500 transition-colors bg-white dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500 ${varNameError ? 'border-red-400' : 'border-slate-200 dark:border-slate-600'}`}
-              placeholder="e.g. product_name"
+            <label htmlFor="template-editor-name-id" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{txt.ed_var_name()}</label>
+            <Input id="template-editor-name-id"
+              tone={varNameError ? 'error' : 'default'}
+              aria-invalid={!!varNameError}
+              placeholder={txt.ed_var_name_placeholder()}
               value={newVar.name || ''}
               onChange={e => { setNewVar(v => ({ ...v, name: e.target.value })); setVarNameError(null); }}
               disabled={!!editingVarId}
@@ -1106,54 +1106,54 @@ const TemplateEditor = () => {
             {varNameError && <p className="text-xs text-red-500 mt-1">{varNameError}</p>}
           </div>
           <div>
-            <label htmlFor="template-editor-label" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Label</label>
-            <input id="template-editor-label" className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:border-brand-500 transition-colors bg-white dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500" placeholder="e.g. Product Name" value={newVar.label || ''} onChange={e => setNewVar(v => ({ ...v, label: e.target.value }))} />
+            <label htmlFor="template-editor-label" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{txt.ed_var_label()}</label>
+            <Input id="template-editor-label" placeholder={txt.ed_var_label_placeholder()} value={newVar.label || ''} onChange={e => setNewVar(v => ({ ...v, label: e.target.value }))} />
           </div>
           <div>
-            <label htmlFor="template-editor-type" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Type</label>
-            <select id="template-editor-type" className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-slate-100 outline-none focus:border-brand-500 transition-colors" value={newVar.type} onChange={e => setNewVar(v => ({ ...v, type: e.target.value as VariableType }))}>
-              <option value="text">Text Input</option>
-              <option value="textarea">Text Area</option>
-              <option value="select">Dropdown Select</option>
-              <option value="file">File Upload</option>
-            </select>
+            <label htmlFor="template-editor-type" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{txt.ed_var_type()}</label>
+            <Select id="template-editor-type" value={newVar.type} onChange={e => setNewVar(v => ({ ...v, type: e.target.value as VariableType }))}>
+              <option value="text">{txt.ed_var_text()}</option>
+              <option value="textarea">{txt.ed_var_textarea()}</option>
+              <option value="select">{txt.ed_var_select()}</option>
+              <option value="file">{txt.ed_var_file()}</option>
+            </Select>
           </div>
           {newVar.type === 'select' && (
             <div>
-              <label htmlFor="template-editor-options-comma-separated" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Options (comma separated)</label>
-              <input id="template-editor-options-comma-separated" className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:border-brand-500 transition-colors bg-white dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500" placeholder="Option A, Option B" value={varOptionsString} onChange={e => setVarOptionsString(e.target.value)} />
+              <label htmlFor="template-editor-options-comma-separated" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{txt.ed_var_options()}</label>
+              <Input id="template-editor-options-comma-separated" placeholder={txt.ed_var_options_placeholder()} value={varOptionsString} onChange={e => setVarOptionsString(e.target.value)} />
             </div>
           )}
           {newVar.type !== 'file' && (
             <div>
-              <label htmlFor="template-editor-default-value" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Default Value</label>
-              <input id="template-editor-default-value" className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:border-brand-500 transition-colors bg-white dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500" value={newVar.defaultValue || ''} onChange={e => setNewVar(v => ({ ...v, defaultValue: e.target.value }))} />
+              <label htmlFor="template-editor-default-value" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{txt.ed_var_default()}</label>
+              <Input id="template-editor-default-value" value={newVar.defaultValue || ''} onChange={e => setNewVar(v => ({ ...v, defaultValue: e.target.value }))} />
             </div>
           )}
         </div>
         <div className="flex gap-3 mt-8">
-          <button onClick={() => setShowVarModal(false)} className="flex-1 px-4 py-3 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 font-medium transition-colors">Cancel</button>
-          <Button onClick={saveVariable} className="flex-1 px-4 py-3 shadow-lg shadow-brand-200">{editingVarId ? 'Update' : 'Add'} Variable</Button>
+          <button onClick={() => setShowVarModal(false)} className="flex-1 px-4 py-3 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 font-medium transition-colors">{txt.pb_cancel()}</button>
+          <Button onClick={saveVariable} className="flex-1 px-4 py-3 shadow-lg shadow-brand-200">{editingVarId ? txt.ed_var_update() : txt.ed_var_add()}</Button>
         </div>
       </Modal>
 
       {/* Discard Changes Modal */}
       <Modal open={showDiscardModal} onClose={() => setShowDiscardModal(false)} size="sm" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Unsaved Changes</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">You have unsaved changes. Are you sure you want to leave without saving?</p>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">{txt.ed_unsaved_title()}</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">{txt.ed_unsaved_body()}</p>
         <div className="flex gap-2">
-          <button onClick={() => setShowDiscardModal(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Keep Editing</button>
-          <Button variant="danger" onClick={() => navigate(listPath)} className="flex-1 py-2.5 text-xs shadow-lg hover:shadow-red-200">Discard</Button>
+          <button onClick={() => setShowDiscardModal(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">{txt.ed_keep_editing()}</button>
+          <Button variant="danger" onClick={() => navigate(listPath)} className="flex-1 py-2.5 text-xs shadow-lg hover:shadow-red-200">{txt.ed_discard()}</Button>
         </div>
       </Modal>
 
       {/* Delete Confirmation Modal */}
       <Modal open={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} size="sm" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Delete Playbook?</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Are you sure you want to delete this playbook? This action cannot be undone.</p>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">{txt.pb_delete_title()}</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">{txt.pb_delete_body()}</p>
         <div className="flex gap-2">
-          <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">Cancel</button>
-          <Button variant="danger" onClick={confirmDelete} className="flex-1 py-2.5 text-xs shadow-lg hover:shadow-red-200">Yes, Delete</Button>
+          <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors">{txt.pb_cancel()}</button>
+          <Button variant="danger" onClick={confirmDelete} className="flex-1 py-2.5 text-xs shadow-lg hover:shadow-red-200">{txt.pb_yes_delete()}</Button>
         </div>
       </Modal>
 

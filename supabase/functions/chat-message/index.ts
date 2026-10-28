@@ -20,6 +20,7 @@ import {
   toOpenAiTools, toClaudeTools, toGeminiTools, toResponsesTools, chatActionDefinitions,
 } from '../_shared/libraryTools.ts';
 import { runLibraryTool } from '../_shared/libraryActions.ts';
+import { m, m as txt, requestLocale, type Locale } from '../_shared/locale.ts';
 import { addChange, type LibraryChange } from '../_shared/libraryChanges.ts';
 import {
   toResponsesInput, connectorResponsesTools, responsesDelta,
@@ -42,7 +43,7 @@ import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
 import { countUsage } from '../_shared/usageCounts.ts';
 import { MAX_LOADED_IDS } from '../_shared/chatPlaybooks.ts';
 import {
-  searchWeb, readWebPage, withWebTools, WEB_SEARCH_INSTRUCTION, SEARCH_KEY_PROVIDERS, ALLOWANCE_NOTICE,
+  searchWeb, readWebPage, withWebTools, WEB_SEARCH_INSTRUCTION, SEARCH_KEY_PROVIDERS, allowanceNotice, webNotSetUpNotice,
   type SearchProvider, type WebSources, type WebState,
 } from '../_shared/webSearch.ts';
 import { withFileTool, type GeneratedFile } from '../_shared/fileOutput.ts';
@@ -59,6 +60,7 @@ declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 const SELF_HOSTED = Deno.env.get('SELF_HOSTED') === 'true';
 
 Deno.serve(async (req) => {
+  let locale: Locale = requestLocale(req); // SQEM-612 — refusals before the body is read are in the person's language too
   const cors = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
@@ -68,7 +70,7 @@ Deno.serve(async (req) => {
   const MAX_BODY_BYTES = 20 * 1024 * 1024;
   const contentLength = Number(req.headers.get('content-length') ?? 0);
   if (contentLength > MAX_BODY_BYTES) {
-    return new Response(JSON.stringify({ error: 'Request body too large. Maximum is 20 MB.' }), {
+    return new Response(JSON.stringify({ error: txt.srv_body_too_large({}, { locale }) }), {
       status: 413,
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
@@ -87,7 +89,7 @@ Deno.serve(async (req) => {
     const token = authHeader.replace(/^Bearer\s+/i, '');
     const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: txt.srv_unauthorized({}, { locale }) }), {
         status: 401,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -95,6 +97,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const { workspaceId, modelId, systemInstruction, jobId, funded, connectorIds, timeZone, webSearch } = body;
+    locale = requestLocale(req, body.locale); // SQEM-599 — the language of the notices sqemes adds (SQEM-612: or the query)
     // SQEM-514 — a file part no provider can take never reaches a provider branch (_shared/messageParts.ts).
     const messages = Array.isArray(body.messages) ? dropUnsendableInMessages(body.messages) : body.messages;
 
@@ -119,7 +122,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (!membership) {
-      return new Response(JSON.stringify({ error: 'Not a member of this workspace' }), {
+      return new Response(JSON.stringify({ error: txt.srv_not_member({}, { locale }) }), {
         status: 403,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -127,7 +130,7 @@ Deno.serve(async (req) => {
 
     // SQEM-083 — server-side paywall: reject when the workspace has no active subscription.
     if (!(await isWorkspaceSubscriptionActive(adminClient, workspaceId))) {
-      return new Response(JSON.stringify({ error: 'This workspace has no active subscription.', code: 'subscription_inactive' }), {
+      return new Response(JSON.stringify({ error: txt.srv_no_subscription({}, { locale }), code: 'subscription_inactive' }), {
         status: 402,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -136,7 +139,7 @@ Deno.serve(async (req) => {
     // SQEM-501 — per person, with a per-workspace ceiling (was: 60/min for the whole workspace).
     const budget = await checkChatBudget(workspaceId, user.id);
     if (!budget.ok) {
-      return new Response(JSON.stringify({ error: budgetMessage(budget), code: 'rate_limited', scope: budget.scope }), {
+      return new Response(JSON.stringify({ error: budgetMessage(budget, locale), code: 'rate_limited', scope: budget.scope }), {
         status: 429,
         headers: { ...cors, 'Content-Type': 'application/json', 'Retry-After': '60' },
       });
@@ -153,7 +156,7 @@ Deno.serve(async (req) => {
       // Cloud-only — absent on self-host → tell the user to bring their own key.
       const fundedKey = Deno.env.get('MISTRAL_API_KEY');
       if (!fundedKey) {
-        return new Response(JSON.stringify({ error: 'AI credits are not available here. Add your own API key in Settings to use AI.', code: 'funded_unavailable' }), {
+        return new Response(JSON.stringify({ error: txt.srv_funded_unavailable({}, { locale }), code: 'funded_unavailable' }), {
           status: 400,
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
@@ -161,7 +164,7 @@ Deno.serve(async (req) => {
       // Roll the monthly period if due, then refuse before spending if the allowance is gone.
       const state = await ensureCreditPeriod(adminClient, workspaceId);
       if (!hasCredits(state)) {
-        return new Response(JSON.stringify({ error: "You've used all your AI credits this month. Add your own API key (BYOK) or upgrade your plan.", code: 'out_of_credits' }), {
+        return new Response(JSON.stringify({ error: txt.srv_out_of_credits({}, { locale }), code: 'out_of_credits' }), {
           status: 402,
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
@@ -195,7 +198,7 @@ Deno.serve(async (req) => {
       } else if (byokLower.includes('mistral') || byokLower.includes('codestral') || byokLower.includes('ministral') || byokLower.includes('magistral') || byokLower.includes('pixtral')) {
         provider = 'mistral';
       } else {
-        return new Response(JSON.stringify({ error: `Unsupported model: ${modelId}` }), {
+        return new Response(JSON.stringify({ error: txt.srv_unsupported_model({ model: modelId }, { locale }) }), {
           status: 400,
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
@@ -209,7 +212,7 @@ Deno.serve(async (req) => {
         .single();
 
       if (!keyRow?.encrypted_key) {
-        return new Response(JSON.stringify({ error: `No API key configured for ${provider}. Add it in Settings > LLM API Keys.` }), {
+        return new Response(JSON.stringify({ error: txt.srv_no_key({ provider }, { locale }) }), {
           status: 400,
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
@@ -337,6 +340,7 @@ Deno.serve(async (req) => {
       role: (membership as { role?: string }).role ?? null, // SQEM-561
       web,
       webRequested: webSearch === true,
+      locale,
     }));
     return new Response(JSON.stringify({ jobId }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
@@ -347,7 +351,7 @@ Deno.serve(async (req) => {
       : message.includes('API_KEY_ENCRYPTION_KEY') ? 503
       : 500;
     const body = status === 503
-      ? { error: 'Server encryption key not configured. Contact your administrator.' }
+      ? { error: txt.srv_encryption_missing({}, { locale }) }
       : { error: message };
     console.error('chat-message error:', message);
     return new Response(JSON.stringify(body), {
@@ -419,6 +423,8 @@ interface JobRequest {
   web: WebSearchConfig | null;
   /** SQEM-594 — switched on by the person, whether or not a key was found (to say so if not). */
   webRequested: boolean;
+  /** SQEM-599 — the language of the notices sqemes adds to a reply. */
+  locale: Locale;
 }
 
 interface WebSearchConfig {
@@ -495,7 +501,7 @@ const TOOL_BUDGET_MS = 90_000;
 
 async function runAndBroadcast({
   jobId, provider, apiKey, modelId, systemInstruction, messages,
-  funded, workspaceId, creditLimit, connectors, userId, role, web, webRequested,
+  funded, workspaceId, creditLimit, connectors, userId, role, web, webRequested, locale,
 }: JobRequest): Promise<void> {
   /**
    * SQEM-372 — the streaming decision, made ONCE and in one place rather than inside each provider.
@@ -656,19 +662,19 @@ async function runAndBroadcast({
       unreachable = loaded.failed;
     }
     if (provider === 'gemini') {
-      result = await callGemini(apiKey, modelId, instruction, messages, false, onDelta, runtime, cancel.signal);
+      result = await callGemini(apiKey, modelId, instruction, messages, false, onDelta, runtime, cancel.signal, locale);
     } else if (provider === 'openai') {
-      result = await callOpenAIResponses(apiKey, modelId, instruction, messages, connectors, onDelta, base, cancel.signal);
+      result = await callOpenAIResponses(apiKey, modelId, instruction, messages, connectors, onDelta, base, cancel.signal, locale);
     } else if (provider === 'claude') {
-      result = await callClaude(apiKey, modelId, instruction, messages, connectors, onDelta, base, cancel.signal);
+      result = await callClaude(apiKey, modelId, instruction, messages, connectors, onDelta, base, cancel.signal, locale);
     } else if (provider === 'deepseek') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.deepseek.com/v1/chat/completions', instruction, messages, 'deepseek', onDelta, runtime, cancel.signal));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.deepseek.com/v1/chat/completions', instruction, messages, 'deepseek', onDelta, runtime, cancel.signal, locale));
     } else if (provider === 'mistral') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.mistral.ai/v1/chat/completions', instruction, messages, 'mistral', onDelta, runtime, cancel.signal));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.mistral.ai/v1/chat/completions', instruction, messages, 'mistral', onDelta, runtime, cancel.signal, locale));
     } else if (provider === 'grok') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.x.ai/v1/chat/completions', instruction, messages, 'grok', onDelta, runtime, cancel.signal));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://api.x.ai/v1/chat/completions', instruction, messages, 'grok', onDelta, runtime, cancel.signal, locale));
     } else if (provider === 'openrouter') {
-      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://openrouter.ai/api/v1/chat/completions', instruction, messages, 'openrouter', onDelta, runtime, cancel.signal));
+      ({ content: result, totalTokens } = await callOpenAICompatible(apiKey, modelId, 'https://openrouter.ai/api/v1/chat/completions', instruction, messages, 'openrouter', onDelta, runtime, cancel.signal, locale));
     } else if (provider === 'loadtest') {
       result = await runLoadtestMock(onDelta, tools);
     } else {
@@ -697,13 +703,13 @@ async function runAndBroadcast({
     }
     // ⛔ The cap must be VISIBLE. A model cut off mid-investigation answers confidently from half the
     // material, and nothing in the reply would say so.
-    if (tools?.stats.cappedAt) result += toolCapNotice(tools.stats.cappedAt, tools.stats.cappedBy ?? 'rounds');
-    if (unreachable.length) result += connectorRefusedNotice(unreachable); // SQEM-584
+    if (tools?.stats.cappedAt) result += toolCapNotice(tools.stats.cappedAt, tools.stats.cappedBy ?? 'rounds', locale);
+    if (unreachable.length) result += connectorRefusedNotice(unreachable, locale); // SQEM-584
     // SQEM-594 — switched on but no key anywhere (self-host without a search key): say so, once.
-    if (webRequested && !web) result += '\n\n---\n_Web search is not set up here. A workspace admin can add a search key in Settings → API & MCP → Web search._';
+    if (webRequested && !web) result += webNotSetUpNotice(locale);
     // SQEM-594 — the model is told too, but says it in its own words (seen in testing: "I cannot search
     // right now") — the reason has to be stated, once, in ours.
-    if (webState.allowanceExhausted) result += ALLOWANCE_NOTICE;
+    if (webState.allowanceExhausted) result += allowanceNotice(locale);
     if (webSources.queries.length || webSources.pages.length) {
       console.log('[chat-web]', JSON.stringify({ jobId, provider, hosted: web?.hosted ?? null, searches: webSources.queries.length, pages: webSources.pages.length }));
     }
@@ -813,6 +819,8 @@ async function callGemini(
   tools?: ToolRuntime | null,
   /** SQEM-583 — aborted when the person presses Stop; reaches every provider request below. */
   signal?: AbortSignal,
+  /** SQEM-604 — the language of the notices this function adds to an answer. */
+  locale: Locale = 'en',
 ): Promise<string> {
   // SQEM-111 — modelId is interpolated into the request path; allow only id-shaped values.
   if (!/^[A-Za-z0-9._-]+$/.test(modelId)) throw new Error('Invalid model id');
@@ -905,7 +913,7 @@ async function callGemini(
     }
     answer += text;
 
-    if (!activeTools || !toolCalls.length) return answer || 'No content generated.';
+    if (!activeTools || !toolCalls.length) return answer || m.chat_no_content({}, { locale });
 
     contents.push(geminiModelTurn(text, toolCalls) as any);
     const results: { name: string; output: string }[] = [];
@@ -943,6 +951,8 @@ async function callOpenAIResponses(
   tools?: ToolRuntime | null,
   /** SQEM-583 — aborted when the person presses Stop; reaches every provider request below. */
   signal?: AbortSignal,
+  /** SQEM-604 — the language of the notices this function adds to an answer. */
+  locale: Locale = 'en',
 ): Promise<string> {
   const input = toResponsesInput(messages, (d) => decodeTextFile(d).text);
 
@@ -1036,7 +1046,7 @@ async function callOpenAIResponses(
       // the old sentence, but the next case is no longer a guess.
       if (!answer) console.warn('[chat-openai] empty answer', JSON.stringify({ model: modelId, ...round, itemTypes: items.map((i: any) => i?.type) }));
       // SQEM-572 — say which connector was left out, as Claude does (a degraded answer must look degraded).
-      return (answer || 'No content generated.') + connectorRefusedNotice(droppedConnectors);
+      return (answer || m.chat_no_content({}, { locale })) + connectorRefusedNotice(droppedConnectors, locale);
     }
 
     // ⛔ EVERY item goes back, verbatim — reasoning items included, not just the calls. A reasoning
@@ -1124,6 +1134,8 @@ async function callClaude(
   tools?: ToolRuntime | null,
   /** SQEM-583 — aborted when the person presses Stop; reaches every provider request below. */
   signal?: AbortSignal,
+  /** SQEM-604 — the language of the notices this function adds to an answer. */
+  locale: Locale = 'en',
 ): Promise<string> {
   const apiMessages = messages.map(msg => {
     if (typeof msg.content === 'string') {
@@ -1268,7 +1280,7 @@ async function callClaude(
     if (!activeTools || !toolCalls.length) {
       // ⛔ The drop must be VISIBLE — the same argument as `toolCapNotice`. Somebody who asks about
       // their Shopify orders and gets an answer without Shopify will believe the answer.
-      return (answer || 'No content generated.') + connectorRefusedNotice(droppedConnectors);
+      return (answer || m.chat_no_content({}, { locale })) + connectorRefusedNotice(droppedConnectors, locale);
     }
 
     apiMessages.push(claudeAssistantTurn(text, toolCalls) as any);
@@ -1327,6 +1339,8 @@ async function callOpenAICompatible(
   tools?: ToolRuntime | null,
   /** SQEM-583 — aborted when the person presses Stop; reaches every provider request below. */
   signal?: AbortSignal,
+  /** SQEM-604 — the language of the notices this function adds to an answer. */
+  locale: Locale = 'en',
 ): Promise<{ content: string; totalTokens: number }> {
   const apiMessages: any[] = [];
 
@@ -1408,7 +1422,7 @@ async function callOpenAICompatible(
     answer += text;
 
     if (!activeTools || !toolCalls.length) {
-      return { content: answer || 'No content generated.', totalTokens };
+      return { content: answer || m.chat_no_content({}, { locale }), totalTokens };
     }
 
     apiMessages.push(openAiAssistantTurn(text, toolCalls));

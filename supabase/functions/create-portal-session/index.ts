@@ -1,9 +1,11 @@
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
+import { m as txt, requestLocale } from '../_shared/locale.ts';
 
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') ?? '';
 
 Deno.serve(async (req) => {
+  const locale = requestLocale(req); // SQEM-612 — refusals in the person's language
   const cors = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
@@ -23,7 +25,7 @@ Deno.serve(async (req) => {
     const token = authHeader.replace(/^Bearer\s+/i, '');
     const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: txt.srv_unauthorized({}, { locale }) }), {
         status: 401,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -47,7 +49,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (!membership || membership.role !== 'admin') {
-      return new Response(JSON.stringify({ error: 'Only workspace admins can manage subscriptions.' }), {
+      return new Response(JSON.stringify({ error: txt.srv_admin_subscriptions({}, { locale }) }), {
         status: 403,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -60,7 +62,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (!ws?.stripe_customer_id) {
-      return new Response(JSON.stringify({ error: 'No billing account found for this workspace.' }), {
+      return new Response(JSON.stringify({ error: txt.srv_no_billing({}, { locale }) }), {
         status: 400,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });

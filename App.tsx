@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import { useApplyLocale } from './hooks/useApplyLocale';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import Sidebar from './components/Sidebar';
@@ -66,6 +67,7 @@ import { usePullToRefresh } from './hooks/usePullToRefresh';
 import PullToRefreshIndicator from './components/PullToRefreshIndicator';
 import { CheckCircle, AlertTriangle, Info, X, Menu, Plus, LogOut } from 'lucide-react';
 import { isStagingSupabaseEnvironment } from './lib/environment';
+import { m } from './lib/i18n';
 
 // SQEM-091 — Password-recovery links are routed to the reset page by the PASSWORD_RECOVERY
 // handler in hooks/useAuth.ts (fires once supabase-js establishes the recovery session from
@@ -78,10 +80,10 @@ const StagingEnvironmentBanner = () => {
   return (
     <div
       role="status"
-      aria-label="Staging environment"
+      aria-label={m.app_staging()}
       className="fixed top-0 left-0 right-0 w-full h-8 bg-red-600 text-white text-center text-xs sm:text-sm font-bold uppercase flex items-center justify-center shadow-sm z-[200] pointer-events-none"
     >
-      Staging environment
+      {m.app_staging()}
     </div>
   );
 };
@@ -124,7 +126,7 @@ const ToastContainer = () => {
       {toast.type === 'error' && <AlertTriangle aria-hidden className="w-5 h-5 text-danger shrink-0" />}
       {toast.type === 'info' && <Info aria-hidden className="w-5 h-5 text-accent shrink-0" />}
       <span className="font-medium text-sm">{toast.message}</span>
-      <button onClick={hideToast} aria-label="Dismiss notification" className="text-ink-subtle hover:text-ink-strong"><X className="w-4 h-4" /></button>
+      <button onClick={hideToast} aria-label={m.app_dismiss_toast()} className="text-ink-subtle hover:text-ink-strong"><X className="w-4 h-4" /></button>
     </div>
   );
 };
@@ -144,7 +146,7 @@ const Layout = ({ children }: React.PropsWithChildren<{}>) => {
         onClick={() => mainRef.current?.focus()}
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[300] focus:px-4 focus:py-2 focus:rounded-xl focus:bg-brand-600 focus:text-white focus:text-sm focus:font-semibold"
       >
-        Skip to content
+        {m.app_skip()}
       </button>
       <Sidebar mobileOpen={mobileMenuOpen} setMobileOpen={setMobileMenuOpen} />
 
@@ -157,6 +159,7 @@ const Layout = ({ children }: React.PropsWithChildren<{}>) => {
             </div>
             <button
               onClick={() => setMobileMenuOpen(true)}
+              aria-label={m.app_open_menu()}
               className="p-2 text-ink-muted hover:bg-surface-sunken rounded-lg transition-colors"
             >
               <Menu className="w-6 h-6" />
@@ -200,20 +203,20 @@ const NoWorkspaceScreen = () => {
             <img src="/logo-favicon-V2.png" alt="sqemes" className="w-10 h-10 rounded-xl shadow-soft" />
             <span className="text-2xl font-bold text-ink-strong">sqemes</span>
           </div>
-          <h2 className="font-display text-xl font-semibold text-ink-strong">{IS_SELF_HOSTED ? 'No workspace yet' : 'Create Your First Workspace'}</h2>
-          <p className="text-ink-muted text-sm mt-2">{IS_SELF_HOSTED ? 'Ask an administrator of this instance to invite you to a workspace.' : 'A workspace is where your team collaborates on prompts.'}</p>
+          <h2 className="font-display text-xl font-semibold text-ink-strong">{IS_SELF_HOSTED ? m.nw_selfhost_title() : m.nw_cloud_title()}</h2>
+          <p className="text-ink-muted text-sm mt-2">{IS_SELF_HOSTED ? m.nw_selfhost_body() : m.nw_cloud_body() /* SQEM-610 — was "on prompts", the word before SQEM-394 */}</p>
         </div>
 
         <div className="bg-surface-raised rounded-2xl shadow-soft border border-line p-8">
           {/* SQEM-121 — self-host is single-instance: orphaned users can't create a workspace, only be invited */}
           {!IS_SELF_HOSTED && <form onSubmit={handleCreate} className="space-y-4">
             <div>
-              <label htmlFor="app-workspace-name" className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-2">Workspace Name</label>
+              <label htmlFor="app-workspace-name" className="block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-2">{m.nw_name()}</label>
               <input id="app-workspace-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="My Team"
+                placeholder={m.nw_name_placeholder()}
                 required
                 className="w-full px-4 py-3 border border-line-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all bg-surface-field text-ink-strong placeholder:text-ink-subtle"
               />
@@ -224,7 +227,7 @@ const NoWorkspaceScreen = () => {
               className="w-full py-3 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4" />
-              {creating ? 'Creating...' : 'Create Workspace'}
+              {creating ? m.nw_creating() : m.nw_create()}
             </button>
           </form>}
           <button
@@ -232,7 +235,7 @@ const NoWorkspaceScreen = () => {
             className="w-full mt-4 py-3 text-ink-muted hover:text-ink-strong text-sm font-medium flex items-center justify-center gap-2 transition-colors"
           >
             <LogOut className="w-4 h-4" />
-            Sign Out
+            {m.stp_sign_out()}
           </button>
         </div>
       </div>
@@ -242,8 +245,10 @@ const NoWorkspaceScreen = () => {
 
 const AppRoutes = () => {
   const { noWorkspace, isLoading, showToast } = useUI();
-  const { workspace } = useWorkspace();
+  const { workspace, currentUser, isSqemesAdmin } = useWorkspace();
   const { pathname } = useLocation();
+  // SQEM-600 — the language in effect, applied once the person and the workspace are loaded.
+  useApplyLocale(!isLoading && !!workspace.id && !!currentUser.id, currentUser.language, workspace.language, isSqemesAdmin);
 
   // SQEM-491 — a GoTrue `#message=` (first email-change confirmation) was stashed by `App()`.
   React.useEffect(() => {
@@ -337,20 +342,23 @@ const AppRoutes = () => {
 
 // Sets the browser tab title to "<Page> - sqemes" from the current route.
 const pageTitleForPath = (pathname: string): string => {
-  if (pathname === '/') return 'Start'; // SQEM-550 (a)
-  if (pathname.startsWith('/chat')) return 'Chat';
-  if (pathname.startsWith('/design')) return 'Design system';
-  if (pathname === '/overview') return 'Overview'; // SQEM-552
-  if (pathname.startsWith('/playbooks/') || pathname.startsWith('/prompts/')) return 'Playbook editor';
-  if (pathname.startsWith('/personas/')) return 'Persona editor';
-  if (pathname.startsWith('/personas')) return 'Personas'; // SQEM-388 — was missing, tab said just "sqemes"
-  if (pathname.startsWith('/playbooks') || pathname.startsWith('/templates') || pathname === '/prompts' || pathname.startsWith('/assistants')) return 'Playbooks';
-  if (pathname.startsWith('/library/')) return 'Marketplace editor';
-  if (pathname === '/library') return 'Marketplace';
-  if (pathname.startsWith('/files')) return 'Files';
-  if (pathname.startsWith('/settings') || pathname === '/workspace') return 'Settings';
-  if (pathname.startsWith('/invite')) return 'Accept invite';
-  if (pathname === '/reset-password') return 'Reset password';
+  if (pathname === '/') return m.nav_start(); // SQEM-550 (a)
+  if (pathname.startsWith('/chat')) return m.nav_chat();
+  if (pathname.startsWith('/history')) return m.nav_history(); // SQEM-611 — was missing, tab said just "sqemes"
+  if (pathname.startsWith('/design')) return m.title_design();
+  if (pathname === '/overview') return m.nav_overview(); // SQEM-552
+  if (pathname.startsWith('/playbooks/') || pathname.startsWith('/prompts/')) return m.title_playbook_editor();
+  if (pathname.startsWith('/personas/')) return m.title_persona_editor();
+  if (pathname.startsWith('/personas')) return m.nav_personas(); // SQEM-388 — was missing, tab said just "sqemes"
+  if (pathname.startsWith('/playbooks') || pathname.startsWith('/templates') || pathname === '/prompts' || pathname.startsWith('/assistants')) return m.nav_playbooks();
+  // SQEM-611 — /library/<id> is the listing (MarketplaceTemplate), not the editor; it was titled "Marketplace editor".
+  if (pathname === '/library/new' || /^\/library\/[^/]+\/edit$/.test(pathname)) return m.title_marketplace_editor();
+  if (pathname.startsWith('/library/')) return m.title_marketplace_listing();
+  if (pathname === '/library') return m.nav_marketplace();
+  if (pathname.startsWith('/files')) return m.nav_files();
+  if (pathname.startsWith('/settings') || pathname === '/workspace') return m.nav_settings();
+  if (pathname.startsWith('/invite')) return m.title_accept_invite();
+  if (pathname === '/reset-password') return m.title_reset_password();
   return '';
 };
 
@@ -389,7 +397,7 @@ const AuthenticatedApp = () => {
  * rendering it outside the inner boundary keeps the sidebar mounted and only the content area waits.
  */
 const PageLoading = () => (
-  <div className="flex items-center justify-center py-24" role="status" aria-label="Loading">
+  <div className="flex items-center justify-center py-24" role="status" aria-label={m.app_loading()}>
     {/* SQEM-554 (a) — no pulse for those who asked the system for less motion. */}
     <img src="/logo-favicon-V2.png" alt="" className="w-8 h-8 rounded-lg opacity-60 motion-safe:animate-pulse" />
   </div>
@@ -405,7 +413,7 @@ const LoadingScreen = () => (
   <div className="min-h-screen bg-surface flex items-center justify-center">
     <div className="text-center">
       <img src="/logo-favicon-V2.png" alt="sqemes" className="w-10 h-10 rounded-xl shadow-soft mx-auto mb-4 motion-safe:animate-pulse" />
-      <p className="text-ink-subtle text-sm font-medium" role="status">Loading…</p>
+      <p className="text-ink-subtle text-sm font-medium" role="status">{m.app_loading()}</p>
     </div>
   </div>
 );

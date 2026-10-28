@@ -4,6 +4,7 @@ import Card from './ui/Card';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { CURRENT_VERSION, UPDATE_DOCS_URL } from '../lib/version';
 import { useUpdateStatus } from '../hooks/useUpdateStatus';
+import { m } from '../lib/i18n';
 
 // SQEM-118 — self-host "About" panel: shows the running Sqemes version and, when a newer
 // release is available, a link to the update docs. Renders nothing on Cloud.
@@ -19,13 +20,13 @@ export function AboutSection() {
   return (
     <Card id="about" className="p-6 md:p-8 scroll-mt-6">
       <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2 mb-6">
-        <Info className="w-5 h-5 text-accent" /> About
+        <Info className="w-5 h-5 text-accent" /> {m.ab_title()}
       </h2>
 
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="text-sm font-bold text-ink-strong">sqemes</div>
-          <div className="text-xs text-ink-muted">Self-hosted</div>
+          <div className="text-xs text-ink-muted">{m.ab_self_hosted()}</div>
         </div>
         <div className="text-sm font-mono text-ink">v{CURRENT_VERSION}</div>
       </div>
@@ -36,10 +37,10 @@ export function AboutSection() {
             <ArrowUpCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
             <div className="min-w-0">
               <div className="text-sm font-bold text-ink-strong">
-                Version {status!.latest} is available
+                {m.ab_update({ version: status!.latest })}
               </div>
               <p className="text-xs text-ink mt-0.5">
-                You&apos;re running v{CURRENT_VERSION}.
+                {m.ab_running({ version: CURRENT_VERSION })}
               </p>
               <a
                 href={UPDATE_DOCS_URL}
@@ -47,14 +48,14 @@ export function AboutSection() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 mt-2 text-sm font-bold text-ink-strong hover:underline transition-colors"
               >
-                How to update <ExternalLink className="w-3.5 h-3.5" />
+                {m.ab_how()} <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
           </div>
         </div>
       ) : status ? (
         <div className="mt-4 flex items-center gap-2 text-xs text-success">
-          <CheckCircle2 className="w-4 h-4" /> You&apos;re on the latest version.
+          <CheckCircle2 className="w-4 h-4" /> {m.ab_latest()}
         </div>
       ) : null}
     </Card>

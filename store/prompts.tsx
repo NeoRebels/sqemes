@@ -3,15 +3,17 @@ import { Prompt } from '../types';
 import * as promptsApi from '../lib/api/prompts';
 import { fetchCanEditMany } from '../lib/api/editors';
 import { applyToEditable, type BulkOutcome } from '../lib/bulkApply';
+import { m } from '../lib/i18n';
 
 export interface PromptsState {
   prompts: Prompt[];
   addPrompt: (prompt: Prompt) => Promise<Prompt | undefined>;
-  updatePrompt: (prompt: Prompt) => void;
+  /** SQEM-606 — false when the save failed (the store has already said so); callers must not report success. */
+  updatePrompt: (prompt: Prompt) => Promise<boolean>;
   toggleFavorite: (prompt: Prompt) => void;
-  deletePrompt: (id: string) => void;
+  deletePrompt: (id: string) => Promise<void>;
   deletePrompts: (ids: string[]) => Promise<void>;
-  duplicatePrompt: (prompt: Prompt) => void;
+  duplicatePrompt: (prompt: Prompt) => Promise<void>;
   /** SQEM-564 — set or clear one tag on many playbooks; only those the person may change. */
   setTagMany: (ids: string[], tag: string | null) => Promise<BulkOutcome>;
 }
@@ -32,17 +34,19 @@ export function usePromptsState(
       setPrompts(prev => [created, ...prev]);
       return created;
     } catch (err: any) {
-      showToast(err.message || 'Failed to create prompt', 'error');
+      showToast(err.message || m.pb_create_failed(), 'error');
     }
   }, [activeWorkspaceId, showToast]);
 
-  const updatePrompt = useCallback(async (prompt: Prompt) => {
-    if (!activeWorkspaceId) return;
+  const updatePrompt = useCallback(async (prompt: Prompt): Promise<boolean> => {
+    if (!activeWorkspaceId) return false;
     try {
       const updated = await promptsApi.updatePrompt(prompt, activeWorkspaceId);
       setPrompts(prev => prev.map(p => p.id === updated.id ? { ...updated, isFavorite: p.isFavorite } : p));
+      return true;
     } catch (err: any) {
-      showToast(err.message || 'Failed to update prompt', 'error');
+      showToast(err.message || m.pb_update_failed(), 'error');
+      return false;
     }
   }, [activeWorkspaceId, showToast]);
 
@@ -54,7 +58,7 @@ export function usePromptsState(
       await promptsApi.setFavorite(prompt.id, currentUserId, newValue);
     } catch (err: any) {
       setPrompts(prev => prev.map(p => p.id === prompt.id ? { ...p, isFavorite: prompt.isFavorite } : p));
-      showToast(err.message || 'Failed to update favourite', 'error');
+      showToast(err.message || m.ps_fav_failed(), 'error');
     }
   }, [currentUserId, showToast]);
 
@@ -62,9 +66,9 @@ export function usePromptsState(
     try {
       await promptsApi.deletePrompt(id);
       setPrompts(prev => prev.filter(p => p.id !== id));
-      showToast('Prompt deleted', 'success');
+      showToast(m.pb_deleted(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to delete prompt', 'error');
+      showToast(err.message || m.pb_delete_failed(), 'error');
     }
   }, [showToast]);
 
@@ -74,8 +78,8 @@ export function usePromptsState(
     const okIds = new Set(ids.filter((_, i) => results[i].status === 'fulfilled'));
     if (okIds.size > 0) setPrompts(prev => prev.filter(p => !okIds.has(p.id)));
     const failed = results.length - okIds.size;
-    if (failed === 0) showToast(`Deleted ${okIds.size} template${okIds.size === 1 ? '' : 's'}`, 'success');
-    else showToast(`Deleted ${okIds.size} of ${results.length} — ${failed} failed`, 'error');
+    if (failed === 0) showToast(m.pb_deleted_many({ playbooks: m.count_playbook({ count: okIds.size }) }), 'success');
+    else showToast(m.ps_deleted_partial({ done: okIds.size, total: results.length, failed }), 'error');
   }, [showToast]);
 
   // SQEM-564 — one tag for many playbooks (or none). Checks the edit right per playbook first, writes
@@ -95,9 +99,9 @@ export function usePromptsState(
       // SQEM-241 — the duplicate belongs to the person making it, not to the original's author.
       const dup = await promptsApi.duplicatePrompt(prompt, activeWorkspaceId, currentUserId);
       setPrompts(prev => [dup, ...prev]);
-      showToast('Prompt duplicated', 'success');
+      showToast(m.pb_duplicated(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to duplicate prompt', 'error');
+      showToast(err.message || m.pb_duplicate_failed(), 'error');
     }
   }, [activeWorkspaceId, currentUserId, showToast]);
 

@@ -5,6 +5,8 @@ import { analyzeWebsite } from '../lib/wizardGeneration';
 import type { BrandProfile } from '../types';
 import { Loader2, Globe, AlertCircle } from 'lucide-react';
 import { describeAIError } from '../lib/aiErrors';
+import { Input } from './ui/Input';
+import { m } from '../lib/i18n';
 
 // SQEM-106 — shared brand form used by both onboarding (WizardCreateStep) and
 // Settings → Brand. Owns the "Analyze your website" prefill + the brand fields.
@@ -32,9 +34,7 @@ export function brandFormFromProfile(p?: BrandProfile): BrandFormValue {
   };
 }
 
-// SQEM-554 (d1) — on tokens; the same form sits in the setup wizard, so only colours changed here.
-const inputCls =
-  'w-full p-3 border border-line-strong bg-surface-field text-ink-strong rounded-control text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle';
+// SQEM-554 (d1) — on tokens; the same form sits in the setup wizard. SQEM-602 — its fields are ui/Input now.
 const labelCls = 'block text-xs font-bold text-ink-subtle uppercase tracking-wider mb-1.5';
 
 export function BrandProfileForm({
@@ -83,11 +83,11 @@ export function BrandProfileForm({
       if (fields.audience) patch.audience = fields.audience;
       onChange(patch);
       setView('manual');
-      showToast('Filled in from your site — review and edit below.', 'success');
+      showToast(m.bp_filled(), 'success');
     } catch (err: any) {
       // SQEM-203 — this belongs at the field, not in a toast 1200px away in the opposite corner
       // that disappears after a few seconds. It stays until the input changes.
-      setWebsiteError(describeAIError(err, 'Could not read that website. Fill the form in manually.', { alternativesAvailable: hasAuthoringAlternatives(workspace) }));
+      setWebsiteError(describeAIError(err, m.bp_read_failed(), { alternativesAvailable: hasAuthoringAlternatives(workspace) }));
     } finally {
       setAnalyzing(false);
     }
@@ -99,10 +99,10 @@ export function BrandProfileForm({
       {(!collapsible || view === 'website') && (
       <div className="mb-4">
         <label htmlFor="brand-profile-form-website" className={labelCls}>
-          Analyze your website <span className="normal-case font-normal text-ink-subtle">(optional — fills the form)</span>
+          {m.bp_analyze_label()} <span className="normal-case font-normal text-ink-subtle">{m.bp_analyze_optional()}</span>
         </label>
         <div className="flex flex-col sm:flex-row gap-2">
-          <input id="brand-profile-form-website"
+          <Input id="brand-profile-form-website"
             type="url"
             value={value.website}
             onChange={e => { onChange({ website: e.target.value }); setWebsiteError(null); }}
@@ -111,18 +111,15 @@ export function BrandProfileForm({
             disabled={disabled}
             aria-invalid={!!websiteError}
             aria-describedby={websiteError ? 'website-error' : undefined}
-            className={`flex-1 p-3 border bg-surface-field text-ink-strong rounded-control text-sm outline-none focus:ring-2 transition-all placeholder:text-ink-subtle ${
-              websiteError
-                ? 'border-danger focus:border-danger focus:ring-danger/20'
-                : 'border-line-strong focus:border-accent focus:ring-accent/20'
-            }`}
+            className="flex-1"
+            tone={websiteError ? 'error' : 'default'}
           />
           <button
             onClick={handleAnalyze}
             disabled={disabled || !canUseAI || !value.website.trim() || analyzing}
             className="shrink-0 px-4 py-3 bg-ink-strong hover:opacity-90 text-surface-raised rounded-control text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing…</> : <><Globe className="w-4 h-4" /> Analyze</>}
+            {analyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> {m.bp_analyzing()}</> : <><Globe className="w-4 h-4" /> {m.bp_analyze()}</>}
           </button>
         </div>
         {websiteError && (
@@ -131,7 +128,7 @@ export function BrandProfileForm({
           </p>
         )}
         {!canUseAI && !websiteError && (
-          <p className="text-2xs text-ink-subtle mt-1">Add a provider key or enable sqemes AI to analyze a website.</p>
+          <p className="text-2xs text-ink-subtle mt-1">{m.bp_needs_ai()}</p>
         )}
       </div>
       )}
@@ -143,7 +140,7 @@ export function BrandProfileForm({
             onClick={() => setView('manual')}
             className="text-xs font-semibold text-accent hover:underline mb-4"
           >
-            Or fill in the details yourself
+            {m.bp_manual()}
           </button>
         ) : (
           <button
@@ -151,13 +148,13 @@ export function BrandProfileForm({
             onClick={() => setView('website')}
             className="text-xs font-semibold text-accent hover:underline mb-4"
           >
-            ← Analyze a website instead
+            {m.bp_back_to_site()}
           </button>
         )
       ) : (
         <div className="flex items-center gap-3 mb-4">
           <div className="flex-1 h-px bg-line-strong" />
-          <span className="text-2xs font-semibold text-ink-subtle uppercase tracking-wider">or fill in manually</span>
+          <span className="text-2xs font-semibold text-ink-subtle uppercase tracking-wider">{m.bp_or_manual()}</span>
           <div className="flex-1 h-px bg-line-strong" />
         </div>
       )}
@@ -165,16 +162,16 @@ export function BrandProfileForm({
       {(!collapsible || view === 'manual') && (
       <div className="space-y-3">
         <div>
-          <label htmlFor="brand-profile-form-brand-name" className={labelCls}>Brand name</label>
-          <input id="brand-profile-form-brand-name" value={value.brandName} onChange={e => onChange({ brandName: e.target.value })} placeholder="Acme Inc." disabled={disabled} className={inputCls} />
+          <label htmlFor="brand-profile-form-brand-name" className={labelCls}>{m.bp_name()}</label>
+          <Input id="brand-profile-form-brand-name" value={value.brandName} onChange={e => onChange({ brandName: e.target.value })} placeholder={m.bp_name_placeholder()} disabled={disabled} />
         </div>
         <div>
-          <label htmlFor="brand-profile-form-what-does-your-brand-do" className={labelCls}>What does your brand do?</label>
-          <input id="brand-profile-form-what-does-your-brand-do" value={value.whatItDoes} onChange={e => onChange({ whatItDoes: e.target.value })} placeholder="One sentence — e.g. we run leadership workshops for tech teams" disabled={disabled} className={inputCls} />
+          <label htmlFor="brand-profile-form-what-does-your-brand-do" className={labelCls}>{m.bp_what()}</label>
+          <Input id="brand-profile-form-what-does-your-brand-do" value={value.whatItDoes} onChange={e => onChange({ whatItDoes: e.target.value })} placeholder={m.bp_what_placeholder()} disabled={disabled} />
         </div>
         <div>
-          <label htmlFor="brand-profile-form-who-is-your-audience" className={labelCls}>Who is your audience?</label>
-          <input id="brand-profile-form-who-is-your-audience" value={value.audience} onChange={e => onChange({ audience: e.target.value })} placeholder="e.g. HR leaders at mid-size companies" disabled={disabled} className={inputCls} />
+          <label htmlFor="brand-profile-form-who-is-your-audience" className={labelCls}>{m.bp_audience()}</label>
+          <Input id="brand-profile-form-who-is-your-audience" value={value.audience} onChange={e => onChange({ audience: e.target.value })} placeholder={m.bp_audience_placeholder()} disabled={disabled} />
         </div>
       </div>
       )}

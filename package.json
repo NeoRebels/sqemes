@@ -1,7 +1,7 @@
 {
   "name": "sqemes",
   "private": true,
-  "version": "1.11.33",
+  "version": "1.11.34",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
@@ -18,6 +18,7 @@
     "local:logs": "bash scripts/local-stack.sh logs",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
+    "i18n": "node scripts/i18n-compile.mjs",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,css}\"",
     "test": "vitest run",
@@ -52,6 +53,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@inlang/paraglide-js": "^2.29.2",
+    "@inlang/plugin-message-format": "4.5.5",
     "@playwright/test": "^1.58.2",
     "@types/jszip": "^3.4.0",
     "@types/mdast": "^4.0.4",

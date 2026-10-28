@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { needsAttention } from '../../lib/needsAttention';
 import { MODE_HOME, modeForPath, navRoutes } from '../../lib/navMode';
+import { en } from './i18nText';
 
 /**
  * SQEM-552 — the Manage Overview (redesign 4/4). The page imports the store, so it is checked at
@@ -49,7 +50,7 @@ describe('SQEM-552 — the Overview is the home of Manage', () => {
     const page = read('pages/Overview.tsx');
     expect(page).toMatch(/if \(!allowed\) return <Navigate to="\/" replace \/>;/);
     // ⛔ …but only once the role is known: the loading placeholder is a 'member'.
-    expect(page).toMatch(/const roleKnown = !!currentUser\.id && workspace\.members\.some\(m => m\.id === currentUser\.id\);\s+if \(!roleKnown\) return null;\s+if \(!allowed\)/);
+    expect(page).toMatch(/const roleKnown = !!currentUser\.id && workspace\.members\.some\(member => member\.id === currentUser\.id\);\s+if \(!roleKnown\) return null;\s+if \(!allowed\)/);
     expect(page).not.toMatch(/usage_daily/);
   });
 
@@ -65,15 +66,17 @@ describe('SQEM-555 — banners and usage on the Overview', () => {
     expect(start).not.toMatch(/Finish setting up your workspace/);
     expect(start).not.toMatch(/trial is active/);
     expect(start).toMatch(/\{showWizard && <SetupWizard onClose=\{handleWizardClose\} \/>\}/);
-    expect(page).toMatch(/Finish setting up your workspace/);
-    expect(page).toMatch(/trial is active/);
+    expect(page).toMatch(/m\.ov_finish_title\(\)/);
+    expect(page).toMatch(/m\.ov_trial_active\(/);
+    expect([en.ov_finish_title, en.ov_trial_active]).toEqual(['Finish setting up your workspace', 'Your {plan} trial is active']); // SQEM-607
     expect(page).toMatch(/\{showWizard && <SetupWizard onClose=\{handleWizardClose\} \/>\}/);
   });
 
   it('the plan card shows seats and storage as bars', () => {
     const page = read('pages/Overview.tsx');
-    expect(page).toMatch(/<UsageBar label="Seats" used=\{seatsUsed\} limit=\{seatsLimit\} tone="onBrand" \/>/);
-    expect(page.match(/<UsageBar label="Storage"/g)).toHaveLength(2); // plan and managed card
+    expect(page).toMatch(/<UsageBar label=\{m\.ov_seats\(\)\} used=\{seatsUsed\} limit=\{seatsLimit\} tone="onBrand" \/>/);
+    expect(page.match(/<UsageBar label=\{m\.ov_storage\(\)\}/g)).toHaveLength(2); // plan and managed card
+    expect([en.ov_seats, en.ov_storage]).toEqual(['Seats', 'Storage']); // SQEM-607
     expect(page).toMatch(/getWorkspaceStorageUsage\(workspace\.id\)/);
   });
 });

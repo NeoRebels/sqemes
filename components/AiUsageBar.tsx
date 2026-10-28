@@ -1,4 +1,5 @@
 import { creditsUsagePercent, creditsTooltip } from '../lib/credits';
+import { m, getLocale } from '../lib/i18n';
 
 interface AiUsageBarProps {
   used: number;
@@ -19,13 +20,13 @@ const AiUsageBar = ({ used, limit, fundedAvailable, hasByokText }: AiUsageBarPro
 
   const showBar = !hasByokText && limit > 0;
   const rightLabel = hasByokText
-    ? 'Using your own key'
-    : `${used.toLocaleString('en-US')} / ${limit.toLocaleString('en-US')}`;
+    ? m.ai_own_key()
+    : `${used.toLocaleString(getLocale())} / ${limit.toLocaleString(getLocale())}`;
 
   return (
-    <div title={hasByokText ? 'Your own API key is used — AI credits are not consumed' : creditsTooltip(used, limit)}>
+    <div title={hasByokText ? m.ai_own_key_title() : creditsTooltip(used, limit)}>
       <div className="flex justify-between text-xs mb-1.5 text-brand-100">
-        <span className="font-medium">AI credits</span>
+        <span className="font-medium">{m.ai_credits()}</span>
         <span className="font-bold">{rightLabel}</span>
       </div>
       {showBar && (

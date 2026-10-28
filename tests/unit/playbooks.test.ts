@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import ts from 'typescript';
 import { LIBRARY_SYSTEM_PROMPT } from '../../supabase/functions/_shared/libraryPrompt';
+import { en } from './i18nText';
 
 /**
  * SQEM-394 — a template is called a **playbook** wherever a person reads it.
@@ -55,9 +56,11 @@ describe('SQEM-394 — the routes', () => {
   });
 
   it('the tab title and the sidebar say Playbooks', () => {
-    expect(app).toMatch(/return 'Playbooks';/);
-    expect(app).toMatch(/return 'Playbook editor';/);
-    expect(code(read('components/Sidebar.tsx'))).toMatch(/\{ to: "\/playbooks", icon: BookMarked, label: "Playbooks" \}/);
+    expect(app).toMatch(/return m\.nav_playbooks\(\);/);
+    expect(app).toMatch(/return m\.title_playbook_editor\(\);/);
+    expect(en.title_playbook_editor).toBe('Playbook editor'); // SQEM-611
+    expect(code(read('components/Sidebar.tsx'))).toMatch(/\{ to: "\/playbooks", icon: BookMarked, label: m\.nav_playbooks\(\) \}/);
+    expect(JSON.parse(read('messages/en.json')).nav_playbooks).toBe('Playbooks'); // SQEM-599 — the word lives in messages/
   });
 
   it('⛔ nothing in the app still navigates to the old paths', () => {
@@ -89,7 +92,7 @@ describe('SQEM-394 — what a person reads', () => {
     'lib/adaptTemplate.ts',
     'lib/wizardGeneration.ts',
   ]);
-  const SWEPT_DIRS = ['components', 'pages'];
+  const SWEPT_DIRS = ['components', 'pages', 'store']; // SQEM-606 — the store's toasts said "templates" until then
   const SWEPT_FILES = ['App.tsx', 'constants.ts', 'lib/accountExport.ts', 'lib/wizardUploads.ts'];
 
   function userReadableTemplateStrings(): string[] {
@@ -138,10 +141,13 @@ describe('SQEM-394 — what a person reads', () => {
 
   it('the plan cards, the empty state and the wizard use the word', () => {
     expect(read('constants.ts')).toMatch(/'Unlimited playbooks'/);
-    expect(code(read('pages/Templates.tsx'))).toMatch(/title="Playbooks"/);
-    expect(code(read('pages/Templates.tsx'))).toMatch(/No playbooks yet/);
-    expect(code(read('components/WizardCreateStep.tsx'))).toMatch(/Generate my starter playbooks/);
-    expect(code(read('components/TemplateLaunchModal.tsx'))).toMatch(/Use a playbook/);
+    expect(code(read('pages/Templates.tsx'))).toMatch(/title=\{m\.pb_title\(\)\}/);
+    expect(en.pb_title).toBe('Playbooks'); // SQEM-605
+    expect(en.pb_empty_title).toBe('No playbooks yet'); // SQEM-605
+    expect(code(read('components/WizardCreateStep.tsx'))).toMatch(/m\.wc_generate\(\)/);
+    expect(en.wc_generate).toBe('Generate my starter playbooks'); // SQEM-610
+    expect(code(read('components/TemplateLaunchModal.tsx'))).toMatch(/m\.launch_title\(\)/);
+    expect(en.launch_title).toBe('Use a playbook'); // SQEM-604
   });
 });
 

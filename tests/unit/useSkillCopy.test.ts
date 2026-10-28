@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { en, de } from './i18nText';
 
 /**
  * SQEM-406 — a person reads "use", the code says "applied".
@@ -23,22 +24,35 @@ describe('SQEM-406 — "Use skill", one word from the button to the "Using:" str
   const modal = code(read('components/TemplateLaunchModal.tsx'));
   const chat = code(read('pages/Chat.tsx'));
 
+  // SQEM-604 — the words live in messages/*.json now, and the rule holds in BOTH languages: German
+  // says "nutzen" from the button to the strip, never "anwenden" / "aktiv" (the word that misled).
   it('the launch button says "Use skill", never "Apply skill"', () => {
-    expect(modal).toContain("'Use skill'");
-    expect(modal).not.toMatch(/Apply skill/i);
+    expect(modal).toContain("m.launch_use_skill()");
+    expect(en.launch_use_skill).toBe('Use skill');
+    expect(de.launch_use_skill).toBe('Skill nutzen');
+    expect(JSON.stringify(en)).not.toMatch(/Apply skill/i);
   });
 
   it('the explanation says what using it does, in the same word', () => {
-    expect(modal).toContain('Using it adds this knowledge to this chat');
-    expect(modal).not.toContain('Applying it adds');
+    expect(modal).toContain('m.launch_skill_hint()');
+    expect(en.launch_skill_hint).toMatch(/^Using it adds this knowledge to this chat/);
+    expect(de.launch_skill_hint).toMatch(/^Nutzt du ihn/);
+    expect(JSON.stringify(en)).not.toContain('Applying it adds');
   });
 
   it('the Chat header still calls the strip "Using:" — the word the button borrows', () => {
-    expect(chat).toContain('Using:');
+    expect(chat).toContain('txt.chat_using()');
+    expect(en.chat_using).toBe('Using:');
+    expect(de.chat_using).toBe('Genutzt:');
   });
 
   it('no toast tells a person something was "applied"', () => {
     expect(chat).not.toMatch(/showToast\([^)]*applied/i);
-    expect(chat).toContain('in this chat`');
+    expect(chat).toContain('txt.chat_using_playbook({ title: template.title })');
+    for (const k of ['chat_using_playbook', 'chat_using_persona'] as const) {
+      expect(en[k]).toMatch(/in this chat$/);
+      expect(de[k]).toMatch(/wird in diesem Chat genutzt$/);
+      expect(en[k] + de[k]).not.toMatch(/appl|angewend|aktiv/i);
+    }
   });
 });

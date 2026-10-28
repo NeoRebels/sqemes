@@ -6,6 +6,7 @@ import { fetchVersions, fetchVersionStates, fetchPresentFiles, restoreVersion, d
 import { lineDiff, diffCounts, withContext } from '../lib/lineDiff';
 import { errorMessage } from '../lib/errorMessage';
 import type { User } from '../types';
+import { getLocale, m as txt } from '../lib/i18n'; // SQEM-605 — `m` is a member in a callback here
 
 /**
  * SQEM-477 — the "History" tab of the playbook editor: every saved state, a diff against the one before
@@ -24,7 +25,8 @@ interface Props {
   onError: (message: string) => void;
 }
 
-const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+// SQEM-605 — the app's language, not the browser's (`undefined` meant the browser's).
+const when = (iso: string) => new Date(iso).toLocaleString(getLocale(), { dateStyle: 'medium', timeStyle: 'short' });
 
 export default function VersionHistoryPanel({ templateId, canEdit, members, refreshKey, isDirty, onRestored, onError }: Props) {
   const [versions, setVersions] = useState<TemplateVersionSummary[] | null>(null);
@@ -35,8 +37,8 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
   const [confirm, setConfirm] = useState<null | { kind: 'restore' | 'delete'; version: TemplateVersionSummary }>(null);
 
   const author = (id: string | null) => {
-    if (!id) return 'Unknown';
-    return members.find(m => m.id === id)?.name || 'Former member';
+    if (!id) return txt.vh_unknown();
+    return members.find(m => m.id === id)?.name || txt.vh_former_member();
   };
 
   useEffect(() => {
@@ -45,7 +47,7 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
       if (!live) return;
       setVersions(v);
       setSelectedId(prev => (prev && v.some(x => x.id === prev) ? prev : v[0]?.id ?? null));
-    }).catch(e => { if (live) { setVersions([]); onError(errorMessage(e, 'Something went wrong — try again.')); } });
+    }).catch(e => { if (live) { setVersions([]); onError(errorMessage(e, txt.vh_error())); } });
     return () => { live = false; };
   }, [templateId, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -62,7 +64,7 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
     let live = true;
     fetchVersionStates(need).then(rows => {
       if (live) setStates(prev => Object.fromEntries([...Object.entries(prev), ...rows.map(r => [r.id, r])]));
-    }).catch(e => { if (live) onError(errorMessage(e, 'Something went wrong — try again.')); });
+    }).catch(e => { if (live) onError(errorMessage(e, txt.vh_error())); });
     return () => { live = false; };
   }, [selected?.id, previous?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -86,14 +88,14 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
   const fieldChanges = useMemo(() => {
     if (!now || !before) return [];
     const out: string[] = [];
-    if (now.title !== before.title) out.push(`Title: “${before.title}” → “${now.title}”`);
-    if (now.description !== before.description) out.push('Description changed');
-    if ((now.tag ?? '') !== (before.tag ?? '')) out.push(`Tag: ${before.tag || 'none'} → ${now.tag || 'none'}`);
+    if (now.title !== before.title) out.push(txt.vh_title_changed({ before: before.title, now: now.title }));
+    if (now.description !== before.description) out.push(txt.vh_description_changed());
+    if ((now.tag ?? '') !== (before.tag ?? '')) out.push(txt.vh_tag_changed({ before: before.tag || txt.vh_tag_none(), now: now.tag || txt.vh_tag_none() }));
     const names = (fs: TemplateVersion['contextFiles']) => fs.map(f => f.name || f.id);
     const was = names(before.contextFiles), is = names(now.contextFiles);
     const added = is.filter(n => !was.includes(n)), removed = was.filter(n => !is.includes(n));
-    if (added.length) out.push(`Files attached: ${added.join(', ')}`);
-    if (removed.length) out.push(`Files detached: ${removed.join(', ')}`);
+    if (added.length) out.push(txt.vh_files_attached({ names: added.join(', ') }));
+    if (removed.length) out.push(txt.vh_files_detached({ names: removed.join(', ') }));
     return out;
   }, [now, before]);
 
@@ -110,7 +112,7 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
         if (selectedId === confirm.version.id) setSelectedId(latest?.id ?? null);
       }
     } catch (e) {
-      onError(errorMessage(e, 'Something went wrong — try again.'));
+      onError(errorMessage(e, txt.vh_error()));
     } finally {
       setBusy(false);
       setConfirm(null);
@@ -126,7 +128,7 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-2 p-6 text-center text-sm text-ink-muted">
         <History className="w-6 h-6 text-ink-subtle" />
-        No versions yet. Every save keeps one.
+        {txt.vh_empty()}
       </div>
     );
   }
@@ -146,7 +148,7 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="font-semibold text-ink-strong">
-                  Version {v.version}{v.id === latest?.id && <span className="ml-2 text-xs font-medium text-accent">current</span>}
+                  {txt.vh_version({ version: v.version })}{v.id === latest?.id && <span className="ml-2 text-xs font-medium text-accent">{txt.vh_current()}</span>}
                 </span>
                 <span className="text-xs text-ink-subtle shrink-0">{when(v.createdAt)}</span>
               </div>
@@ -163,15 +165,15 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-line shrink-0">
             <span className="text-xs text-ink-muted">
-              {previous ? `Changes since version ${previous.version}` : 'First version'}
+              {previous ? txt.vh_changes_since({ version: previous.version }) : txt.vh_first()}
               {counts && previous && <> · <span className="text-success">+{counts.added}</span> <span className="text-danger">−{counts.removed}</span></>}
             </span>
             {canEdit && selected.id !== latest?.id && (
               <div className="flex gap-1">
                 <Button size="sm" variant="secondary" onClick={() => setConfirm({ kind: 'restore', version: selected })}>
-                  <RotateCcw className="w-3.5 h-3.5 mr-1" />Restore
+                  <RotateCcw className="w-3.5 h-3.5 mr-1" />{txt.vh_restore()}
                 </Button>
-                <Button size="sm" variant="secondary" onClick={() => setConfirm({ kind: 'delete', version: selected })} aria-label={`Delete version ${selected.version}`}>
+                <Button size="sm" variant="secondary" onClick={() => setConfirm({ kind: 'delete', version: selected })} aria-label={txt.vh_delete_label({ version: selected.version })}>
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </div>
@@ -189,12 +191,12 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
                 )}
                 {now.contextFiles.length > 0 && (
                   <p className="px-4 py-2 text-xs text-ink-muted border-b border-line">
-                    Files:{' '}
+                    {txt.vh_files()}{' '}
                     {now.contextFiles.map((f, k) => {
                       const gone = present[now.id] ? !present[now.id].has(f.id) : false;
                       return (
                         <span key={f.id} className={gone ? 'text-warning' : ''}>
-                          {k > 0 && ', '}{gone && <FileX className="inline w-3 h-3 mr-0.5 -mt-0.5" />}{f.name || 'Unnamed file'}{gone && ' (deleted)'}
+                          {k > 0 && ', '}{gone && <FileX className="inline w-3 h-3 mr-0.5 -mt-0.5" />}{f.name || txt.vh_unnamed_file()}{gone && txt.vh_deleted_suffix()}
                         </span>
                       );
                     })}
@@ -202,12 +204,12 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
                 )}
                 <pre className="text-xs font-mono leading-relaxed whitespace-pre-wrap break-words">
                   {withContext(contentDiff ?? [], previous ? 3 : Number.MAX_SAFE_INTEGER).map((row, k) => row.type === 'gap' ? (
-                    <div key={k} className="px-4 py-1 text-ink-subtle bg-surface-sunken select-none">⋯ {row.count} unchanged line{row.count === 1 ? '' : 's'}</div>
+                    <div key={k} className="px-4 py-1 text-ink-subtle bg-surface-sunken select-none">{txt.vh_unchanged_lines({ count: row.count })}</div>
                   ) : (
                     <div key={k} className={`px-4 ${row.type === 'added' && previous ? 'bg-success-soft text-ink-strong' : row.type === 'removed' ? 'bg-danger-soft text-ink-strong line-through decoration-danger/40' : 'text-ink'}`}>
                       <span className="select-none text-ink-subtle mr-2">{row.type === 'added' && previous ? '+' : row.type === 'removed' ? '−' : ' '}</span>
                       {/* SQEM-544 — a blank line that was added or removed is named, not shown as a bare sign. */}
-                      {row.text || ((row.type === 'removed' || (row.type === 'added' && previous)) ? <span className="select-none italic text-ink-subtle no-underline">(empty line)</span> : ' ')}
+                      {row.text || ((row.type === 'removed' || (row.type === 'added' && previous)) ? <span className="select-none italic text-ink-subtle no-underline">{txt.vh_empty_line()}</span> : ' ')}
                     </div>
                   ))}
                 </pre>
@@ -219,8 +221,8 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
 
       <ConfirmModal
         open={!!confirm}
-        title={confirm ? `${confirm.kind === 'restore' ? 'Restore' : 'Delete'} version ${confirm.version.version}?` : ''}
-        confirmLabel={confirm?.kind === 'delete' ? 'Delete' : 'Restore'}
+        title={confirm ? (confirm.kind === 'restore' ? txt.vh_restore_q({ version: confirm.version.version }) : txt.vh_delete_q({ version: confirm.version.version })) : ''}
+        confirmLabel={confirm?.kind === 'delete' ? txt.vh_delete() : txt.vh_restore()}
         variant={confirm?.kind === 'delete' ? 'danger' : 'primary'}
         busy={busy}
         onConfirm={run}
@@ -228,11 +230,11 @@ export default function VersionHistoryPanel({ templateId, canEdit, members, refr
       >
         {confirm?.kind === 'restore' ? (
           <>
-            <p>Its title, description, content and files become the current playbook, saved as a new version. Nothing is lost — the current state stays in the history. Files deleted since cannot come back and are left out.</p>
-            {isDirty && <p className="text-warning">Your unsaved changes in the editor will be discarded.</p>}
+            <p>{txt.vh_restore_body()}</p>
+            {isDirty && <p className="text-warning">{txt.vh_unsaved_discarded()}</p>}
           </>
         ) : (
-          <p>It disappears from the history for everyone and cannot be restored afterwards.</p>
+          <p>{txt.vh_delete_body()}</p>
         )}
       </ConfirmModal>
     </div>

@@ -4,6 +4,9 @@ import { Lock, Eye, EyeOff, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import ScrollScreen from '../components/ScrollScreen';
+import { Input } from '../components/ui/Input';
+import { m } from '../lib/i18n';
+import { authErrorText } from '../lib/authErrors';
 
 type Phase = 'verifying' | 'ready' | 'link_error';
 
@@ -62,11 +65,11 @@ const ResetPassword = () => {
     setError(null);
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
+      setError(m.reset_too_short());
       return;
     }
     if (password !== confirm) {
-      setError('Passwords do not match.');
+      setError(m.reset_mismatch());
       return;
     }
 
@@ -83,7 +86,7 @@ const ResetPassword = () => {
         navigate('/', { replace: true });
       }, 2000);
     } catch (err: any) {
-      setError(err.message || 'Failed to update password.');
+      setError(err?.code || err?.message ? authErrorText(err) : m.reset_failed());
     } finally {
       setLoading(false);
     }
@@ -94,7 +97,7 @@ const ResetPassword = () => {
       <ScrollScreen className="bg-surface">
         <div className="text-center">
           <img src="/logo-favicon-V2.png" alt="sqemes" className="w-10 h-10 rounded-xl shadow-soft mx-auto mb-4 animate-pulse" />
-          <p className="text-ink-subtle text-sm font-medium">Verifying your reset link…</p>
+          <p className="text-ink-subtle text-sm font-medium">{m.reset_verifying()}</p>
         </div>
       </ScrollScreen>
     );
@@ -105,13 +108,13 @@ const ResetPassword = () => {
       <ScrollScreen className="bg-surface">
         <div className="w-full max-w-md bg-surface-raised rounded-2xl shadow-soft border border-line p-8 text-center">
           <AlertTriangle className="w-12 h-12 text-warning mx-auto mb-4" />
-          <h2 className="font-display text-xl font-semibold text-ink-strong mb-2">Reset link invalid or expired</h2>
-          <p className="text-ink-muted text-sm mb-6">This password reset link is no longer valid. Request a new one and use it right away.</p>
+          <h2 className="font-display text-xl font-semibold text-ink-strong mb-2">{m.reset_link_invalid_title()}</h2>
+          <p className="text-ink-muted text-sm mb-6">{m.reset_link_invalid_body()}</p>
           <button
             onClick={() => { window.location.hash = '#/'; }}
             className="w-full py-3 bg-accent-strong text-white rounded-xl font-bold text-sm shadow-lg hover:opacity-90 transition-all"
           >
-            Back to sign in
+            {m.auth_back_to_sign_in()}
           </button>
         </div>
       </ScrollScreen>
@@ -123,8 +126,8 @@ const ResetPassword = () => {
       <ScrollScreen className="bg-surface">
         <div className="w-full max-w-md bg-surface-raised rounded-2xl shadow-soft border border-line p-8 text-center">
           <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
-          <h2 className="font-display text-xl font-semibold text-ink-strong mb-2">Password Updated</h2>
-          <p className="text-ink-muted text-sm">Redirecting you to sign in…</p>
+          <h2 className="font-display text-xl font-semibold text-ink-strong mb-2">{m.reset_updated_title()}</h2>
+          <p className="text-ink-muted text-sm">{m.reset_redirecting()}</p>
         </div>
       </ScrollScreen>
     );
@@ -135,32 +138,33 @@ const ResetPassword = () => {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img src="/logo-favicon-V2.png" alt="sqemes" className="w-12 h-12 rounded-xl shadow-soft mx-auto mb-4" />
-          <h1 className="font-display text-2xl font-semibold text-ink-strong">Set new password</h1>
-          <p className="text-ink-muted mt-1 text-sm">Choose a strong password for your account.</p>
+          <h1 className="font-display text-2xl font-semibold text-ink-strong">{m.reset_title()}</h1>
+          <p className="text-ink-muted mt-1 text-sm">{m.reset_subtitle()}</p>
         </div>
 
         <div className="bg-surface-raised rounded-2xl shadow-soft border border-line p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="reset-password-new-password" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">
-                New Password
+                {m.reset_new_password()}
               </label>
               <div className="relative">
                 <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-subtle">
                   <Lock className="w-4 h-4" />
                 </div>
-                <input id="reset-password-new-password" autoComplete="new-password"
+                <Input id="reset-password-new-password" autoComplete="new-password"
                   type={showPassword ? 'text' : 'password'}
-                  className="w-full pl-10 pr-10 py-3 bg-surface-sunken border border-line-strong rounded-xl text-sm text-ink-strong placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:border-accent focus:bg-surface-field transition-colors"
+                  className="pl-10 pr-10"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
+                  placeholder={m.reset_new_password_placeholder()}
                   required
                   autoFocus
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
+                  aria-label={showPassword ? m.auth_hide_password() : m.auth_show_password()}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -170,18 +174,18 @@ const ResetPassword = () => {
 
             <div>
               <label htmlFor="reset-password-confirm-password" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">
-                Confirm Password
+                {m.reset_confirm_password()}
               </label>
               <div className="relative">
                 <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-subtle">
                   <Lock className="w-4 h-4" />
                 </div>
-                <input id="reset-password-confirm-password" autoComplete="new-password"
+                <Input id="reset-password-confirm-password" autoComplete="new-password"
                   type={showPassword ? 'text' : 'password'}
-                  className="w-full pl-10 pr-10 py-3 bg-surface-sunken border border-line-strong rounded-xl text-sm text-ink-strong placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:border-accent focus:bg-surface-field transition-colors"
+                  className="pl-10 pr-10"
                   value={confirm}
                   onChange={e => setConfirm(e.target.value)}
-                  placeholder="Repeat your password"
+                  placeholder={m.reset_confirm_placeholder()}
                   required
                 />
               </div>
@@ -196,7 +200,7 @@ const ResetPassword = () => {
               disabled={loading}
               className="w-full py-3 bg-accent-strong text-white rounded-xl font-bold text-sm shadow-lg hover:opacity-90 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-2"
             >
-              {loading ? 'Updating...' : 'Update Password'}
+              {loading ? m.reset_updating() : m.reset_submit()}
             </button>
           </form>
         </div>

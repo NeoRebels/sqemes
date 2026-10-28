@@ -2,6 +2,7 @@
 // Same table the extension uses (source of truth), so pins + list stay in sync across
 // the Dashboard widget and the extension drawer.
 import { supabase } from '../supabase';
+import { m } from '../i18n';
 
 export interface ExternalChat {
   id: string;
@@ -38,5 +39,5 @@ export async function setExternalChatPinned(id: string, pinned: boolean): Promis
 export async function deleteExternalChat(id: string): Promise<void> {
   const { data, error } = await supabase.from('external_chat_history').delete().eq('id', id).select('id');
   if (error) throw error;
-  if (!data?.length) throw new Error('This entry could not be deleted.');
+  if (!data?.length) throw new Error(m.api_entry_not_deleted());
 }

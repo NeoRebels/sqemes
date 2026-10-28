@@ -28,9 +28,11 @@ import {
   SlidersHorizontal, History as HistoryIcon } from 'lucide-react';
 import { useUI, useWorkspace, useChatSessions } from '../store';
 import SegmentedTabs from './ui/SegmentedTabs';
+import { m } from '../lib/i18n';
 import { MODE_HOME, canManage, modeForPath, navRoutes, readRememberedMode, resolveMode, writeRememberedMode, type NavMode, type NavRoute } from '../lib/navMode';
 import PersonCard from './ui/PersonCard';
-import { PLANS, VAT_NOTE } from '../constants';
+import { PLANS } from '../constants';
+import { planTagline, planMonthly, planMonthlyAmount } from '../lib/labels';
 import type { PlanTier } from '../types';
 import { startCheckout, type BillingCycle } from '../lib/billing';
 import { CHROME_STORE_URL } from '../lib/links';
@@ -41,6 +43,7 @@ import { CURRENT_VERSION } from '../lib/version';
 import { useExtensionInstalled } from '../hooks/useExtensionInstalled';
 import { useUpdateStatus } from '../hooks/useUpdateStatus';
 import PlanBadge from './PlanBadge';
+import { Input } from './ui/Input';
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -124,7 +127,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
   const handleCreateWorkspace = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newWorkspaceName.trim()) {
-      setWorkspaceNameError('Workspace name is required');
+      setWorkspaceNameError(m.sb_name_required());
       return;
     }
     setCreatingWorkspace(true);
@@ -142,7 +145,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
     } catch (err: any) {
       // The workspace exists at this point; only the redirect failed. Say so, rather than implying
       // nothing happened — the user will find it in the switcher, gated until a plan is chosen.
-      showToast(err.message || 'Workspace created, but checkout could not be opened.', 'error');
+      showToast(err.message || m.sb_checkout_failed(), 'error');
     } finally {
       setCreatingWorkspace(false);
     }
@@ -174,11 +177,11 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
   // SQEM-548 — the link metadata, by route. WHICH links show, and in which order, is lib/navMode.ts
   // (Work | Manage, by role); this table only says what each one looks like.
   const navLinks: { to: NavRoute; icon: any; label: string; badge?: string; arrow?: boolean }[] = [
-    { to: "/", icon: Home, label: "Start" }, // SQEM-550 (a) — was "Dashboard"
-    { to: "/overview", icon: LayoutDashboard, label: "Overview" }, // SQEM-552 — Manage home
+    { to: "/", icon: Home, label: m.nav_start() }, // SQEM-550 (a) — was "Dashboard"
+    { to: "/overview", icon: LayoutDashboard, label: m.nav_overview() }, // SQEM-552 — Manage home
     // SQEM-394 — "Playbooks", the word the landing page uses; "Templates" was the app's own word and
     // two UX testers tripped over the mismatch. The route moved with it (/templates redirects).
-    { to: "/playbooks", icon: BookMarked, label: "Playbooks" },
+    { to: "/playbooks", icon: BookMarked, label: m.nav_playbooks() },
     // SQEM-324 — directly under Playbooks, because a persona is made of them; anywhere else in
     // this list and the relationship has to be explained instead of seen.
     // ⛔ SQEM-384 — this entry carried `badge: "MCP only"` from SQEM-350 to SQEM-384. It was true
@@ -189,12 +192,12 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
     // cost of the SQEM-350 decision, and this is the bill.
     // SQEM-390 — the Bot, not the Users icon: a persona is an AI role, and "Users" read as people
     // (UX test, 2026-09-11). The icon was the assistant kind's until that kind was retired.
-    { to: "/personas", icon: Bot, label: "Personas" },
-    { to: "/library", icon: Store, label: "Marketplace" },
-    { to: "/files", icon: Paperclip, label: "Files" },
-    { to: "/chat", icon: MessageSquare, label: "Chat", arrow: true },
+    { to: "/personas", icon: Bot, label: m.nav_personas() },
+    { to: "/library", icon: Store, label: m.nav_marketplace() },
+    { to: "/files", icon: Paperclip, label: m.nav_files() },
+    { to: "/chat", icon: MessageSquare, label: m.nav_chat(), arrow: true },
     // SQEM-563 — the chat list (sqemes + extension). Not the History VISION removed (PromptRunner's log).
-    { to: "/history", icon: HistoryIcon, label: "History" },
+    { to: "/history", icon: HistoryIcon, label: m.nav_history() },
   ];
 
   // SQEM-548 — Work | Manage (redesign C): every route belongs to one mode;
@@ -235,8 +238,8 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
         // SQEM-206 — the arrow already hinted that this one leaves the shell; say it out loud for
         // anyone who cannot see the arrow. Chat is a full-screen mode: entering it takes the main
         // navigation away, so the entrance should admit that before the click, not after.
-        title={arrow ? `${label} — opens full screen` : undefined}
-        aria-label={arrow ? `${label} — opens full screen` : undefined}
+        title={arrow ? m.nav_opens_full_screen({ label }) : undefined}
+        aria-label={arrow ? m.nav_opens_full_screen({ label }) : undefined}
         className={`relative flex items-center gap-3 ${isCollapsed ? 'justify-center px-2' : 'px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
           // SQEM-548 — redesign C: the active link is a raised card with an edge and an accent icon.
           active
@@ -275,7 +278,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
       {mobileOpen && (
         <button
           onClick={closeMobileMenu}
-          aria-label="Close menu"
+          aria-label={m.sb_close_menu()}
           className="fixed top-3 left-64 ml-2 z-[60] p-2 rounded-full bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 shadow-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors md:hidden"
         >
           <X className="w-5 h-5" />
@@ -289,7 +292,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
       `}>
         {/* Desktop Collapse Toggle */}
         <button 
-           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+           aria-label={isCollapsed ? m.sb_expand() : m.sb_collapse()}
            aria-expanded={!isCollapsed}
            onClick={() => {
              setIsCollapsed(!isCollapsed);
@@ -327,7 +330,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
                   {isWorkspaceMenuOpen && (
                     <div className="absolute top-full left-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-1 z-[100] animate-scale-up origin-top-left">
                       <div className="px-3 py-2 border-b border-slate-50 dark:border-slate-700">
-                        <p className="text-2xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Switch Workspace</p>
+                        <p className="text-2xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{m.sb_switch_workspace()}</p>
                       </div>
                       <div className="max-h-48 overflow-y-auto">
                         {availableWorkspaces.map(ws => (
@@ -361,7 +364,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
                           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-brand-600 dark:hover:text-brand-400 rounded-lg transition-colors"
                         >
                           <PlusCircle className="w-4 h-4" />
-                          Create Workspace
+                          {m.nw_create()}
                         </button>
                       </div>
                       )}
@@ -379,20 +382,20 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
             <button
               type="button"
               onClick={() => switchMode(mode === 'work' ? 'manage' : 'work')}
-              aria-label={mode === 'work' ? 'Switch to Manage' : 'Switch to Work'}
-              onMouseEnter={(e) => showTooltip(e, mode === 'work' ? 'Switch to Manage' : 'Switch to Work')}
+              aria-label={mode === 'work' ? m.sb_to_manage() : m.sb_to_work()}
+              onMouseEnter={(e) => showTooltip(e, mode === 'work' ? m.sb_to_manage() : m.sb_to_work())}
               onMouseLeave={hideTooltip}
               className="w-full flex justify-center px-2 py-2.5 mb-3 rounded-xl border border-line bg-surface-raised text-ink-muted hover:text-ink-strong transition-colors"
             >
               {mode === 'work' ? <SlidersHorizontal className="w-5 h-5" /> : <Briefcase className="w-5 h-5" />}
             </button>
           ) : (
-            <div className="mb-3" role="group" aria-label="Navigation mode">
+            <div className="mb-3" role="group" aria-label={m.sb_nav_mode()}>
               <SegmentedTabs<NavMode>
                 fill
                 value={mode}
                 onChange={switchMode}
-                tabs={[{ value: 'work', label: 'Work' }, { value: 'manage', label: 'Manage' }]}
+                tabs={[{ value: 'work', label: m.nav_mode_work() }, { value: 'manage', label: m.nav_mode_manage() }]}
               />
             </div>
           ))}
@@ -405,7 +408,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
             // its selector outranks `mt-*`/`mb-*` — an `mt-4` here rendered as 4 px (and the nav block's
             // `mb-6` above as 0), which is how the first attempt changed nothing.
             <div className="pt-5 pb-6">
-              <p className="px-3 mb-1 text-2xs font-bold uppercase tracking-wider text-ink-subtle">Recent Chats</p>
+              <p className="px-3 mb-1 text-2xs font-bold uppercase tracking-wider text-ink-subtle">{m.sb_recent()}</p>
               {recentChats.map(c => (
                 <Link
                   key={c.id}
@@ -414,7 +417,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
                   title={c.title}
                   className="block px-3 py-1.5 rounded-lg text-sm text-ink-muted hover:text-ink-strong hover:bg-surface-raised truncate transition-colors"
                 >
-                  {c.title || 'Untitled chat'}
+                  {c.title || m.chatsearch_untitled()}
                 </Link>
               ))}
             </div>
@@ -427,14 +430,14 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
               href={CHROME_STORE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              onMouseEnter={(e) => showTooltip(e, 'Install Extension')}
+              onMouseEnter={(e) => showTooltip(e, m.sb_install())}
               onMouseLeave={hideTooltip}
               className={`flex items-center gap-3 ${isCollapsed ? 'justify-center px-2' : 'px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100`}
             >
               <Chrome className="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors" />
               {!isCollapsed && (
                 <>
-                  <span className="truncate whitespace-nowrap">Install Extension</span>
+                  <span className="truncate whitespace-nowrap">{m.sb_install()}</span>
                   <ArrowUpRight className="w-4 h-4 ml-auto shrink-0 transition-colors text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400" />
                 </>
               )}
@@ -449,14 +452,14 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => { if (!IS_SELF_HOSTED && openWhatsNew()) e.preventDefault(); }}
-            onMouseEnter={(e) => showTooltip(e, "What's new")}
+            onMouseEnter={(e) => showTooltip(e, m.sb_whats_new())}
             onMouseLeave={hideTooltip}
             className={`flex items-center gap-3 ${isCollapsed ? 'justify-center px-2' : 'px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100`}
           >
             <Megaphone className="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors" />
             {!isCollapsed && (
               <>
-                <span className="truncate">{"What's new"}</span>
+                <span className="truncate">{m.sb_whats_new()}</span>
                 {/* The arrow means "opens a new tab": true on self-host (GitHub) and when this build has no
                     Gleap key (the help-centre fallback); with Gleap the changelog opens inside the app. */}
                 {(IS_SELF_HOSTED || !gleapConfigured) && <ArrowUpRight className="w-4 h-4 ml-auto shrink-0 transition-colors text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400" />}
@@ -468,26 +471,26 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
             href="https://help.sqemes.com/"
             target="_blank"
             rel="noopener noreferrer"
-            onMouseEnter={(e) => showTooltip(e, 'Documentation')}
+            onMouseEnter={(e) => showTooltip(e, m.sb_docs())}
             onMouseLeave={hideTooltip}
             className={`flex items-center gap-3 ${isCollapsed ? 'justify-center px-2' : 'px-3'} py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100`}
           >
             <BookOpen className="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors" />
             {!isCollapsed && (
               <>
-                <span className="truncate">Documentation</span>
+                <span className="truncate">{m.sb_docs()}</span>
                 <ArrowUpRight className="w-4 h-4 ml-auto shrink-0 transition-colors text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400" />
               </>
             )}
           </a>
 
-          {renderNavItem('/settings', Settings, 'Settings')}
+          {renderNavItem('/settings', Settings, m.nav_settings())}
 
           {/* SQEM-241 — this markup moved into `ui/PersonCard`, which the template editor's Owner
               block also uses. One element to maintain instead of two that look alike today. */}
           <PersonCard
             name={currentUser.name}
-            subtitle="My Profile"
+            subtitle={m.st_tab_profile()}
             avatar={currentUser.avatar}
             role={currentUser.role}
             collapsed={isCollapsed}
@@ -503,7 +506,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
           {isCollapsed ? (
             <button
               onClick={toggleTheme}
-              onMouseEnter={(e) => showTooltip(e, theme === 'dark' ? 'Light Mode' : 'Dark Mode')}
+              onMouseEnter={(e) => showTooltip(e, theme === 'dark' ? m.sb_light() : m.sb_dark())}
               onMouseLeave={hideTooltip}
               className="w-full flex justify-center px-2 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100"
             >
@@ -514,14 +517,14 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
               <Sun className="w-4 h-4 shrink-0 text-amber-400" />
               <button
                 onClick={toggleTheme}
-                aria-label="Toggle dark mode"
+                aria-label={m.sb_toggle_dark()}
                 className={`hit-24 relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 focus:outline-none ${theme === 'dark' ? 'bg-brand-600' : 'bg-slate-300'}`}
               >
                 <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${theme === 'dark' ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
               </button>
               <Moon className="w-4 h-4 shrink-0 text-slate-500 dark:text-slate-400" />
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400 ml-1 whitespace-nowrap">
-                {theme === 'dark' ? 'Dark mode' : 'Light mode'}
+                {theme === 'dark' ? m.sb_dark() : m.sb_light()}
               </span>
             </div>
           )}
@@ -530,7 +533,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
           {IS_SELF_HOSTED && (isCollapsed ? (
             <button
               onClick={openAbout}
-              onMouseEnter={(e) => showTooltip(e, updateAvailable ? `Update available (v${CURRENT_VERSION})` : `Version v${CURRENT_VERSION}`)}
+              onMouseEnter={(e) => showTooltip(e, updateAvailable ? m.sb_update_version({ version: CURRENT_VERSION }) : m.sb_version({ version: CURRENT_VERSION }))}
               onMouseLeave={hideTooltip}
               className="w-full flex items-center justify-center gap-1 px-2 py-1 text-2xs font-mono text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
             >
@@ -540,12 +543,12 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
           ) : (
             <button
               onClick={openAbout}
-              title={updateAvailable ? 'A newer version is available — click for details' : 'About & version'}
+              title={updateAvailable ? m.sb_newer_version() : m.sb_about()}
               className="w-full flex items-center gap-1.5 px-3 py-1 text-2xs text-left text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors whitespace-nowrap"
             >
               <span className="font-mono">v{CURRENT_VERSION}</span>
               {updateAvailable && (
-                <span className="text-amber-600 dark:text-amber-400 font-semibold">· Update available</span>
+                <span className="text-amber-600 dark:text-amber-400 font-semibold">· {m.sb_update_available()}</span>
               )}
             </button>
           ))}
@@ -568,9 +571,9 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
       {!IS_SELF_HOSTED && isWorkspaceModalOpen && (
         <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-slate-100 dark:border-slate-700 animate-scale-up">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-1">Create Workspace</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-1">{m.nw_create()}</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              {wsStep === 'plan' ? 'Step 1 of 2 · Choose a plan' : IS_SELF_HOSTED ? 'Name your workspace' : 'Step 2 of 2 · Name it'}
+              {wsStep === 'plan' ? m.sb_step_plan() : IS_SELF_HOSTED ? m.sb_step_name_selfhost() : m.sb_step_name()}
             </p>
 
             {/* SQEM-209 — Step 1. The old modal claimed "You will start on the Solo plan", which the
@@ -591,7 +594,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
                           : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                       }`}
                     >
-                      {cycle}
+                      {cycle === 'monthly' ? m.stl_monthly() : m.stl_yearly()}
                     </button>
                   ))}
                 </div>
@@ -599,7 +602,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
                 <div className="space-y-2">
                   {(Object.keys(PLANS) as PlanTier[]).map(tier => {
                     const plan = PLANS[tier];
-                    const monthly = billingCycle === 'yearly' ? plan.priceYearly : parseInt(plan.price.replace(/[^0-9]/g, ''), 10);
+                    const monthly = billingCycle === 'yearly' ? plan.priceYearly : planMonthlyAmount(plan.price);
                     return (
                       <button
                         key={tier}
@@ -609,9 +612,9 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
                       >
                         <span className="min-w-0">
                           <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">{tier}</span>
-                          <span className="block text-2xs text-slate-500 dark:text-slate-400 truncate">{plan.tagline}</span>
+                          <span className="block text-2xs text-slate-500 dark:text-slate-400 truncate">{planTagline(tier, plan.tagline)}</span>
                         </span>
-                        <span className="text-sm font-bold text-slate-900 dark:text-slate-100 shrink-0">€{monthly}<span className="text-2xs font-medium text-slate-400">/mo</span></span>
+                        <span className="text-sm font-bold text-slate-900 dark:text-slate-100 shrink-0">{planMonthly(monthly)}</span>
                       </button>
                     );
                   })}
@@ -619,14 +622,14 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
 
                 {/* SQEM-283 — once under the list, not on every row: this is a compact picker, and
                     six copies of the same sentence would read as noise and get skipped. */}
-                <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2">{VAT_NOTE}</p>
+                <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2">{m.stl_vat()}</p>
 
                 <button
                   type="button"
                   onClick={() => setIsWorkspaceModalOpen(false)}
                   className="w-full py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors"
                 >
-                  Cancel
+                  {m.sb_cancel()}
                 </button>
               </div>
             )}
@@ -634,11 +637,12 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
             {wsStep === 'name' && (
             <form onSubmit={handleCreateWorkspace} className="space-y-4">
               <div>
-                <label htmlFor="sidebar-workspace-name" className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Workspace Name</label>
-                <input id="sidebar-workspace-name"
+                <label htmlFor="sidebar-workspace-name" className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">{m.nw_name()}</label>
+                <Input id="sidebar-workspace-name"
                   autoFocus
-                  className={`w-full p-2.5 bg-white dark:bg-slate-700 border rounded-xl text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500 ${workspaceNameError ? 'border-red-400' : 'border-slate-200 dark:border-slate-600'}`}
-                  placeholder="e.g. My New Team"
+                  tone={workspaceNameError ? 'error' : 'default'}
+                  aria-invalid={!!workspaceNameError}
+                  placeholder={m.sb_name_placeholder()}
                   value={newWorkspaceName}
                   onChange={e => { setNewWorkspaceName(e.target.value); if (workspaceNameError) setWorkspaceNameError(''); }}
                 />
@@ -646,8 +650,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
               </div>
               {!IS_SELF_HOSTED && selectedPlan && (
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  <span className="font-bold text-slate-700 dark:text-slate-200">{selectedPlan}</span>, billed {billingCycle}.
-                  Next step is payment — the workspace is created when you continue.
+                  <span className="font-bold text-slate-700 dark:text-slate-200">{selectedPlan}</span>{billingCycle === 'monthly' ? m.sb_billed_monthly() : m.sb_billed_yearly()}
                 </p>
               )}
               <div className="flex gap-2 mt-6">
@@ -657,7 +660,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
                   disabled={creatingWorkspace}
                   className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-xs font-bold transition-colors disabled:opacity-60"
                 >
-                  {IS_SELF_HOSTED ? 'Cancel' : 'Back'}
+                  {IS_SELF_HOSTED ? m.sb_cancel() : m.sb_back()}
                 </button>
                 <button
                   type="submit"
@@ -665,7 +668,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
                   className="flex-1 py-2.5 text-white bg-brand-600 rounded-xl hover:bg-brand-700 text-xs font-bold shadow-lg hover:shadow-brand-200 dark:shadow-none dark:hover:shadow-none transition-all disabled:opacity-60 inline-flex items-center justify-center gap-2"
                 >
                   {creatingWorkspace && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  {IS_SELF_HOSTED ? 'Create' : 'Continue to payment'}
+                  {IS_SELF_HOSTED ? m.sb_create() : m.sb_continue_payment()}
                 </button>
               </div>
             </form>

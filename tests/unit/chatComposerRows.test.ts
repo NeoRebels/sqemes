@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { en } from './i18nText';
 
 /**
  * SQEM-401 — on a phone the chat composer is two rows; on a desktop it is the one row it was.
@@ -44,7 +45,8 @@ describe('SQEM-401 — two rows on a phone, one row on a desktop', () => {
     const toolsEnd = src.indexOf('order-1 md:order-2');
     const toolsBody = src.slice(toolsStart, toolsEnd);
     expect(toolsBody).toMatch(/<Paperclip /);
-    expect(toolsBody).toMatch(/title="Use playbook {2}\(\/\)"/); // SQEM-544 — was "Use template"
+    expect(toolsBody).toMatch(/title=\{txt\.chat_use_playbook\(\)\}/); // SQEM-544 — was "Use template"
+    expect(en.chat_use_playbook).toBe('Use playbook  (/)'); // SQEM-604 — the words live in messages/
     expect(toolsBody).toMatch(/<Plug /);
     expect(toolsBody).not.toMatch(/<textarea/);
   });
@@ -55,7 +57,8 @@ describe('SQEM-401 — two rows on a phone, one row on a desktop', () => {
     expect(input![1]).toMatch(/flex-1/);
     const body = src.slice(src.indexOf(input![0]));
     expect(body).toMatch(/<textarea/);
-    expect(body).toMatch(/title="Enhance with AI"/);
+    expect(body).toMatch(/title=\{txt\.chat_enhance\(\)\}/);
+    expect(en.chat_enhance).toBe('Enhance with AI');
     expect(body).toMatch(/<Send /);
     expect(body).not.toMatch(/<Paperclip /);
   });

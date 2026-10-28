@@ -1,5 +1,11 @@
 import React from 'react';
 import { Trash2, X, Download, Loader2, Tag as TagIcon, Lock } from 'lucide-react';
+import { m } from '../../lib/i18n';
+import type { BulkNoun } from '../../lib/bulkApply';
+
+const SELECTED: Record<BulkNoun, (i: { count: number }) => string> = {
+  playbook: m.bulk_selected_playbook, persona: m.bulk_selected_persona, file: m.bulk_selected_file, chat: m.bulk_selected_chat,
+};
 
 // SQEM-077 — sticky bar shown when ≥1 item is selected on a list/grid page.
 // Shared by Files and Templates. The parent owns the selection state.
@@ -25,7 +31,7 @@ export default function BulkActionBar({
   onAddTag,
   onRemoveTag,
   tagBusy,
-  addTagLabel = 'Add tag',
+  addTagLabel = m.bulk_add_tag(),
   onAccess,
 }: {
   count: number;
@@ -34,7 +40,8 @@ export default function BulkActionBar({
   onToggleSelectAll: () => void;
   onDelete: () => void;
   onClear: () => void;
-  noun: string;
+  /** SQEM-605 — a fixed set: each noun has its own plural text ("3 playbooks" / "3 Playbooks"). */
+  noun: BulkNoun;
   onExport?: () => void;
   exporting?: boolean;
   /** The workspace tag vocabulary. Nothing here may create a tag — see Files.tsx. */
@@ -76,19 +83,19 @@ export default function BulkActionBar({
   return (
     <div className="sticky top-2 z-20 mb-4 flex flex-wrap items-center gap-3 px-4 py-2.5 rounded-2xl bg-slate-900 dark:bg-slate-700 text-white shadow-lg">
       <span className="text-sm font-semibold">
-        {count} {noun}{count === 1 ? '' : 's'} selected
+        {SELECTED[noun]({ count })}
       </span>
       <button
         type="button"
         onClick={onToggleSelectAll}
         className="text-xs font-medium text-slate-300 hover:text-white transition-colors"
       >
-        {allSelected ? 'Deselect all' : `Select all ${total}`}
+        {allSelected ? m.bulk_deselect_all() : m.bulk_select_all({ count: total })}
       </button>
       <div className="flex-1" />
       {tagBusy && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-300" />}
       {onAddTag && tagSelect(addTagLabel, addableTags ?? [], onAddTag)}
-      {onRemoveTag && (removableTags?.length ?? 0) > 0 && tagSelect('Remove tag', removableTags ?? [], onRemoveTag)}
+      {onRemoveTag && (removableTags?.length ?? 0) > 0 && tagSelect(m.bulk_remove_tag(), removableTags ?? [], onRemoveTag)}
       {onAccess && (
         <button
           type="button"
@@ -96,7 +103,7 @@ export default function BulkActionBar({
           disabled={tagBusy}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
         >
-          <Lock className="w-3.5 h-3.5" /> Access…
+          <Lock className="w-3.5 h-3.5" /> {m.bulk_access()}
         </button>
       )}
       {onExport && (
@@ -106,7 +113,7 @@ export default function BulkActionBar({
           disabled={exporting}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
         >
-          {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Export
+          {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} {m.bulk_export()}
         </button>
       )}
       <button
@@ -114,13 +121,13 @@ export default function BulkActionBar({
         onClick={onDelete}
         className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors"
       >
-        <Trash2 className="w-3.5 h-3.5" /> Delete
+        <Trash2 className="w-3.5 h-3.5" /> {m.bulk_delete()}
       </button>
       <button
         type="button"
         onClick={onClear}
         className="p-1.5 text-slate-300 hover:text-white rounded-lg transition-colors"
-        title="Clear selection"
+        title={m.bulk_clear()}
       >
         <X className="w-4 h-4" />
       </button>

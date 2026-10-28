@@ -20,6 +20,8 @@ import { Input } from './ui/Input';
 import Checkbox from './ui/Checkbox';
 import { useUI } from '../store';
 import type { User } from '../types';
+import { m as txt } from '../lib/i18n'; // SQEM-608 — `m` is a member in a loop here
+import { roleLabel } from '../lib/labels';
 import {
   fetchGroups, createGroup, renameGroup, deleteGroup, setGroupMembers, countTemplatesUsingGroup,
   type WorkspaceGroup,
@@ -42,7 +44,7 @@ export default function AccessGroupsCard({
     try {
       setGroups(await fetchGroups(workspaceId));
     } catch (err: any) {
-      showToast(err.message || 'Could not load groups', 'error');
+      showToast(err.message || txt.ag_load_failed(), 'error');
       setGroups([]);
     }
   };
@@ -60,7 +62,7 @@ export default function AccessGroupsCard({
       // The unique index on (workspace_id, lower(name)) is the likely cause, and "duplicate key"
       // does not say that to anyone.
       const dup = /duplicate key|unique/i.test(err?.message ?? '');
-      showToast(dup ? `A group called “${name}” already exists.` : (err.message || 'Could not create the group'), 'error');
+      showToast(dup ? txt.ag_exists({ name }) : (err.message || txt.ag_create_failed()), 'error');
     } finally {
       setCreating(false);
     }
@@ -87,9 +89,9 @@ export default function AccessGroupsCard({
       await deleteGroup(g.id);
       await load();
       setPendingDelete(null);
-      showToast(`Deleted “${g.name}”`, 'success');
+      showToast(txt.ag_deleted({ name: g.name }), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Could not delete the group', 'error');
+      showToast(err.message || txt.ag_delete_failed(), 'error');
     } finally {
       setBusy(false);
     }
@@ -105,7 +107,7 @@ export default function AccessGroupsCard({
     try {
       await setGroupMembers(g.id, next);
     } catch (err: any) {
-      showToast(err.message || 'Could not save the group', 'error');
+      showToast(err.message || txt.ag_save_failed(), 'error');
       await load();
     }
   };
@@ -120,7 +122,7 @@ export default function AccessGroupsCard({
       setRenaming(null);
       await load();
     } catch (err: any) {
-      showToast(err.message || 'Could not rename the group', 'error');
+      showToast(err.message || txt.ag_rename_failed(), 'error');
     } finally {
       setBusy(false);
     }
@@ -135,9 +137,9 @@ export default function AccessGroupsCard({
           SQEM-304 the neighbour is "Playbook Access", which has none either. The reason held through
           the move, which is the useful kind of reason. */}
       <div className="mb-1">
-        <h2 className="font-display text-xl font-semibold text-ink-strong">Access Groups</h2>
+        <h2 className="font-display text-xl font-semibold text-ink-strong">{txt.ag_title()}</h2>
         <p className="text-sm text-ink-muted mt-1">
-          Name a set of people once, then grant a playbook to the group instead of to each person. Adding somebody to a group gives them everything that group can reach.
+          {txt.ag_desc()}
         </p>
       </div>
 
@@ -146,19 +148,19 @@ export default function AccessGroupsCard({
           value={newName}
           onChange={e => setNewName(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void handleCreate(); } }}
-          placeholder="Group name, e.g. Marketing"
+          placeholder={txt.ag_placeholder()}
           className="flex-1"
         />
         <Button onClick={() => void handleCreate()} loading={creating} disabled={!newName.trim()}>
-          <Plus className="w-4 h-4" /> Add
+          <Plus className="w-4 h-4" /> {txt.sts_add()}
         </Button>
       </div>
 
       {groups === null ? (
-        <div className="flex items-center gap-2 text-sm text-ink-subtle py-4"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
+        <div className="flex items-center gap-2 text-sm text-ink-subtle py-4"><Loader2 className="w-4 h-4 animate-spin" /> {txt.ag_loading()}</div>
       ) : groups.length === 0 ? (
         <p className="text-sm text-ink-subtle py-4 text-center border border-dashed border-line-strong rounded-xl">
-          No groups yet. A group keeps working as the team changes — a list of names does not.
+          {txt.ag_empty()}
         </p>
       ) : (
         <div className="space-y-2">
@@ -183,7 +185,7 @@ export default function AccessGroupsCard({
                       {/* An empty group grants nobody anything. Saying so here means it is not
                           discovered later, when somebody reports that a template "does not work". */}
                       <span className="block text-xs text-ink-subtle">
-                        {g.memberIds.length === 0 ? 'No members — grants nobody access' : `${g.memberIds.length} ${g.memberIds.length === 1 ? 'person' : 'people'}`}
+                        {g.memberIds.length === 0 ? txt.ag_no_members() : txt.ag_people({ count: g.memberIds.length })}
                       </span>
                     </button>
                     <button type="button" onClick={() => setRenaming({ id: g.id, name: g.name })} className="p-1.5 text-ink-subtle hover:text-ink hover:bg-surface-sunken rounded-lg"><Pencil className="w-3.5 h-3.5" /></button>
@@ -198,7 +200,7 @@ export default function AccessGroupsCard({
                       <Checkbox checked={g.memberIds.includes(m.id)} onChange={() => void toggleMember(g, m.id)} />
                       <span className="min-w-0">
                         <span className="font-medium">{m.name || m.email}</span>
-                        <span className="block text-2xs text-ink-subtle truncate">{m.email} · {m.role}</span>
+                        <span className="block text-2xs text-ink-subtle truncate">{m.email} · {roleLabel(m.role)}</span>
                       </span>
                     </label>
                   ))}
@@ -215,8 +217,8 @@ export default function AccessGroupsCard({
           itself is worse than one that opens a moment later. */}
       <ConfirmModal
         open={!!pendingDelete}
-        title={`Delete “${pendingDelete?.group.name ?? ''}”?`}
-        confirmLabel="Delete group"
+        title={txt.ag_delete_title({ name: pendingDelete?.group.name ?? '' })}
+        confirmLabel={txt.ag_delete()}
         busy={busy}
         onConfirm={() => void handleDelete()}
         onClose={() => setPendingDelete(null)}
@@ -224,13 +226,12 @@ export default function AccessGroupsCard({
         {pendingDelete && pendingDelete.used > 0 ? (
           <p>
             <span className="font-semibold text-ink">
-              {pendingDelete.used} playbook{pendingDelete.used === 1 ? '' : 's'}
+              {txt.count_playbook({ count: pendingDelete.used })}
             </span>{' '}
-            currently grant access through this group — they will lose it, and nothing at the
-            playbook will say why.
+            {txt.ag_used_rest({ count: pendingDelete.used })}
           </p>
         ) : (
-          <p>It is not used by any playbook.</p>
+          <p>{txt.ag_unused()}</p>
         )}
       </ConfirmModal>
     </Card>

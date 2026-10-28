@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { m } from '../lib/i18n';
 import { useUI, useWorkspace, usePrompts } from '../store';
 import { Link, useNavigate } from 'react-router';
 import { ArrowRight, Loader2, FilePlus } from 'lucide-react';
@@ -21,7 +22,7 @@ const Dashboard = () => {
     if (queryStart !== -1) {
       const params = new URLSearchParams(hash.slice(queryStart));
       if (params.get('checkout') === 'success') {
-        showToast('Subscription activated! Your plan has been updated.', 'success');
+        showToast(m.start_subscription_activated(), 'success');
         window.history.replaceState({}, '', window.location.pathname + '#/');
       }
     }
@@ -69,9 +70,9 @@ const Dashboard = () => {
       <div className="mt-4 md:mt-10 mb-8 md:mb-10 flex flex-col items-center text-center gap-6">
         <div>
           <h1 className="font-display text-3xl font-semibold text-ink-strong tracking-tight">
-            {firstName ? `What are we working on, ${firstName}?` : 'What are we working on?'}
+            {firstName ? m.start_question_named({ name: firstName }) : m.start_question()}
           </h1>
-          <p className="text-ink-muted mt-2 text-sm">in <span className="font-semibold text-ink">{workspace.name}</span></p>
+          <p className="text-ink-muted mt-2 text-sm">{m.start_in_workspace()} <span className="font-semibold text-ink">{workspace.name}</span></p>
         </div>
         <StartComposer workspaceId={workspace.id} />
         {/* SQEM-557 — or take the playbooks to the tool you already use. */}
@@ -83,16 +84,18 @@ const Dashboard = () => {
           first visit of an empty workspace. */}
       {/* SQEM-550 (a) — favourites as tiles with "Use" (redesign C), above the rest. */}
       <section aria-labelledby="start-favourites" className="max-w-3xl mx-auto mb-10">
-        <div className="flex items-center justify-between mb-3">
-          <h2 id="start-favourites" className="font-semibold text-ink-strong">Your favourites</h2>
-          <div className="flex items-center gap-4">
+        {/* SQEM-604 — the row wraps as a whole, its items never: at 375 px the German labels broke
+            into three two-line stacks ("Deine / Favoriten", "Neues / Playbook", …). */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 mb-3">
+          <h2 id="start-favourites" className="font-semibold text-ink-strong whitespace-nowrap">{m.start_favourites()}</h2>
+          <div className="flex items-center gap-4 whitespace-nowrap">
             {canCreate && (
               <Link to="/playbooks/new" className="text-sm font-medium text-ink-muted hover:text-ink-strong flex items-center gap-1">
-                <FilePlus className="w-3.5 h-3.5" /> New playbook
+                <FilePlus className="w-3.5 h-3.5" /> {m.start_new_playbook()}
               </Link>
             )}
             <Link to="/playbooks" className="text-sm font-medium text-accent flex items-center gap-1">
-              All playbooks <ArrowRight className="w-3.5 h-3.5" />
+              {m.start_all_playbooks()} <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
@@ -100,9 +103,9 @@ const Dashboard = () => {
           <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-ink-subtle" /></div>
         ) : quickTemplates.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-6 text-center rounded-card border border-dashed border-line-strong">
-            <p className="text-sm text-ink-subtle">No favourite playbooks yet.</p>
+            <p className="text-sm text-ink-subtle">{m.start_no_favourites()}</p>
             <Link to="/playbooks" className="text-sm font-medium text-accent flex items-center gap-1">
-              Star a playbook to pin it here <ArrowRight className="w-3.5 h-3.5" />
+              {m.start_star_hint()} <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         ) : (
@@ -117,7 +120,7 @@ const Dashboard = () => {
                 <span className="font-display text-lg font-semibold text-ink-strong leading-snug line-clamp-2">{t.title}</span>
                 {t.description && <span className="text-sm text-ink-muted line-clamp-2">{t.description}</span>}
                 <span className="mt-auto pt-1 text-sm font-semibold text-accent flex items-center gap-1">
-                  Use <ArrowRight className="w-3.5 h-3.5" />
+                  {m.start_use()} <ArrowRight className="w-3.5 h-3.5" />
                 </span>
               </button>
             ))}

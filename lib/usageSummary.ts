@@ -7,6 +7,7 @@
  * left out rather than named (same rule as the chat chips, SQEM-551).
  */
 import type { PromptKind } from '../types';
+import { m } from './i18n';
 
 export const USAGE_DAYS = 7;
 export type UsageChannel = 'extension' | 'mcp' | 'chat';
@@ -45,11 +46,11 @@ export function usageLine(
   days = USAGE_DAYS,
 ): UsageLine {
   const count = usage?.uses ?? 0;
-  if (count === 0) return { count, label: `No uses in the last ${days} days`, top: null };
+  if (count === 0) return { count, label: m.ov_usage_none({ days }), top: null };
   const p = usage?.topTemplateId ? visible.get(usage.topTemplateId) : undefined;
   return {
     count,
-    label: `${count === 1 ? 'use' : 'uses'} · last ${days} days`,
+    label: m.ov_usage_label({ count, days }),
     top: p && usage?.topTemplateId ? { id: usage.topTemplateId, title: p.title, uses: usage.topUses } : null,
   };
 }

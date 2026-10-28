@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { en } from './i18nText';
 
 /**
  * SQEM-436 — connectors are always sent; the icon only says whether the chosen model can use them.
@@ -37,11 +38,15 @@ describe('SQEM-436 — connectors always active', () => {
   });
 
   it('both hover texts are present, in the owner’s wording', () => {
-    expect(CHAT).toContain('Your MCP Connectors are active');
-    expect(CHAT).toContain('image models cannot use them'); // SQEM-584 — was "only works with Claude and ChatGPT"
+    // SQEM-604 — the words live in messages/en.json; the code must use them.
+    expect(CHAT).toContain('txt.chat_connectors_active()');
+    expect(en.chat_connectors_active).toBe('Your MCP Connectors are active');
+    expect(CHAT).toContain('txt.chat_connectors_image_models()');
+    expect(en.chat_connectors_image_models).toBe('image models cannot use them'); // SQEM-584 — was "only works with Claude and ChatGPT"
     // ⚠️ Both states name the thing. "inactive" alone made the reader supply the subject, and next to
     // a red dot the likeliest guess is "something is broken" rather than "the model you picked cannot".
-    expect(CHAT).toContain('Your MCP Connectors are inactive');
+    expect(CHAT).toContain('txt.chat_connectors_inactive()');
+    expect(en.chat_connectors_inactive).toBe('Your MCP Connectors are inactive');
   });
 
   it('⚠️ green and red, and red is a deliberate choice', () => {

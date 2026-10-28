@@ -2,6 +2,7 @@ import type { LibraryChange } from './supabase/functions/_shared/libraryChanges.
 import type { WebSources } from './supabase/functions/_shared/webSearch.ts';
 import type { GeneratedFile } from './supabase/functions/_shared/fileOutput.ts';
 import type { DocumentStyle } from './supabase/functions/_shared/documentStyle.ts';
+import type { Locale } from './lib/i18n';
 
 export type UserRole = 'admin' | 'editor' | 'member';
 
@@ -11,6 +12,8 @@ export interface User {
   email: string;
   avatar: string;
   role: UserRole;
+  /** SQEM-600 — the person's UI language; null/undefined = the workspace default. */
+  language?: Locale | null;
 }
 
 export type PlanTier = 'Solo' | 'Team' | 'Business';
@@ -36,6 +39,8 @@ export interface Workspace {
   webSearchHosted?: boolean;
   /** SQEM-597 — the default look of files from Chat (Settings → Brand, admins). */
   documentStyle?: DocumentStyle | null;
+  /** SQEM-600 — the workspace's default UI language (admins set it). */
+  language?: Locale;
   /**
    * SQEM-311 — the model used for AI *authoring* (enhance, descriptions, both wizards, brand
    * adaptation). Null/absent ⇒ pick the first text model with a key, which is what happened

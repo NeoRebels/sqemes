@@ -25,6 +25,8 @@ import { fetchPersonas } from '../lib/api/personas';
 import type { Persona } from '../types';
 import { fetchUsageSummary, fetchWebSearchUsage } from '../lib/api/usage';
 import { usageLine, type ChannelUsage, type UsageChannel } from '../lib/usageSummary';
+import { m, getLocale } from '../lib/i18n';
+import { planFeature, planTagline } from '../lib/labels';
 
 /**
  * SQEM-552 — the Manage Overview (redesign 4/4: C's look, the Leitstand from A). The home of the
@@ -40,10 +42,10 @@ import { usageLine, type ChannelUsage, type UsageChannel } from '../lib/usageSum
  */
 function ago(iso: string): string {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 3600) return `${Math.max(1, Math.round(s / 60))} min ago`;
-  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  if (s < 3600) return m.ov_ago_min({ count: Math.max(1, Math.round(s / 60)) });
+  if (s < 86400) return m.ov_ago_h({ count: Math.round(s / 3600) });
   const d = Math.round(s / 86400);
-  return d === 1 ? 'yesterday' : `${d} days ago`;
+  return d === 1 ? m.ov_yesterday() : m.ov_ago_days({ count: d });
 }
 
 const Overview = () => {
@@ -96,17 +98,17 @@ const Overview = () => {
     setPortalLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      if (!session) throw new Error(m.ov_not_authenticated());
       const res = await fetch(functionCallUrl('create-portal-session'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ workspaceId: workspace.id }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to open billing portal');
+      if (!res.ok) throw new Error(data.error || m.ov_portal_failed());
       window.location.href = data.url;
     } catch (err: any) {
-      showToast(err.message || 'Failed to open billing portal', 'error');
+      showToast(err.message || m.ov_portal_failed(), 'error');
       setPortalLoading(false);
     }
   };
@@ -173,10 +175,10 @@ const Overview = () => {
   const planBadge = isTrialing(workspace)
     ? (() => {
         const d = trialDaysLeft(workspace);
-        return d == null ? 'Trial' : d === 1 ? '1 day left' : `${d} days left`;
+        return d == null ? m.ov_trial() : m.ov_days_left({ count: d });
       })()
     : workspace.cancelAtPeriodEnd
-      ? 'Canceling'
+      ? m.ov_canceling()
       : null;
   const seatsUsed = workspace.members.length;
   const seatsLimit = workspace.isManaged ? null : currentPlan.users;
@@ -187,7 +189,7 @@ const Overview = () => {
   // ⛔ Decide only once the role is known. While the store loads (and during a workspace switch) the
   // user is a placeholder with role 'member' and an empty member list — redirecting on that sent
   // admins to Start on every reload of /overview (found in the local check).
-  const roleKnown = !!currentUser.id && workspace.members.some(m => m.id === currentUser.id);
+  const roleKnown = !!currentUser.id && workspace.members.some(member => member.id === currentUser.id);
   if (!roleKnown) return null;
   if (!allowed) return <Navigate to="/" replace />;
 
@@ -204,7 +206,7 @@ const Overview = () => {
         </p>
         {line.top && (
           <p className="text-xs text-ink-muted mt-1 truncate">
-            Most used: <Link to={`/playbooks?id=${encodeURIComponent(line.top.id)}`} className="font-medium text-ink hover:underline">{line.top.title}</Link>
+            {m.ov_most_used()} <Link to={`/playbooks?id=${encodeURIComponent(line.top.id)}`} className="font-medium text-ink hover:underline">{line.top.title}</Link>
           </p>
         )}
       </div>
@@ -217,7 +219,7 @@ const Overview = () => {
         <span className="font-semibold text-ink-strong flex-1">{name}</span>
         {ok !== null && (
           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-raised text-xs font-semibold ${ok ? 'text-success' : 'text-ink-muted'}`}>
-            <span aria-hidden className={`w-1.5 h-1.5 rounded-full ${ok ? 'bg-success' : 'bg-ink-subtle'}`} /> {ok ? 'Ready' : 'Not set up'}
+            <span aria-hidden className={`w-1.5 h-1.5 rounded-full ${ok ? 'bg-success' : 'bg-ink-subtle'}`} /> {ok ? m.ov_ready() : m.ov_not_set_up()}
           </span>
         )}
       </div>
@@ -231,21 +233,21 @@ const Overview = () => {
     <div className="p-4 md:p-8 pb-16 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
         <div className="min-w-0">
-          <h1 className="font-display text-2xl md:text-3xl font-semibold tracking-tight text-ink-strong">Overview</h1>
+          <h1 className="font-display text-2xl md:text-3xl font-semibold tracking-tight text-ink-strong">{m.ov_title()}</h1>
           <p className="text-ink-muted mt-2">
-            {workspace.name} · {prompts.length} playbook{prompts.length === 1 ? '' : 's'}
-            {personaCount !== undefined && ` · ${personaCount} persona${personaCount === 1 ? '' : 's'}`}
-            {` · ${seatsUsed} member${seatsUsed === 1 ? '' : 's'}`}
+            {workspace.name} · {m.count_playbook({ count: prompts.length })}
+            {personaCount !== undefined && ` · ${m.count_persona({ count: personaCount })}`}
+            {` · ${m.count_member({ count: seatsUsed })}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
             <Link to="/settings" state={{ initialTab: 'team' }} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-control border border-line-strong bg-surface-raised text-sm font-semibold text-ink-strong hover:bg-surface-sunken transition-colors">
-              <UserPlus className="w-4 h-4" /> Invite
+              <UserPlus className="w-4 h-4" /> {m.ov_invite()}
             </Link>
           )}
           <Link to="/playbooks/new" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-control bg-accent-strong text-white text-sm font-semibold hover:opacity-90 transition-opacity">
-            <FilePlus className="w-4 h-4" /> New playbook
+            <FilePlus className="w-4 h-4" /> {m.ov_new_playbook()}
           </Link>
         </div>
       </div>
@@ -262,9 +264,11 @@ const Overview = () => {
                 <div>
                   {workspace.cancelAtPeriodEnd ? (
                     <>
-                      <p className="text-base font-bold text-slate-900 dark:text-slate-100">Your subscription is cancelled</p>
+                      <p className="text-base font-bold text-slate-900 dark:text-slate-100">{m.ov_cancelled_title()}</p>
                       <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                        {workspace.name} will be deactivated after {workspace.trialEndsAt ? new Date(workspace.trialEndsAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the trial ends'}.
+                        {workspace.trialEndsAt
+                          ? m.ov_deactivated_after({ workspace: workspace.name, date: new Date(workspace.trialEndsAt).toLocaleDateString(getLocale(), { year: 'numeric', month: 'long', day: 'numeric' }) })
+                          : m.ov_deactivated_after_trial({ workspace: workspace.name })}
                       </p>
                     </>
                   ) : (
@@ -276,12 +280,12 @@ const Overview = () => {
                           const d = trialDaysLeft(workspace);
                           return d == null ? null : (
                             <span className="text-2xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-brand-600 text-white">
-                              {d === 1 ? '1 day left' : `${d} days left`}
+                              {m.ov_days_left({ count: d })}
                             </span>
                           );
                         })()}
                         <p className="text-base font-bold text-slate-900 dark:text-slate-100">
-                          Your {workspace.plan} trial is active
+                          {m.ov_trial_active({ plan: workspace.plan })}
                         </p>
                       </div>
                       {/* SQEM-205 — the commitment was named here, the way out was not. The product
@@ -289,7 +293,7 @@ const Overview = () => {
                           word "cancel" first appeared four plan cards down on the billing page.
                           Naming both in the same breath is the honest version — and the cancellation
                           itself is already self-serve, so there is nothing to soften. */}
-                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Your card is on file — the trial converts to a paid {workspace.plan} subscription automatically. Cancel any time before then and you won&apos;t be charged.</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{m.ov_trial_body({ plan: workspace.plan })}</p>
                     </>
                   )}
                 </div>
@@ -301,11 +305,11 @@ const Overview = () => {
                     disabled={portalLoading}
                     className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {portalLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Opening…</> : 'Reactivate'}
+                    {portalLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> {m.ov_opening()}</> : m.ov_reactivate()}
                   </button>
                 ) : (
                   <Link to="/settings" state={{ initialTab: 'plans' }} className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-brand-200 dark:border-brand-700 text-brand-700 dark:text-brand-300 rounded-xl text-sm font-bold hover:bg-brand-50 dark:hover:bg-slate-700 transition-all">
-                    Manage plan <ArrowRight className="w-4 h-4" />
+                    {m.ov_manage_plan()} <ArrowRight className="w-4 h-4" />
                   </Link>
                 )
               )}
@@ -331,7 +335,7 @@ const Overview = () => {
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-base font-bold tracking-tight">Finish setting up your workspace</p>
+                  <p className="text-base font-bold tracking-tight">{m.ov_finish_title()}</p>
                   {/* SQEM-201 — no longer mentions MCP: it left the wizard and lives in the
                       Connections card right below this banner.
                       ⛔ SQEM-424 — and it no longer starts with the provider key. The sentence still
@@ -342,8 +346,8 @@ const Overview = () => {
                       (SQEM-170), so promising one would be a lie told on the first screen. */}
                   <p className="text-sm text-brand-100/90 mt-1 leading-relaxed">
                     {IS_SELF_HOSTED
-                      ? <>Choose where you want to use your playbooks — and set up only that.</>
-                      : <>Let AI write your first playbooks, choose where you want to use them, and set up only that.</>}
+                      ? m.ov_finish_selfhost()
+                      : m.ov_finish_cloud()}
                   </p>
                 </div>
               </div>
@@ -352,7 +356,7 @@ const Overview = () => {
                 // SQEM-386 — full width on a phone: in testing it read as too unobtrusive.
                 className="relative w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-brand-50 text-brand-800 rounded-xl text-sm font-bold transition-all shadow-sm"
               >
-                Finish setup <ArrowRight className="w-4 h-4" />
+                {m.ov_finish()} <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           )}
@@ -364,25 +368,27 @@ const Overview = () => {
       {/* Channels — the state, and since SQEM-553 the use of the last 7 days. */}
       {/* SQEM-568 — `grid-cols-1` is `minmax(0, 1fr)`: without it the one phone column sized itself to the
           longest unbreakable content (a truncated title is nowrap) and ran past the screen. */}
-      <section aria-label="Channels" className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
-        {channel(<Chrome className="w-4 h-4" />, 'Browser extension',
-          extensionInstalled ? 'Installed in this browser.' : 'Not found in this browser.',
+      <section aria-label={m.ov_channels()} className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
+        {channel(<Chrome className="w-4 h-4" />, m.ov_extension(),
+          extensionInstalled ? m.ov_ext_installed() : m.ov_ext_missing(),
           extensionInstalled,
-          !extensionInstalled && <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-accent inline-flex items-center gap-1">Install <ArrowRight className="w-3.5 h-3.5" /></a>,
+          !extensionInstalled && <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-accent inline-flex items-center gap-1">{m.ov_install()} <ArrowRight className="w-3.5 h-3.5" /></a>,
           usageBlock('extension'),
         )}
-        {channel(<McpIcon className="w-4 h-4" />, 'MCP server',
-          mcpKeysActive === null ? 'Use your playbooks in Claude, ChatGPT, Cursor and other AI tools.' : mcpKeysActive > 0 ? `${mcpKeysActive} active connection${mcpKeysActive === 1 ? '' : 's'}.` : 'No active connection yet.',
+        {channel(<McpIcon className="w-4 h-4" />, m.ov_mcp(),
+          mcpKeysActive === null ? m.ov_mcp_intro() : mcpKeysActive > 0 ? m.ov_mcp_active({ count: mcpKeysActive }) : m.ov_mcp_none(),
           mcpKeysActive === null ? null : mcpKeysActive > 0,
-          canManageConnections && <Link to="/settings" state={{ initialTab: 'api' }} className="text-sm font-semibold text-accent inline-flex items-center gap-1">{mcpKeysActive ? 'Manage' : 'Set up'} <ArrowRight className="w-3.5 h-3.5" /></Link>,
+          canManageConnections && <Link to="/settings" state={{ initialTab: 'api' }} className="text-sm font-semibold text-accent inline-flex items-center gap-1">{mcpKeysActive ? m.ov_manage() : m.ov_set_up()} <ArrowRight className="w-3.5 h-3.5" /></Link>,
           usageBlock('mcp'),
         )}
-        {channel(<MessageSquare className="w-4 h-4" />, 'Chat',
+        {channel(<MessageSquare className="w-4 h-4" />, m.nav_chat(),
           enabledModels.length > 0
-            ? (apiKeysConfigured > 0 ? `${apiKeysConfigured} provider key${apiKeysConfigured === 1 ? '' : 's'} · ${enabledModels.length} model${enabledModels.length === 1 ? '' : 's'}` : `${enabledModels.length} managed model${enabledModels.length === 1 ? '' : 's'}`)
-            : 'No AI model available yet.',
+            ? (apiKeysConfigured > 0
+              ? m.ov_chat_keys({ keys: m.count_provider_key({ count: apiKeysConfigured }), models: m.count_model({ count: enabledModels.length }) })
+              : m.ov_chat_managed({ count: enabledModels.length }))
+            : m.ov_chat_none(),
           enabledModels.length > 0,
-          canManageConnections && <Link to="/settings" state={{ initialTab: 'api' }} className="text-sm font-semibold text-accent inline-flex items-center gap-1">{/* SQEM-424 — the same words as the wizard step it leads to. */}{apiKeysConfigured > 0 ? 'AI provider keys' : 'Add AI provider key'} <ArrowRight className="w-3.5 h-3.5" /></Link>,
+          canManageConnections && <Link to="/settings" state={{ initialTab: 'api' }} className="text-sm font-semibold text-accent inline-flex items-center gap-1">{/* SQEM-424 — the same words as the wizard step it leads to. */}{apiKeysConfigured > 0 ? m.ov_provider_keys() : m.ov_add_provider_key()} <ArrowRight className="w-3.5 h-3.5" /></Link>,
           usageBlock('chat'),
         )}
       </section>
@@ -391,13 +397,13 @@ const Overview = () => {
         <div className="min-w-0 space-y-6 lg:col-span-1 order-2 lg:order-1">
           <section aria-labelledby="overview-attention" className="rounded-card border border-line bg-surface-raised p-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 id="overview-attention" className="font-display text-lg font-semibold text-ink-strong">Needs attention</h2>
+              <h2 id="overview-attention" className="font-display text-lg font-semibold text-ink-strong">{m.ov_attention()}</h2>
               {attention && attention.length > 0 && <span className="px-2 py-0.5 rounded-full bg-warning-soft text-warning text-xs font-bold">{attention.length}</span>}
             </div>
             {attention === null ? (
-              <p className="text-sm text-ink-subtle">Checking…</p>
+              <p className="text-sm text-ink-subtle">{m.ov_checking()}</p>
             ) : attention.length === 0 ? (
-              <p className="text-sm text-ink-muted flex items-center gap-2"><Check className="w-4 h-4 text-success" /> All set — nothing needs attention.</p>
+              <p className="text-sm text-ink-muted flex items-center gap-2"><Check className="w-4 h-4 text-success" /> {m.ov_all_set()}</p>
             ) : (
               <ul className="space-y-2">
                 {attention.map(a => (
@@ -426,27 +432,27 @@ const Overview = () => {
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <span className="text-xs font-bold uppercase tracking-wider text-brand-200 flex items-center gap-2">
-                    <CreditCard className="w-3 h-3" /> Current Plan
+                    <CreditCard className="w-3 h-3" /> {m.ov_current_plan()}
                   </span>
-                  <h3 className="text-2xl font-bold mt-1">Managed</h3>
+                  <h3 className="text-2xl font-bold mt-1">{m.ov_managed()}</h3>
                 </div>
-                <span className="bg-brand-700/50 px-3 py-1 rounded-lg text-xs font-bold border border-brand-600">€0/mo</span>
+                <span className="bg-brand-700/50 px-3 py-1 rounded-lg text-xs font-bold border border-brand-600">{m.ov_per_month()}</span>
               </div>
               <div className="flex justify-between text-xs mb-1.5 text-brand-100">
-                <span className="font-medium">Team Members</span>
-                <span className="font-bold">Unlimited</span>
+                <span className="font-medium">{m.ov_team_members()}</span>
+                <span className="font-bold">{m.ov_unlimited()}</span>
               </div>
               <div className="flex justify-between items-center mt-1.5">
-                <p className="text-xs text-brand-300">{seatsUsed} member{seatsUsed !== 1 ? 's' : ''} · BYOK</p>
+                <p className="text-xs text-brand-300">{m.ov_members_byok({ members: m.count_member({ count: seatsUsed }) })}</p>
               </div>
-              {storage && <div className="mt-4"><UsageBar label="Storage" used={storage.used} limit={storage.limit} format={formatStorage} tone="onBrand" /></div>}
+              {storage && <div className="mt-4"><UsageBar label={m.ov_storage()} used={storage.used} limit={storage.limit} format={formatStorage} tone="onBrand" /></div>}
             </div>
           ) : (
           <div className="bg-gradient-to-br from-brand-900 to-brand-800 rounded-2xl p-6 text-white shadow-lg">
             <div className="flex justify-between items-start mb-1">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-brand-200 flex items-center gap-2">
-                  <CreditCard className="w-3 h-3" /> Current Plan
+                  <CreditCard className="w-3 h-3" /> {m.ov_current_plan()}
                 </span>
                 <h3 className="text-2xl font-bold mt-1">{workspace.plan}</h3>
               </div>
@@ -460,13 +466,13 @@ const Overview = () => {
                 </span>
               )}
             </div>
-            <p className="text-xs text-brand-300 mb-4">{currentPlan.tagline}</p>
+            <p className="text-xs text-brand-300 mb-4">{planTagline(workspace.plan, currentPlan.tagline)}</p>
 
             {/* SQEM-555 — usage as bars: seats, storage (and credits below, as before). */}
             <div className="mb-4 space-y-3">
-              <UsageBar label="Seats" used={seatsUsed} limit={seatsLimit} tone="onBrand" />
-              {storage && <UsageBar label="Storage" used={storage.used} limit={storage.limit} format={formatStorage} tone="onBrand" />}
-              {webSearch && <UsageBar label="Web searches" used={webSearch.used} limit={webSearch.limit} format={n => n.toLocaleString('en-US')} tone="onBrand" />}
+              <UsageBar label={m.ov_seats()} used={seatsUsed} limit={seatsLimit} tone="onBrand" />
+              {storage && <UsageBar label={m.ov_storage()} used={storage.used} limit={storage.limit} format={formatStorage} tone="onBrand" />}
+              {webSearch && <UsageBar label={m.ov_web_searches()} used={webSearch.used} limit={webSearch.limit} format={n => n.toLocaleString(getLocale())} tone="onBrand" />}
             </div>
 
             {showAiCredits && (
@@ -479,14 +485,14 @@ const Overview = () => {
               {currentPlan.features.map(feature => (
                 <li key={feature} className="flex items-center gap-2 text-xs text-brand-100">
                   <Check className="w-3 h-3 text-brand-400 shrink-0" />
-                  {feature}
+                  {planFeature(feature)}
                 </li>
               ))}
             </ul>
 
             {isAdmin && (
               <Link to="/settings" state={{ initialTab: 'plans' }} className="block w-full py-3 bg-white text-brand-900 text-center rounded-xl text-xs font-bold hover:bg-brand-50 transition-colors shadow-md">
-                Manage plan
+                {m.ov_manage_plan()}
               </Link>
             )}
           </div>
@@ -495,11 +501,11 @@ const Overview = () => {
 
         <section aria-labelledby="overview-recent" className="min-w-0 lg:col-span-2 rounded-card border border-line bg-surface-raised p-5 order-1 lg:order-2">
           <div className="flex items-center justify-between mb-3">
-            <h2 id="overview-recent" className="font-display text-lg font-semibold text-ink-strong">Recently changed</h2>
-            <Link to="/playbooks" className="text-sm font-semibold text-accent inline-flex items-center gap-1">All playbooks <ArrowRight className="w-3.5 h-3.5" /></Link>
+            <h2 id="overview-recent" className="font-display text-lg font-semibold text-ink-strong">{m.ov_recent()}</h2>
+            <Link to="/playbooks" className="text-sm font-semibold text-accent inline-flex items-center gap-1">{m.ov_all_playbooks()} <ArrowRight className="w-3.5 h-3.5" /></Link>
           </div>
           {recent.length === 0 ? (
-            <p className="text-sm text-ink-muted">No playbooks yet.</p>
+            <p className="text-sm text-ink-muted">{m.ov_no_playbooks()}</p>
           ) : (
             <ul>
               {recent.map(p => (

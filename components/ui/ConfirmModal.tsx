@@ -1,6 +1,7 @@
 import React, { useId, useState } from 'react';
 import Modal from './Modal';
 import Button from './Button';
+import { m } from '../../lib/i18n';
 
 /**
  * SQEM-329 — the confirmation dialog, in one place.
@@ -24,8 +25,8 @@ export default function ConfirmModal({
   title,
   /** The body. A node rather than a string, because some of these have to name what will be lost. */
   children,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel = m.confirm_confirm(),
+  cancelLabel = m.save_cancel(),
   /** `danger` for anything destructive; `primary` when the action merely proceeds. */
   variant = 'danger',
   busy = false,
@@ -62,7 +63,7 @@ export default function ConfirmModal({
       {confirmText !== undefined && (
         <div className="mb-6">
           <label htmlFor={inputId} className="block text-xs font-bold text-ink-muted mb-1.5">
-            Type <span className="font-mono text-ink-strong">{confirmText}</span> to confirm
+            {m.confirm_type_before()} <span className="font-mono text-ink-strong">{confirmText}</span> {m.confirm_type_after()}
           </label>
           <input
             id={inputId}

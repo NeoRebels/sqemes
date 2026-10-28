@@ -13,6 +13,10 @@ import {
   acceptanceRows,
   type LegalDocument,
 } from '../lib/legal';
+import { m } from '../lib/i18n';
+
+/** SQEM-603 — the documents' names in the user's language; `label` in lib/legal.ts stays the English one. */
+const DOCUMENT_LABEL: Record<string, () => string> = { terms: m.legal_doc_terms, privacy: m.legal_doc_privacy };
 
 /**
  * SQEM-264 — nobody uses the product without having agreed to the documents that govern it.
@@ -91,7 +95,7 @@ const LegalGateActive = ({
       .from('legal_acceptances')
       .upsert(acceptanceRows(userId, pending), { onConflict: 'user_id,document,version', ignoreDuplicates: true });
     setSaving(false);
-    if (error) { setError('Could not save your agreement. Please try again.'); return; }
+    if (error) { setError(m.legal_save_failed()); return; }
     setPending([]);
   };
 
@@ -107,14 +111,14 @@ const LegalGateActive = ({
         <div className="flex items-center gap-3 mb-4">
           <FileText className="w-5 h-5 text-brand-600" aria-hidden="true" />
           <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-            {pending.length === live.length ? 'Before you start' : 'We have updated our terms'}
+            {pending.length === live.length ? m.legal_title_first() : m.legal_title_updated()}
           </h1>
         </div>
 
         <p className="text-sm text-slate-600 dark:text-slate-300 mb-5">
           {pending.length === live.length
-            ? 'Please read and agree to the documents below to use sqemes.'
-            : 'Please read and agree to the updated documents below to continue.'}
+            ? m.legal_body_first()
+            : m.legal_body_updated()}
         </p>
 
         <ul className="space-y-2 mb-6">
@@ -126,9 +130,9 @@ const LegalGateActive = ({
                 rel="noopener noreferrer"
                 className="text-sm font-medium text-brand-600 hover:text-brand-700 underline underline-offset-2"
               >
-                {d.label}
+                {DOCUMENT_LABEL[d.id]?.() ?? d.label}
               </a>
-              <span className="text-xs text-slate-400 dark:text-slate-500 ml-2">version {d.version}</span>
+              <span className="text-xs text-slate-400 dark:text-slate-500 ml-2">{m.legal_version({ version: d.version })}</span>
             </li>
           ))}
         </ul>
@@ -138,18 +142,18 @@ const LegalGateActive = ({
         <label className="flex items-start gap-3 mb-6 cursor-pointer">
           <Checkbox checked={checked} onChange={() => setChecked(!checked)} />
           <span className="text-sm text-slate-700 dark:text-slate-200">
-            I have read and agree to the {pending.length > 1 ? 'documents' : 'document'} above.
+            {pending.length > 1 ? m.legal_agree_many() : m.legal_agree_one()}
           </span>
         </label>
 
         {error && <p className="text-sm text-red-600 dark:text-red-400 mb-4">{error}</p>}
 
         <Button onClick={accept} disabled={!checked || saving} className="w-full py-2.5">
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Agree and continue'}
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : m.legal_agree_continue()}
         </Button>
 
         <p className="text-2xs text-slate-400 dark:text-slate-500 mt-4 text-center">
-          We record which version you agreed to and when.
+          {m.legal_record_note()}
         </p>
       </div>
     </ScrollScreen>

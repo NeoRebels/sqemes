@@ -7,8 +7,11 @@
  *
  * Two tones: `onBrand` for the dark plan card (white on purple), `surface` for ordinary cards.
  */
+import { m, getLocale } from '../../lib/i18n';
+
 export function formatStorage(bytes: number): string {
-  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(bytes >= 10 * 1024 ** 3 ? 0 : 1)} GB`;
+  // SQEM-607 — the decimal separator follows the app language.
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toLocaleString(getLocale(), { maximumFractionDigits: bytes >= 10 * 1024 ** 3 ? 0 : 1, minimumFractionDigits: bytes >= 10 * 1024 ** 3 ? 0 : 1 })} GB`;
   if (bytes >= 1024 ** 2) return `${Math.round(bytes / 1024 ** 2)} MB`;
   if (bytes > 0) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return '0 MB';
@@ -35,7 +38,7 @@ export default function UsageBar({
 }) {
   const pct = usagePercent(used, limit);
   const onBrand = tone === 'onBrand';
-  const value = limit === null ? `${format(used)} · Unlimited` : `${format(used)} / ${format(limit)}`;
+  const value = limit === null ? m.usage_unlimited({ used: format(used) }) : `${format(used)} / ${format(limit)}`;
   return (
     <div>
       <div className={`flex justify-between text-xs mb-1.5 ${onBrand ? 'text-brand-100' : 'text-ink-muted'}`}>

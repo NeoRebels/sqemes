@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import { getLocale, m as txt } from '../lib/i18n'; // SQEM-599 — the language of server notices; SQEM-604 — `txt`, because `m` is a common callback name in this file
 import { useUI, useWorkspace, useData, useChatSessions, usePrompts } from '../store';
 import { can } from '../lib/permissions';
 import { checkContentViolation } from '../lib/contentGuard';
@@ -81,7 +82,7 @@ const MarkdownComponents = {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-2xs font-mono font-bold text-slate-500 uppercase tracking-wider">{match ? match[1] : 'text'}</span>
-            <button onClick={() => navigator.clipboard.writeText(String(children))} className="text-2xs text-slate-400 hover:text-white transition-colors uppercase font-bold tracking-wider">Copy</button>
+            <button onClick={() => navigator.clipboard.writeText(String(children))} className="text-2xs text-slate-400 hover:text-white transition-colors uppercase font-bold tracking-wider">{txt.chat_copy()}</button>
           </div>
         </div>
         <div className="p-4 overflow-x-auto">
@@ -219,7 +220,7 @@ const MessageItem = memo(function MessageItem({
                     <div className="flex flex-wrap gap-2 mt-2">
                       {msg.attachments.map((att, i) =>
                         isImageType(att.mimeType)
-                          ? <img key={i} src={att.dataUrl} alt="Attachment" className="max-w-[200px] max-h-[150px] rounded-lg object-cover border border-line" />
+                          ? <img key={i} src={att.dataUrl} alt={txt.chat_attachment_alt()} className="max-w-[200px] max-h-[150px] rounded-lg object-cover border border-line" />
                           : <span key={i} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 bg-surface-sunken text-xs font-medium text-ink-muted"><FileText className="w-4 h-4" />{fileTypeLabel(att.mimeType)}</span>
                       )}
                     </div>
@@ -232,7 +233,7 @@ const MessageItem = memo(function MessageItem({
                 <div className="flex flex-wrap gap-2 mb-2">
                   {msg.attachments.map((att, i) =>
                     isImageType(att.mimeType) ? (
-                      <img key={i} src={att.dataUrl} alt="Attachment" className="max-w-[200px] max-h-[150px] rounded-lg object-cover border border-white/20" />
+                      <img key={i} src={att.dataUrl} alt={txt.chat_attachment_alt()} className="max-w-[200px] max-h-[150px] rounded-lg object-cover border border-white/20" />
                     ) : (
                       <div key={i} className="flex items-center gap-1.5 bg-white/10 rounded-lg px-2.5 py-1.5">
                         <FileText className="w-4 h-4 text-white/70" />
@@ -247,11 +248,11 @@ const MessageItem = memo(function MessageItem({
             )}
             <div className={`mt-2 flex gap-2 ${isOtherUser ? 'ml-1' : 'mr-1 justify-end'}`}>
               <button onClick={() => onCopy(msg.id, msg.content)} className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
-                {isCopied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+                {isCopied ? <><Check className="w-3.5 h-3.5" /> {txt.chat_copied()}</> : <><Copy className="w-3.5 h-3.5" /> {txt.chat_copy()}</>}
               </button>
               {!isLoading && !isOtherUser && (
                 <button onClick={() => onEdit(msg)} className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
-                  <Pencil className="w-3.5 h-3.5" /> Edit
+                  <Pencil className="w-3.5 h-3.5" /> {txt.chat_edit()}
                 </button>
               )}
             </div>
@@ -262,7 +263,7 @@ const MessageItem = memo(function MessageItem({
               {msg.pending ? (
                 <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm">Thinking...</span>
+                  <span className="text-sm">{txt.chat_thinking()}</span>
                 </div>
               ) : (
                 <div className="prose max-w-none text-sm">
@@ -279,7 +280,7 @@ const MessageItem = memo(function MessageItem({
             {!msg.pending && <WebSourcesCard sources={msg.webSources} />}
             {!msg.pending && (
               <button onClick={() => onCopy(msg.id, msg.content)} className="mt-2 ml-1 inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
-                {isCopied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+                {isCopied ? <><Check className="w-3.5 h-3.5" /> {txt.chat_copied()}</> : <><Copy className="w-3.5 h-3.5" /> {txt.chat_copy()}</>}
               </button>
             )}
           </div>
@@ -299,18 +300,18 @@ const MessageItem = memo(function MessageItem({
 const formatRelativeTime = (iso: string) => {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return txt.chat_time_just_now();
+  if (mins < 60) return txt.chat_time_minutes({ count: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return txt.chat_time_hours({ count: hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+  if (days < 7) return txt.chat_time_days({ count: days });
+  return new Date(iso).toLocaleDateString(getLocale()); // SQEM-604 — the app's language, not the browser's
 };
 
 // Platform-aware hint for the search shortcut (SQEM-173) — cosmetic only.
 const searchShortcutHint =
-  typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent) ? '⌘K' : 'Ctrl K';
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent) ? '⌘K' : txt.chat_ctrl_k();
 
 // ---------------------------------------------------------------------------
 // Component
@@ -539,7 +540,7 @@ const Chat = () => {
       .then(persona => {
         if (cancelled || !persona) return;
         applyPersona(persona);
-        showToast(`Using persona “${persona.title}” in this chat`, 'success');
+        showToast(txt.chat_using_persona({ title: persona.title }), 'success');
       })
       .catch(() => { /* a persona that cannot be read is simply not applied */ });
     return () => { cancelled = true; };
@@ -637,7 +638,7 @@ const Chat = () => {
     setSharedLoading(true);
     fetchSharedChatSessions(workspace.id, currentUser.id)
       .then(setSharedSessions)
-      .catch(() => showToast('Failed to load shared chats', 'error'))
+      .catch(() => showToast(txt.chat_shared_load_failed(), 'error'))
       .finally(() => setSharedLoading(false));
   }, [sidebarTab, workspace.id, currentUser.id, showToast]);
 
@@ -748,15 +749,15 @@ const Chat = () => {
       await navigator.clipboard.writeText(content);
       setCopiedMessageId(msgId);
       setTimeout(() => setCopiedMessageId(prev => prev === msgId ? null : prev), 1500);
-    } catch { showToast('Failed to copy text', 'error'); }
+    } catch { showToast(txt.chat_copy_failed(), 'error'); }
   }, [showToast]);
 
   const processFile = (file: File) => {
     if (!SUPPORTED_MIME_TYPES.has(file.type)) {
-      showToast('Unsupported file type. Supported: PNG, JPG, WEBP, GIF, PDF, TXT, CSV, MD', 'error'); return;
+      showToast(txt.chat_unsupported_file(), 'error'); return;
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      showToast(`File must be under ${MAX_FILE_SIZE_MB}MB`, 'error'); return;
+      showToast(txt.chat_file_too_big({ size: MAX_FILE_SIZE_MB }), 'error'); return;
     }
     const reader = new FileReader();
     reader.onloadend = () => setAttachments(prev => [...prev, { id: crypto.randomUUID(), file, dataUrl: reader.result as string, mimeType: file.type }]);
@@ -770,7 +771,7 @@ const Chat = () => {
       const wf = await uploadWorkspaceFile(workspace.id, file);
       addWorkspaceFile(wf);
     } catch {
-      showToast(`Could not save ${file.name} to workspace`, 'error');
+      showToast(txt.chat_save_to_workspace_failed({ name: file.name }), 'error');
     }
   };
 
@@ -787,7 +788,7 @@ const Chat = () => {
   // Attach existing workspace files to the message (fetch via signed URL → base64).
   const attachWorkspaceFiles = async (selected: WorkspaceFile[]) => {
     for (const f of selected) {
-      if (f.sizeBytes > MAX_FILE_SIZE_BYTES) { showToast(`${f.name} is too large to attach`, 'error'); continue; }
+      if (f.sizeBytes > MAX_FILE_SIZE_BYTES) { showToast(txt.chat_attach_too_large({ name: f.name }), 'error'); continue; }
       try {
         const url = await getWorkspaceFileSignedUrl(f.storagePath);
         const res = await fetch(url);
@@ -800,7 +801,7 @@ const Chat = () => {
         });
         setAttachments(prev => [...prev, { id: crypto.randomUUID(), file: new File([], f.name, { type: f.mimeType }), dataUrl, mimeType: f.mimeType }]);
       } catch {
-        showToast(`Could not attach ${f.name} — try again, or drag the file in directly.`, 'error');
+        showToast(txt.chat_attach_failed({ name: f.name }), 'error');
       }
     }
   };
@@ -886,12 +887,12 @@ const Chat = () => {
         m => !IMAGE_MODEL_PATTERNS.some(p => m.id.toLowerCase().includes(p))
       );
       if (!textModel) {
-        showToast('No text model available for enhancement. Add an API key in Settings.', 'error');
+        showToast(txt.chat_enhance_no_model(), 'error');
         return;
       }
 
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      if (!session) throw new Error(txt.chat_not_authenticated());
       const jobId = crypto.randomUUID();
       const resultPromise = waitForJobResult(jobId);
       const funded = isFundedModel(textModel.id);
@@ -909,13 +910,13 @@ const Chat = () => {
           jobId,
         }),
       });
-      if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error || `Error ${res.status}`); }
+      if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error || txt.chat_error_status({ status: res.status })); }
       const data = await res.json();
       if (data?.error) throw new Error(data.error);
       const enhancedResult = data?.result ?? await resultPromise;
       if (enhancedResult) setInput(enhancedResult);
     } catch (err: any) {
-      showToast(err.message || 'Failed to enhance input', 'error');
+      showToast(err.message || txt.chat_enhance_failed(), 'error');
     } finally {
       setIsEnhancing(false);
     }
@@ -1055,7 +1056,7 @@ const Chat = () => {
       });
 
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      if (!session) throw new Error(txt.chat_not_authenticated());
 
       const modelInfo = AVAILABLE_MODELS.find(m => m.id === selectedModel) ?? enabledModels.find(m => m.id === selectedModel);
       const assistantMsgId = crypto.randomUUID();
@@ -1110,7 +1111,7 @@ const Chat = () => {
         method: 'POST',
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ ...chatPayloadBase, messages: messagesToSend, jobId, connectorIds: activeConnectorIds, ...(webThis ? { webSearch: true } : {}) }),
+        body: JSON.stringify({ ...chatPayloadBase, messages: messagesToSend, jobId, connectorIds: activeConnectorIds, ...(webThis ? { webSearch: true } : {}), locale: getLocale() }),
       });
 
       if (!res.ok) throw await edgeError(res);
@@ -1122,7 +1123,7 @@ const Chat = () => {
 
       if (resData?.result !== undefined) {
         // Image generation models return { result } directly (fast path, no jobId)
-        rawResult = resData.result || 'No content generated.';
+        rawResult = resData.result || txt.chat_no_content();
         setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: inlineImagesToBlobUrls(rawResult), pending: false } : m));
       } else {
         // Text model — wait for Realtime broadcast
@@ -1205,7 +1206,7 @@ const Chat = () => {
     const next = session.visibility === 'private' ? 'workspace' : 'private';
     await storeUpdateSession(session.id, { visibility: next });
     setOpenMenuId(null);
-    showToast(next === 'workspace' ? 'Chat shared with workspace' : 'Chat set to private', 'success');
+    showToast(next === 'workspace' ? txt.chat_shared_with_workspace() : txt.chat_set_private(), 'success');
   };
 
   /**
@@ -1222,9 +1223,9 @@ const Chat = () => {
     try {
       await unshareChatSession(session.id);
       setSharedSessions(prev => prev.filter(s => s.id !== session.id));
-      showToast('Sharing withdrawn — the chat stays with its author', 'success');
+      showToast(txt.chat_withdrawn(), 'success');
     } catch (err: any) {
-      showToast(err?.message || 'Could not withdraw sharing', 'error');
+      showToast(err?.message || txt.chat_withdraw_failed(), 'error');
     }
   };
 
@@ -1302,7 +1303,7 @@ const Chat = () => {
         {/* Visibility icon */}
         {/* SQEM-594 — shared chats are marked with Users: the globe now means web search. */}
         {isOwner && session.visibility === 'workspace' && (
-          <Users className="w-3 h-3 text-brand-400 shrink-0 mt-1" aria-label="Shared with the team" />
+          <Users className="w-3 h-3 text-brand-400 shrink-0 mt-1" aria-label={txt.chat_shared_with_team()} />
         )}
 
         {/* SQEM-357 — the one action an admin has on somebody else's shared chat. A dead artefact
@@ -1311,7 +1312,7 @@ const Chat = () => {
         {!isOwner && session.visibility === 'workspace' && can(currentUser, workspace, 'team:manage') && (
           <button
             onClick={e => { e.stopPropagation(); handleWithdrawSharing(session); }}
-            title="Withdraw sharing — the chat stays with its author"
+            title={txt.chat_withdraw_title()}
             className="relative z-10 p-1.5 shrink-0 text-slate-300 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 rounded-md transition-all reveal-on-hover"
           >
             <Lock className="w-3.5 h-3.5" />
@@ -1334,14 +1335,14 @@ const Chat = () => {
                 onClick={e => e.stopPropagation()}
               >
                 <button onClick={() => handleStartRename(session)} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                  <Pencil className="w-3.5 h-3.5" /> Rename
+                  <Pencil className="w-3.5 h-3.5" /> {txt.chat_rename()}
                 </button>
                 <button onClick={() => handleToggleVisibility(session)} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                  {session.visibility === 'workspace' ? <><Lock className="w-3.5 h-3.5" /> Set Private</> : <><Users className="w-3.5 h-3.5" /> Share with Team</>}
+                  {session.visibility === 'workspace' ? <><Lock className="w-3.5 h-3.5" /> {txt.chat_make_private()}</> : <><Users className="w-3.5 h-3.5" /> {txt.chat_share_team()}</>}
                 </button>
                 <div className="border-t border-slate-100 dark:border-slate-700 mt-1 pt-1">
                   <button onClick={() => { setDeleteConfirmId(session.id); setOpenMenuId(null); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                    <Trash2 className="w-3.5 h-3.5" /> {txt.chat_delete()}
                   </button>
                 </div>
               </div>
@@ -1363,13 +1364,13 @@ const Chat = () => {
           onClick={() => setMobileTab('sessions')}
           className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${mobileTab === 'sessions' ? 'text-brand-600 border-b-2 border-brand-600' : 'text-slate-500 dark:text-slate-400'}`}
         >
-          <MessageSquare className="w-4 h-4" /> Chats
+          <MessageSquare className="w-4 h-4" /> {txt.chat_tab_chats()}
         </button>
         <button
           onClick={() => setMobileTab('chat')}
           className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 ${mobileTab === 'chat' ? 'text-brand-600 border-b-2 border-brand-600' : 'text-slate-500 dark:text-slate-400'}`}
         >
-          <Bot className="w-4 h-4" /> Conversation
+          <Bot className="w-4 h-4" /> {txt.chat_tab_conversation()}
         </button>
       </div>
 
@@ -1389,7 +1390,7 @@ const Chat = () => {
             <div className="flex items-center gap-2 mb-4">
               <img src="/logo-favicon-V2.png" alt="sqemes" className="w-8 h-8 rounded-lg shrink-0" />
               <FullScreenExit
-                label="Back to Start"
+                label={txt.chat_back_to_start()}
                 onExit={() => navigate('/')}
                 escapeEnabled
                 escapeReady={
@@ -1403,16 +1404,16 @@ const Chat = () => {
               onClick={handleNewChat}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-strong text-white rounded-control text-sm font-semibold hover:opacity-90 transition-opacity"
             >
-              <MessageSquarePlus className="w-4 h-4" /> New Chat
+              <MessageSquarePlus className="w-4 h-4" /> {txt.chat_new_chat()}
             </button>
             {/* Search (SQEM-173) — labeled entry under New Chat; ⌘K/Ctrl+K also opens it */}
             <button
               onClick={() => setSearchOpen(true)}
-              title="Search chats (⌘K / Ctrl+K)"
+              title={txt.chat_search_title()}
               className="w-full mt-2 flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
             >
               <Search className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-500" />
-              <span>Search chats</span>
+              <span>{txt.chat_search()}</span>
               <kbd className="ml-auto hidden sm:inline-flex items-center text-2xs font-sans font-semibold text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded px-1.5 py-0.5">
                 {searchShortcutHint}
               </kbd>
@@ -1426,14 +1427,14 @@ const Chat = () => {
                 onClick={() => setSidebarTab('mine')}
                 className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${sidebarTab === 'mine' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
               >
-                My Chats
+                {txt.chat_my_chats()}
                 {mySessions.length > 0 && <span className="ml-1 text-slate-400 dark:text-slate-500">{mySessions.length}</span>}
               </button>
               <button
                 onClick={() => setSidebarTab('shared')}
                 className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${sidebarTab === 'shared' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
               >
-                Shared
+                {txt.chat_shared()}
                 {sharedSessions.length > 0 && <span className="ml-1 text-slate-400 dark:text-slate-500">{sharedSessions.length}</span>}
               </button>
             </div>
@@ -1447,8 +1448,8 @@ const Chat = () => {
                   <div className="w-10 h-10 bg-slate-50 dark:bg-slate-700 rounded-full flex items-center justify-center mb-3">
                     <MessageSquare className="w-5 h-5 text-slate-300 dark:text-slate-500" />
                   </div>
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-0.5">No chats yet</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">Your chats will show up here.</p>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-0.5">{txt.chat_no_chats()}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">{txt.chat_no_chats_hint()}</p>
                 </div>
               ) : (
                 mySessions.map(s => renderSession(s))
@@ -1465,15 +1466,15 @@ const Chat = () => {
                   <div className="w-10 h-10 bg-slate-50 dark:bg-slate-700 rounded-full flex items-center justify-center mb-3">
                     <Users className="w-5 h-5 text-slate-300 dark:text-slate-500" />
                   </div>
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-0.5">No shared chats yet</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">Chats shared with the workspace appear here.</p>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-0.5">{txt.chat_no_shared()}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">{txt.chat_no_shared_hint()}</p>
                 </div>
               ) : (
                 sharedSessions.map(s => renderSession(s))
               )
             )}
           </div>
-          <p className="text-center text-2xs text-slate-400 dark:text-slate-500 px-4 pb-3 shrink-0">Private chats auto-delete after 30 days</p>
+          <p className="text-center text-2xs text-slate-400 dark:text-slate-500 px-4 pb-3 shrink-0">{txt.chat_private_expiry()}</p>
         </div>
 
         {/* ════════════════════════════════════════════════════════════════
@@ -1491,7 +1492,7 @@ const Chat = () => {
                 setSelectedModel(id);
                 if (sessionId) storeUpdateSession(sessionId, { model: id });
               }}
-              emptyLabel="No model available"
+              emptyLabel={txt.chat_no_model()}
               // SQEM-536 — only someone who can add a key gets the button; a member's tab has no key card.
               emptyActionLabel={keyHint.actionLabel ?? undefined}
               emptyActionIcon={<Key className="w-3.5 h-3.5" />}
@@ -1515,10 +1516,10 @@ const Chat = () => {
               onChange={persona => {
                 if (!persona) { removePersona(); return; }
                 applyPersona(persona);
-                showToast(`Using persona “${persona.title}” in this chat`, 'success');
+                showToast(txt.chat_using_persona({ title: persona.title }), 'success');
               }}
-              emptyLabel="No persona"
-              emptyActionLabel={can(currentUser, workspace, 'prompts:edit') ? 'Create a persona' : undefined}
+              emptyLabel={txt.start_no_persona()}
+              emptyActionLabel={can(currentUser, workspace, 'prompts:edit') ? txt.chat_create_persona() : undefined}
               onEmptyAction={can(currentUser, workspace, 'prompts:edit') ? () => navigate('/personas') : undefined}
             />
 
@@ -1548,15 +1549,15 @@ const Chat = () => {
               return (
                 <>
                   <div className="w-px h-5 bg-slate-200 dark:bg-slate-600 shrink-0" />
-                  <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 font-medium">Using:</span>
+                  <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 font-medium">{txt.chat_using()}</span>
                   <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0 flex-1">
                     {activePersona && (
                       <div className="shrink-0 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full text-accent bg-accent-soft">
                         <Bot className="w-3.5 h-3.5" />
-                        <span className="opacity-60 font-medium">Persona</span>
+                        <span className="opacity-60 font-medium">{txt.chat_persona()}</span>
                         <span className="opacity-30">·</span>
                         <span className="font-semibold">{activePersona.title}</span>
-                        <button onClick={removePersona} className="ml-0.5 transition-opacity opacity-70 hover:opacity-100" title="Remove">
+                        <button onClick={removePersona} className="ml-0.5 transition-opacity opacity-70 hover:opacity-100" title={txt.chat_remove()}>
                           <X className="w-3 h-3" />
                         </button>
                       </div>
@@ -1564,13 +1565,13 @@ const Chat = () => {
                     {activeSkills.map(({ template }) => (
                         <div key={template.id} className="shrink-0 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full text-skill bg-skill-soft">
                           <Wand2 className="w-3.5 h-3.5" />
-                          <span className="opacity-60 font-medium">Skill</span>
+                          <span className="opacity-60 font-medium">{txt.chat_skill()}</span>
                           <span className="opacity-30">·</span>
                           <span className="font-semibold">{template.title}</span>
                           <button
                             onClick={() => removeApplied(template)}
                             className="ml-0.5 transition-opacity opacity-70 hover:opacity-100"
-                            title="Remove"
+                            title={txt.chat_remove()}
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -1579,7 +1580,7 @@ const Chat = () => {
                     {fileCount > 0 && (
                       <div className="shrink-0 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-full">
                         <FileText className="w-3 h-3" />
-                        <span className="font-medium">{fileCount} file{fileCount !== 1 ? 's' : ''}</span>
+                        <span className="font-medium">{txt.chat_file_count({ count: fileCount })}</span>
                       </div>
                     )}
                   </div>
@@ -1597,10 +1598,12 @@ const Chat = () => {
                 <div className="w-14 h-14 rounded-card bg-accent-soft flex items-center justify-center mb-4">
                   <Sparkles className="w-7 h-7 text-accent" />
                 </div>
-                <h2 className="font-display text-2xl font-semibold tracking-tight text-ink-strong mb-2">Start a conversation</h2>
+                <h2 className="font-display text-2xl font-semibold tracking-tight text-ink-strong mb-2">{txt.chat_start_conversation()}</h2>
                 <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm">
                   {enabledModels.length > 0
-                    ? `Chat with ${modelInfo?.name || 'AI'}${activePersona ? ` as ${activePersona.title}` : ''}. Type a message below.`
+                    ? (activePersona
+                        ? txt.chat_start_hint_persona({ model: modelInfo?.name || txt.chat_model_fallback(), persona: activePersona.title })
+                        : txt.chat_start_hint({ model: modelInfo?.name || txt.chat_model_fallback() }))
                     : keyHint.text}
                 </p>
                 {enabledModels.length === 0 && keyHint.actionLabel && (
@@ -1643,7 +1646,7 @@ const Chat = () => {
               <div className="max-w-3xl mx-auto p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span className="flex-1">{error}</span>
-                <Link to="/settings" state={{ initialTab: 'plans' }} className="shrink-0 font-bold underline hover:no-underline">Upgrade or add a key</Link>
+                <Link to="/settings" state={{ initialTab: 'plans' }} className="shrink-0 font-bold underline hover:no-underline">{txt.chat_upgrade_or_key()}</Link>
               </div>
             </div>
           ) : error && (
@@ -1669,7 +1672,7 @@ const Chat = () => {
             {otherIsGenerating && (
               <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-t border-amber-100 dark:border-amber-800 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
                 <Loader2 className="w-3 h-3 animate-spin" />
-                Someone is waiting for a response…
+                {txt.chat_someone_waiting()}
               </div>
             )}
             {/* SQEM-550 (e) — redesign C: the composer is a raised card on the page, not a bar. */}
@@ -1680,7 +1683,7 @@ const Chat = () => {
                     {attachments.map(att => (
                       <div key={att.id} className="relative group">
                         {isImageType(att.mimeType) ? (
-                          <img src={att.dataUrl} alt="Attachment" className="w-16 h-16 rounded-lg object-cover border border-slate-200" />
+                          <img src={att.dataUrl} alt={txt.chat_attachment_alt()} className="w-16 h-16 rounded-lg object-cover border border-slate-200" />
                         ) : (
                           <div className="w-16 h-16 rounded-lg bg-red-50 border border-red-200 flex flex-col items-center justify-center">
                             <FileText className="w-6 h-6 text-red-500" />
@@ -1711,7 +1714,7 @@ const Chat = () => {
                         onClick={() => setAttachMenuOpen(o => !o)}
                         disabled={isLoading || enabledModels.length === 0}
                         className="p-3 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                        title="Attach file"
+                        title={txt.chat_attach_file()}
                       >
                         <Paperclip className="w-4 h-4" />
                       </button>
@@ -1722,14 +1725,14 @@ const Chat = () => {
                             className="w-full text-left px-3 py-2 flex items-center gap-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                           >
                             <Files className="w-4 h-4 text-slate-400 shrink-0" />
-                            <span className="text-sm text-slate-700 dark:text-slate-200">Choose from workspace</span>
+                            <span className="text-sm text-slate-700 dark:text-slate-200">{txt.chat_choose_workspace()}</span>
                           </button>
                           <button
                             onClick={() => { setAttachMenuOpen(false); fileInputRef.current?.click(); }}
                             className="w-full text-left px-3 py-2 flex items-center gap-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                           >
                             <Upload className="w-4 h-4 text-slate-400 shrink-0" />
-                            <span className="text-sm text-slate-700 dark:text-slate-200">Upload from device</span>
+                            <span className="text-sm text-slate-700 dark:text-slate-200">{txt.chat_upload_device()}</span>
                           </button>
                           <label className="flex items-center gap-2 px-3 py-2 mt-1 border-t border-slate-100 dark:border-slate-700 cursor-pointer">
                             <Checkbox
@@ -1737,7 +1740,7 @@ const Chat = () => {
                               onChange={() => setSaveToWorkspace(!saveToWorkspace)}
                               align="center"
                             />
-                            <span className="text-xs text-slate-600 dark:text-slate-400">Save uploads to workspace</span>
+                            <span className="text-xs text-slate-600 dark:text-slate-400">{txt.chat_save_uploads()}</span>
                           </label>
                         </div>
                       )}
@@ -1745,7 +1748,7 @@ const Chat = () => {
                     <button
                       onClick={() => { setTemplateModalInitId(null); setTemplateModalOpen(true); }}
                       disabled={enabledModels.length === 0}
-                      title="Use playbook  (/)"
+                      title={txt.chat_use_playbook()}
                       className="p-3 text-slate-400 dark:text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                     >
                       <FileText className="w-4 h-4" />
@@ -1758,8 +1761,8 @@ const Chat = () => {
                         <div
                           role="status"
                           aria-label={connectorsSupported
-                            ? 'Your MCP Connectors are active'
-                            : 'Your MCP Connectors are inactive — image models cannot use them'}
+                            ? txt.chat_connectors_active()
+                            : txt.chat_connectors_inactive_label()}
                           className={`p-3 rounded-control transition-all ${connectorsSupported
                             ? 'text-success bg-success-soft'
                             : 'text-danger bg-danger-soft'}`}
@@ -1771,11 +1774,11 @@ const Chat = () => {
                           className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[15rem] px-3 py-2 bg-surface-raised border border-line rounded-control shadow-xl z-30 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           {connectorsSupported ? (
-                            <p className="text-2xs font-bold text-success">Your MCP Connectors are active</p>
+                            <p className="text-2xs font-bold text-success">{txt.chat_connectors_active()}</p>
                           ) : (
                             <>
-                              <p className="text-2xs font-bold text-danger">Your MCP Connectors are inactive</p>
-                              <p className="text-2xs text-ink-muted mt-0.5">image models cannot use them</p>
+                              <p className="text-2xs font-bold text-danger">{txt.chat_connectors_inactive()}</p>
+                              <p className="text-2xs text-ink-muted mt-0.5">{txt.chat_connectors_image_models()}</p>
                             </>
                           )}
                         </div>
@@ -1789,8 +1792,8 @@ const Chat = () => {
                         value={input}
                         onChange={e => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        aria-label="Message"
-                        placeholder={dragActive ? 'Drop file here...' : 'Type a message...'}
+                        aria-label={txt.chat_message_label()}
+                        placeholder={dragActive ? txt.chat_drop_here() : txt.chat_type_message()}
                         rows={1}
                         disabled={isLoading || enabledModels.length === 0}
                         className="w-full resize-none bg-transparent px-2 py-2.5 text-sm md:text-base text-ink-strong outline-none transition-all disabled:opacity-50 placeholder:text-ink-subtle"
@@ -1802,12 +1805,12 @@ const Chat = () => {
                       onClick={() => setWebNext(v => !v)}
                       disabled={!webAvailable || isLoading}
                       aria-pressed={webNext && webAvailable}
-                      aria-label="Search the web for this message"
+                      aria-label={txt.chat_web_label()}
                       title={!webKeyAvailable
-                        ? 'Web search needs a search key — add one in Settings → API & MCP → Web search'
+                        ? txt.chat_web_needs_key()
                         : !connectorsSupported
-                          ? 'Image models cannot search the web'
-                          : webNext ? 'Web search is on for this message' : 'Search the web for this message'}
+                          ? txt.chat_web_image_models()
+                          : webNext ? txt.chat_web_on() : txt.chat_web_label()}
                       className={`p-3 rounded-xl transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${webNext && webAvailable ? 'bg-accent-soft text-accent' : 'text-ink-subtle hover:text-ink hover:bg-surface-sunken'}`}
                     >
                       <Globe className="w-4 h-4" />
@@ -1815,18 +1818,18 @@ const Chat = () => {
                     <button
                       onClick={handleEnhanceInput}
                       disabled={isEnhancing || isLoading || !input.trim() || enabledModels.length === 0}
-                      title="Enhance with AI"
+                      title={txt.chat_enhance()}
                       className="p-3 text-brand-500 hover:text-brand-700 hover:bg-brand-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                     >
                       {isEnhancing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                     </button>
                     {/* SQEM-583 — while an answer runs, Send becomes Stop (as in ChatGPT and Claude). */}
                     {isLoading ? (
-                      <button onClick={handleStop} aria-label="Stop generating" title="Stop" className="p-3 bg-ink-strong text-surface-raised rounded-control hover:opacity-90 transition-all shadow-sm dark:shadow-none shrink-0">
+                      <button onClick={handleStop} aria-label={txt.chat_stop_label()} title={txt.chat_stop()} className="p-3 bg-ink-strong text-surface-raised rounded-control hover:opacity-90 transition-all shadow-sm dark:shadow-none shrink-0">
                         <Square className="w-4 h-4" fill="currentColor" />
                       </button>
                     ) : (
-                      <button onClick={handleSend} aria-label="Send message" disabled={!input.trim() || enabledModels.length === 0} className="p-3 bg-accent-strong text-white rounded-control hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm hover:shadow-md dark:shadow-none dark:hover:shadow-none shrink-0">
+                      <button onClick={handleSend} aria-label={txt.chat_send_label()} disabled={!input.trim() || enabledModels.length === 0} className="p-3 bg-accent-strong text-white rounded-control hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm hover:shadow-md dark:shadow-none dark:hover:shadow-none shrink-0">
                         <Send className="w-4 h-4" />
                       </button>
                     )}
@@ -1844,9 +1847,9 @@ const Chat = () => {
                   `pm/DOCUMENTATION.md` → Regulatory in the source repository. */}
               <p className="flex items-center justify-center gap-1.5 text-2xs text-slate-500 dark:text-slate-400 mt-2">
                 <Bot className="w-3 h-3 shrink-0" aria-hidden="true" />
-                Responses are generated by an AI system and can be wrong.
+                {txt.chat_ai_disclosure()}
               </p>
-              <p className="text-center text-2xs text-slate-400 dark:text-slate-500 mt-1">↵ to send · Shift+↵ for new line · Messages are saved to your chat history</p>
+              <p className="text-center text-2xs text-slate-400 dark:text-slate-500 mt-1">{txt.chat_key_hints()}</p>
             </div>
           </div>
         </div>
@@ -1859,11 +1862,11 @@ const Chat = () => {
 
       {/* ── Delete confirm modal ── */}
       <Modal open={!!deleteConfirmId} onClose={() => setDeleteConfirmId(null)} size="sm" className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">Delete Chat?</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">This conversation will be permanently deleted and cannot be recovered.</p>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">{txt.chat_delete_title()}</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">{txt.chat_delete_body()}</p>
         <div className="flex gap-2">
-          <button onClick={() => setDeleteConfirmId(null)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-sm font-medium transition-colors">Cancel</button>
-          <Button variant="danger" onClick={() => handleDeleteConfirm(deleteConfirmId!)} className="flex-1 py-2.5 text-sm shadow-lg hover:shadow-red-200">Delete</Button>
+          <button onClick={() => setDeleteConfirmId(null)} className="flex-1 py-2.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 text-sm font-medium transition-colors">{txt.chat_cancel()}</button>
+          <Button variant="danger" onClick={() => handleDeleteConfirm(deleteConfirmId!)} className="flex-1 py-2.5 text-sm shadow-lg hover:shadow-red-200">{txt.chat_delete()}</Button>
         </div>
       </Modal>
 
@@ -1891,7 +1894,7 @@ const Chat = () => {
             return next;
           });
           if (images.length) addContextImages(images);
-          showToast(`Using “${template.title}” in this chat`, 'success');
+          showToast(txt.chat_using_playbook({ title: template.title }), 'success');
         }}
       />
 

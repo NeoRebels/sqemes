@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Info, Plug } from 'lucide-react';
 import { ProviderIcon } from './ProviderIcon';
+import { m as txt } from '../lib/i18n'; // `m` is a callback name in this file
+import { modelDescription } from '../lib/labels';
 
 interface ModelSpecs {
   description: string;
@@ -53,7 +55,7 @@ export function ModelSelect({
   value,
   onChange,
   disabled = false,
-  emptyLabel = 'No models available',
+  emptyLabel = txt.model_none(),
   fullWidth = false,
   emptyActionLabel,
   emptyActionIcon,
@@ -154,7 +156,7 @@ export function ModelSelect({
                   {/* SQEM-446 — same mark and same green as the composer's active state, so the two
                       places read as one statement rather than two unrelated signals. */}
                   {connectorProviders?.includes(m.provider) && (
-                    <Plug className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Works with your MCP connectors" />
+                    <Plug className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label={txt.model_works_with_connectors()} />
                   )}
                   {m.specs && (
                     <Info className={`w-3.5 h-3.5 shrink-0 transition-colors ${hoveredId === m.id ? 'text-brand-500' : 'text-slate-300 dark:text-slate-600'}`} />
@@ -167,18 +169,18 @@ export function ModelSelect({
           {hoveredModel?.specs && (
             <div className="border-t border-slate-100 dark:border-slate-700 px-4 py-3">
               <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">{hoveredModel.name}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-3">{hoveredModel.specs.description}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-3">{modelDescription(hoveredModel.specs.description)}</p>
               <div className="grid grid-cols-3 gap-2">
                 <div className="text-center">
-                  <div className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1">Cost</div>
+                  <div className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1">{txt.model_cost()}</div>
                   <div className={`text-xs font-bold px-1.5 py-0.5 rounded ${getCostColor(hoveredModel.specs.cost)}`}>{hoveredModel.specs.cost}/10</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1">Speed</div>
+                  <div className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1">{txt.model_speed()}</div>
                   <div className={`text-xs font-bold px-1.5 py-0.5 rounded ${getPerfColor(hoveredModel.specs.speed)}`}>{hoveredModel.specs.speed}/10</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1">Thinking</div>
+                  <div className="text-2xs font-bold text-slate-400 uppercase tracking-wider mb-1">{txt.model_thinking()}</div>
                   <div className={`text-xs font-bold px-1.5 py-0.5 rounded ${getPerfColor(hoveredModel.specs.thinking)}`}>{hoveredModel.specs.thinking}/10</div>
                 </div>
               </div>

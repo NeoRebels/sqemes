@@ -3,6 +3,7 @@ import { X, FileText, FileSpreadsheet, Image, Paperclip, Upload, Folder } from '
 import type { WorkspaceFile } from '../types';
 import { baseNameOf, groupByFolder, hasFolders } from '../lib/filePaths';
 import PickerDropdown from './ui/PickerDropdown';
+import { m } from '../lib/i18n';
 
 function FileTypeIcon({ mimeType, className }: { mimeType: string; className?: string }) {
   if (mimeType.startsWith('image/')) return <Image className={className} />;
@@ -63,7 +64,7 @@ export function ContextFilePicker({ selectedIds, onChange, files, disabled = fal
       <PickerDropdown
         disabled={disabled}
         triggerIcon={<Paperclip className="w-3.5 h-3.5 shrink-0" />}
-        triggerLabel={files.length === 0 ? 'No files in workspace' : 'Attach context files...'}
+        triggerLabel={files.length === 0 ? m.cf_none() : m.cf_attach()}
         search={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search files..."
@@ -74,14 +75,14 @@ export function ContextFilePicker({ selectedIds, onChange, files, disabled = fal
             className="w-full text-left px-3 py-2 flex items-center gap-2 text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
           >
             <Upload className="w-4 h-4 shrink-0" />
-            <span className="text-sm font-semibold">Upload context file</span>
+            <span className="text-sm font-semibold">{m.cf_upload()}</span>
           </button>
         ) : undefined}
       >
         {() => (
           available.length === 0 ? (
             <div className="px-3 py-4 text-xs text-slate-400 text-center">
-              {files.length === 0 ? 'No files in workspace' : search ? 'No files match your search' : 'All files already attached'}
+              {files.length === 0 ? m.cf_none() : search ? m.cf_no_match() : m.cf_all_attached()}
             </div>
           ) : (
             /* SQEM-244 — the same grouping as the Files page, but NOT collapsible. This list already

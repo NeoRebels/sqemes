@@ -1,6 +1,7 @@
 import { supabase } from '../supabase';
 import { functionCallUrl } from '../env';
 import { logError } from '../monitoring';
+import { m } from '../i18n';
 import type { Database } from '../database.types';
 import type { Invitation, UserRole } from '../../types';
 
@@ -38,7 +39,7 @@ export async function createInvitation(
 
   if (existing) {
     if (existing.status === 'pending') {
-      throw new Error('An invitation has already been sent to this email.');
+      throw new Error(m.api_invite_pending());
     }
     // 'accepted' or 'expired': delete so we can re-create.
     // If the user is still a member the membership check below will catch it.
@@ -61,7 +62,7 @@ export async function createInvitation(
       .single();
 
     if (membership) {
-      throw new Error('This user is already a member of this workspace.');
+      throw new Error(m.api_already_member());
     }
   }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { en } from './i18nText';
 
 /**
  * SQEM-534 — the workspace default for "Who can edit". The database applies it on every insert and lets
@@ -13,9 +14,10 @@ const security = settings.slice(settings.indexOf('{/* --- Security Tab --- */}')
 describe('SQEM-534 — the setting', () => {
   it('sits in Security with the conditions of Playbook Access (admin, Cloud, several seats)', () => {
     // SQEM-554 (d2) — the heads are `SettingsCardHeader` now; the order and the condition are what count.
-    const i = security.indexOf('title="Who can edit new playbooks and personas"');
-    expect(i).toBeGreaterThan(security.indexOf('title="Playbook Access"'));
-    expect(security.slice(0, i + 60)).toMatch(/\{!IS_SELF_HOSTED && isMultiSeat\(workspace\) && can\(currentUser, workspace, 'team:manage'\) && \(\s*<Card className="p-6 md:p-8">\s*<SettingsCardHeader title="Who can edit new playbooks/);
+    const i = security.indexOf('title={m.sts_edit_title()}');
+    expect(i).toBeGreaterThan(security.indexOf('title={m.sts_access_title()}'));
+    expect([en.sts_edit_title, en.sts_access_title]).toEqual(['Who can edit new playbooks and personas', 'Playbook Access']); // SQEM-608
+    expect(security.slice(0, i + 60)).toMatch(/\{!IS_SELF_HOSTED && isMultiSeat\(workspace\) && can\(currentUser, workspace, 'team:manage'\) && \(\s*<Card className="p-6 md:p-8">\s*<SettingsCardHeader title=\{m\.sts_edit_title\(\)\}/);
     // SQEM-539 — written by the card's Save button from a draft, no longer on the click itself.
     expect(security).toContain("saveCard('edit', { defaultEditRestricted: editDraft }");
   });

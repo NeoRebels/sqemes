@@ -6,6 +6,7 @@
  * This client helper subscribes before the fetch and resolves when the broadcast arrives.
  */
 import { supabase } from './supabase';
+import { m } from './i18n';
 import { CLIENT_JOB_TIMEOUT_MS, nextJobDeadline } from '../supabase/functions/_shared/chatTimeouts.ts';
 
 /**
@@ -49,7 +50,7 @@ export function waitForJobResult(
       clearTimeout(timeout);
       timeout = setTimeout(() => {
         supabase.removeChannel(channel);
-        reject(new Error('The model took too long to respond. Try a shorter prompt.'));
+        reject(new Error(m.job_timeout()));
       }, Math.max(0, deadline - Date.now()));
     };
     arm();

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { accessBadgeMode, accessBadgeModes, ACCESS_BADGE_LABEL } from '../../lib/accessBadge';
+import { en } from './i18nText';
 
 /**
  * SQEM-400 — "Only me" and "Restricted" are two states; the card badge said "Restricted" for both.
@@ -81,7 +82,8 @@ describe('SQEM-400 — the fetchers select the principals, the sites render the 
     expect(code(read('components/PersonaPreview.tsx'))).toMatch(/<AccessBadge mode=\{accessMode\} \/>/);
     const chip = code(read('pages/PersonaEditor.tsx'));
     expect(chip).toMatch(/ACCESS_BADGE_LABEL\[restrictedRouteIds\.get\(route\.templateId\)/);
-    expect(chip).toMatch(/Only me — colleagues receive this persona without this playbook/); // SQEM-544 — "route" is "playbook" in the UI
+    expect(chip).toMatch(/\? m\.pe_only_me_route\(\)/); // SQEM-605 — the words live in messages/
+    expect(en.pe_only_me_route).toBe('Only me — colleagues receive this persona without this playbook'); // SQEM-544 — "route" is "playbook" in the UI
     const badge = code(read('components/ui/AccessBadge.tsx'));
     expect(badge).toMatch(/ACCESS_BADGE_LABEL\[mode\]/);
     expect(badge).toMatch(/ACCESS_BADGE_TITLE\[mode\]/);
@@ -89,7 +91,7 @@ describe('SQEM-400 — the fetchers select the principals, the sites render the 
 
   it('the persona archive\'s empty state carries the persona icon from the navigation', () => {
     const sidebar = code(read('components/Sidebar.tsx'));
-    const nav = sidebar.match(/to: "\/personas", icon: (\w+), label: "Personas"/);
+    const nav = sidebar.match(/to: "\/personas", icon: (\w+), label: m\.nav_personas\(\)/); // SQEM-599 — text in messages/en.json
     expect(nav, 'sidebar personas entry').not.toBeNull();
     const icon = nav![1];
     const personas = code(read('pages/Personas.tsx'));

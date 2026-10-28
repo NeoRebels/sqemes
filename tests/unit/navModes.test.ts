@@ -7,6 +7,7 @@ import {
   MODE_HOME, NAV_MODE_STORAGE_KEY, canManage, modeForPath, navRoutes, readRememberedMode, resolveMode, writeRememberedMode,
 } from '../../lib/navMode';
 import SegmentedTabs from '../../components/ui/SegmentedTabs';
+import { en } from './i18nText';
 
 /**
  * SQEM-548 — Work | Manage (redesign C): every page belongs to one mode; members
@@ -113,7 +114,8 @@ describe('SQEM-548 — the Sidebar wires it up', () => {
     expect(src).toMatch(/const showModeSwitch = canManage\(role\);/);
     expect(src).toMatch(/\{showModeSwitch && \(/);
     expect(src).toMatch(/<SegmentedTabs<NavMode>\s+fill/);
-    expect(src).toMatch(/aria-label=\{mode === 'work' \? 'Switch to Manage' : 'Switch to Work'\}/);
+    expect(src).toMatch(/aria-label=\{mode === 'work' \? m\.sb_to_manage\(\) : m\.sb_to_work\(\)\}/);
+    expect([en.sb_to_manage, en.sb_to_work]).toEqual(['Switch to Manage', 'Switch to Work']); // SQEM-611
   });
 
   it('Recent shows the person’s own three latest chats in Work only', () => {

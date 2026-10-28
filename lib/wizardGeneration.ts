@@ -7,6 +7,7 @@ import {
   SINGLE_TEMPLATE_RULE, SINGLE_TEMPLATE_SHAPE,
 } from '../supabase/functions/_shared/authoringPrompts.ts';
 import { supabase } from './supabase';
+import { m } from './i18n'; // SQEM-610 — the messages a person reads; the model instructions stay English
 
 /**
  * The three facts every generation starts from. SQEM-395 — `tone` (a 1–5 level) and `useCase` were
@@ -115,7 +116,7 @@ function parseJsonObject(raw: string): any {
  */
 export async function analyzeWebsite(url: string, ctx: GenContext): Promise<Partial<BrandInput>> {
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('Not authenticated');
+  if (!session) throw new Error(m.ov_not_authenticated());
 
   const res = await fetch(functionCallUrl('analyze-website'), {
     method: 'POST',
@@ -123,7 +124,7 @@ export async function analyzeWebsite(url: string, ctx: GenContext): Promise<Part
     body: JSON.stringify({ url, workspaceId: ctx.workspaceId }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || 'Could not read that website.');
+  if (!res.ok) throw new Error(data?.error || m.wg_site_failed());
 
   const systemInstruction =
     'Extract brand details from the website text below. Return ONLY a JSON object — no prose, no code fences — with keys "brandName" (string), "whatItDoes" (one sentence), and "audience" (string). If a field is unknown, use an empty string.';
@@ -147,7 +148,7 @@ export async function analyzeWebsite(url: string, ctx: GenContext): Promise<Part
  */
 export async function generateBrandVoiceSkill(b: BrandInput, ctx: GenContext): Promise<TemplateDraft> {
   const content = (await runAuthoringAI({ ...ctx, systemInstruction: BRAND_VOICE_SKILL_INSTRUCTION, prompt: brandSummary(b) })).trim();
-  if (!content) throw new Error('The brand voice came back empty.');
+  if (!content) throw new Error(m.wg_voice_empty());
   return {
     kind: 'skill',
     title: `${b.brandName} Brand Voice`,
@@ -275,7 +276,7 @@ export async function generateStarterLibrary(
       const reason = outcome.reason;
       failures.push({
         section: sections[i].label,
-        message: reason instanceof Error ? reason.message : String(reason ?? 'Unknown error'),
+        message: reason instanceof Error ? reason.message : String(reason ?? m.wg_unknown()),
       });
     }
   });
@@ -401,7 +402,7 @@ ${goal}${filesBlock}`,
   const x = parseJsonObject(raw);
   const content = String(x?.content ?? '');
   if (!x?.title || !content) {
-    throw new Error('The model returned something this could not read as a playbook. Try describing the goal a little more concretely.');
+    throw new Error(m.wg_unreadable());
   }
 
   return {

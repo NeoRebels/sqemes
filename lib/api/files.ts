@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import { IS_SELF_HOSTED, functionCallUrl } from '../env';
+import { m } from '../i18n';
 import { SUPPORTED_MIME_TYPES, MAX_FILE_SIZE_BYTES, inferTextMime } from '../uploadTypes';
 import { safeStorageFileName } from '../storageKey';
 import { classifySkillFile, isUtf8Text, STORAGE_TEXT_MIME } from '../../supabase/functions/_shared/skillFile.ts';
@@ -56,7 +57,7 @@ async function storeWorkspaceFile(
   anyType: boolean,
 ): Promise<WorkspaceFile> {
   if (file.size > MAX_FILE_SIZE_BYTES) {
-    throw new Error('File exceeds the 15 MB size limit');
+    throw new Error(m.api_file_too_big());
   }
 
   let labelMime: string;
@@ -78,7 +79,7 @@ async function storeWorkspaceFile(
       inferredMime = STORAGE_TEXT_MIME;
     }
     if (!isStandard && !inferredMime) {
-      throw new Error(`Unsupported file type: ${file.type || file.name}`);
+      throw new Error(m.api_file_type({ type: file.type || file.name }));
     }
     labelMime = isStandard ? file.type : inferredMime!;
     const storeAsPlain = !isStandard;
@@ -262,10 +263,10 @@ async function flushSign(key: string, expiresIn: number): Promise<void> {
         body: JSON.stringify({ paths, expiresIn }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) { fail(paths, new Error(body.error || `Could not open the file (${res.status})`)); continue; }
+      if (!res.ok) { fail(paths, new Error(body.error || m.api_file_open({ status: res.status }))); continue; }
       for (const p of paths) {
         const url = body.urls?.[p];
-        q.get(p)?.forEach(w => (url ? w.resolve(url) : w.reject(new Error('File not found or not accessible'))));
+        q.get(p)?.forEach(w => (url ? w.resolve(url) : w.reject(new Error(m.api_file_missing()))));
       }
     }
   } catch (e) {
@@ -289,8 +290,11 @@ export async function getWorkspaceStorageUsage(workspaceId: string): Promise<{ u
   return { used: body.used, limit: body.limit == null ? null : Number(body.limit) };
 }
 
-/** SQEM-515 — the same words the database trigger uses, so the browser and agents read one message. */
+/**
+ * SQEM-515 — the same words the database trigger uses, so the browser and agents read one message.
+ * SQEM-611 — in the app language; the English message is still the trigger's sentence word for word.
+ */
 export function storageLimitMessage(used: number, limit: number): string {
   const mb = (n: number) => Math.round(n / 1048576);
-  return `Storage limit reached: this workspace uses ${mb(used)} MB of ${mb(limit)} MB. An admin can delete files or change the plan.`;
+  return m.api_storage_limit({ used: mb(used), limit: mb(limit) });
 }

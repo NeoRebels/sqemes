@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Search, Loader2, MessageSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { m } from '../lib/i18n';
 
 // SQEM-103 — Chat search. Command-palette modal that searches the current workspace's
 // chats by BOTH title (chat_sessions) and message content (chat_messages), scoped by RLS
@@ -100,7 +101,7 @@ const ChatSearchModal = ({ open, onClose, workspaceId, onSelect }: Props) => {
 
   return (
     <div role="presentation" className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-[12vh] bg-slate-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="Search chats" className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={m.chatsearch_label()} className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-2.5 px-4 border-b border-slate-100 dark:border-slate-700">
           <Search className="w-4 h-4 text-slate-400 shrink-0" />
           <input
@@ -108,7 +109,7 @@ const ChatSearchModal = ({ open, onClose, workspaceId, onSelect }: Props) => {
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Search chats by title or content…"
+            placeholder={m.chatsearch_placeholder()}
             className="flex-1 py-3.5 bg-transparent outline-none text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
           />
           {loading && <Loader2 className="w-4 h-4 animate-spin text-slate-400 shrink-0" />}
@@ -116,9 +117,9 @@ const ChatSearchModal = ({ open, onClose, workspaceId, onSelect }: Props) => {
 
         <div className="max-h-[52vh] overflow-y-auto py-2">
           {term.length < 2 ? (
-            <p className="px-4 py-6 text-center text-sm text-slate-400 dark:text-slate-500">Type at least 2 characters to search.</p>
+            <p className="px-4 py-6 text-center text-sm text-slate-400 dark:text-slate-500">{m.chatsearch_min_chars()}</p>
           ) : results.length === 0 && !loading ? (
-            <p className="px-4 py-6 text-center text-sm text-slate-400 dark:text-slate-500">No chats found for “{term}”.</p>
+            <p className="px-4 py-6 text-center text-sm text-slate-400 dark:text-slate-500">{m.chatsearch_none({ term })}</p>
           ) : (
             results.map((r, i) => (
               <button
@@ -129,7 +130,7 @@ const ChatSearchModal = ({ open, onClose, workspaceId, onSelect }: Props) => {
               >
                 <MessageSquare className="w-4 h-4 mt-0.5 text-slate-400 dark:text-slate-500 shrink-0" />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{r.title || 'Untitled chat'}</span>
+                  <span className="block text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{r.title || m.chatsearch_untitled()}</span>
                   {r.snippet && <span className="block text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">{r.snippet}</span>}
                 </span>
               </button>

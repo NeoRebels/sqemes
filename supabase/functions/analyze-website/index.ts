@@ -2,6 +2,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
 import { fetchWithTimeout } from '../_shared/fetchWithTimeout.ts';
+import { m as txt, requestLocale } from '../_shared/locale.ts';
 
 // Fetch a user-supplied URL and return its visible text. SSRF-sensitive: this is
 // the ONLY thing this function does. No AI, no key handling — extraction runs on
@@ -205,6 +206,7 @@ function stripHtml(html: string): string {
 }
 
 Deno.serve(async (req) => {
+  const locale = requestLocale(req); // SQEM-612 — refusals in the person's language
   const cors = getCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -218,7 +220,7 @@ Deno.serve(async (req) => {
     if (!authHeader) return json({ error: 'Missing authorization header' }, 401);
     const token = authHeader.replace(/^Bearer\s+/i, '');
     const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
-    if (authError || !user) return json({ error: 'Unauthorized' }, 401);
+    if (authError || !user) return json({ error: txt.srv_unauthorized({}, { locale }) }, 401);
 
     const { url, workspaceId } = await req.json();
     if (!url || !workspaceId) return json({ error: 'url and workspaceId are required' }, 400);
@@ -230,14 +232,14 @@ Deno.serve(async (req) => {
       .eq('workspace_id', workspaceId)
       .eq('user_id', user.id)
       .maybeSingle();
-    if (!member) return json({ error: 'Forbidden' }, 403);
+    if (!member) return json({ error: txt.srv_forbidden({}, { locale }) }, 403);
 
     if (!(await checkRateLimit(workspaceId))) {
-      return json({ error: 'Rate limit exceeded. Please wait a moment and try again.' }, 429);
+      return json({ error: txt.srv_rate_limit({}, { locale }) }, 429);
     }
 
     const target = parseUrl(url);
-    if (!target) return json({ error: 'Enter a valid http(s) URL.' }, 400);
+    if (!target) return json({ error: txt.srv_valid_url({}, { locale }) }, 400);
 
     let res: Response;
     try {
@@ -251,19 +253,19 @@ Deno.serve(async (req) => {
 
     if (!res.ok) {
       await res.body?.cancel();
-      return json({ error: `The site returned ${res.status}. Try another URL or fill the form in manually.` }, 422);
+      return json({ error: txt.srv_site_status({ status: res.status }, { locale }) }, 422);
     }
 
     const contentType = (res.headers.get('content-type') ?? '').toLowerCase();
     if (!contentType.includes('text/html') && !contentType.includes('text/plain') && !contentType.includes('application/xhtml')) {
       await res.body?.cancel();
-      return json({ error: 'That URL isn\'t a web page. Paste your homepage URL or fill the form in manually.' }, 422);
+      return json({ error: txt.srv_not_web_page({}, { locale }) }, 422);
     }
 
     const html = await readCapped(res, MAX_BYTES);
     const text = stripHtml(html);
     if (text.length < 50) {
-      return json({ error: 'Couldn\'t read enough text from that page. Fill the form in manually.' }, 422);
+      return json({ error: txt.srv_too_little_text({}, { locale }) }, 422);
     }
 
     return json({ text });

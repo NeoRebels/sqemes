@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { lineDiff, diffCounts, withContext } from '../../lib/lineDiff';
+import { en } from './i18nText';
 
 /**
  * SQEM-477 (b) — the History tab. The rules (who may restore or delete, what a version holds) are in the
@@ -58,6 +59,7 @@ describe('SQEM-477 — the editor\'s right panel', () => {
     expect(panel).toContain('{isDirty && <p');
   });
   it('names the files a restore had to leave out', () => {
-    expect(editor).toContain('Left out because deleted: ${missingFiles.join');
+    expect(editor).toContain('txt.ed_restored_missing({ version, files: missingFiles.join');
+    expect(en.ed_restored_missing).toContain('Left out because deleted: {files}'); // SQEM-605
   });
 });

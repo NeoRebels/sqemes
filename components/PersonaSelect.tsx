@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Bot, Plus } from 'lucide-react';
 import type { Persona } from '../types';
+import { m } from '../lib/i18n';
 
 /**
  * SQEM-390 (PR C) — the persona picker in the Chat top bar: the role of this session, chosen where
@@ -38,7 +39,7 @@ export function PersonaSelect({
   value,
   onChange,
   onOpen,
-  emptyLabel = 'No persona',
+  emptyLabel = m.start_no_persona(),
   emptyActionLabel,
   onEmptyAction,
   disabled = false,
@@ -74,7 +75,7 @@ export function PersonaSelect({
           });
         }}
         className={triggerBase}
-        title={selected ? `Persona: ${selected.title}` : 'Choose a persona — the role for this chat'}
+        title={selected ? m.persona_select_title({ title: selected.title }) : m.persona_select_hint()}
       >
         <Bot className={`w-4 h-4 shrink-0 ${selected ? 'text-brand-500' : 'text-slate-400'}`} />
         {selected ? (

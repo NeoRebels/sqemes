@@ -8,6 +8,7 @@
 // same value clears the vote), mirroring the Cloud voteListing behaviour.
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { checkRateLimit, uuidFromSeed } from '../_shared/rateLimit.ts';
+import { m as txt, requestLocale } from '../_shared/locale.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -19,6 +20,7 @@ const HEX64 = /^[0-9a-f]{64}$/;
 const RATE_PER_MIN = 60; // casts per voter_key (and per IP) per minute
 
 Deno.serve(async (req) => {
+  const locale = requestLocale(req); // SQEM-612 — refusals in the person's language
   const json = (b: unknown, s = 200) =>
     new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } });
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -64,14 +66,14 @@ Deno.serve(async (req) => {
     for (const seed of [`vote:${voterKey}`, `voteip:${ip}`]) {
       const nsId = await uuidFromSeed(seed);
       if (!(await checkRateLimit(nsId, RATE_PER_MIN))) {
-        return json({ error: 'Rate limit reached — try again shortly' }, 429);
+        return json({ error: txt.srv_vote_rate({}, { locale }) }, 429);
       }
     }
 
     // Only published listings are votable.
     const { data: listing } = await admin.from('library_templates')
       .select('id, published, score, vote_count').eq('id', listingId).eq('published', true).maybeSingle();
-    if (!listing) return json({ error: 'Not found' }, 404);
+    if (!listing) return json({ error: txt.srv_not_found({}, { locale }) }, 404);
 
     // Upsert / toggle by (listing, voter_key).
     const { data: existing } = await admin.from('library_template_votes')

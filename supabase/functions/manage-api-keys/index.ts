@@ -2,6 +2,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { encryptApiKey } from '../_shared/crypto.ts';
 import { SEARCH_KEY_PROVIDERS } from '../_shared/webSearch.ts';
+import { m as txt, requestLocale } from '../_shared/locale.ts';
 
 /** SQEM-594 — a workspace has at most ONE search key: Linkup or Brave. */
 const SEARCH_PROVIDERS = Object.values(SEARCH_KEY_PROVIDERS);
@@ -23,6 +24,7 @@ function isHeaderSafeAscii(value: string) {
 }
 
 Deno.serve(async (req) => {
+  const locale = requestLocale(req); // SQEM-612 — refusals in the person's language
   const cors = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
@@ -45,7 +47,7 @@ Deno.serve(async (req) => {
     const token = authHeader.replace(/^Bearer\s+/i, '');
     const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: txt.srv_unauthorized({}, { locale }) }), {
         status: 401,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -70,7 +72,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (!membership) {
-      return new Response(JSON.stringify({ error: 'Not a member of this workspace.' }), {
+      return new Response(JSON.stringify({ error: txt.srv_not_member({}, { locale }) }), {
         status: 403,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -102,7 +104,7 @@ Deno.serve(async (req) => {
 
     // Write operations require admin or editor role
     if (membership.role === 'member') {
-      return new Response(JSON.stringify({ error: 'Insufficient permissions. Admin or Editor required.' }), {
+      return new Response(JSON.stringify({ error: txt.srv_editor_required({}, { locale }) }), {
         status: 403,
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -124,7 +126,7 @@ Deno.serve(async (req) => {
     // POST: Upsert a key
     if (provider && key !== undefined) {
       if (typeof key !== 'string') {
-        return new Response(JSON.stringify({ error: 'Invalid API key format' }), {
+        return new Response(JSON.stringify({ error: txt.srv_key_format({}, { locale }) }), {
           status: 400,
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
@@ -132,7 +134,7 @@ Deno.serve(async (req) => {
 
       const normalizedKey = key.trim();
       if (!normalizedKey || isPlaceholderKey(normalizedKey) || !isHeaderSafeAscii(normalizedKey)) {
-        return new Response(JSON.stringify({ error: 'Invalid API key format. Paste the original provider key.' }), {
+        return new Response(JSON.stringify({ error: txt.srv_key_format_original({}, { locale }) }), {
           status: 400,
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
@@ -178,7 +180,7 @@ Deno.serve(async (req) => {
     // Surface missing encryption key as a clear configuration error
     const status = message.includes('API_KEY_ENCRYPTION_KEY') ? 503 : 500;
     const body = status === 503
-      ? { error: 'Server encryption key not configured. Contact your administrator.' }
+      ? { error: txt.srv_encryption_missing({}, { locale }) }
       : { error: message };
     console.error('manage-api-keys error:', message);
     return new Response(JSON.stringify(body), {

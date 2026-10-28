@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { blanksIn } from '../../components/PlaybookPreview';
+import { en } from './i18nText';
 
 /**
  * SQEM-550 (b) — Playbooks as a list with a preview (redesign C). The page imports the store, so it is
@@ -62,7 +63,8 @@ describe('SQEM-550 (b) — the selection lives in the URL', () => {
 describe('SQEM-550 (b) — the row follows the SQEM-538 row pattern', () => {
   it('the title is the stretched button; checkbox and star sit above it', () => {
     expect(page).toMatch(/after:absolute after:inset-0/);
-    expect(page).toMatch(/<label aria-label=\{`Select \$\{prompt\.title\}`\} className="relative z-10/);
+    expect(page).toMatch(/<label aria-label=\{m\.pb_select\(\{ title: prompt\.title \}\)\} className="relative z-10/);
+    expect(en.pb_select).toBe('Select {title}'); // SQEM-605
     expect(page).toMatch(/className="hit-24 relative z-10/);
   });
 });

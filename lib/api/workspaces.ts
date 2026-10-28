@@ -1,6 +1,8 @@
 import { supabase } from '../supabase';
 import { normalizeDocumentStyle, type DocumentStyle } from '../../supabase/functions/_shared/documentStyle.ts';
+import { toLocale, BASE_LOCALE, type Locale } from '../i18n';
 import { functionCallUrl } from '../env';
+import { m } from '../i18n';
 import type { Database } from '../database.types';
 import type { Workspace, User, BrandProfile, UserRole } from '../../types';
 
@@ -36,6 +38,8 @@ export function rowToWorkspace(row: WorkspaceRow, members: User[] = []): Workspa
     authoringModelId: (row as unknown as { authoring_model_id?: string | null }).authoring_model_id ?? null,
     // SQEM-597 — validated on read; a malformed value becomes null, never a broken document.
     documentStyle: normalizeDocumentStyle((row as unknown as { document_style?: unknown }).document_style),
+    // SQEM-600 — checked on read like every value that steers rendering.
+    language: toLocale((row as unknown as { language?: unknown }).language) ?? BASE_LOCALE,
   };
 }
 
@@ -111,6 +115,7 @@ export async function updateWorkspace(id: string, updates: Partial<{
   default_edit_restricted: boolean;
   authoring_model_id: string | null;
   document_style: DocumentStyle | null; // SQEM-597 — admins only (guard_document_style)
+  language: Locale; // SQEM-600 — admins only (guard_workspace_language)
 }>) {
   const { data, error } = await supabase
     .from('workspaces')
@@ -142,7 +147,7 @@ export async function deleteWorkspace(id: string) {
   });
 
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || 'Failed to delete workspace');
+  if (!res.ok) throw new Error(body.error || m.ws_delete_failed());
 }
 
 export async function setWorkspaceManaged(id: string, managed: boolean) {

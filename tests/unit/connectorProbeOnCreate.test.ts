@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { en, de } from './i18nText';
 
 /**
  * SQEM-467 — a connector is only saved once the server has answered.
@@ -58,8 +59,11 @@ describe('SQEM-467 — nothing is stored before the server answers', () => {
   it("⛔ the server's own words survive — no invented 'connection failed'", () => {
     // SQEM-273 lost an afternoon to a message that swallowed what the provider had actually said;
     // `lib/aiErrors.ts` in the source repository argues the rule at length.
-    expect(src).toMatch(/\$\{why\}/);
-    expect(src).toMatch(/\$\{whyToken\}/);
+    // SQEM-612 — the reason travels as a message value, in both languages.
+    expect(src).toMatch(/txt\.srv_server_refused\(\{ why \}, \{ locale \}\)/);
+    expect(src).toMatch(/txt\.srv_token_refused\(\{ why: whyToken \}, \{ locale \}\)/);
+    expect(en.srv_server_refused).toMatch(/\{why\}$/);
+    expect(de.srv_server_refused).toMatch(/\{why\}$/);
     expect(src.toLowerCase()).not.toMatch(/connection failed/);
   });
 });

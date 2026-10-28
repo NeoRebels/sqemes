@@ -12,6 +12,9 @@ import {
   resolveAppliedContext,
   type ContextImage,
 } from '../lib/templateContext';
+import Select from './ui/Select';
+import { Input, Textarea } from './ui/Input';
+import { m } from '../lib/i18n';
 
 // SQEM-371 — the type moved to `lib/templateContext` with the resolution itself; re-exported here
 // because Chat has always imported it from this module.
@@ -181,7 +184,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
             </button>
           )}
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
-            {step === 'pick' ? 'Use a playbook' : selected?.title}
+            {step === 'pick' ? m.launch_title() : selected?.title}
           </h2>
         </div>
         <button onClick={handleClose} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
@@ -200,7 +203,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
                 type="text"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search playbooks..."
+                placeholder={m.launch_search()}
                 className="w-full pl-9 pr-4 py-2.5 border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400"
               />
             </div>
@@ -209,7 +212,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
                 value={kindFilter}
                 onChange={setKindFilter}
                 tabs={[
-                  { value: 'all', label: 'All' },
+                  { value: 'all', label: m.pb_tab_all() }, // SQEM-605 — missed in SQEM-604 (short word in a list)
                   { value: 'prompt', label: 'Prompts', icon: <PenTool className="w-3 h-3" /> },
                   { value: 'skill', label: 'Skills', icon: <Wand2 className="w-3 h-3" /> },
                 ]}
@@ -219,7 +222,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
                 className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border transition-all ${showFavoritesOnly ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-700 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
               >
                 <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-current' : ''}`} />
-                Favorites
+                {m.launch_favorites()}
               </button>
             </div>
           </div>
@@ -228,7 +231,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
           <div className="flex-1 overflow-y-auto px-4 pb-4">
             {filteredPrompts.length === 0 ? (
               <div className="text-center py-10 text-slate-400 dark:text-slate-500 text-sm">
-                {showFavoritesOnly ? 'No favourite playbooks yet' : 'No playbooks found'}
+                {showFavoritesOnly ? m.launch_no_favourites() : m.launch_none_found()}
               </div>
             ) : (
               <div className="space-y-1.5">
@@ -255,7 +258,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
                     <button
                       onClick={() => toggleFavorite(t)}
                       className="p-2 mr-2 text-slate-300 hover:text-amber-400 hover:scale-110 transition-all shrink-0"
-                      title={t.isFavorite ? 'Remove from favourites' : 'Add to favourites'}
+                      title={t.isFavorite ? m.launch_unfavourite() : m.launch_favourite()}
                     >
                       <Star className={`w-4 h-4 ${t.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`} />
                     </button>
@@ -274,7 +277,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
             )}
             {templateVars.length === 0 && selected?.kind === 'prompt' && (
               <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 px-4 py-3">
-                <p className="text-xs text-slate-500 dark:text-slate-400">No inputs required — the playbook will be inserted into the chat as-is.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{m.launch_no_inputs()}</p>
               </div>
             )}
             {/* SQEM-390 — the note a skill gets. Until now the "inserted as-is" line above showed for a
@@ -282,29 +285,27 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
                 had said the right thing for the wrong kind; now it says it for the one that is left. */}
             {selected?.kind === 'skill' && (
               <div className="rounded-xl border border-emerald-100 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-900/10 px-4 py-3">
-                <p className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold mb-0.5">Skill</p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-400">Using it adds this knowledge to this chat as context for every message — nothing is inserted into the input.</p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold mb-0.5">{m.launch_skill()}</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">{m.launch_skill_hint()}</p>
               </div>
             )}
             {templateVars.map(v => (
               <div key={v.id}>
                 <label htmlFor={`launch-var-${v.id}`} className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">{v.label}</label>
                 {v.type === 'textarea' ? (
-                  <textarea id={`launch-var-${v.id}`}
-                    className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all bg-white dark:bg-slate-700 placeholder:text-slate-400"
+                  <Textarea id={`launch-var-${v.id}`}
                     rows={4}
                     value={inputs[v.name] ?? ''}
                     onChange={e => setInputs(prev => ({ ...prev, [v.name]: e.target.value }))}
                   />
                 ) : v.type === 'select' ? (
-                  <select id={`launch-var-${v.id}`}
-                    className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all bg-white dark:bg-slate-700 appearance-none"
+                  <Select id={`launch-var-${v.id}`}
                     value={inputs[v.name] ?? ''}
                     onChange={e => setInputs(prev => ({ ...prev, [v.name]: e.target.value }))}
                   >
-                    <option value="">Select an option</option>
+                    <option value="">{m.launch_select_option()}</option>
                     {v.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
+                  </Select>
                 ) : v.type === 'file' ? (
                   <div
                     className={`w-full relative border-2 border-dashed rounded-xl transition-all ${dragActive === v.name ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20' : 'border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700'}`}
@@ -317,10 +318,10 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
                       <div className="p-3 flex items-center gap-3">
                         <div className="w-9 h-9 bg-white dark:bg-slate-600 rounded-lg border border-slate-200 dark:border-slate-500 flex items-center justify-center shrink-0 overflow-hidden">
                           {inputs[v.name].startsWith('data:image')
-                            ? <img src={inputs[v.name]} alt="Preview" className="w-full h-full object-cover" />
+                            ? <img src={inputs[v.name]} alt={m.launch_preview_alt()} className="w-full h-full object-cover" />
                             : <FileIcon className="w-4 h-4 text-slate-400" />}
                         </div>
-                        <p className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200 truncate">File uploaded</p>
+                        <p className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{m.launch_file_uploaded()}</p>
                         <button onClick={() => setInputs(prev => ({ ...prev, [v.name]: '' }))} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -328,8 +329,8 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
                     ) : (
                       <div className="p-6 text-center">
                         <Upload className="w-5 h-5 text-brand-500 mx-auto mb-2" />
-                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Click or drag file</p>
-                        <p className="text-xs text-slate-400 mt-0.5">Images, PDF, text · max {MAX_FILE_SIZE_MB} MB</p>
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{m.launch_click_or_drag()}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{m.launch_file_types({ size: MAX_FILE_SIZE_MB })}</p>
                         <input id={`launch-var-${v.id}`}
                           type="file"
                           accept={ACCEPT_STRING}
@@ -340,9 +341,8 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
                     )}
                   </div>
                 ) : (
-                  <input id={`launch-var-${v.id}`}
+                  <Input id={`launch-var-${v.id}`}
                     type="text"
-                    className="w-full p-3 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all bg-white dark:bg-slate-700 placeholder:text-slate-400"
                     value={inputs[v.name] ?? ''}
                     onChange={e => setInputs(prev => ({ ...prev, [v.name]: e.target.value }))}
                     placeholder={v.defaultValue || ''}
@@ -355,7 +355,7 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
           {/* Footer */}
           <div className="px-5 py-4 border-t border-slate-100 dark:border-slate-700 flex gap-2 shrink-0">
             <button onClick={() => setStep('pick')} className="flex-1 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors">
-              Back
+              {m.launch_back()}
             </button>
             <button
               onClick={handleLaunch}
@@ -363,11 +363,11 @@ export default function TemplateLaunchModal({ isOpen, onClose, onInsert, onSkill
               className="flex-1 py-2.5 text-sm font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
             >
               {isResolving
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing…</>
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> {m.launch_preparing()}</>
                 // SQEM-406 — "Use", not "Apply": a UX tester read "Apply skill" as "activate / share
                 // live". The Chat header lists what is in effect under "Using:", so the button says
                 // the same word. "Applied" stays the code's term (SQEM-371); a person reads "use".
-                : selected?.kind === 'skill' ? 'Use skill' : 'Insert into chat'
+                : selected?.kind === 'skill' ? m.launch_use_skill() : m.launch_insert()
               }
             </button>
           </div>

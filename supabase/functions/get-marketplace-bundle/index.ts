@@ -6,8 +6,10 @@
 // importBundle. Read-only; no mutation here.
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
+import { m as txt, requestLocale } from '../_shared/locale.ts';
 
 Deno.serve(async (req) => {
+  const locale = requestLocale(req); // SQEM-612 — refusals in the person's language
   const cors = getCorsHeaders(req);
   const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -18,14 +20,14 @@ Deno.serve(async (req) => {
     if (!authHeader) return json({ error: 'Missing authorization header' }, 401);
     const admin = createAdminClient();
     const { data: { user }, error: authErr } = await admin.auth.getUser(authHeader.replace(/^Bearer\s+/i, ''));
-    if (authErr || !user) return json({ error: 'Unauthorized' }, 401);
+    if (authErr || !user) return json({ error: txt.srv_unauthorized({}, { locale }) }, 401);
 
     const { listingId } = await req.json().catch(() => ({}));
     if (!listingId) return json({ error: 'listingId required' }, 400);
 
     const { data: row } = await admin.from('library_templates')
       .select('id, workspace_id, status, published, bundle_path').eq('id', listingId).single();
-    if (!row || !row.bundle_path) return json({ error: 'Not found' }, 404);
+    if (!row || !row.bundle_path) return json({ error: txt.srv_not_found({}, { locale }) }, 404);
 
     // Authorize: published (anyone) · sqemes-admin · a member of the source workspace (own submission).
     let allowed = row.published === true || row.status === 'published';
@@ -38,13 +40,13 @@ Deno.serve(async (req) => {
         .eq('workspace_id', row.workspace_id).eq('user_id', user.id).maybeSingle();
       allowed = !!mem;
     }
-    if (!allowed) return json({ error: 'Forbidden' }, 403);
+    if (!allowed) return json({ error: txt.srv_forbidden({}, { locale }) }, 403);
 
     // SQEM-492 — only sign a bundle that sits where its row says it comes from: the submitting
     // workspace's folder (Cloud) or the publisher submissions folder (self-host, row without workspace).
     const expectedPrefix = row.workspace_id ? `${row.workspace_id}/` : 'submissions/';
     if (!row.bundle_path.startsWith(expectedPrefix) || row.bundle_path.includes('..')) {
-      return json({ error: 'Not found' }, 404);
+      return json({ error: txt.srv_not_found({}, { locale }) }, 404);
     }
 
     const { data: signed, error: signErr } = await admin.storage.from('library-files').createSignedUrl(row.bundle_path, 300);

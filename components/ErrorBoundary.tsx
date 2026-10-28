@@ -2,6 +2,7 @@ import React, { Component, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { logError } from '../lib/monitoring';
 import { isStaleBuildError } from '../lib/staleBuild';
+import { m } from '../lib/i18n';
 
 interface Props {
   children: ReactNode;
@@ -51,15 +52,15 @@ class ErrorBoundary extends Component<Props, State> {
               <div className="w-12 h-12 bg-brand-50 dark:bg-brand-900/30 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <RefreshCw className="w-6 h-6 text-brand-600 dark:text-brand-400" />
               </div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">We&apos;ve updated sqemes</h2>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{m.eb_updated_title()}</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-                Reload to use the latest version.
+                {m.eb_updated_body()}
               </p>
               <button
                 onClick={() => window.location.reload()}
                 className="px-6 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-200 dark:shadow-none"
               >
-                Reload
+                {m.eb_reload()}
               </button>
             </div>
           </div>
@@ -72,15 +73,15 @@ class ErrorBoundary extends Component<Props, State> {
             <div className="w-12 h-12 bg-red-50 dark:bg-red-900/20 rounded-xl flex items-center justify-center mx-auto mb-4">
               <AlertTriangle className="w-6 h-6 text-red-500" />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Something went wrong</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{m.eb_error_title()}</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 font-mono break-all">
-              {this.state.error?.message || 'An unexpected error occurred.'}
+              {this.state.error?.message || m.eb_error_unknown()}
             </p>
             <button
               onClick={() => window.location.reload()}
               className="px-6 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-bold hover:bg-brand-700 transition-all shadow-lg shadow-brand-200 dark:shadow-none"
             >
-              Reload page
+              {m.eb_reload_page()}
             </button>
           </div>
         </div>

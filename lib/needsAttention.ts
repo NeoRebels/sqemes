@@ -8,6 +8,8 @@
  *
  * Pure (no store, no Supabase), so the rules are unit-tested directly.
  */
+import { m } from './i18n';
+
 export type AttentionKind = 'persona-without-playbooks' | 'playbook-without-description' | 'chat-without-model';
 
 export type AttentionItem = {
@@ -34,9 +36,9 @@ export function needsAttention(input: {
     items.push({
       kind: 'persona-without-playbooks',
       count: emptyPersonas,
-      title: emptyPersonas === 1 ? '1 persona loads no playbooks' : `${emptyPersonas} personas load no playbooks`,
-      detail: 'Without a playbook a persona is a role description and nothing else.',
-      actionLabel: 'Fix',
+      title: m.att_personas_title({ count: emptyPersonas }),
+      detail: m.att_personas_detail(),
+      actionLabel: m.att_fix(),
       to: '/personas',
     });
   }
@@ -46,9 +48,9 @@ export function needsAttention(input: {
     items.push({
       kind: 'playbook-without-description',
       count: undescribed,
-      title: undescribed === 1 ? '1 playbook has no description' : `${undescribed} playbooks have no description`,
-      detail: 'Members and AI tools cannot tell it apart in search.',
-      actionLabel: 'Review',
+      title: m.att_undescribed_title({ count: undescribed }),
+      detail: m.att_undescribed_detail(),
+      actionLabel: m.att_review(),
       to: '/playbooks',
     });
   }
@@ -57,9 +59,9 @@ export function needsAttention(input: {
     items.push({
       kind: 'chat-without-model',
       count: 1,
-      title: 'Chat has no AI model',
-      detail: 'Add a provider key so the team can chat.',
-      actionLabel: 'Add key',
+      title: m.att_model_title(),
+      detail: m.att_model_detail(),
+      actionLabel: m.att_add_key(),
       to: '/settings',
     });
   }

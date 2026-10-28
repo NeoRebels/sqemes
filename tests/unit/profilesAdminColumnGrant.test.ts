@@ -24,7 +24,15 @@ const SQL = sqlCode(read('supabase/migrations/20260929170000_sqem489_profiles_ad
 const grantedColumns = (() => {
   const list = SQL.match(/cols\s+text\[\]\s*:=\s*ARRAY\[([^\]]*)\]/);
   if (!list) throw new Error('column list not found in the migration');
-  return [...list[1].matchAll(/'([a-z_]+)'/g)].map(m => m[1]);
+  const cols = [...list[1].matchAll(/'([a-z_]+)'/g)].map(m => m[1]);
+  // SQEM-600 — later migrations grant further single columns the same way (`language`); they count too.
+  for (const f of readdirSync(resolve(ROOT, 'supabase/migrations')).filter(n => n > '20260929170000')) {
+    const later = sqlCode(read(`supabase/migrations/${f}`));
+    for (const g of later.matchAll(/grant\s+update\s*\(([^)]*)\)\s+on\s+public\.profiles\s+to\s+authenticated/gi)) {
+      cols.push(...g[1].split(',').map(c => c.trim()));
+    }
+  }
+  return cols;
 })();
 
 describe('SQEM-489 — the migration', () => {

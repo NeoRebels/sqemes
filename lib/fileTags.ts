@@ -4,6 +4,8 @@
 // tested without a DOM: a **mixed selection** (some files already carry the tag) and a **partial
 // failure** (some writes land, some do not).
 
+import { m } from './i18n';
+
 export type TaggableFile = { id: string; tags: string[] };
 
 /**
@@ -48,23 +50,23 @@ export function tagChangeSummary(
   tag: string,
   mode: 'add' | 'remove',
 ): { text: string; ok: boolean } {
-  const files = (n: number) => `${n} file${n === 1 ? '' : 's'}`;
+  const files = (n: number) => m.count_file({ count: n }); // SQEM-607 — plural in the app language
   if (planned === 0) {
     return {
-      text: `Nothing to change — every selected file already ${mode === 'add' ? 'has' : 'lacks'} “${tag}”.`,
+      text: mode === 'add' ? m.ftag_nothing_add({ tag }) : m.ftag_nothing_remove({ tag }),
       ok: true,
     };
   }
   if (ok === planned) {
     return {
-      text: mode === 'add' ? `Added “${tag}” to ${files(ok)}.` : `Removed “${tag}” from ${files(ok)}.`,
+      text: mode === 'add' ? m.ftag_added({ tag, files: files(ok) }) : m.ftag_removed({ tag, files: files(ok) }),
       ok: true,
     };
   }
   return {
     text: mode === 'add'
-      ? `Added “${tag}” to ${ok} of ${files(planned)} — the rest failed and stay selected.`
-      : `Removed “${tag}” from ${ok} of ${files(planned)} — the rest failed and stay selected.`,
+      ? m.ftag_added_partial({ tag, done: ok, files: files(planned) })
+      : m.ftag_removed_partial({ tag, done: ok, files: files(planned) }),
     ok: false,
   };
 }

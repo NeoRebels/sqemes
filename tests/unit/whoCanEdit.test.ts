@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { en } from './i18nText';
 
 /**
  * SQEM-473 (b) — the "Who can edit" control and the read-only editor. The rule is enforced by the
@@ -20,7 +21,9 @@ describe('SQEM-473 — both editors key on the edit right', () => {
     });
     it(`${name}: says why it is read-only, and whom to ask`, () => {
       expect(src).toMatch(/roleCanEdit && !editRight/);
-      expect(src).toMatch(/but not change it\.<\/span>/);
+      // SQEM-605 — the playbook editor's words live in messages/ (the persona editor follows in PR B).
+      expect(src).toMatch(kind === 'template' ? /\{txt\.ed_readonly_1\(\)\}<\/span>/ : /\{m\.pe_readonly_1\(\)\}<\/span>/); // SQEM-605
+      expect(kind === 'template' ? en.ed_readonly_1 : en.pe_readonly_1).toMatch(/but not change it\.$/);
     });
     it(`${name}: "Who can edit" is the edit variant, changeable only by owner or admin`, () => {
       expect(src).toMatch(/variant="edit"[\s\S]{0,1200}readOnly=\{!canManageEditors\}/);
@@ -60,7 +63,9 @@ describe('SQEM-473 — lib/api/editors.ts', () => {
 
 describe('SQEM-473 — a refused update is said, not crashed on', () => {
   it('updatePrompt and updatePersona notice zero rows', () => {
-    expect(read('lib/api/prompts.ts')).toContain("throw new Error('You may use this playbook but not change it.')");
-    expect(read('lib/api/personas.ts')).toContain("throw new Error('You may use this persona but not change it.')");
+    expect(read('lib/api/prompts.ts')).toContain('throw new Error(m.api_playbook_read_only())');
+    expect(read('lib/api/personas.ts')).toContain('throw new Error(m.api_persona_read_only())');
+    expect(en.api_playbook_read_only).toBe('You may use this playbook but not change it.'); // SQEM-611
+    expect(en.api_persona_read_only).toBe('You may use this persona but not change it.');
   });
 });

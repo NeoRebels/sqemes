@@ -19,6 +19,7 @@ import {
 } from './libraryQueries.ts';
 import { LIBRARY_TOOL_DEFS, TOOL_CAPABILITY } from './libraryToolDefs.ts';
 import { describeChange, type LibraryChange } from './libraryChanges.ts';
+import { m, type Locale } from './locale.ts';
 
 // ── Provider-neutral definitions ────────────────────────────────────────────
 
@@ -303,11 +304,12 @@ function bound(text: string): string {
  * ⛔ Silence was the alternative and it is the wrong one: a model that stops mid-investigation
  * produces a confident answer built on half the material, and nothing in the reply says so.
  */
-export function toolCapNotice(rounds: number, reason: 'rounds' | 'time' = 'rounds'): string {
-  const why = reason === 'time'
-    ? 'ran out of time for further tool use'
-    : `stopped after ${rounds} rounds of tool use`; // SQEM-595 — the tools are no longer only library lookups
-  return `\n\n---\n_Sqemes ${why} and answered with what had been loaded._`;
+export function toolCapNotice(rounds: number, reason: 'rounds' | 'time' = 'rounds', locale: Locale = 'en'): string {
+  // SQEM-595 — the tools are no longer only library lookups. SQEM-599 — the first server text in two languages.
+  const text = reason === 'time'
+    ? m.chat_tool_cap_time({}, { locale })
+    : m.chat_tool_cap_rounds({ rounds }, { locale });
+  return `\n\n---\n_${text}_`;
 }
 
 /**

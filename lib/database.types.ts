@@ -16,6 +16,7 @@ export type Database = {
           email: string;
           avatar: string;
           is_sqemes_admin: boolean;
+          language: 'en' | 'de' | null; // SQEM-600
           created_at: string;
         };
         Insert: {
@@ -24,6 +25,7 @@ export type Database = {
           email?: string;
           avatar?: string;
           is_sqemes_admin?: boolean;
+          language?: 'en' | 'de' | null;
           created_at?: string;
         };
         Update: {
@@ -32,6 +34,7 @@ export type Database = {
           email?: string;
           avatar?: string;
           is_sqemes_admin?: boolean;
+          language?: 'en' | 'de' | null;
           created_at?: string;
         };
         Relationships: [];
@@ -79,6 +82,7 @@ export type Database = {
         Row: {
           id: string;
           name: string;
+          language: 'en' | 'de'; // SQEM-600
           plan: 'Solo' | 'Team' | 'Business';
           is_managed: boolean;
           /** SQEM-515 — Cloud only (the migration is pruned from the self-host export). */
@@ -104,6 +108,7 @@ export type Database = {
         Insert: {
           id?: string;
           name: string;
+          language?: 'en' | 'de';
           plan?: 'Solo' | 'Team' | 'Business';
           is_managed?: boolean;
           storage_limit_bytes?: number | null;
@@ -128,6 +133,7 @@ export type Database = {
         Update: {
           id?: string;
           name?: string;
+          language?: 'en' | 'de';
           plan?: 'Solo' | 'Team' | 'Business';
           is_managed?: boolean;
           storage_limit_bytes?: number | null;

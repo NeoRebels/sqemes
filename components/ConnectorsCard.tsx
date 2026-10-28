@@ -10,11 +10,13 @@ import { IS_SELF_HOSTED } from '../lib/env';
 import { useWorkspace } from '../store';
 import type { User } from '../types';
 import ConnectorLogo from './ConnectorLogo';
-import { OAUTH_APPS, GOOGLE_TESTING_NOTE, type TokenAppUI, type OAuthIdAppUI, type PublicAppUI } from './connectorAppTiles';
+import { OAUTH_APPS, GOOGLE_TESTING_NOTE, tileText, type TokenAppUI, type OAuthIdAppUI, type PublicAppUI } from './connectorAppTiles';
 import {
   fetchConnectors, createConnector, deleteConnector, probeConnector, startOAuthConnect, createTokenConnector, setConnectorTools, connectorRedirectUri, inspectConnector,
   type Connector, type ProbeResult, type InspectResult,
 } from '../lib/api/connectors';
+import { Input } from './ui/Input';
+import { m } from '../lib/i18n';
 
 /**
  * SQEM-589 — no app tiles on self-host. The export already ships an EMPTY `OAUTH_APPS`; the flag here
@@ -84,13 +86,13 @@ export default function ConnectorsCard({
     const status = searchParams.get('connector');
     if (!status) return;
     if (status === 'connected') {
-      const name = searchParams.get('name') || 'Connector';
+      const name = searchParams.get('name') || m.cc_connector();
       const sc = searchParams.get('scopes'); // compact granted scopes, e.g. "readonly,compose" / "Mail.Read,Mail.ReadWrite"
       if (searchParams.get('read') === '0') {
         // Read scope not granted → data calls will fail with a permission error even though connect succeeds.
-        showToast(`${name} connected, but the READ scope is missing${sc ? ` (granted: ${sc})` : ''}. Grant the read scope on the consent screen and reconnect.`, 'error');
+        showToast(m.cc_read_missing({ name, granted: sc ? m.cc_granted({ scopes: sc }) : '' }), 'error');
       } else {
-        showToast(sc ? `${name} connected — scopes: ${sc}` : `${name} connected`, 'success');
+        showToast(sc ? m.cc_connected_scopes({ name, scopes: sc }) : m.cc_connected({ name }), 'success');
       }
       load();
     } else {
@@ -125,7 +127,7 @@ export default function ConnectorsCard({
         const justNow = fresh.find(c => Date.now() - new Date(c.created_at).getTime() < 120_000);
         if (justNow) {
           setConnectors(fresh);
-          showToast(`${justNow.name} connected`, 'success');
+          showToast(m.cc_connected({ name: justNow.name }), 'success');
           const cleaned = new URLSearchParams(searchParams);
           ['connector', 'name', 'reason', 'code', 'desc', 'scopes', 'read'].forEach(k => cleaned.delete(k));
           setSearchParams(cleaned, { replace: true });
@@ -138,7 +140,7 @@ export default function ConnectorsCard({
         // maintainer needs. The person reading this is often not that maintainer, so the sentence
         // after them says what *they* can do. Reconnecting genuinely fixes the common cases
         // (expired consent, a revoked grant); where it does not, the code is there to pass on.
-        `Connection failed${reason ? `: ${reason}` : ''}${code ? ` (${code})` : ''}.${desc ? ` ${desc}` : ''} Try connecting again — if it keeps failing, send us this message.`,
+        m.cc_failed({ detail: `${reason ? `: ${reason}` : ''}${code ? ` (${code})` : ''}`, desc: desc ? ` ${desc}` : '' }),
         'error',
       );
     }
@@ -151,7 +153,7 @@ export default function ConnectorsCard({
   const connectApp = async (appId: string) => {
     setConnectingProvider(appId);
     try { window.location.href = await startOAuthConnect(workspaceId, appId); }
-    catch (e) { showToast(e instanceof Error ? e.message : 'Could not start connect', 'error'); setConnectingProvider(null); }
+    catch (e) { showToast(e instanceof Error ? e.message : m.cc_start_failed(), 'error'); setConnectingProvider(null); }
   };
 
   /**
@@ -176,9 +178,9 @@ export default function ConnectorsCard({
       // ⚠️ A failed probe must NOT render as "this connector has no tools" — the saved selection is
       // still valid and still editable; only the live list is missing.
       if (r.ok) setToolsList((r.tools || []).map(t => ({ name: t.name, description: t.description })));
-      else setToolsError(r.error || 'Could not load the tool list');
+      else setToolsError(r.error || m.cc_tools_load_failed());
     } catch (e) {
-      setToolsError(e instanceof Error ? e.message : 'Could not load the tool list');
+      setToolsError(e instanceof Error ? e.message : m.cc_tools_load_failed());
     } finally { setToolsLoading(false); }
   };
 
@@ -188,10 +190,10 @@ export default function ConnectorsCard({
     try {
       const { allowedTools } = await setConnectorTools(toolsFor.id, toolsPick);
       setConnectors(prev => prev.map(c => (c.id === toolsFor.id ? { ...c, allowed_tools: allowedTools } : c)));
-      showToast(allowedTools ? `Saved — ${allowedTools.length} tools enabled` : 'Saved — all tools enabled', 'success');
+      showToast(allowedTools ? m.cc_saved_n({ count: allowedTools.length }) : m.cc_saved_all(), 'success');
       setToolsFor(null);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not save', 'error');
+      showToast(e instanceof Error ? e.message : m.cc_save_failed(), 'error');
     } finally { setToolsSaving(false); }
   };
 
@@ -220,7 +222,7 @@ export default function ConnectorsCard({
     if (tokenApp.auth === 'public') {
       const host = tokenValue.trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '').toLowerCase();
       if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(host) || /^\d+(\.\d+){3}$/.test(host)) {
-        showToast('That does not look like a store domain — try example.com', 'error');
+        showToast(m.cc_bad_domain(), 'error');
         return;
       }
       setTokenSaving(true);
@@ -235,11 +237,11 @@ export default function ConnectorsCard({
         // of leaving a connector that looks fine and fails on first use.
         const r = await probeConnector({ connectorId: connector.id });
         showToast(
-          r.ok ? `✓ Connected — ${(r.tools || []).length} tools` : `Connected, but the store did not answer: ${r.error}`,
+          r.ok ? m.cc_connected_tools({ count: (r.tools || []).length }) : m.cc_store_no_answer({ error: r.error ?? '' }),
           r.ok ? 'success' : 'error',
         );
       } catch (e) {
-        showToast(e instanceof Error ? e.message : 'Could not connect', 'error');
+        showToast(e instanceof Error ? e.message : m.cc_connect_failed(), 'error');
       } finally { setTokenSaving(false); }
       return;
     }
@@ -247,17 +249,17 @@ export default function ConnectorsCard({
     if (tokenApp.auth === 'oauth-id') {
       setTokenSaving(true);
       try { window.location.href = await startOAuthConnect(workspaceId, tokenApp.id, tokenValue.trim(), tokenSecret.trim() || undefined); }
-      catch (e) { showToast(e instanceof Error ? e.message : 'Could not start connect', 'error'); setTokenSaving(false); }
+      catch (e) { showToast(e instanceof Error ? e.message : m.cc_start_failed(), 'error'); setTokenSaving(false); }
       return;
     }
     setTokenSaving(true);
     try {
       await createTokenConnector({ workspaceId, app: tokenApp.id, token: tokenValue.trim(), shared: tokenShared && canShare, ...(tokenApp.needsShop ? { shop: tokenShop.trim() } : {}), ...(tokenApp.needsSecret ? { secret: tokenSecret.trim() } : {}) });
-      showToast(`${tokenApp.name} connected`, 'success');
+      showToast(m.cc_connected({ name: tokenApp.name }), 'success');
       setTokenApp(null);
       await load();
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not connect', 'error');
+      showToast(e instanceof Error ? e.message : m.cc_connect_failed(), 'error');
     } finally {
       setTokenSaving(false);
     }
@@ -268,12 +270,12 @@ export default function ConnectorsCard({
   };
 
   const runProbe = async () => {
-    if (!/^https:\/\//i.test(mcpUrl.trim())) { setProbe({ ok: false, error: 'Enter a https:// MCP URL first.' }); return; }
+    if (!/^https:\/\//i.test(mcpUrl.trim())) { setProbe({ ok: false, error: m.cc_https_first() }); return; }
     setProbing(true); setProbe(null);
     try {
       setProbe(await probeConnector({ mcpUrl: mcpUrl.trim(), token: token.trim() || undefined }));
     } catch (e) {
-      setProbe({ ok: false, error: e instanceof Error ? e.message : 'Probe failed' });
+      setProbe({ ok: false, error: e instanceof Error ? e.message : m.cc_probe_failed() });
     } finally {
       setProbing(false);
     }
@@ -284,7 +286,7 @@ export default function ConnectorsCard({
     try {
       setInspected(await inspectConnector(mcpUrl.trim()));
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not reach that address', 'error');
+      showToast(e instanceof Error ? e.message : m.cc_unreachable(), 'error');
     } finally { setInspecting(false); }
   };
 
@@ -302,7 +304,7 @@ export default function ConnectorsCard({
         { mcpUrl: mcpUrl.trim(), name: name.trim(), scopes },
       );
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not start connect', 'error');
+      showToast(e instanceof Error ? e.message : m.cc_start_failed(), 'error');
       setSaving(false);
     }
   };
@@ -315,11 +317,11 @@ export default function ConnectorsCard({
         workspaceId, name: name.trim(), mcpUrl: mcpUrl.trim(),
         token: token.trim() || undefined, shared: shared && canShare,
       });
-      showToast('Connector added', 'success');
+      showToast(m.cc_added(), 'success');
       setShowAdd(false);
       await load();
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to add connector', 'error');
+      showToast(e instanceof Error ? e.message : m.cc_add_failed(), 'error');
     } finally {
       setSaving(false);
     }
@@ -328,7 +330,7 @@ export default function ConnectorsCard({
   const handleDelete = async (id: string) => {
     setDeletingId(id);
     try { await deleteConnector(id); setConnectors(prev => prev.filter(c => c.id !== id)); }
-    catch { showToast('Failed to remove connector', 'error'); }
+    catch { showToast(m.cc_remove_failed(), 'error'); }
     finally { setDeletingId(null); }
   };
 
@@ -336,9 +338,9 @@ export default function ConnectorsCard({
     setTestingId(id);
     try {
       const r = await probeConnector({ connectorId: id });
-      showToast(r.ok ? `✓ ${r.serverName || 'Connected'} — ${(r.tools || []).length} tools` : `Failed: ${r.error}`, r.ok ? 'success' : 'error');
+      showToast(r.ok ? m.cc_test_ok({ name: r.serverName || m.cc_connected_word(), count: (r.tools || []).length }) : m.cc_test_failed_with({ error: r.error ?? '' }), r.ok ? 'success' : 'error');
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Test failed', 'error');
+      showToast(e instanceof Error ? e.message : m.cc_test_failed(), 'error');
     } finally {
       setTestingId(null);
     }
@@ -350,29 +352,30 @@ export default function ConnectorsCard({
   return (
     <>
     <Card className="p-6 md:p-8">
-      <div className="flex items-center justify-between mb-6">
+      {/* SQEM-609 — stacked on a phone: the German button label is longer and ran out of the card. */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
             <Plug className="w-5 h-5 text-accent" />
-            Connectors
+            {m.cc_title()}
           </h2>
           <p className="text-sm text-ink-muted mt-1">
-            Connect external MCP tools to use in Chat.
+            {m.cc_desc()}
           </p>
         </div>
         <button
           onClick={openAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-lg shrink-0"
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-lg shrink-0 self-start sm:self-auto"
         >
-          <Plus className="w-4 h-4" /> Add connector
+          <Plus className="w-4 h-4" /> {m.cc_add()}
         </button>
       </div>
 
       {loaded && manualConnectors.length === 0 ? (
         <div className="text-center py-10 border-2 border-dashed border-line-strong rounded-2xl">
           <Plug className="w-8 h-8 text-ink-subtle mx-auto mb-3" />
-          <p className="text-sm font-semibold text-ink-muted">No connectors yet</p>
-          <p className="text-xs text-ink-subtle mt-1">Add a hosted MCP endpoint to use its tools in Chat.</p>
+          <p className="text-sm font-semibold text-ink-muted">{m.cc_none()}</p>
+          <p className="text-xs text-ink-subtle mt-1">{m.cc_none_hint()}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -387,21 +390,21 @@ export default function ConnectorsCard({
                 <p className="text-xs font-mono text-ink-subtle mt-0.5 truncate">{c.mcp_url}</p>
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
                   <span className={`text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md flex items-center gap-1 ${c.user_id ? 'bg-success-soft text-ink-strong' : 'bg-accent-soft text-accent'}`}>
-                    {c.user_id ? <><UserIcon className="w-3 h-3" /> Personal</> : <><Users className="w-3 h-3" /> Workspace</>}
+                    {c.user_id ? <><UserIcon className="w-3 h-3" /> {m.cc_personal()}</> : <><Users className="w-3 h-3" /> {m.cc_workspace()}</>}
                   </span>
                   {c.allowed_tools?.length ? (
-                    <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-line-strong text-ink">{c.allowed_tools.length} tools</span>
+                    <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-line-strong text-ink">{m.cc_n_tools({ count: c.allowed_tools.length })}</span>
                   ) : null}
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button onClick={() => handleTest(c.id)} disabled={testingId === c.id} className="px-3 py-1.5 text-xs font-bold text-ink bg-surface-field border border-line-strong rounded-lg hover:bg-surface-sunken transition-colors disabled:opacity-50 flex items-center gap-1.5">
-                  {testingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Test
+                  {testingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} {m.cc_test()}
                 </button>
-                <button onClick={() => openToolsModal(c)} className="p-2 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors" title="Tools">
+                <button onClick={() => openToolsModal(c)} className="p-2 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors" title={m.cc_tools()}>
                   <Settings2 className="w-4 h-4" />
                 </button>
-                <button onClick={() => handleDelete(c.id)} disabled={deletingId === c.id} className="p-2 text-ink-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors disabled:opacity-50" title="Remove">
+                <button onClick={() => handleDelete(c.id)} disabled={deletingId === c.id} className="p-2 text-ink-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors disabled:opacity-50" title={m.cc_remove()}>
                   {deletingId === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 </button>
               </div>
@@ -416,10 +419,10 @@ export default function ConnectorsCard({
       <div className="mb-6">
         <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
           <LayoutGrid className="w-5 h-5 text-accent" />
-          Apps
+          {m.cc_apps()}
         </h2>
         <p className="text-sm text-ink-muted mt-1">
-          One-click connectors — sign in once, then use them in Chat.
+          {m.cc_apps_desc()}
         </p>
       </div>
       {/* SQEM-589 — on self-host the apps are a sqemes Cloud feature: ONE line saying so, in the design
@@ -428,7 +431,7 @@ export default function ConnectorsCard({
       {IS_SELF_HOSTED && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 rounded-control bg-surface-sunken border border-line">
           <p className="text-sm text-ink-muted">
-            One-click apps — Google Workspace, Microsoft 365, Atlassian, Linear, Notion and more — are available on sqemes Cloud.
+            {m.cc_apps_selfhost()}
           </p>
           <a
             href="https://sqemes.com"
@@ -460,7 +463,7 @@ export default function ConnectorsCard({
                     <app.Icon className="w-6 h-6" />
                   </div>
                   {connected && (
-                    <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-success ring-2 ring-surface-raised flex items-center justify-center" title="Connected">
+                    <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-success ring-2 ring-surface-raised flex items-center justify-center" title={m.cc_connected_word()}>
                       <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
                     </span>
                   )}
@@ -477,7 +480,7 @@ export default function ConnectorsCard({
                       : blocked ? 'text-ink font-semibold'
                       : 'text-ink-subtle'}`}>
                     {blocked && !connected && <AlertTriangle aria-hidden className="inline w-3 h-3 mr-1 -mt-0.5 text-warning" />}
-                    {connected ? 'Connected' : blocked ? app.unavailable : testingUnlock ? GOOGLE_TESTING_NOTE : app.description}
+                    {connected ? m.cc_connected_word() : blocked ? tileText(app.unavailable) : testingUnlock ? tileText(GOOGLE_TESTING_NOTE) : tileText(app.description)}
                   </p>
                 </div>
               </div>
@@ -485,13 +488,13 @@ export default function ConnectorsCard({
                 <button
                   onClick={() => (app.auth === 'token' || app.auth === 'oauth-id' || app.auth === 'public' ? openTokenModal(app) : connectApp(app.id))}
                   disabled={connectingApp === app.id || blocked}
-                  title={blocked ? app.unavailable : undefined}
+                  title={blocked ? tileText(app.unavailable) : undefined}
                   className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 ${connected ? 'text-ink bg-surface-field border border-line-strong hover:bg-surface-sunken' : 'text-white bg-accent-strong hover:opacity-90'}`}
                 >
-                  {connectingApp === app.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : connected ? 'Reconnect' : 'Connect'}
+                  {connectingApp === app.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : connected ? m.cc_reconnect() : m.cc_connect()}
                 </button>
                 {connected && appConnector && (
-                  <button onClick={() => openToolsModal(appConnector)} className="p-2 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors" title="Tools">
+                  <button onClick={() => openToolsModal(appConnector)} className="p-2 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors" title={m.cc_tools()}>
                     <Settings2 className="w-4 h-4" />
                   </button>
                 )}
@@ -500,7 +503,7 @@ export default function ConnectorsCard({
                     onClick={() => handleDelete(appConnector.id)}
                     disabled={deletingId === appConnector.id}
                     className="p-2 text-ink-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors disabled:opacity-50"
-                    title="Disconnect"
+                    title={m.cc_disconnect()}
                   >
                     {deletingId === appConnector.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                   </button>
@@ -514,48 +517,48 @@ export default function ConnectorsCard({
 
       {/* Add connector modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} size="sm" className="p-6">
-        <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">Add connector</h3>
-        <p className="text-sm text-ink-muted mb-5">Point at a hosted MCP endpoint. We ask the server how it wants to be connected.</p>
+        <h3 className="font-display text-xl font-semibold text-ink-strong mb-2">{m.cc_add()}</h3>
+        <p className="text-sm text-ink-muted mb-5">{m.cc_add_desc()}</p>
 
-        <label htmlFor="connectors-card-name" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Name</label>
-        <input id="connectors-card-name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. My Shopify store"
-          className="w-full p-3 mb-4 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle" />
+        <label htmlFor="connectors-card-name" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">{m.cc_name()}</label>
+        <Input id="connectors-card-name" value={name} onChange={e => setName(e.target.value)} placeholder={m.cc_name_placeholder()}
+          className="mb-4" />
 
         <label htmlFor="connectors-card-mcp-url" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">MCP URL</label>
-        <input id="connectors-card-mcp-url" value={mcpUrl} onChange={e => { setMcpUrl(e.target.value); setProbe(null); setInspected(null); }} placeholder="https://…/mcp"
-          className="w-full p-3 mb-4 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm font-mono outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle" />
+        <Input id="connectors-card-mcp-url" value={mcpUrl} onChange={e => { setMcpUrl(e.target.value); setProbe(null); setInspected(null); }} placeholder="https://…/mcp"
+          className="mb-4 font-mono" />
 
         {/* SQEM-444 — what the server said, and only the fields it actually needs. Nothing below this
             line appears until the address has been checked, because until then we would be guessing. */}
         {inspected?.kind === 'none' && (
           <div className="mb-4 p-3 rounded-xl bg-success-soft text-ink-strong text-xs">
-            <div className="font-bold flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Open server — no sign-in needed{inspected.serverName ? ` (${inspected.serverName})` : ''}</div>
-            {(inspected.tools || []).length > 0 && <div className="mt-1">{(inspected.tools || []).length} tools available.</div>}
+            <div className="font-bold flex items-center gap-1"><Check className="w-3.5 h-3.5" /> {m.cc_open_server()}{inspected.serverName ? ` (${inspected.serverName})` : ''}</div>
+            {(inspected.tools || []).length > 0 && <div className="mt-1">{m.cc_tools_available({ count: (inspected.tools || []).length })}</div>}
           </div>
         )}
 
         {inspected?.kind === 'oauth' && (
           <div className="mb-4 p-3 rounded-xl bg-surface-sunken border border-line text-xs">
-            <div className="font-bold text-ink">Signs you in with {new URL(inspected.issuer).hostname}</div>
+            <div className="font-bold text-ink">{m.cc_signs_in_with({ host: new URL(inspected.issuer).hostname })}</div>
             {inspected.registration ? (
-              <p className="text-ink-muted mt-1">Nothing to enter — this server issues its own credentials.</p>
+              <p className="text-ink-muted mt-1">{m.cc_nothing_to_enter()}</p>
             ) : (
               <>
                 {/* ⛔ SQEM-439 — the redirect URI is the one value nobody can guess, and registering the
                     wrong one fails with an error that names neither it nor the mistake. */}
-                <p className="text-ink-muted mt-1 mb-2">This server needs an app you register yourself. Use this redirect URI:</p>
+                <p className="text-ink-muted mt-1 mb-2">{m.cc_register_app()}</p>
                 <div className="flex items-center gap-2 mb-3">
                   <code className="flex-1 text-2xs font-mono text-ink break-all">{connectorRedirectUri()}</code>
                   <button onClick={() => { navigator.clipboard?.writeText(connectorRedirectUri()); setAddCopied(true); }}
                     className="shrink-0 px-2 py-1 text-2xs font-bold text-ink bg-surface-field border border-line-strong rounded-lg hover:bg-surface-sunken transition-colors">
-                    {addCopied ? 'Copied' : 'Copy'}
+                    {addCopied ? m.cc_copied() : m.cc_copy()}
                   </button>
                 </div>
                 <label htmlFor="connectors-card-client-id" className="block text-2xs font-bold text-ink-muted uppercase tracking-wider mb-1">Client ID</label>
-                <input id="connectors-card-client-id" value={addClientId} onChange={e => setAddClientId(e.target.value)} type="text" placeholder="from the app you registered"
+                <input id="connectors-card-client-id" value={addClientId} onChange={e => setAddClientId(e.target.value)} type="text" placeholder={m.cc_from_app()}
                   className="w-full p-2.5 mb-2 border border-line-strong bg-surface-field text-ink-strong rounded-lg text-xs outline-none focus:border-accent transition-all placeholder:text-ink-subtle" />
-                <label htmlFor="connectors-card-client-secret-optional" className="block text-2xs font-bold text-ink-muted uppercase tracking-wider mb-1">Client Secret <span className="normal-case tracking-normal font-medium text-ink-subtle">— optional</span></label>
-                <input id="connectors-card-client-secret-optional" value={addClientSecret} onChange={e => setAddClientSecret(e.target.value)} type="password" placeholder="leave empty if none was issued"
+                <label htmlFor="connectors-card-client-secret-optional" className="block text-2xs font-bold text-ink-muted uppercase tracking-wider mb-1">Client Secret <span className="normal-case tracking-normal font-medium text-ink-subtle">{m.cc_optional()}</span></label>
+                <input id="connectors-card-client-secret-optional" value={addClientSecret} onChange={e => setAddClientSecret(e.target.value)} type="password" placeholder={m.cc_secret_empty()}
                   className="w-full p-2.5 border border-line-strong bg-surface-field text-ink-strong rounded-lg text-xs outline-none focus:border-accent transition-all placeholder:text-ink-subtle" />
               </>
             )}
@@ -566,16 +569,16 @@ export default function ConnectorsCard({
             not the default it used to be. */}
         {inspected?.kind === 'token' && (
           <>
-            <label htmlFor="connectors-card-bearer-token" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Bearer token</label>
-            <input id="connectors-card-bearer-token" value={token} onChange={e => { setToken(e.target.value); setProbe(null); }} type="password" placeholder="the token this server expects"
-              className="w-full p-3 mb-4 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle" />
+            <label htmlFor="connectors-card-bearer-token" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">{m.cc_bearer()}</label>
+            <Input id="connectors-card-bearer-token" value={token} onChange={e => { setToken(e.target.value); setProbe(null); }} type="password" placeholder={m.cc_bearer_placeholder()}
+              className="mb-4" />
           </>
         )}
 
         {canShare && (
           <label className="flex items-start gap-2.5 mb-4 text-sm text-ink cursor-pointer select-none">
             <input type="checkbox" checked={shared} onChange={e => setShared(e.target.checked)} className="mt-0.5 w-4 h-4 rounded accent-brand-600 cursor-pointer shrink-0" />
-            <span>Share with the whole workspace<span className="block text-2xs text-ink-subtle">Off = personal to you. Shared connectors need admin/editor.</span></span>
+            <span>{m.cc_share()}<span className="block text-2xs text-ink-subtle">{m.cc_share_hint()}</span></span>
           </label>
         )}
 
@@ -584,18 +587,18 @@ export default function ConnectorsCard({
           {/* SQEM-444 — "check" rather than "test": it decides what the dialog asks for next, so it is
               a step in the flow and not an optional reassurance. */}
           <button onClick={runInspect} disabled={inspecting || !mcpUrl.trim()} className="text-xs font-bold text-accent hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5">
-            {inspecting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking…</> : <><Check className="w-3.5 h-3.5" /> Check server</>}
+            {inspecting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {m.cc_checking()}</> : <><Check className="w-3.5 h-3.5" /> {m.cc_check()}</>}
           </button>
           {inspected?.kind === 'token' && (
             <button onClick={runProbe} disabled={probing || !mcpUrl.trim()} className="mt-2 text-xs font-bold text-accent hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5">
-              {probing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Testing…</> : <><Check className="w-3.5 h-3.5" /> Test with this token</>}
+              {probing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {m.cc_testing()}</> : <><Check className="w-3.5 h-3.5" /> {m.cc_test_token()}</>}
             </button>
           )}
           {probe && (
             <div className={`mt-2 text-xs rounded-lg p-2.5 ${probe.ok ? 'bg-success-soft text-ink-strong' : 'bg-danger-soft text-danger'}`}>
               {probe.ok ? (
                 <>
-                  <div className="font-bold flex items-center gap-1"><Check className="w-3.5 h-3.5" /> {probe.serverName || 'Connected'} — {(probe.tools || []).length} tools</div>
+                  <div className="font-bold flex items-center gap-1"><Check className="w-3.5 h-3.5" /> {m.cc_probe_ok({ name: probe.serverName || m.cc_connected_word(), count: (probe.tools || []).length })}</div>
                   {(probe.tools || []).length > 0 && (
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {(probe.tools || []).slice(0, 12).map(t => (
@@ -605,14 +608,14 @@ export default function ConnectorsCard({
                   )}
                 </>
               ) : (
-                <div className="flex items-start gap-1"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {probe.error || 'Could not connect.'}</div>
+                <div className="flex items-start gap-1"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {probe.error || m.cc_could_not_connect()}</div>
               )}
             </div>
           )}
         </div>
 
         <div className="flex gap-2">
-          <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">Cancel</button>
+          <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">{m.pb_cancel()}</button>
           {/* ⛔ SQEM-444 — an OAuth server is not "added", it is *connected*: the row appears when the
               person comes back from the provider. Two different endings, so two different buttons. */}
           {inspected?.kind === 'oauth' ? (
@@ -620,12 +623,12 @@ export default function ConnectorsCard({
               onClick={connectAdHoc}
               disabled={saving || !name.trim() || (!inspected.registration && !addClientId.trim())}
               className="flex-1 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-              {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Connecting…</> : 'Continue'}
+              {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {m.cc_connecting()}</> : m.cc_continue()}
             </button>
           ) : (
             <button onClick={handleAdd} disabled={saving || !inspected || !name.trim() || !/^https:\/\//i.test(mcpUrl.trim())}
               className="flex-1 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-              {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Adding…</> : 'Add connector'}
+              {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {m.cc_adding()}</> : m.cc_add()}
             </button>
           )}
         </div>
@@ -637,70 +640,70 @@ export default function ConnectorsCard({
           <>
             <div className="flex items-center gap-2.5 mb-2">
               <tokenApp.Icon className="w-6 h-6" />
-              <h3 className="font-display text-xl font-semibold text-ink-strong">Connect {tokenApp.name}</h3>
+              <h3 className="font-display text-xl font-semibold text-ink-strong">{m.cc_connect_app({ name: tokenApp.name })}</h3>
             </div>
             {/* ⛔ SQEM-439 — the redirect URI comes FIRST, before the help text that refers to it.
                 It is the one value the person cannot obtain anywhere else, and registering an app
                 without it produces a token-endpoint error that names everything except the URI. */}
             {tokenApp.auth === 'oauth-id' && tokenApp.needsRedirectUri && (
               <div className="mb-4 p-3 rounded-xl bg-surface-sunken border border-line">
-                <p className="text-2xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Redirect URI — register this in Nifty</p>
+                <p className="text-2xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">{m.cc_redirect_nifty()}</p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 text-2xs font-mono text-ink break-all">{connectorRedirectUri()}</code>
                   <button
                     onClick={() => { navigator.clipboard?.writeText(connectorRedirectUri()); setRedirectCopied(true); }}
                     className="shrink-0 px-2 py-1 text-2xs font-bold text-ink bg-surface-field border border-line-strong rounded-lg hover:bg-surface-sunken transition-colors"
                   >
-                    {redirectCopied ? 'Copied' : 'Copy'}
+                    {redirectCopied ? m.cc_copied() : m.cc_copy()}
                   </button>
                 </div>
                 {/* Staging and production are different hosts, so they need separate apps. */}
-                <p className="text-2xs text-ink-subtle mt-1.5">This address is specific to this sqemes instance — an app registered for another one will be rejected.</p>
+                <p className="text-2xs text-ink-subtle mt-1.5">{m.cc_redirect_instance()}</p>
               </div>
             )}
 
-            <p className="text-sm text-ink-muted mb-5">{tokenApp.help}</p>
+            <p className="text-sm text-ink-muted mb-5">{tileText(tokenApp.help)}</p>
 
             {tokenApp.auth === 'token' && tokenApp.needsShop && (
               <>
-                <label htmlFor="connectors-card-shop-domain" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">Shop domain</label>
-                <input id="connectors-card-shop-domain" value={tokenShop} onChange={e => setTokenShop(e.target.value)} placeholder="your-store.myshopify.com"
-                  className="w-full p-3 mb-4 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm font-mono outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle" />
+                <label htmlFor="connectors-card-shop-domain" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">{m.cc_shop_domain()}</label>
+                <Input id="connectors-card-shop-domain" value={tokenShop} onChange={e => setTokenShop(e.target.value)} placeholder="your-store.myshopify.com"
+                  className="mb-4 font-mono" />
               </>
             )}
 
-            <label htmlFor="connectors-card-" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">{tokenApp.auth === 'public' ? tokenApp.hostLabel : tokenApp.tokenLabel}</label>
+            <label htmlFor="connectors-card-" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">{tileText(tokenApp.auth === 'public' ? tokenApp.hostLabel : tokenApp.tokenLabel)}</label>
             {/* ⚠️ SQEM-437 — a client id is NOT a secret (Microsoft publishes its own in a 401
                 header), and masking it would stop the person checking what they pasted. A token is
                 masked for the opposite reason. */}
             {/* ⚠️ SQEM-441 — a shop domain is public information, so it is plain text like the client
                 id above and unlike a token. */}
-            <input id="connectors-card-" value={tokenValue} onChange={e => setTokenValue(e.target.value)} type={tokenApp.auth === 'token' && !tokenApp.needsSecret ? 'password' : 'text'} placeholder={tokenApp.placeholder}
-              className="w-full p-3 mb-4 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle" />
+            <Input id="connectors-card-" value={tokenValue} onChange={e => setTokenValue(e.target.value)} type={tokenApp.auth === 'token' && !tokenApp.needsSecret ? 'password' : 'text'} placeholder={tileText(tokenApp.placeholder)}
+              className="mb-4" />
 
             {((tokenApp.auth === 'oauth-id') || (tokenApp.auth === 'token' && tokenApp.needsSecret)) && tokenApp.secretLabel && (
               <>
                 <label htmlFor="connectors-card--2" className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1.5">
-                  {tokenApp.secretLabel}{tokenApp.secretOptional && <span className="ml-1 normal-case tracking-normal font-medium text-ink-subtle">— optional</span>}
+                  {tileText(tokenApp.secretLabel)}{tokenApp.secretOptional && <span className="ml-1 normal-case tracking-normal font-medium text-ink-subtle">{m.cc_optional()}</span>}
                 </label>
                 {/* ⚠️ Masked, unlike the Client ID above: this one IS a secret. */}
-                <input id="connectors-card--2" value={tokenSecret} onChange={e => setTokenSecret(e.target.value)} type="password" placeholder={tokenApp.auth === 'token' ? 'shpss_…' : 'leave empty if Nifty did not issue one'}
-                  className="w-full p-3 mb-4 border border-line-strong bg-surface-field text-ink-strong rounded-xl text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-subtle" />
+                <Input id="connectors-card--2" value={tokenSecret} onChange={e => setTokenSecret(e.target.value)} type="password" placeholder={tokenApp.auth === 'token' ? 'shpss_…' : m.cc_nifty_secret_empty()}
+                  className="mb-4" />
               </>
             )}
 
             {canShare && (tokenApp.auth === 'token' || tokenApp.auth === 'public') && (
               <label className="flex items-start gap-2.5 mb-4 text-sm text-ink cursor-pointer select-none">
                 <input type="checkbox" checked={tokenShared} onChange={e => setTokenShared(e.target.checked)} className="mt-0.5 w-4 h-4 rounded accent-brand-600 cursor-pointer shrink-0" />
-                <span>Share with the whole workspace<span className="block text-2xs text-ink-subtle">Off = personal to you. Shared connectors need admin/editor.</span></span>
+                <span>{m.cc_share()}<span className="block text-2xs text-ink-subtle">{m.cc_share_hint()}</span></span>
               </label>
             )}
 
             <div className="flex gap-2">
-              <button onClick={() => setTokenApp(null)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">Cancel</button>
+              <button onClick={() => setTokenApp(null)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">{m.pb_cancel()}</button>
               <button onClick={connectToken} disabled={tokenSaving || !tokenValue.trim() || (tokenApp.auth === 'token' && tokenApp.needsShop && !tokenShop.trim())}
                 className="flex-1 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                {tokenSaving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Connecting…</> : (tokenApp.auth === 'oauth-id' ? 'Continue' : 'Connect')}
+                {tokenSaving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {m.cc_connecting()}</> : (tokenApp.auth === 'oauth-id' ? m.cc_continue() : m.cc_connect())}
               </button>
             </div>
           </>
@@ -714,7 +717,7 @@ export default function ConnectorsCard({
           <>
             <div className="flex items-center gap-2.5 mb-1">
               <Settings2 className="w-5 h-5 text-ink-subtle" />
-              <h3 className="font-display text-xl font-semibold text-ink-strong">{toolsFor.name} — tools</h3>
+              <h3 className="font-display text-xl font-semibold text-ink-strong">{m.cc_tools_title({ name: toolsFor.name })}</h3>
             </div>
             <p className="text-xs font-mono text-ink-subtle mb-4 truncate">{toolsFor.mcp_url}</p>
 
@@ -723,21 +726,21 @@ export default function ConnectorsCard({
             <div className="space-y-2 mb-4">
               <label className="flex items-start gap-2.5 text-sm text-ink cursor-pointer select-none">
                 <input type="radio" checked={toolsPick === null} onChange={() => setToolsPick(null)} className="mt-0.5 w-4 h-4 accent-brand-600 cursor-pointer shrink-0" />
-                <span>All tools<span className="block text-2xs text-ink-subtle">Whatever this service offers, now and later. New tools are included automatically.</span></span>
+                <span>{m.cc_all_tools()}<span className="block text-2xs text-ink-subtle">{m.cc_all_tools_hint()}</span></span>
               </label>
               <label className="flex items-start gap-2.5 text-sm text-ink cursor-pointer select-none">
                 <input type="radio" checked={toolsPick !== null} onChange={() => setToolsPick(toolsList ? toolsList.map(t => t.name) : [])} className="mt-0.5 w-4 h-4 accent-brand-600 cursor-pointer shrink-0" />
-                <span>Only the ones I pick<span className="block text-2xs text-ink-subtle">Fewer tools means smaller requests and fewer wrong guesses — but a tool added later stays off until you come back.</span></span>
+                <span>{m.cc_pick()}<span className="block text-2xs text-ink-subtle">{m.cc_pick_hint()}</span></span>
               </label>
             </div>
 
-            {toolsLoading && <p className="text-xs text-ink-subtle flex items-center gap-2 mb-4"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading the tool list…</p>}
+            {toolsLoading && <p className="text-xs text-ink-subtle flex items-center gap-2 mb-4"><Loader2 className="w-3.5 h-3.5 animate-spin" /> {m.cc_loading_tools()}</p>}
 
             {toolsError && (
               <div className="flex items-start gap-2 p-3 mb-4 rounded-xl bg-warning-soft text-ink-strong">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 {/* Not "no tools" — the saved selection is still in force and still editable. */}
-                <p className="text-xs">Could not load the live tool list ({toolsError}). Your saved selection is unchanged and can still be edited below.</p>
+                <p className="text-xs">{m.cc_live_failed({ error: toolsError })}</p>
               </div>
             )}
 
@@ -757,16 +760,16 @@ export default function ConnectorsCard({
                   );
                 })}
                 {!toolsList && toolsPick.length === 0 && (
-                  <p className="text-xs text-ink-subtle px-2.5 py-2">No tool list available right now.</p>
+                  <p className="text-xs text-ink-subtle px-2.5 py-2">{m.cc_no_tool_list()}</p>
                 )}
               </div>
             )}
 
             <div className="flex gap-2">
-              <button onClick={() => setToolsFor(null)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">Cancel</button>
+              <button onClick={() => setToolsFor(null)} className="flex-1 py-2.5 text-ink bg-surface-sunken rounded-xl hover:bg-line-strong text-xs font-bold transition-colors">{m.pb_cancel()}</button>
               <button onClick={saveTools} disabled={toolsSaving}
                 className="flex-1 py-2.5 bg-accent-strong hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                {toolsSaving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</> : 'Save'}
+                {toolsSaving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {m.cc_saving()}</> : m.st_save()}
               </button>
             </div>
           </>

@@ -6,11 +6,13 @@ import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { encryptApiKey } from '../_shared/crypto.ts';
 import { CONNECTOR_APPS, MCP_OAUTH_APPS, PROVIDERS, mcpClientIdSource } from '../_shared/connectorApps.ts';
 import { discoverAuthServer, getOrRegisterClient, createPkce } from '../_shared/mcpOauth.ts';
+import { m as txt, requestLocale } from '../_shared/locale.ts';
 
 const PUBLIC_API_URL = (Deno.env.get('PUBLIC_API_URL') ?? Deno.env.get('SUPABASE_URL') ?? '').trim().replace(/\/+$/, '');
 const REDIRECT_URI = `${PUBLIC_API_URL}/functions/v1/connector-oauth-callback`;
 
 Deno.serve(async (req) => {
+  const locale = requestLocale(req); // SQEM-612 — refusals in the person's language
   const cors = getCorsHeaders(req);
   const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -43,7 +45,7 @@ Deno.serve(async (req) => {
       let u: URL | null = null;
       try { u = new URL(adHoc); } catch { u = null; }
       const bad = !u || u.protocol !== 'https:' || /^\d+(\.\d+){3}$/.test(u.hostname) || !u.hostname.includes('.');
-      if (bad) return json({ error: 'mcpUrl must be an https:// address with a hostname' }, 400);
+      if (bad) return json({ error: txt.srv_https_host({}, { locale }) }, 400);
     }
     const mcpTarget = mcpApp ?? (adHoc
       ? {
@@ -59,18 +61,18 @@ Deno.serve(async (req) => {
     // SQEM-273 — trimmed for the same reason as the callback: a pasted value with trailing
     // whitespace would send a client_id the provider does not recognise, and nothing would say so.
     const clientId = cfg ? (Deno.env.get(cfg.clientIdEnv) ?? '').trim() : '';
-    if (cfg && !clientId) return json({ error: `This connector is not configured on this instance (${cfg.clientIdEnv}).` }, 503);
+    if (cfg && !clientId) return json({ error: txt.srv_connector_unconfigured({ env: cfg.clientIdEnv }, { locale }) }, 503);
     if (!workspaceId) return json({ error: 'workspaceId required' }, 400);
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) return json({ error: 'Missing authorization header' }, 401);
     const admin = createAdminClient();
     const { data: { user }, error: authErr } = await admin.auth.getUser(authHeader.replace(/^Bearer\s+/i, ''));
-    if (authErr || !user) return json({ error: 'Unauthorized' }, 401);
+    if (authErr || !user) return json({ error: txt.srv_unauthorized({}, { locale }) }, 401);
 
     const { data: mem } = await admin.from('workspace_members').select('role')
       .eq('workspace_id', workspaceId).eq('user_id', user.id).single();
-    if (!mem) return json({ error: 'Not a member of this workspace' }, 403);
+    if (!mem) return json({ error: txt.srv_not_member({}, { locale }) }, 403);
 
     // ---- SQEM-426: the MCP kind discovers, registers, and carries PKCE through `state` ----
     if (mcpTarget) {

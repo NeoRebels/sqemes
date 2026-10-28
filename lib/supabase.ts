@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 import { runtimeConfig } from './runtimeConfig';
+import { getLocale } from './i18n';
+import { MARKETPLACE_API_URL } from './env';
+import { withLocaleParam, functionsBaseOf } from './localeParam';
 
 // SQEM-126 — prefer runtime instance config (self-host /config.js), fall back to build-time VITE_*.
 const supabaseUrl = (runtimeConfig.supabaseUrl || import.meta.env.VITE_SUPABASE_URL)?.trim();
@@ -54,6 +57,7 @@ Headers.prototype.append = function (name: string, value: string) {
   return _origAppend.call(this, name, strip(value));
 };
 
+const FUNCTION_BASES = [`${supabaseUrl}/functions/v1/`, functionsBaseOf(MARKETPLACE_API_URL)];
 const _nativeFetch = globalThis.fetch.bind(globalThis);
 globalThis.fetch = function (
   input: RequestInfo | URL,
@@ -65,6 +69,13 @@ globalThis.fetch = function (
     typeof input === 'string' ? input
     : input instanceof URL ? input.href
     : (input as Request).url;
+
+  // SQEM-612 — every edge-function call carries the app language, so a refusal comes back in it
+  // (a query parameter, not a header — why: lib/localeParam.ts).
+  if (typeof input === 'string' || input instanceof URL) {
+    const localized = withLocaleParam(url, FUNCTION_BASES, getLocale());
+    if (localized !== url) input = localized;
+  }
 
   if (url.startsWith(supabaseUrl) && init?.headers && !(init.headers instanceof Headers)) {
     // Build a Headers object using our patched .set() so values get sanitized.

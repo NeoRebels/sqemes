@@ -10,6 +10,7 @@ import ConfirmModal from '../components/ui/ConfirmModal';
 import EmptyState from '../components/ui/EmptyState';
 import Checkbox from '../components/ui/Checkbox';
 import BulkActionBar from '../components/ui/BulkActionBar';
+import { m } from '../lib/i18n';
 import { fetchExternalChatHistory, setExternalChatPinned, deleteExternalChat, type ExternalChat } from '../lib/api/externalChatHistory';
 import { buildHistory, filterHistory, historySources, deleteWarning, bulkDeleteWarning, relTime, type HistoryEntry } from '../lib/historyItems';
 
@@ -75,11 +76,11 @@ const History = () => {
       } else {
         await deleteExternalChat(toDelete.id);
         setExternal(prev => prev.filter(x => x.id !== toDelete.id));
-        showToast('Removed from your history', 'success');
+        showToast(m.hi_removed(), 'success');
       }
       setToDelete(null);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not delete', 'error');
+      showToast(err instanceof Error ? err.message : m.hi_delete_failed(), 'error');
     } finally {
       setBusy(false);
     }
@@ -97,8 +98,8 @@ const History = () => {
       setExternal(prev => prev.filter(x => !gone.has(x.id)));
       const failed = sq.failed + (ext.length - gone.size);
       const deleted = sq.deleted + gone.size;
-      if (failed) showToast(`${deleted} deleted, ${failed} could not be deleted`, 'error');
-      else showToast(`${deleted} deleted`, 'success');
+      if (failed) showToast(m.hi_bulk_partial({ deleted, failed }), 'error');
+      else showToast(m.hi_bulk_done({ deleted }), 'success');
       setSelectedKeys(new Set());
       setBulkDelete(null);
     } finally {
@@ -110,7 +111,7 @@ const History = () => {
     // SQEM-538 — the title is the button and its ::after covers the row; pin and delete sit above it.
     <li key={e.key} className="group relative flex items-center gap-3 px-3 py-2.5 rounded-control hover:bg-surface-sunken transition-colors">
       {/* SQEM-576 — as on Personas: padded label gives the checkbox a hit margin over the row button. */}
-      <label aria-label={`Select ${e.title}`} className="relative z-10 p-1 -m-1 cursor-pointer">
+      <label aria-label={m.hi_select({ title: e.title })} className="relative z-10 p-1 -m-1 cursor-pointer">
         <Checkbox
           checked={selectedKeys.has(e.key)}
           onChange={() => toggleSelect(e.key)}
@@ -129,13 +130,13 @@ const History = () => {
         >
           {e.title}
         </button>
-        <p className="text-xs text-ink-subtle truncate">{e.label}{e.shared ? ' · shared' : ''} · {relTime(e.ts)}</p>
+        <p className="text-xs text-ink-subtle truncate">{e.label}{e.shared ? m.hi_shared() : ''} · {relTime(e.ts)}</p>
       </div>
       <button
         type="button"
         onClick={() => togglePin(e)}
-        title={e.pinned ? 'Unpin' : 'Pin'}
-        aria-label={e.pinned ? `Unpin ${e.title}` : `Pin ${e.title}`}
+        title={e.pinned ? m.hi_unpin() : m.hi_pin()}
+        aria-label={e.pinned ? m.hi_unpin_x({ title: e.title }) : m.hi_pin_x({ title: e.title })}
         className={`relative z-10 shrink-0 w-7 h-7 rounded-chip flex items-center justify-center transition-colors ${
           e.pinned ? 'text-accent' : 'text-ink-subtle reveal-on-hover hover:text-accent'
         }`}
@@ -145,8 +146,8 @@ const History = () => {
       <button
         type="button"
         onClick={() => setToDelete(e)}
-        title="Delete"
-        aria-label={`Delete ${e.title}`}
+        title={m.hi_delete()}
+        aria-label={m.hi_delete_x({ title: e.title })}
         className="relative z-10 shrink-0 w-7 h-7 rounded-chip flex items-center justify-center text-ink-subtle reveal-on-hover hover:text-danger hover:bg-danger-soft transition-colors"
       >
         <Trash2 className="w-4 h-4" />
@@ -167,31 +168,31 @@ const History = () => {
     // better narrow (max-w-3xl; 7xl like Personas was tried and dropped).
     <div className="p-4 md:p-8 pb-16 md:pb-20 max-w-3xl mx-auto">
       <PageHeader
-        title="History"
-        subtitle="Your sqemes chats and the chats the browser extension recorded on ChatGPT, Claude and others."
+        title={m.nav_history()}
+        subtitle={m.hi_subtitle()}
       />
       <div className="flex flex-col sm:flex-row gap-2 mb-6">
-        <div className="flex-1"><SearchInput value={query} onChange={setQuery} placeholder="Search chats..." /></div>
+        <div className="flex-1"><SearchInput value={query} onChange={setQuery} placeholder={m.hi_search()} /></div>
         {sources.length > 1 && (
-          <SelectFilter icon={Filter} ariaLabel="Source" allLabel="All sources" options={sources} value={source} onChange={setSource} />
+          <SelectFilter icon={Filter} ariaLabel={m.hi_source()} allLabel={m.hi_all_sources()} options={sources} value={source} onChange={setSource} />
         )}
       </div>
       {loading && all.length === 0 ? (
         <div className="flex items-center gap-2 text-ink-subtle text-sm py-20 justify-center">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading history…
+          <Loader2 className="w-4 h-4 animate-spin" /> {m.hi_loading()}
         </div>
       ) : all.length === 0 ? (
         <EmptyState
           icon={<MessageSquare className="w-8 h-8" />}
           tone="brand"
-          title="No chats yet"
-          description="Chats you start in sqemes appear here, and so do the ChatGPT, Claude or Gemini chats the browser extension records."
+          title={m.hi_empty_title()}
+          description={m.hi_empty_desc()}
         />
       ) : shown.length === 0 ? (
         <EmptyState
           icon={<MessageSquare className="w-8 h-8" />}
-          title="No chat matches"
-          description="Try another word, or show all sources."
+          title={m.hi_nomatch_title()}
+          description={m.hi_nomatch_desc()}
         />
       ) : (
         <div className="space-y-5">
@@ -206,14 +207,14 @@ const History = () => {
               noun="chat"
             />
           )}
-          {section('Pinned', pinned)}
-          {section('Recent Chats', recent)}
+          {section(m.hi_pinned(), pinned)}
+          {section(m.sb_recent(), recent)}
         </div>
       )}
       <ConfirmModal
         open={!!toDelete}
-        title={toDelete?.kind === 'external' ? 'Remove from history?' : 'Delete chat?'}
-        confirmLabel={toDelete?.kind === 'external' ? 'Remove' : 'Delete'}
+        title={toDelete?.kind === 'external' ? m.hi_remove_title() : m.hi_delete_title()}
+        confirmLabel={toDelete?.kind === 'external' ? m.hi_remove() : m.hi_delete()}
         busy={busy}
         onConfirm={confirmDelete}
         onClose={() => !busy && setToDelete(null)}
@@ -222,8 +223,8 @@ const History = () => {
       </ConfirmModal>
       <ConfirmModal
         open={!!bulkDelete}
-        title={`Delete ${bulkDelete?.length ?? 0} chat${bulkDelete?.length === 1 ? '' : 's'}?`}
-        confirmLabel="Delete"
+        title={m.hi_bulk_title({ count: bulkDelete?.length ?? 0 })}
+        confirmLabel={m.hi_delete()}
         busy={busy}
         onConfirm={confirmBulkDelete}
         onClose={() => !busy && setBulkDelete(null)}

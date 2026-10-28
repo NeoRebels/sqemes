@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import SegmentedTabs from '../../components/ui/SegmentedTabs';
 import PickerDropdown from '../../components/ui/PickerDropdown';
 import Modal from '../../components/ui/Modal';
+import { en } from './i18nText';
 
 /**
  * SQEM-544 — wording and polish: what a person reads, and what a screen reader is told.
@@ -18,17 +19,22 @@ const h = React.createElement;
 describe('SQEM-544 — the words', () => {
   it('a persona uses "playbooks", not "routes", wherever a person reads it', () => {
     const editor = read('pages/PersonaEditor.tsx');
-    expect(editor).toMatch(/label: 'Playbooks', icon: <ListTree/);
-    expect(editor).toMatch(/uppercase tracking-wider">Playbooks<\/p>/);
+    expect(editor).toMatch(/label: m\.pe_tab_playbooks\(\), icon: <ListTree/);
+    expect(editor).toMatch(/uppercase tracking-wider">\{m\.pe_tab_playbooks\(\)\}<\/p>/);
+    expect(en.pe_tab_playbooks).toBe('Playbooks'); // SQEM-605
     expect(editor).not.toMatch(/>No routes yet</);
     // SQEM-554 (b) — the archive is a list + preview; the sentence moved to the preview, the row says it short.
-    expect(read('components/PersonaPreview.tsx')).toMatch(/No playbooks yet — this persona loads nothing/);
-    expect(read('pages/Personas.tsx')).toMatch(/'Loads nothing yet'/);
+    expect(read('components/PersonaPreview.tsx')).toMatch(/m\.ppv_empty\(\)/);
+    expect(en.ppv_empty).toMatch(/^No playbooks yet — this persona loads nothing/);
+    expect(read('pages/Personas.tsx')).toMatch(/m\.ps_loads_nothing\(\)/);
+    expect(en.ps_loads_nothing).toBe('Loads nothing yet');
   });
 
   it('Chat and the playbooks page speak of playbooks', () => {
-    expect(read('pages/Chat.tsx')).toMatch(/title="Use playbook {2}\(\/\)"/);
-    expect(read('pages/Templates.tsx')).toMatch(/subtitle="Your team's playbooks — prompts for tasks, skills for knowledge\."/);
+    expect(read('pages/Chat.tsx')).toMatch(/title=\{txt\.chat_use_playbook\(\)\}/);
+    expect(en.chat_use_playbook).toBe('Use playbook  (/)'); // SQEM-604
+    expect(read('pages/Templates.tsx')).toMatch(/subtitle=\{m\.pb_subtitle\(\)\}/);
+    expect(en.pb_subtitle).toBe("Your team's playbooks — prompts for tasks, skills for knowledge."); // SQEM-605
   });
 
   it('the marketplace admin panel uses the brand colour', () => {
@@ -46,7 +52,8 @@ describe('SQEM-544 — structure', () => {
   it('a skip link focuses the main area without a fragment route', () => {
     const app = read('App.tsx');
     expect(app).toMatch(/onClick=\{\(\) => mainRef\.current\?\.focus\(\)\}/);
-    expect(app).toMatch(/>\s*Skip to content\s*</);
+    expect(app).toMatch(/>\s*\{m\.app_skip\(\)\}\s*</);
+    expect(en.app_skip).toBe('Skip to content'); // SQEM-611
     expect(app).toMatch(/<main ref=\{mainRef\} id="main-content" tabIndex=\{-1\}/);
   });
 });

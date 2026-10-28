@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { Prompt, LibraryTemplate, ChatSession, User, WorkspaceFile } from '../types';
 import { logError } from '../lib/monitoring';
+import { m } from '../lib/i18n';
 import * as libraryApi from '../lib/api/library';
 import * as chatSessionsApi from '../lib/api/chatSessions';
 import * as filesApi from '../lib/api/files';
@@ -9,8 +10,9 @@ export interface DataState {
   libraryTemplates: LibraryTemplate[];
   fetchLibraryTemplates: () => void;
   addLibraryTemplate: (template: LibraryTemplate) => Promise<LibraryTemplate | undefined>;
-  updateLibraryTemplate: (template: LibraryTemplate) => void;
-  deleteLibraryTemplate: (id: string) => void;
+  /** SQEM-606 — false when the save failed (the store has already said so). */
+  updateLibraryTemplate: (template: LibraryTemplate) => Promise<boolean>;
+  deleteLibraryTemplate: (id: string) => Promise<void>;
   copyTemplateToWorkspace: (templateId: string) => Promise<string | undefined>;
   // SQEM-013 — chatSessions + its methods moved to ChatSessionsContext (see store/chatSessions.tsx).
   workspaceFiles: WorkspaceFile[];
@@ -51,16 +53,18 @@ export function useDataState(
       setLibraryTemplates(prev => [created, ...prev]);
       return created;
     } catch (err: any) {
-      showToast(err.message || 'Failed to create template', 'error');
+      showToast(err.message || m.pb_create_failed(), 'error');
     }
   }, [showToast]);
 
-  const updateLibraryTemplateAction = useCallback(async (template: LibraryTemplate) => {
+  const updateLibraryTemplateAction = useCallback(async (template: LibraryTemplate): Promise<boolean> => {
     try {
       const updated = await libraryApi.updateLibraryTemplate(template);
       setLibraryTemplates(prev => prev.map(t => t.id === updated.id ? updated : t));
+      return true;
     } catch (err: any) {
-      showToast(err.message || 'Failed to update template', 'error');
+      showToast(err.message || m.pb_update_failed(), 'error');
+      return false;
     }
   }, [showToast]);
 
@@ -68,9 +72,9 @@ export function useDataState(
     try {
       await libraryApi.deleteLibraryTemplate(id);
       setLibraryTemplates(prev => prev.filter(t => t.id !== id));
-      showToast('Template deleted', 'success');
+      showToast(m.pb_deleted(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to delete template', 'error');
+      showToast(err.message || m.pb_delete_failed(), 'error');
     }
   }, [showToast]);
 
@@ -81,10 +85,10 @@ export function useDataState(
       setLibraryTemplates(prev => prev.map(t =>
         t.id === templateId ? { ...t, usageCount: t.usageCount + 1 } : t
       ));
-      showToast('Template saved to workspace', 'success');
+      showToast(m.lib_copied(), 'success');
       return promptId;
     } catch (err: any) {
-      showToast(err.message || 'Failed to copy template', 'error');
+      showToast(err.message || m.lib_copy_failed(), 'error');
     }
   }, [activeWorkspaceId, currentUser.id, showToast]);
 
@@ -103,9 +107,9 @@ export function useDataState(
     try {
       await filesApi.deleteWorkspaceFile(id, file.storagePath);
       setWorkspaceFiles(prev => prev.filter(f => f.id !== id));
-      showToast('File deleted', 'success');
+      showToast(m.fi_deleted(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to delete file', 'error');
+      showToast(err.message || m.fi_delete_failed(), 'error');
     }
   }, [workspaceFiles, showToast]);
 
@@ -118,8 +122,8 @@ export function useDataState(
     const okIds = new Set(targets.filter((_, i) => results[i].status === 'fulfilled').map(f => f.id));
     if (okIds.size > 0) setWorkspaceFiles(prev => prev.filter(f => !okIds.has(f.id)));
     const failed = results.length - okIds.size;
-    if (failed === 0) showToast(`Deleted ${okIds.size} file${okIds.size === 1 ? '' : 's'}`, 'success');
-    else showToast(`Deleted ${okIds.size} of ${results.length} — ${failed} failed`, 'error');
+    if (failed === 0) showToast(m.fi_deleted_many({ files: m.count_file({ count: okIds.size }) }), 'success');
+    else showToast(m.ps_deleted_partial({ done: okIds.size, total: results.length, failed }), 'error');
   }, [workspaceFiles, showToast]);
 
   // ---- Chat Session actions ----
@@ -132,7 +136,7 @@ export function useDataState(
       const updated = await chatSessionsApi.updateChatSession(id, updates);
       if (updated) setChatSessions(prev => prev.map(s => s.id === id ? updated : s));
     } catch (err: any) {
-      showToast(err.message || 'Failed to update chat', 'error');
+      showToast(err.message || m.chat_update_failed(), 'error');
     }
   }, [showToast]);
 
@@ -140,9 +144,9 @@ export function useDataState(
     try {
       await chatSessionsApi.deleteChatSession(id);
       setChatSessions(prev => prev.filter(s => s.id !== id));
-      showToast('Chat deleted', 'success');
+      showToast(m.chat_deleted_toast(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to delete chat', 'error');
+      showToast(err.message || m.chat_delete_failed(), 'error');
     }
   }, [showToast]);
 

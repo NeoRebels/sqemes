@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve, relative } from 'node:path';
 import ts from 'typescript';
+import { en } from './i18nText';
 
 /**
  * SQEM-538 — every form label is bound to its field.
@@ -111,12 +112,15 @@ describe('SQEM-538 — fields and controls have names', () => {
 
   it('the named controls keep their names', () => {
     const read = (f: string) => readFileSync(join(ROOT, f), 'utf8');
-    expect(read('components/Sidebar.tsx')).toMatch(/aria-label=\{isCollapsed \? 'Expand sidebar' : 'Collapse sidebar'\}/);
-    expect(read('pages/Chat.tsx')).toMatch(/onClick=\{handleSend\} aria-label="Send message"/);
+    expect(read('components/Sidebar.tsx')).toMatch(/aria-label=\{isCollapsed \? m\.sb_expand\(\) : m\.sb_collapse\(\)\}/);
+    expect([en.sb_expand, en.sb_collapse]).toEqual(['Expand sidebar', 'Collapse sidebar']); // SQEM-611
+    expect(read('pages/Chat.tsx')).toMatch(/onClick=\{handleSend\} aria-label=\{txt\.chat_send_label\(\)\}/);
+    expect(en.chat_send_label).toBe('Send message'); // SQEM-604
     // SQEM-554 (d2) — the governance toggles are the shared Switch, which renders `labelledBy` as aria-labelledby.
     expect(read('pages/Settings.tsx')).toMatch(/labelledBy=\{`governance-\$\{key\}`\}/);
     expect(read('components/ui/Switch.tsx')).toMatch(/aria-labelledby=\{naming\.labelledBy\}/);
-    expect(read('pages/Settings.tsx')).toMatch(/aria-label="Change profile picture"/);
+    expect(read('pages/Settings.tsx')).toMatch(/aria-label=\{m\.stp_change_picture\(\)\}/);
+    expect(en.stp_change_picture).toBe('Change profile picture'); // SQEM-608
   });
 
   it('the login fields tell a password manager what they are', () => {

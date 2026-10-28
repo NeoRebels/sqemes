@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { functionCallUrl } from '../lib/env';
+import { m as txt } from '../lib/i18n'; // `m` is the member in this file's callbacks
 import { User, Workspace, UserRole, Invitation } from '../types';
 import { supabase } from '../lib/supabase';
 import { clearMonitoringUser, logError } from '../lib/monitoring';
@@ -71,6 +72,8 @@ export function useWorkspaceState(
       if (updates.authoringModelId !== undefined) dbUpdates.authoring_model_id = updates.authoringModelId;
       // SQEM-597 — null clears it (back to the built-in layout).
       if (updates.documentStyle !== undefined) dbUpdates.document_style = updates.documentStyle;
+      // SQEM-600 — admins only (guard_workspace_language).
+      if (updates.language !== undefined) dbUpdates.language = updates.language;
 
       if (Object.keys(dbUpdates).length > 0) {
         await workspacesApi.updateWorkspace(activeWorkspaceId, dbUpdates);
@@ -82,7 +85,7 @@ export function useWorkspaceState(
         return updated;
       });
     } catch (err: any) {
-      showToast(err.message || 'Failed to update workspace', 'error');
+      showToast(err.message || txt.ws_update_failed(), 'error');
     }
   }, [activeWorkspaceId, showToast]);
 
@@ -96,9 +99,9 @@ export function useWorkspaceState(
         setAvailableWorkspaces(list => list.map(w => w.id === id ? updated : w));
         return updated;
       });
-      showToast(managed ? 'Workspace set to Managed' : 'Managed mode disabled', 'success');
+      showToast(managed ? txt.ws_managed_on() : txt.ws_managed_off(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to update managed status', 'error');
+      showToast(err.message || txt.ws_managed_failed(), 'error');
     }
   }, [showToast]);
 
@@ -117,10 +120,10 @@ export function useWorkspaceState(
       localStorage.setItem('activeWorkspaceId', newWs.id);
       setUser(prev => ({ ...prev, role: 'admin' }));
       setNoWorkspace(false);
-      showToast('Workspace created', 'success');
+      showToast(txt.ws_created(), 'success');
       return newWs;
     } catch (err: any) {
-      showToast(err.message || 'Failed to create workspace', 'error');
+      showToast(err.message || txt.ws_create_failed(), 'error');
       return null;
     }
   }, [showToast, setNoWorkspace]);
@@ -141,7 +144,7 @@ export function useWorkspaceState(
       setWorkspace(prev => ({ ...prev, members }));
       setUser(prev => ({ ...prev, role: currentMember?.role || 'member' }));
     } catch (err: any) {
-      showToast(err.message || 'Failed to switch workspace', 'error');
+      showToast(err.message || txt.ws_switch_failed(), 'error');
     }
   }, [availableWorkspaces, activeWorkspaceId, currentUser.id, showToast]);
 
@@ -161,9 +164,9 @@ export function useWorkspaceState(
       } else {
         setNoWorkspace(true);
       }
-      showToast('Workspace deleted', 'success');
+      showToast(txt.ws_deleted(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to delete workspace', 'error');
+      showToast(err.message || txt.ws_delete_failed(), 'error');
     }
   }, [availableWorkspaces, currentUser.id, showToast, setNoWorkspace]);
 
@@ -180,7 +183,7 @@ export function useWorkspaceState(
     // confirmation in Settings says so before this runs.
     if (isSoleAdmin && !isSoleMember) {
       showToast(
-        'You are the only admin of this workspace. Make someone else an admin before you leave.',
+        txt.ws_sole_admin_leave(),
         'error'
       );
       return;
@@ -190,7 +193,7 @@ export function useWorkspaceState(
       try {
         await workspacesApi.deleteWorkspace(activeWorkspaceId);
       } catch (err: any) {
-        showToast(err.message || 'Failed to leave workspace', 'error');
+        showToast(err.message || txt.ws_leave_failed(), 'error');
         return;
       }
     }
@@ -210,16 +213,16 @@ export function useWorkspaceState(
       } else {
         setNoWorkspace(true);
       }
-      showToast('You have left the workspace', 'success');
+      showToast(txt.ws_left(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to leave workspace', 'error');
+      showToast(err.message || txt.ws_leave_failed(), 'error');
     }
   }, [activeWorkspaceId, currentUser.id, workspace.members, availableWorkspaces, showToast, setNoWorkspace]);
 
   const deleteAccount = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      if (!session) throw new Error(txt.ws_not_signed_in());
 
       const res = await fetch(functionCallUrl('delete-account'), {
         method: 'POST',
@@ -231,7 +234,7 @@ export function useWorkspaceState(
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Failed to delete account');
+        throw new Error(data.error || txt.ws_account_delete_failed());
       }
 
       localStorage.removeItem('pendingInviteToken');
@@ -243,7 +246,7 @@ export function useWorkspaceState(
       clearMonitoringUser();
       await supabase.auth.signOut();
     } catch (err: any) {
-      showToast(err.message || 'Failed to delete account', 'error');
+      showToast(err.message || txt.ws_account_delete_failed(), 'error');
     }
   }, [showToast]);
 
@@ -255,6 +258,8 @@ export function useWorkspaceState(
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
       if (updates.avatar !== undefined) dbUpdates.avatar = updates.avatar;
+      // SQEM-600 — null is a real value ("follow the workspace"), so the guard is `!== undefined`.
+      if (updates.language !== undefined) dbUpdates.language = updates.language;
 
       if (Object.keys(dbUpdates).length > 0) {
         const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', currentUser.id);
@@ -263,7 +268,7 @@ export function useWorkspaceState(
 
       setUser(prev => ({ ...prev, ...updates }));
     } catch (err: any) {
-      showToast(err.message || 'Failed to update profile', 'error');
+      showToast(err.message || txt.ws_profile_failed(), 'error');
     }
   }, [currentUser.id, showToast]);
 
@@ -281,12 +286,12 @@ export function useWorkspaceState(
       setPendingInvitations(prev => [invitation, ...prev]);
       if ((invitation as any).emailFailed) {
         // SQEM-112 — the invite now appears in Pending Invitations with a "Copy link" action.
-        showToast(`Invitation created, but the email couldn't be sent. Use "Copy link" on the pending invitation to share it.`, 'info');
+        showToast(txt.ws_invite_no_email(), 'info');
       } else {
-        showToast(`Invitation sent to ${email}`, 'success');
+        showToast(txt.ws_invite_sent({ email }), 'success');
       }
     } catch (err: any) {
-      showToast(err.message || 'Failed to send invitation', 'error');
+      showToast(err.message || txt.ws_invite_failed(), 'error');
     }
   }, [activeWorkspaceId, currentUser.id, currentUser.name, workspace.name, showToast]);
 
@@ -298,9 +303,9 @@ export function useWorkspaceState(
         ...prev,
         members: prev.members.filter(m => m.id !== id),
       }));
-      showToast('Member removed', 'success');
+      showToast(txt.ws_member_removed(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to remove member', 'error');
+      showToast(err.message || txt.ws_member_remove_failed(), 'error');
     }
   }, [activeWorkspaceId, showToast]);
 
@@ -321,7 +326,7 @@ export function useWorkspaceState(
     const admins = workspace.members.filter(m => m.role === 'admin');
     if (role !== 'admin' && admins.length === 1 && admins[0].id === id) {
       showToast(
-        'A workspace needs at least one admin. Make someone else an admin first.',
+        txt.ws_last_admin(),
         'error',
       );
       return;
@@ -333,9 +338,9 @@ export function useWorkspaceState(
         ...prev,
         members: prev.members.map(m => m.id === id ? { ...m, role } : m),
       }));
-      showToast('Role updated', 'success');
+      showToast(txt.ws_role_updated(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to update role', 'error');
+      showToast(err.message || txt.ws_role_failed(), 'error');
     }
   }, [activeWorkspaceId, workspace.members, showToast]);
 
@@ -353,9 +358,9 @@ export function useWorkspaceState(
     try {
       await invitationsApi.cancelInvitation(id);
       setPendingInvitations(prev => prev.filter(inv => inv.id !== id));
-      showToast('Invitation cancelled', 'success');
+      showToast(txt.ws_invite_cancelled(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to cancel invitation', 'error');
+      showToast(err.message || txt.ws_invite_cancel_failed(), 'error');
     }
   }, [showToast]);
 
@@ -364,9 +369,9 @@ export function useWorkspaceState(
     try {
       const updated = await invitationsApi.resendInvitation(id, currentUser.name);
       setPendingInvitations(prev => prev.map(inv => inv.id === id ? updated : inv));
-      showToast(`Invite resent to ${invite?.email ?? 'user'}`, 'success');
+      showToast(invite?.email ? txt.ws_invite_resent({ email: invite.email }) : txt.ws_invite_resent_unknown(), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to resend invitation', 'error');
+      showToast(err.message || txt.ws_invite_resend_failed(), 'error');
     }
   }, [pendingInvitations, currentUser.name, showToast]);
 

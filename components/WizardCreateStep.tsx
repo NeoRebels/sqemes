@@ -9,6 +9,12 @@ import { TEMPLATE_CATEGORIES } from '../constants';
 import { Wand2, Sparkles, Key, ChevronDown, ChevronUp, ArrowRight, Check, AlertCircle, Loader2 } from 'lucide-react';
 import Checkbox from './ui/Checkbox';
 import { describeAIError } from '../lib/aiErrors';
+import { m, getLocale } from '../lib/i18n';
+import { categoryLabel } from '../lib/labels';
+
+/** SQEM-610 — the generation sections are keys ('brand voice', 'prompts', 'skills'); this is their name on screen. */
+const SECTION_NAME: Record<string, () => string> = { 'brand voice': m.wc_sec_name_brand, prompts: m.wc_sec_name_prompts, skills: m.wc_sec_name_skills };
+const sectionName = (section: string) => SECTION_NAME[section]?.() ?? section;
 
 const KIND_BADGE: Record<string, { label: string; cls: string }> = {
   prompt: { label: 'Prompt', cls: 'text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20' },
@@ -114,8 +120,8 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange, onBackChan
         // credits does not get better by retrying, so don't tell the user to try again for those.
         showToast(
           failures.length > 0
-            ? `Couldn't generate your starter playbooks. ${describeAIError(failures[0], 'Try again in a moment.', { alternativesAvailable: hasAuthoringAlternatives(workspace) })}`
-            : "The AI didn't return anything usable. Try again, or browse the Marketplace for ready-made playbooks.",
+            ? m.wc_gen_failed_all({ reason: describeAIError(failures[0], m.wc_try_again(), { alternativesAvailable: hasAuthoringAlternatives(workspace) }) })
+            : m.wc_nothing_usable(),
           'error',
         );
         return;
@@ -126,12 +132,12 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange, onBackChan
       // Partial success is still success — but name what's missing instead of quietly shipping less.
       if (failures.length > 0) {
         showToast(
-          `${failures.map(f => f.section).join(' and ')} couldn't be generated — you can add those later. ${failures[0].message}`,
+          m.wc_partial({ sections: new Intl.ListFormat(getLocale(), { type: 'conjunction' }).format(failures.map(f => sectionName(f.section))), reason: failures[0].message }),
           'info',
         );
       }
     } catch (err: any) {
-      showToast(err.message || 'Generation failed', 'error');
+      showToast(err.message || m.wc_gen_failed(), 'error');
     } finally {
       setGenerating(false);
     }
@@ -174,12 +180,12 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange, onBackChan
         usageCount: 0,
         published: true,
       } as Prompt)));
-      showToast(`Created ${chosen.length} playbook${chosen.length > 1 ? 's' : ''}`, 'success');
+      showToast(m.wc_created({ count: chosen.length }), 'success');
       // SQEM-386 — no navigation here any more: the wizard continues to the extension step and lands
       // on Templates from its final "Done", so the person sees what was generated once they leave.
       onComplete(chosen.length);
     } catch (err: any) {
-      showToast(err.message || 'Failed to create playbooks', 'error');
+      showToast(err.message || m.wc_create_failed(), 'error');
     } finally {
       setSaving(false);
     }
@@ -194,10 +200,10 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange, onBackChan
   useEffect(() => {
     onActionChange(
       phase === 'brand'
-        ? { label: 'Continue', onClick: runAction, disabled: !canContinue, loading: false }
+        ? { label: m.wc_continue(), onClick: runAction, disabled: !canContinue, loading: false }
         : phase === 'areas'
-          ? { label: generating ? 'Generating your starter playbooks…' : 'Generate my starter playbooks', onClick: runAction, disabled: !canGenerate || generating, loading: generating }
-          : { label: saving ? 'Creating…' : `Create ${selected.size} playbook${selected.size === 1 ? '' : 's'}`, onClick: runAction, disabled: selected.size === 0 || saving, loading: saving },
+          ? { label: generating ? m.wc_generating() : m.wc_generate(), onClick: runAction, disabled: !canGenerate || generating, loading: generating }
+          : { label: saving ? m.wc_creating() : m.wc_create_n({ count: selected.size }), onClick: runAction, disabled: selected.size === 0 || saving, loading: saving },
     );
   }, [phase, generating, canContinue, canGenerate, saving, selected.size, runAction, onActionChange]);
 
@@ -224,16 +230,16 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange, onBackChan
             <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">Review your starter playbooks</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">{m.wc_review_title()}</h3>
             {/* SQEM-386 — say whose they are: a tester did not realise these were generated for HIM. */}
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Generated for {brand.brandName.trim() || 'your brand'} from what you told us. <span className="font-semibold text-slate-600 dark:text-slate-300">Start easy, customize later</span> — these are starting points; edit, delete or add playbooks any time.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{m.wc_review_1({ brand: brand.brandName.trim() || m.wc_your_brand() })} <span className="font-semibold text-slate-600 dark:text-slate-300">{m.wc_review_bold()}</span> {m.wc_review_2()}</p>
           </div>
         </div>
 
         {/* SQEM-413 — grouped by the area the person chose, brand voice first: a flat list of eight made
             a tester ask what one of them was for. `undefined` area = the brand voice, which has none. */}
         <div className="space-y-4 max-h-[42vh] overflow-y-auto pr-1">
-          {[{ heading: 'Brand', area: undefined as string | undefined }, ...areas.map(a => ({ heading: a, area: a as string | undefined }))]
+          {[{ heading: 'Brand', area: undefined as string | undefined }, ...areas.map(a => ({ heading: a, area: a as string | undefined }))] /* heading = key; shown via categoryLabel (SQEM-610) */
             .map(group => ({ ...group, items: drafts.map((d, i) => ({ d, i })).filter(({ d }) => d.area === group.area) }))
             .filter(group => group.items.length > 0)
             .map(group => (
@@ -241,7 +247,7 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange, onBackChan
               {/* SQEM-417 — the heading carries the count: "Marketing 2" answers "what did I just get?"
                   before anything is read. */}
               <div className="flex items-center gap-2">
-                <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider">{group.heading}</p>
+                <p className="text-2xs font-bold text-slate-400 uppercase tracking-wider">{group.area ? categoryLabel(group.area) : m.wc_group_brand()}</p>
                 <span className="text-2xs font-bold text-slate-400 bg-slate-100 dark:bg-slate-700 rounded-md px-1.5 py-0.5">{group.items.length}</span>
                 <span className="h-px flex-1 bg-slate-100 dark:bg-slate-700" />
               </div>
@@ -262,7 +268,7 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange, onBackChan
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className={`text-2xs font-bold px-2 py-0.5 rounded-md ${badge.cls}`}>{badge.label}</span>
-                      {d.variables.length > 0 && <span className="text-2xs text-slate-400">{d.variables.length} variable{d.variables.length > 1 ? 's' : ''}</span>}
+                      {d.variables.length > 0 && <span className="text-2xs text-slate-400">{m.wc_variables({ count: d.variables.length })}</span>}
                     </div>
                     <input
                       value={d.title}
@@ -272,13 +278,13 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange, onBackChan
                     <input
                       value={d.description}
                       onChange={e => updateDraft(i, { description: e.target.value })}
-                      placeholder="Description"
+                      placeholder={m.wc_description()}
                       className="w-full text-xs text-slate-500 dark:text-slate-400 bg-transparent outline-none focus:bg-slate-50 dark:focus:bg-slate-700/50 rounded px-1 -mx-1 mt-0.5"
                     />
                     {d.content && (
                       <>
                         <button onClick={() => setExpanded(s => toggle(s, i))} className="inline-flex items-center gap-1 text-2xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 mt-1.5">
-                          {isOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />} {isOpen ? 'Hide' : 'Preview'} content
+                          {isOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />} {isOpen ? m.wc_hide_content() : m.wc_preview_content()}
                         </button>
                         {isOpen && (
                           <pre className="mt-2 text-2xs font-mono text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/40 rounded-lg p-3 whitespace-pre-wrap max-h-40 overflow-y-auto">{d.content}</pre>
@@ -309,9 +315,9 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange, onBackChan
   // no invented progress bar, and a failed section says so instead of spinning forever.
   if (generating) {
     const rows = [
-      { label: 'brand voice', text: 'Reading your brand' },
-      { label: 'prompts', text: 'Writing one prompt per area' },
-      { label: 'skills', text: 'Writing one skill per area' },
+      { label: 'brand voice', text: m.wc_sec_brand() },
+      { label: 'prompts', text: m.wc_sec_prompts() },
+      { label: 'skills', text: m.wc_sec_skills() },
     ];
     return (
       <div>
@@ -320,9 +326,9 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange, onBackChan
             <Sparkles className="w-5 h-5 animate-pulse" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">Writing your starter playbooks</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">{m.wc_writing_title()}</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-              For {brand.brandName.trim() || 'your brand'} — {areas.join(', ')}. This takes a few seconds.
+              {m.wc_writing_for({ brand: brand.brandName.trim() || m.wc_your_brand(), areas: areas.map(categoryLabel).join(', ') })}
             </p>
           </div>
         </div>
@@ -374,9 +380,9 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange, onBackChan
           <div>
             {/* The labels are the marketplace categories, so the word picked here is the word met
                 again when browsing — and it becomes the playbook's tag. */}
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">Which areas should your first playbooks cover?</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">{m.wc_areas_title()}</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-              You get your brand voice plus one prompt and one skill for each area — written for {brand.brandName.trim() || 'your brand'}.
+              {m.wc_areas_body({ brand: brand.brandName.trim() || m.wc_your_brand() })}
             </p>
           </div>
         </div>
@@ -389,8 +395,8 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange, onBackChan
             className="w-full flex items-center gap-2.5 p-3 mb-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 text-left hover:bg-amber-100/70 dark:hover:bg-amber-900/30 transition-colors"
           >
             <Key className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span className="flex-1 text-xs text-amber-700 dark:text-amber-300">A provider key is needed to generate playbooks here — that is step 3. You can add it first and come back.</span>
-            <span className="text-xs font-bold text-amber-700 dark:text-amber-300 shrink-0 inline-flex items-center gap-1">Go to step 3 <ArrowRight className="w-3.5 h-3.5" /></span>
+            <span className="flex-1 text-xs text-amber-700 dark:text-amber-300">{m.wc_key_needed()}</span>
+            <span className="text-xs font-bold text-amber-700 dark:text-amber-300 shrink-0 inline-flex items-center gap-1">{m.wc_go_step3()} <ArrowRight className="w-3.5 h-3.5" /></span>
           </button>
         )}
 
@@ -413,15 +419,15 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange, onBackChan
                       : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-brand-400 hover:text-brand-600 dark:hover:text-brand-400'
                 }`}
               >
-                {cat}
+                {categoryLabel(cat)}
               </button>
             );
           })}
         </div>
         <p className="text-xs text-slate-400 dark:text-slate-500 mt-3">
           {areas.length === 0
-            ? 'Pick one to three — two is a good start.'
-            : `${areas.length} of ${MAX_AREAS} — start easy, customize later.`}
+            ? m.wc_pick()
+            : m.wc_picked({ count: areas.length, max: MAX_AREAS })}
         </p>
       </div>
     );
@@ -435,8 +441,8 @@ const WizardCreateStep = ({ onComplete, onConnectKey, onActionChange, onBackChan
           <Wand2 className="w-5 h-5" />
         </div>
         <div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">Create your starter playbooks</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Your website is enough — AI drafts your brand voice plus one prompt and one skill for each area you pick.</p>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">{m.wc_create_title()}</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{m.wc_create_body()}</p>
         </div>
       </div>
 

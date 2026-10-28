@@ -17,8 +17,10 @@
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { cancelAndDeleteWorkspace } from '../_shared/workspaceDeletion.ts';
+import { m as txt, requestLocale } from '../_shared/locale.ts';
 
 Deno.serve(async (req) => {
+  const locale = requestLocale(req); // SQEM-612 — refusals in the person's language
   const cors = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
@@ -35,7 +37,7 @@ Deno.serve(async (req) => {
     const adminClient = createAdminClient();
     const token = authHeader.replace(/^Bearer\s+/i, '');
     const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
-    if (authError || !user) return json({ error: 'Unauthorized' }, 401);
+    if (authError || !user) return json({ error: txt.srv_unauthorized({}, { locale }) }, 401);
 
     const { workspaceId } = await req.json();
     if (!workspaceId) return json({ error: 'Missing workspaceId' }, 400);
@@ -49,7 +51,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (!membership || membership.role !== 'admin') {
-      return json({ error: 'Only workspace admins can delete a workspace.' }, 403);
+      return json({ error: txt.srv_admin_delete_ws({}, { locale }) }, 403);
     }
 
     // 2. + 3. Cancel, then delete — and only in that order. SQEM-214 moved this into

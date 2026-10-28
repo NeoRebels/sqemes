@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { MCP_CLIENTS } from '../../lib/mcpClients';
+import { en } from './i18nText';
 
 /**
  * SQEM-554 (c) — the MCP card in Settings → API & MCP: first in the tab, three numbered steps, the
@@ -23,9 +24,10 @@ describe('SQEM-554 (c) — the MCP card', () => {
   });
 
   it('three numbered steps, in order: endpoint, client, system prompt', () => {
-    const steps = [...card.matchAll(/<McpStep n=\{(\d)\} title="([^"]+)">/g)].map(m => `${m[1]} ${m[2]}`);
+    // SQEM-609 — the titles are messages; the order and the words are pinned through them.
+    const steps = [...card.matchAll(/<McpStep n=\{(\d)\} title=\{m\.(mcp_step\d)\(\)\}>/g)].map(x => `${x[1]} ${en[x[2] as keyof typeof en]}`);
     expect(steps).toEqual(['1 Copy the endpoint', '2 Connect your AI tool', '3 Paste the system prompt too']);
-    expect(card).toMatch(/<McpStep n=\{2\} title="Connect your AI tool">\s*<McpClientGuide url=\{mcpUrl\} \/>/);
+    expect(card).toMatch(/<McpStep n=\{2\} title=\{m\.mcp_step2\(\)\}>\s*<McpClientGuide url=\{mcpUrl\} \/>/);
   });
 
   it('⛔ the system prompt is shortened, never hidden: Copy is outside the clamp and always rendered', () => {
@@ -34,7 +36,7 @@ describe('SQEM-554 (c) — the MCP card', () => {
     expect(afterPre).toMatch(/^[\s\S]{0,200}<button[\s\S]{0,200}copyToClipboard\(LIBRARY_SYSTEM_PROMPT\)/);
     expect(card).toMatch(/aria-expanded=\{promptOpen\}\s*aria-controls="mcp-system-prompt"/);
     expect(card).not.toMatch(/\{promptOpen && [^}]*copyToClipboard/);
-    expect(card).toMatch(/Paste the system prompt too/);
+    expect(card).toMatch(/m\.mcp_step3\(\)/);
   });
 
   it('display-face title; no old slate/brand classes left in the card', () => {
@@ -64,7 +66,7 @@ describe('SQEM-554 (c) — client logos', () => {
   });
   it('the guide puts the logo on each tab, inverted in dark mode when single-colour', () => {
     const guide = read('components/McpClientGuide.tsx');
-    expect(guide).toMatch(/tabs=\{MCP_CLIENTS\.map\(c => \(\{ value: c\.id, label: c\.label, icon: clientIcon\(c\) \}\)\)\}/);
+    expect(guide).toMatch(/tabs=\{MCP_CLIENTS\.map\(c => \(\{ value: c\.id, label: mcpClientText\(c\.label\), icon: clientIcon\(c\) \}\)\)\}/);
     expect(guide).toMatch(/c\.logo\.mono \? ' dark:invert' : ''/);
   });
   it('the licence note names the three new files', () => {

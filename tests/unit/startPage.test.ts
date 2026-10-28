@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { HANDOFF_MAX_AGE_MS, clearChatHandoff, handOffToChat, peekChatHandoff } from '../../lib/chatHandoff';
+import { en } from './i18nText';
 
 /**
  * SQEM-550 (a) — the Start page (redesign C): a composer that hands its text to Chat, which sends it
@@ -69,13 +70,16 @@ describe('SQEM-550 (a) — the page', () => {
   const dash = read('pages/Dashboard.tsx');
 
   it('opens with the question in the display face and the composer', () => {
-    expect(dash).toMatch(/<h1 className="font-display[^"]*">\s*\{firstName \? `What are we working on, \$\{firstName\}\?` : 'What are we working on\?'\}/);
+    expect(dash).toMatch(/<h1 className="font-display[^"]*">\s*\{firstName \? m\.start_question_named\(\{ name: firstName \}\) : m\.start_question\(\)\}/);
+    expect(en.start_question_named).toBe('What are we working on, {name}?'); // SQEM-604
+    expect(en.start_question).toBe('What are we working on?');
     expect(dash).toMatch(/<StartComposer workspaceId=\{workspace\.id\} \/>/);
   });
 
   it('favourites are tiles with "Use"; the old action buttons are gone', () => {
     expect(dash).toMatch(/id="start-favourites"/);
-    expect(dash).toMatch(/Use <ArrowRight/);
+    expect(dash).toMatch(/\{m\.start_use\(\)\} <ArrowRight/);
+    expect(en.start_use).toBe('Use'); // SQEM-604
     expect(dash).not.toMatch(/renderActions/);
   });
 
@@ -83,13 +87,15 @@ describe('SQEM-550 (a) — the page', () => {
     expect(dash).not.toMatch(/>Connections</);
     expect(dash).not.toMatch(/Current Plan/);
     const overview = read('pages/Overview.tsx');
-    expect(overview).toMatch(/Current Plan/);
-    expect(overview).toMatch(/aria-label="Channels"/);
+    expect(overview).toMatch(/m\.ov_current_plan\(\)/);
+    expect(overview).toMatch(/aria-label=\{m\.ov_channels\(\)\}/);
+    expect([en.ov_current_plan, en.ov_channels]).toEqual(['Current Plan', 'Channels']); // SQEM-607
   });
 
   it('it is called Start in the sidebar and in the page title', () => {
-    expect(read('components/Sidebar.tsx')).toMatch(/\{ to: "\/", icon: Home, label: "Start" \}/);
-    expect(read('App.tsx')).toMatch(/if \(pathname === '\/'\) return 'Start';/);
+    expect(read('components/Sidebar.tsx')).toMatch(/\{ to: "\/", icon: Home, label: m\.nav_start\(\) \}/);
+    expect(JSON.parse(read('messages/en.json')).nav_start).toBe('Start'); // SQEM-599 — the word lives in messages/
+    expect(read('App.tsx')).toMatch(/if \(pathname === '\/'\) return m\.nav_start\(\);/); // SQEM-611
   });
 });
 

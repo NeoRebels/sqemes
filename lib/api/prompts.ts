@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { m } from '../i18n';
 import { fetchTemplateAccess, setTemplateAccess } from './templateAccess';
 import type { Database } from '../database.types';
 import type { Prompt, PromptKind, Variable } from '../../types';
@@ -215,7 +216,7 @@ export async function updatePrompt(prompt: Prompt, workspaceId: string) {
   if (error) throw error;
   // SQEM-473 — RLS filters an UPDATE the person may not make (an editor not on the playbook's editor
   // list): no error, zero rows. Said plainly instead of crashing on `data[0]`.
-  if (!data || data.length === 0) throw new Error('You may use this playbook but not change it.');
+  if (!data || data.length === 0) throw new Error(m.api_playbook_read_only());
   return rowToPrompt(data[0] as unknown as PromptRow);
 }
 
@@ -231,7 +232,7 @@ export async function setPromptTag(id: string, tag: string | null): Promise<void
     .eq('id', id)
     .select('id');
   if (error) throw error;
-  if (!data || data.length === 0) throw new Error('You may use this playbook but not change it.');
+  if (!data || data.length === 0) throw new Error(m.api_playbook_read_only());
 }
 
 export async function deletePrompt(id: string) {
@@ -254,7 +255,7 @@ export async function duplicatePrompt(prompt: Prompt, workspaceId: string, userI
   const dup = {
     workspace_id: workspaceId,
     kind: prompt.kind,
-    title: `${prompt.title} (Copy)`,
+    title: m.api_copy_title({ title: prompt.title }),
     description: prompt.description,
     tag: prompt.tag ?? null,
     variables: JSON.parse(JSON.stringify(prompt.variables)),
@@ -293,7 +294,7 @@ export async function duplicatePrompt(prompt: Prompt, workspaceId: string, userI
     // leave a restricted template's contents sitting in the open behind a toast nobody reads.
     await supabase.from('prompts').delete().eq('id', created.id);
     throw new Error(
-      `Duplicated, but its access rules could not be applied — the copy was removed so it could not stay more open than the original. ${err instanceof Error ? err.message : ''}`.trim(),
+      `${m.api_duplicate_access()} ${err instanceof Error ? err.message : ''}`.trim(),
     );
   }
 

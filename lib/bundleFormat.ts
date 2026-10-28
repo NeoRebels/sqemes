@@ -14,6 +14,7 @@
 // put it in every page load's modulepreload, because this module is reachable from the start.
 import type JSZip from 'jszip';
 import type { PromptKind, Variable } from '../types';
+import { m } from './i18n';
 
 export const BUNDLE_SCHEMA = 'sqemes-bundle/v1';
 const MAX_BUNDLE_FILES = 100;
@@ -93,13 +94,13 @@ export const sanitizeName = (name: string) => name.replace(/[^\w.-]+/g, '_').sli
 export async function readBundle(zipFile: File): Promise<{ zip: JSZip; manifest: BundleManifest }> {
   const zip = await ((await import('jszip')).default).loadAsync(zipFile);
   const entry = zip.file('manifest.json');
-  if (!entry) throw new Error('Not a sqemes bundle (manifest.json missing).');
+  if (!entry) throw new Error(m.bf_not_bundle());
   let manifest: BundleManifest;
-  try { manifest = JSON.parse(await entry.async('string')); } catch { throw new Error('Corrupt bundle (invalid manifest).'); }
-  if (manifest.schema !== BUNDLE_SCHEMA) throw new Error(`Unsupported bundle version: ${manifest.schema ?? 'unknown'}.`);
+  try { manifest = JSON.parse(await entry.async('string')); } catch { throw new Error(m.bf_corrupt()); }
+  if (manifest.schema !== BUNDLE_SCHEMA) throw new Error(m.bf_version({ version: manifest.schema ?? m.bf_unknown() }));
   const files = manifest.files || [];
-  if (files.length > MAX_BUNDLE_FILES) throw new Error(`Bundle has too many files (${files.length}, max ${MAX_BUNDLE_FILES}).`);
-  if (files.reduce((s, f) => s + (f.sizeBytes || 0), 0) > MAX_BUNDLE_BYTES) throw new Error('Bundle exceeds the size limit.');
+  if (files.length > MAX_BUNDLE_FILES) throw new Error(m.bf_too_many({ count: files.length, max: MAX_BUNDLE_FILES }));
+  if (files.reduce((s, f) => s + (f.sizeBytes || 0), 0) > MAX_BUNDLE_BYTES) throw new Error(m.bf_too_big());
   return { zip, manifest };
 }
 

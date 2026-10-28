@@ -23,6 +23,8 @@
 // value import put its 28 KB gzip in every page load's modulepreload, because this module is
 // reachable from the start.
 
+import { m } from './i18n';
+
 export const SKILL_ENTRY = 'SKILL.md';
 // SQEM-250 — was 100, which no real skill fits: `diagram-design` is 152 files. The workaround
 // everyone reaches for ("just zip the skill folder") therefore failed too, one wall further in.
@@ -65,12 +67,12 @@ export class SkillArchiveError extends Error {
 export function importErrorMessage(bundleErr: unknown, skillErr: unknown): string {
   if (skillErr instanceof SkillArchiveError && skillErr.kind !== 'none') {
     if (skillErr.kind === 'ambiguous') {
-      return `This archive holds ${skillErr.folders.length} skills — ${skillErr.folders.join(', ')}. Zip just the one you want and import that.`;
+      return m.skb_ambiguous({ count: skillErr.folders.length, folders: skillErr.folders.join(', ') });
     }
     return skillErr.message;
   }
-  const detail = bundleErr instanceof Error ? bundleErr.message : 'it could not be read';
-  return `Neither a sqemes bundle nor an Agent Skill: no ${SKILL_ENTRY} anywhere in the archive, and ${detail.charAt(0).toLowerCase()}${detail.slice(1)}.`;
+  const detail = bundleErr instanceof Error ? bundleErr.message : m.skb_unreadable();
+  return m.skb_neither({ entry: SKILL_ENTRY, detail: `${detail.charAt(0).toLowerCase()}${detail.slice(1)}`.replace(/\.$/, '') });
 }
 
 /** What a skill folder holds, independent of how it is packed. */
@@ -227,7 +229,7 @@ export async function buildSkillZip(b: SkillBundle): Promise<Blob> {
     // A context file literally called SKILL.md would overwrite the instructions. Refuse loudly
     // rather than produce a bundle that silently lost its own body.
     if (normalisePath(f.name) === SKILL_ENTRY) {
-      throw new Error(`A context file is named ${SKILL_ENTRY}, which would replace the skill's instructions. Rename it first.`);
+      throw new Error(m.skb_context_named({ entry: SKILL_ENTRY }));
     }
     zip.file(normalisePath(f.name), f.blob);
   }
@@ -335,7 +337,7 @@ export async function readSkillZip(file: File): Promise<SkillBundle> {
   const zip = await ((await import('jszip')).default).loadAsync(file);
 
   const entries = Object.values(zip.files).filter(e => !e.dir && !isArchiveJunk(e.name));
-  if (!entries.length) throw new SkillArchiveError('The archive is empty.', 'empty');
+  if (!entries.length) throw new SkillArchiveError(m.skb_empty(), 'empty');
 
   // SQEM-250 — find the skill wherever it is, instead of insisting it sit one level down. A GitHub
   // "Download ZIP" is `repo-main/skills/<name>/SKILL.md`, which is what a person actually has when
@@ -346,12 +348,12 @@ export async function readSkillZip(file: File): Promise<SkillBundle> {
   // and importing it as context would be worse than the bug being fixed.
   const inSkill = entries.filter(e => e.name.startsWith(root));
   if (inSkill.length > MAX_SKILL_FILES) {
-    throw new SkillArchiveError(`This skill has ${inSkill.length} files, more than the ${MAX_SKILL_FILES} allowed in one import.`, 'too-many');
+    throw new SkillArchiveError(m.skb_too_many({ count: inSkill.length, max: MAX_SKILL_FILES }), 'too-many');
   }
 
   const strip = (p: string) => p.slice(root.length);
   const skillEntry = inSkill.find(e => strip(e.name) === SKILL_ENTRY)!;
-  const head = readSkillMd(await skillEntry.async('string'), lastSegment(root) || 'Imported skill');
+  const head = readSkillMd(await skillEntry.async('string'), lastSegment(root) || m.skb_imported_skill());
 
   const files: SkillBundle['files'] = [];
   let total = 0;
@@ -359,7 +361,7 @@ export async function readSkillZip(file: File): Promise<SkillBundle> {
     if (e === skillEntry) continue;
     const blob = await e.async('blob');
     total += blob.size;
-    if (total > MAX_SKILL_BYTES) throw new SkillArchiveError('The archive exceeds the size limit.', 'too-big');
+    if (total > MAX_SKILL_BYTES) throw new SkillArchiveError(m.skb_too_big(), 'too-big');
     files.push({ name: strip(e.name), blob, mimeType: blob.type || '' });
   }
   return { ...head, files };
@@ -375,8 +377,11 @@ function findSkillRootOrThrow(paths: string[]): string {
     return findSkillRoot(paths);
   } catch (err) {
     const candidates = paths.filter(p => !isArchiveJunk(p) && (p === SKILL_ENTRY || p.endsWith(`/${SKILL_ENTRY}`)));
+    // SQEM-611 — `findSkillRoot` is the twin of the MCP importer's and stays word for word identical
+    // (skillImport.test.ts), so its English sentence is replaced here; 'ambiguous' is rebuilt by
+    // `importErrorMessage`.
     throw new SkillArchiveError(
-      (err as Error).message,
+      candidates.length ? (err as Error).message : m.skb_none({ entry: SKILL_ENTRY }),
       candidates.length ? 'ambiguous' : 'none',
       candidates.map(p => p.slice(0, Math.max(0, p.length - SKILL_ENTRY.length - 1))),
     );

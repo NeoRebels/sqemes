@@ -13,6 +13,7 @@
 //   • Public like stripe-webhook: no apikey/JWT required (deploy uses --no-verify-jwt; verify_jwt=false).
 import { createAdminClient } from '../_shared/supabase-admin.ts';
 import { copySummaryOf, type ReviewedFile } from '../_shared/fileReview.ts';
+import { m as txt, requestLocale } from '../_shared/locale.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -37,6 +38,7 @@ function toPublicRow(row: Record<string, unknown>) {
 }
 
 Deno.serve(async (req) => {
+  const locale = requestLocale(req); // SQEM-612 — refusals in the person's language
   const json = (b: unknown, s = 200) =>
     new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
@@ -66,7 +68,7 @@ Deno.serve(async (req) => {
         .eq('published', true)
         .maybeSingle();
       if (error) return json({ error: error.message }, 500);
-      if (!data) return json({ error: 'Not found' }, 404);
+      if (!data) return json({ error: txt.srv_not_found({}, { locale }) }, 404);
       return json({ listing: toPublicRow(data as Record<string, unknown>) });
     }
 
@@ -78,7 +80,7 @@ Deno.serve(async (req) => {
         .eq('id', listingId)
         .eq('published', true)
         .maybeSingle();
-      if (!row || !row.bundle_path) return json({ error: 'Not found' }, 404);
+      if (!row || !row.bundle_path) return json({ error: txt.srv_not_found({}, { locale }) }, 404);
       const { data: signed, error: signErr } = await admin.storage
         .from('library-files')
         .createSignedUrl(row.bundle_path as string, 300);

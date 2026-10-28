@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowDown, Loader2 } from 'lucide-react';
 import type { PullToRefreshState } from '../hooks/usePullToRefresh';
+import { m } from '../lib/i18n';
 
 /**
  * SQEM-385 — the pill that follows the finger. Render it as the FIRST child of the scroll container
@@ -10,7 +11,7 @@ import type { PullToRefreshState } from '../hooks/usePullToRefresh';
  */
 export default function PullToRefreshIndicator({ distance, phase, enabled }: PullToRefreshState) {
   if (!enabled) return null;
-  const label = phase === 'refreshing' ? 'Refreshing…' : phase === 'ready' ? 'Release to refresh' : 'Pull to refresh';
+  const label = phase === 'refreshing' ? m.ptr_refreshing() : phase === 'ready' ? m.ptr_release() : m.ptr_pull();
   return (
     <div aria-live="polite" className="sticky top-0 z-30 h-0 overflow-visible pointer-events-none flex justify-center">
       <div

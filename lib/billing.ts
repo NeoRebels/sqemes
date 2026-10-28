@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { functionCallUrl } from './env';
 import type { PlanTier } from '../types';
+import { m } from './i18n';
 
 export type BillingCycle = 'monthly' | 'yearly';
 
@@ -17,7 +18,7 @@ export type BillingCycle = 'monthly' | 'yearly';
  */
 export async function startCheckout(workspaceId: string, plan: PlanTier, billingCycle: BillingCycle): Promise<never> {
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('Not authenticated');
+  if (!session) throw new Error(m.bill_not_signed_in());
 
   const res = await fetch(functionCallUrl('create-checkout-session'), {
     method: 'POST',
@@ -25,7 +26,7 @@ export async function startCheckout(workspaceId: string, plan: PlanTier, billing
     body: JSON.stringify({ workspaceId, plan, billingCycle }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to start checkout');
+  if (!res.ok) throw new Error(data.error || m.bill_failed());
 
   window.location.href = data.url;
   // The redirect is asynchronous; keep the caller's loading state up rather than letting it
