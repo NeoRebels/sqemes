@@ -31,6 +31,9 @@ const CASES = [
   { id: 'T1', type: 'playbook', want: 'release_notes', q: 'Schreib Release Notes für Version 2.3: Login ist schneller, der Export-Fehler ist behoben.' },
   { id: 'T2', type: 'playbook', want: 'meeting_notes', q: 'Fass dieses Meeting zusammen: Wir haben beschlossen, das Projekt bis Q2 zu verschieben; Anna klärt das Budget.' },
   { id: 'T3', type: 'playbook', want: 'brand_voice', q: 'Formulier diesen Satz in unserer Markenstimme: Wir sind ab Montag wieder erreichbar.' },
+  // SQEM-623 — a correction of the loaded playbook should end in ONE offer to update it; T1–T3 must stay quiet.
+  { id: 'C1', type: 'correct', want: 'release_notes', q: 'Schreib Release Notes für Version 2.3: Login ist schneller, der Export-Fehler ist behoben. Wichtig: Bei uns haben Release Notes immer einen Abschnitt „Bekannte Probleme“, der fehlt in eurer Vorlage.' },
+  { id: 'C2', type: 'correct', want: 'candidate_rejection', q: 'Schreib eine Absage an einen Bewerber für die Stelle als Backend-Entwickler. Achtung: Wir duzen Bewerber grundsätzlich, und wir nennen immer einen konkreten Grund für die Absage.' },
   { id: 'N1', type: 'none', q: 'Was ist die Hauptstadt von Australien?' },
   { id: 'N2', type: 'none', q: 'Erklär mir in zwei Sätzen, was ein Mutex ist.' },
 ].filter(c => !only || only.split(',').includes(c.id));
@@ -47,7 +50,7 @@ function runOne(c, n) {
     const log = join(OUT, `${c.id}-${n}.calls.jsonl`);
     if (existsSync(log)) rmSync(log);
     const cfg = join(OUT, `${c.id}-${n}.mcp.json`);
-    writeFileSync(cfg, JSON.stringify({ mcpServers: { sqemes: { type: 'stdio', command: 'node', args: [join(HERE, 'mock-mcp.mjs')], env: { MOCK_LOG: log } } } }));
+    writeFileSync(cfg, JSON.stringify({ mcpServers: { sqemes: { type: 'stdio', command: 'node', args: [join(HERE, 'mock-mcp.mjs')], env: { MOCK_LOG: log, MOCK_HINT: process.env.MOCK_HINT ?? '' } } } }));
     const args = ['-p', c.q, '--append-system-prompt', PROMPT, '--mcp-config', cfg, '--strict-mcp-config',
       '--allowedTools', 'mcp__sqemes__search_templates,mcp__sqemes__get_template,mcp__sqemes__list_personas,mcp__sqemes__get_persona',
       '--disallowedTools', 'Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,Task,Agent,TodoWrite,NotebookEdit',
@@ -76,7 +79,11 @@ function judge(c, n, calls, text) {
   if (c.type === 'two') ok = c.want.every(w => text.includes(w)) && templates.length === 0;
   if (c.type === 'playbook') ok = templates.includes(c.want);
   if (c.type === 'none') ok = tools.length === 0;
-  const r = { variant, id: c.id, type: c.type, n, ok, first: tools[0] ?? '-', tools: tools.join('>'), persona: personaLoaded.join(','), templates: templates.join(','), text: text.slice(0, 400) };
+  // SQEM-623 — an offer is a sentence naming the playbook/persona/template next to a change verb.
+  const offered = /(playbook|vorlage|persona|template)[^.?!\n]{0,160}(anpass|aktualis|ergänz|erweiter|aufnehm|übernehm|hinzufüg|speicher|update)|(anpass|aktualis|ergänz|erweiter|aufnehm|übernehm|hinzufüg|speicher|update)[^.?!\n]{0,160}(playbook|vorlage|persona|template)/i.test(text);
+  if (c.type === 'correct') ok = templates.includes(c.want) && offered;
+  if (c.type === 'playbook') ok = ok && !offered;
+  const r = { variant, id: c.id, type: c.type, n, ok, offered, first: tools[0] ?? '-', tools: tools.join('>'), persona: personaLoaded.join(','), templates: templates.join(','), text: text.slice(0, 3000) };
   writeFileSync(join(OUT, `${c.id}-${n}.json`), JSON.stringify(r, null, 2));
   console.log(`${variant} ${c.id}#${n} ${ok ? 'OK ' : 'NO '} first=${r.first} tools=${r.tools || '-'}`);
   return r;

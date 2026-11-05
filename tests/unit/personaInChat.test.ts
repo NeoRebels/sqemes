@@ -52,8 +52,10 @@ describe('SQEM-389 — personaInstruction (lib/personaChat.ts)', () => {
   });
 
   it('⛔ drops a route whose template is gone (deleted or invisible) instead of failing', () => {
-    expect(text).not.toContain('gone');
-    expect(text).not.toContain('never');
+    // SQEM-623 — only the role and routes; the improvement hint after them says "never" on its own.
+    const routesPart = text.split('## After the task')[0];
+    expect(routesPart).not.toContain('gone');
+    expect(routesPart).not.toContain('never');
   });
 
   it('⛔ uses the MCP server\'s composer, not a copy', () => {
@@ -75,7 +77,7 @@ describe('⛔ SQEM-389 — the wiring', () => {
 
   it('the session API reads and writes persona_id, and the row carries it', () => {
     const api = code(read('lib/api/chatSessions.ts'));
-    expect(api).toMatch(/select\('applied_skill_ids, persona_id'\)/); // SQEM-390 — assistant_id left the reader
+    expect(api).toMatch(/select\('applied_skill_ids, persona_id(, connector_ids)?'\)/); // SQEM-390 — assistant_id left the reader
     expect(api).toMatch(/if \('personaId' in applied\) patch\.persona_id = applied\.personaId \?\? null/);
     expect(api).toMatch(/persona_id: personaId \|\| null/);
     expect(api).toMatch(/personaId: row\.persona_id \|\| undefined/);

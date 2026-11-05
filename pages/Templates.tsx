@@ -1,15 +1,12 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
 import { useUI, useWorkspace, usePrompts, useData } from '../store';
-import { collectWorkspaceTags } from '../lib/workspaceTags';
+import { collectWorkspaceTags, withRegistry } from '../lib/workspaceTags';
 import { can } from '../lib/permissions';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { m } from '../lib/i18n';
-import { fetchRestrictedTemplateIds, setTemplateAccess } from '../lib/api/templateAccess';
-import { fetchCanEditMany } from '../lib/api/editors';
-import { fetchGroups } from '../lib/api/groups';
-import { applyToEditable, bulkSummary, wouldLoseSight } from '../lib/bulkApply';
+import { fetchRestrictedTemplateIds } from '../lib/api/templateAccess';
+import { bulkSummary } from '../lib/bulkApply';
 import { isMultiSeat } from '../lib/templateAccessScope';
-import { TemplateAccessControl, accessValueToAccess, type TemplateAccessValue } from '../components/TemplateAccessControl';
 import AccessBadge from '../components/ui/AccessBadge';
 import type { AccessBadgeMode } from '../lib/accessBadge';
 import { exportTemplatesToZip, downloadBlob, readBundle, importBundle, type BundleManifest } from '../lib/templateBundle';
@@ -20,15 +17,20 @@ import { TEMPLATE_CATEGORIES } from '../constants';
 import { categoryLabel, kindHelp } from '../lib/labels';
 import type JSZip from 'jszip';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Search, Plus, Trash2, Star, PenTool, Wand2, Sparkles, Loader2, Store, Upload, Package, FolderDown } from 'lucide-react';
+import { Search, Plus, Trash2, Star, User, Unlink, PenTool, Wand2, Sparkles, Loader2, Store, Upload, Package, FolderDown } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import BulkActionBar from '../components/ui/BulkActionBar';
+import BulkEditorsModal from '../components/BulkEditorsModal';
+import BulkAccessModal from '../components/BulkAccessModal';
 import SearchInput from '../components/ui/SearchInput';
 import SegmentedTabs from '../components/ui/SegmentedTabs';
 import EmptyState from '../components/ui/EmptyState';
 import TagFilter from '../components/ui/TagFilter';
+import FilterToggle from '../components/ui/FilterToggle';
+import SelectFilter from '../components/ui/SelectFilter';
+import { matchesOwner, ownerOptions } from '../lib/listFilters';
 import { Prompt, PromptKind, TemplateCategory } from '../types';
 import Checkbox from '../components/ui/Checkbox';
 import TemplateWizardModal from '../components/TemplateWizardModal';
@@ -136,6 +138,8 @@ const Templates = () => {
   const navigate = useNavigate();
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [ownerFilter, setOwnerFilter] = useState<string | null>(null); // SQEM-620 — a member id, OWNER_GONE, or all
+  const [showUnusedOnly, setShowUnusedOnly] = useState(false); // SQEM-620
   // Delete Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [promptToDelete, setPromptToDelete] = useState<string | null>(null);
@@ -146,8 +150,7 @@ const Templates = () => {
   // SQEM-564 — bulk tag and bulk access. One busy flag: both write to the same selection.
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkAccessOpen, setBulkAccessOpen] = useState(false);
-  const [bulkAccess, setBulkAccess] = useState<TemplateAccessValue>({ mode: 'restricted', userIds: [], groupIds: [] });
-  const [accessGroups, setAccessGroups] = useState<{ id: string; name: string; memberIds: string[] }[]>([]);
+  const [bulkEditorsOpen, setBulkEditorsOpen] = useState(false); // SQEM-621
   // SQEM-161 — export / import (.sqemes.zip bundle)
   const [exporting, setExporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -213,6 +216,34 @@ const Templates = () => {
     )
   ) : null;
 
+  // "Loaded by" — which personas route to which playbook. Loaded once per workspace; small list.
+  const [loadedByMap, setLoadedByMap] = useState<Map<string, LoadedBy[]>>(new Map());
+  // SQEM-620 — "Not in a persona" reads this map, so it stays off until the personas have loaded:
+  // a failed load would otherwise call every playbook unused.
+  const [personasLoaded, setPersonasLoaded] = useState(false);
+  useEffect(() => {
+    if (!workspace?.id) return;
+    let cancelled = false;
+    fetchPersonas(workspace.id).then(personas => {
+      if (cancelled) return;
+      const map = new Map<string, LoadedBy[]>();
+      for (const persona of personas) for (const r of persona.routes || []) {
+        map.set(r.templateId, [...(map.get(r.templateId) || []), { id: persona.id, title: persona.title, condition: r.condition }]);
+      }
+      setLoadedByMap(map);
+      setPersonasLoaded(true);
+    }).catch(() => { /* the field then just says nobody loads it */ });
+    return () => { cancelled = true; };
+  }, [workspace?.id]);
+
+  // SQEM-620 — the owner filter: every member who owns a listed playbook, shown only from two owners on.
+  const memberIds = useMemo(() => new Set((workspace?.members ?? []).map(mb => mb.id)), [workspace?.members]);
+  const owners = useMemo(
+    () => ownerOptions(prompts, workspace?.members ?? [], currentUser?.id, { you: name => m.flt_owner_you({ name }), gone: m.flt_owner_gone() }),
+    [prompts, workspace?.members, currentUser?.id],
+  );
+  const activeOwner = owners.length > 0 ? ownerFilter : null; // a hidden filter never filters
+
   const filteredPrompts = useMemo(() => {
     const lowerSearch = searchTerm.toLowerCase();
     const filtered = prompts.filter(p => {
@@ -224,31 +255,19 @@ const Templates = () => {
       const matchesKind = selectedKind === 'all' || p.kind === selectedKind;
       const matchesTag = selectedTag ? p.tag === selectedTag : true;
       const matchesFavorite = showFavoritesOnly ? p.isFavorite : true;
-      return matchesSearch && matchesKind && matchesTag && matchesFavorite;
+      // SQEM-620 — owner and "Not in a persona", combined with everything above.
+      const matchesMine = matchesOwner(p.createdBy, activeOwner, memberIds);
+      const matchesUnused = showUnusedOnly ? !loadedByMap.has(p.id) : true;
+      return matchesSearch && matchesKind && matchesTag && matchesFavorite && matchesMine && matchesUnused;
     });
 
     return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [prompts, searchTerm, selectedKind, selectedTag, showFavoritesOnly, canEdit]);
+  }, [prompts, searchTerm, selectedKind, selectedTag, showFavoritesOnly, activeOwner, memberIds, showUnusedOnly, loadedByMap, canEdit]);
 
   // SQEM-550 (b) — the playbook in the preview: the one in ?id= if it is in the list, else the first.
   const selectedPrompt = filteredPrompts.find(p => p.id === selectedParam) ?? filteredPrompts[0] ?? null;
   const showPreviewOnMobile = !!selectedParam && selectedPrompt?.id === selectedParam;
 
-  // "Loaded by" — which personas route to which playbook. Loaded once per workspace; small list.
-  const [loadedByMap, setLoadedByMap] = useState<Map<string, LoadedBy[]>>(new Map());
-  useEffect(() => {
-    if (!workspace?.id) return;
-    let cancelled = false;
-    fetchPersonas(workspace.id).then(personas => {
-      if (cancelled) return;
-      const map = new Map<string, LoadedBy[]>();
-      for (const persona of personas) for (const r of persona.routes || []) {
-        map.set(r.templateId, [...(map.get(r.templateId) || []), { id: persona.id, title: persona.title, condition: r.condition }]);
-      }
-      setLoadedByMap(map);
-    }).catch(() => { /* the field then just says nobody loads it */ });
-    return () => { cancelled = true; };
-  }, [workspace?.id]);
 
   const handleDeleteRequest = useCallback((id: string) => {
     setPromptToDelete(id);
@@ -279,8 +298,6 @@ const Templates = () => {
 
   // --- SQEM-564 — bulk tag and bulk access ---
   const selectedPrompts = prompts.filter(p => selectedIds.has(p.id));
-  // One tag per playbook: "Set tag" replaces it, "Remove tag" lists only tags the selection carries.
-  const removableTags = [...new Set(selectedPrompts.map(p => p.tag).filter((t): t is string => !!t))].sort();
   const handleBulkTag = async (tag: string | null, ids: string[]) => {
     setBulkBusy(true);
     try {
@@ -294,37 +311,6 @@ const Templates = () => {
 
   // Cloud only and multi-seat only — the same condition under which the editor offers access at all.
   const canBulkAccess = canEdit && !IS_SELF_HOSTED && isMultiSeat(workspace);
-  const openBulkAccess = () => {
-    setBulkAccess({ mode: 'restricted', userIds: [], groupIds: [] });
-    setBulkAccessOpen(true);
-    if (workspace?.id) fetchGroups(workspace.id).then(setAccessGroups).catch(() => setAccessGroups([]));
-  };
-  // ⛔ "Restricted" with nobody named would be stored as the principal-less row — "Only me", which bulk
-  // deliberately does not offer (SQEM-564). So Apply waits for a name.
-  const bulkAccessIncomplete = bulkAccess.mode === 'restricted'
-    && bulkAccess.userIds.length === 0 && (bulkAccess.groupIds ?? []).length === 0;
-  const loseSight = bulkAccess.mode === 'restricted' && currentUser
-    ? wouldLoseSight(selectedPrompts, currentUser.id, { userIds: bulkAccess.userIds, groupIds: bulkAccess.groupIds ?? [] }, accessGroups)
-    : 0;
-  const handleBulkAccess = async () => {
-    if (!workspace?.id || bulkAccessIncomplete) return;
-    setBulkBusy(true);
-    try {
-      const byId = new Map(selectedPrompts.map(p => [p.id, p]));
-      const outcome = await applyToEditable(
-        [...byId.keys()],
-        ids => fetchCanEditMany('template', ids),
-        // Each playbook's own owner is stripped from its rows (SQEM-300) — the owner always has access.
-        id => setTemplateAccess(id, workspace.id, accessValueToAccess(bulkAccess, byId.get(id)?.createdBy || null)),
-      );
-      fetchRestrictedTemplateIds(workspace.id).then(setRestrictedIds).catch(() => {});
-      const { message, type } = bulkSummary(outcome, 'playbook', m.pb_access_changed());
-      showToast(message, type);
-      setBulkAccessOpen(false);
-    } finally {
-      setBulkBusy(false);
-    }
-  };
 
   const handleBulkDelete = async () => {
     setBulkDeleting(true);
@@ -517,6 +503,10 @@ const Templates = () => {
           <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-current' : ''}`} />
           {m.pb_favorites()}
         </button>
+        {owners.length > 0 && (
+          <SelectFilter icon={User} ariaLabel={m.flt_owner_label()} allLabel={m.flt_owner_all()} options={owners} value={activeOwner} onChange={setOwnerFilter} />
+        )}
+        <FilterToggle active={showUnusedOnly} onClick={() => setShowUnusedOnly(v => !v)} disabled={!personasLoaded} icon={<Unlink className="w-3.5 h-3.5" />} label={m.flt_unused()} title={m.flt_unused_title()} />
 
         {/* Kind tabs */}
         <SegmentedTabs<'all' | PromptKind>
@@ -550,13 +540,13 @@ const Templates = () => {
           noun="playbook"
           onExport={handleBulkExport}
           exporting={exporting}
-          addableTags={allTags}
-          removableTags={removableTags}
-          addTagLabel={m.bulk_set_tag()}
-          onAddTag={tag => void handleBulkTag(tag, selectedPrompts.map(p => p.id))}
-          onRemoveTag={tag => void handleBulkTag(null, selectedPrompts.filter(p => p.tag === tag).map(p => p.id))}
+          addableTags={withRegistry(allTags, workspace.tags)}
+          // SQEM-646 — one "Edit tag" list: remove (only where a tag is set) or set (replaces).
+          onEditTag={tag => void handleBulkTag(tag, tag ? selectedPrompts.map(p => p.id) : selectedPrompts.filter(p => p.tag).map(p => p.id))}
+          hasTaggedSelection={selectedPrompts.some(p => !!p.tag)}
           tagBusy={bulkBusy}
-          onAccess={canBulkAccess ? openBulkAccess : undefined}
+          onAccess={canBulkAccess ? () => setBulkAccessOpen(true) : undefined}
+          onEditors={canBulkAccess ? () => setBulkEditorsOpen(true) : undefined}
         />
       )}
 
@@ -604,9 +594,9 @@ const Templates = () => {
 
       {!isLoading && prompts.length > 0 && filteredPrompts.length === 0 && (
         <EmptyState
-          icon={showFavoritesOnly ? <Star className="w-8 h-8 text-amber-300" /> : <Search className="w-8 h-8" />}
-          title={showFavoritesOnly ? m.pb_no_favourites() : m.pb_none_found()}
-          description={showFavoritesOnly ? m.pb_star_hint() : m.pb_adjust_filters()}
+          icon={showFavoritesOnly && !activeOwner && !showUnusedOnly ? <Star className="w-8 h-8 text-amber-300" /> : <Search className="w-8 h-8" />}
+          title={showFavoritesOnly && !activeOwner && !showUnusedOnly ? m.pb_no_favourites() : m.pb_none_found()}
+          description={showFavoritesOnly && !activeOwner && !showUnusedOnly ? m.pb_star_hint() : m.pb_adjust_filters()}
         />
       )}
 
@@ -633,6 +623,7 @@ const Templates = () => {
             <div className={`lg:sticky lg:top-4 ${showPreviewOnMobile ? '' : 'hidden lg:block'}`}>
               <PlaybookPreview
                 prompt={selectedPrompt}
+                members={workspace?.members ?? []}
                 canEdit={canEdit}
                 accessMode={restrictedIds.get(selectedPrompt.id)}
                 workspaceTags={workspace.tags}
@@ -689,37 +680,22 @@ const Templates = () => {
         </div>
       </Modal>
 
-      {/* SQEM-564 — access for several playbooks at once. Replaces what each of them had; no "Only me". */}
-      <Modal open={bulkAccessOpen} onClose={() => !bulkBusy && setBulkAccessOpen(false)} size="md" className="p-6">
-        <h3 className="font-display text-xl font-semibold text-ink-strong mb-1">
-          {m.pb_bulk_access_title({ count: selectedIds.size })}
-        </h3>
-        <p className="text-sm text-ink-muted mb-5">
-          {m.pb_bulk_access_body()}
-        </p>
-        <TemplateAccessControl
-          value={bulkAccess}
-          onChange={setBulkAccess}
-          hint={m.pb_bulk_access_hint()}
-          members={workspace?.members}
-          groups={accessGroups}
-          multiSeat={isMultiSeat(workspace)}
-        />
-        {bulkAccessIncomplete && (
-          <p className="mt-3 text-xs text-ink-muted">{m.pb_pick_someone()}</p>
-        )}
-        {!bulkAccessIncomplete && loseSight > 0 && (
-          <p className="mt-3 text-xs text-ink">
-            {m.pb_lose_sight({ count: loseSight })}
-          </p>
-        )}
-        <div className="flex gap-2 mt-6">
-          <Button variant="secondary" className="flex-1" onClick={() => setBulkAccessOpen(false)} disabled={bulkBusy}>{m.pb_cancel()}</Button>
-          <Button className="flex-1" onClick={() => void handleBulkAccess()} disabled={bulkAccessIncomplete} loading={bulkBusy}>
-            {bulkBusy ? m.pb_applying() : m.pb_apply()}
-          </Button>
-        </div>
-      </Modal>
+      {/* SQEM-621 — who may change several playbooks at once; same condition as bulk access. */}
+      <BulkEditorsModal
+        open={bulkEditorsOpen}
+        onClose={() => setBulkEditorsOpen(false)}
+        kind="template"
+        items={selectedPrompts.map(p => ({ id: p.id, createdBy: p.createdBy || null }))}
+      />
+
+      {/* SQEM-564 — access for several playbooks at once; since SQEM-646 the dialog the Personas page shares. */}
+      <BulkAccessModal
+        open={bulkAccessOpen}
+        onClose={() => setBulkAccessOpen(false)}
+        kind="template"
+        items={selectedPrompts.map(p => ({ id: p.id, createdBy: p.createdBy || null }))}
+        onDone={() => { if (workspace?.id) fetchRestrictedTemplateIds(workspace.id).then(setRestrictedIds).catch(() => {}); }}
+      />
 
       {/* Publish to Marketplace (SQEM-163) */}
       <Modal open={!!publishTarget} onClose={() => !publishing && setPublishTarget(null)} size="sm" className="p-6">

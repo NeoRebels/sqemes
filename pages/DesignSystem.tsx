@@ -266,6 +266,8 @@ export default function DesignSystem() {
             <Checkbox checked={checked} onChange={() => setChecked(c => !c)} aria-label="Checkbox sample" />
             <span id="ds-switch-label" className="text-sm text-ink">Switch</span>
             <Switch checked={on} onChange={setOn} labelledBy="ds-switch-label" />
+            {/* SQEM-645 — the compact size for dense lists */}
+            <Switch checked={on} onChange={setOn} labelledBy="ds-switch-label" size="sm" />
             <MoveButtons label="sample" index={1} count={3} onMove={() => {}} />
           </div>
           <SegmentedTabs<'one' | 'two'> value={tab} onChange={setTab} tabs={[{ value: 'one', label: 'One' }, { value: 'two', label: 'Two' }]} />

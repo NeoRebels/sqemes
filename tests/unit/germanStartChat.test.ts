@@ -21,7 +21,7 @@ describe('SQEM-604 — notices sqemes adds to an answer follow the request langu
   it('web search: allowance used up, and not set up', () => {
     expect(allowanceNotice()).toMatch(/^\n\n---\n_The web searches included in your plan are used up for this month\./);
     expect(allowanceNotice('de')).toMatch(/Die Websuchen in deinem Plan sind für diesen Monat aufgebraucht\./);
-    expect(webNotSetUpNotice()).toBe('\n\n---\n_Web search is not set up here. A workspace admin can add a search key in Settings → API & MCP → Web search._');
+    expect(webNotSetUpNotice()).toBe('\n\n---\n_Web search is not set up here. A workspace admin can add a search key in Settings → AI providers → Web search._'); // SQEM-618
     expect(webNotSetUpNotice('de')).toMatch(/Die Websuche ist hier nicht eingerichtet\./);
   });
 

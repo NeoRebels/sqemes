@@ -42,6 +42,8 @@
 /** @typedef {{ detail: NonNullable<unknown> }} Aierr_QuotedInputs */
 /** @typedef {{ provider: NonNullable<unknown> }} Aierr_Refused_KeyInputs */
 /** @typedef {{}} Aierr_Refused_Key_NextInputs */
+/** @typedef {{ provider: NonNullable<unknown> }} Aierr_Too_LargeInputs */
+/** @typedef {{}} Aierr_Too_Large_NextInputs */
 /** @typedef {{ provider: NonNullable<unknown> }} Aierr_Unknown_ModelInputs */
 /** @typedef {{}} Aierr_Unknown_Model_NextInputs */
 /** @typedef {{}} Am_Add_KeyInputs */
@@ -156,14 +158,24 @@
 /** @typedef {{}} Bulk_ClearInputs */
 /** @typedef {{}} Bulk_DeleteInputs */
 /** @typedef {{}} Bulk_Deselect_AllInputs */
+/** @typedef {{}} Bulk_Edit_TagInputs */
+/** @typedef {{}} Bulk_EditorsInputs */
+/** @typedef {{}} Bulk_Editors_BodyInputs */
+/** @typedef {{}} Bulk_Editors_ChangedInputs */
+/** @typedef {{}} Bulk_Editors_Hint_PersonaInputs */
+/** @typedef {{}} Bulk_Editors_Hint_PlaybookInputs */
+/** @typedef {{}} Bulk_Editors_Owner_OnlyInputs */
+/** @typedef {{ things: NonNullable<unknown> }} Bulk_Editors_TitleInputs */
 /** @typedef {{}} Bulk_ExportInputs */
 /** @typedef {{}} Bulk_Remove_TagInputs */
+/** @typedef {{}} Bulk_Remove_Tag_AllInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Bulk_Select_AllInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Bulk_Selected_ChatInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Bulk_Selected_FileInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Bulk_Selected_PersonaInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Bulk_Selected_PlaybookInputs */
 /** @typedef {{}} Bulk_Set_TagInputs */
+/** @typedef {{}} Bulk_Set_Tag_GroupInputs */
 /** @typedef {{ done: NonNullable<unknown>, things: NonNullable<unknown> }} Bulksum_DoneInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Bulksum_FailedInputs */
 /** @typedef {{}} Bulksum_NothingInputs */
@@ -274,10 +286,7 @@
 /** @typedef {{}} Chat_Back_To_StartInputs */
 /** @typedef {{}} Chat_CancelInputs */
 /** @typedef {{}} Chat_Choose_WorkspaceInputs */
-/** @typedef {{}} Chat_Connectors_ActiveInputs */
-/** @typedef {{}} Chat_Connectors_Image_ModelsInputs */
-/** @typedef {{}} Chat_Connectors_InactiveInputs */
-/** @typedef {{}} Chat_Connectors_Inactive_LabelInputs */
+/** @typedef {{ list: NonNullable<unknown> }} Chat_Connectors_FetchedInputs */
 /** @typedef {{}} Chat_CopiedInputs */
 /** @typedef {{}} Chat_CopyInputs */
 /** @typedef {{}} Chat_Copy_FailedInputs */
@@ -310,6 +319,8 @@
 /** @typedef {{}} Chat_No_Shared_HintInputs */
 /** @typedef {{}} Chat_Not_AuthenticatedInputs */
 /** @typedef {{}} Chat_PersonaInputs */
+/** @typedef {{}} Chat_Persona_Connectors_ConnectInputs */
+/** @typedef {{ persona: NonNullable<unknown>, list: NonNullable<unknown> }} Chat_Persona_Connectors_MissingInputs */
 /** @typedef {{}} Chat_Private_ExpiryInputs */
 /** @typedef {{}} Chat_RemoveInputs */
 /** @typedef {{}} Chat_RenameInputs */
@@ -329,6 +340,7 @@
 /** @typedef {{}} Chat_Start_ConversationInputs */
 /** @typedef {{ model: NonNullable<unknown> }} Chat_Start_HintInputs */
 /** @typedef {{ model: NonNullable<unknown>, persona: NonNullable<unknown> }} Chat_Start_Hint_PersonaInputs */
+/** @typedef {{}} Chat_Still_WorkingInputs */
 /** @typedef {{}} Chat_StopInputs */
 /** @typedef {{}} Chat_Stop_LabelInputs */
 /** @typedef {{}} Chat_StoppedInputs */
@@ -340,8 +352,13 @@
 /** @typedef {{ count: NonNullable<unknown> }} Chat_Time_HoursInputs */
 /** @typedef {{}} Chat_Time_Just_NowInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Chat_Time_MinutesInputs */
+/** @typedef {{}} Chat_Tool_Cap_EmptyInputs */
+/** @typedef {{}} Chat_Tool_Cap_LoopInputs */
 /** @typedef {{ rounds: NonNullable<unknown> }} Chat_Tool_Cap_RoundsInputs */
 /** @typedef {{}} Chat_Tool_Cap_TimeInputs */
+/** @typedef {{ tools: NonNullable<unknown> }} Chat_Tool_TruncatedInputs */
+/** @typedef {{}} Chat_Tools_Refused_AllInputs */
+/** @typedef {{ list: NonNullable<unknown> }} Chat_Tools_Refused_ConnectorsInputs */
 /** @typedef {{}} Chat_Type_MessageInputs */
 /** @typedef {{}} Chat_Unsupported_FileInputs */
 /** @typedef {{}} Chat_Update_FailedInputs */
@@ -635,6 +652,12 @@
 /** @typedef {{}} Filepick_NoneInputs */
 /** @typedef {{}} Filepick_SearchInputs */
 /** @typedef {{}} Filepick_TitleInputs */
+/** @typedef {{}} Flt_Owner_AllInputs */
+/** @typedef {{}} Flt_Owner_GoneInputs */
+/** @typedef {{}} Flt_Owner_LabelInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Flt_Owner_YouInputs */
+/** @typedef {{}} Flt_UnusedInputs */
+/** @typedef {{}} Flt_Unused_TitleInputs */
 /** @typedef {{ tag: NonNullable<unknown>, files: NonNullable<unknown> }} Ftag_AddedInputs */
 /** @typedef {{ tag: NonNullable<unknown>, done: NonNullable<unknown>, files: NonNullable<unknown> }} Ftag_Added_PartialInputs */
 /** @typedef {{ tag: NonNullable<unknown> }} Ftag_Nothing_AddInputs */
@@ -786,17 +809,21 @@
 /** @typedef {{}} Mcp_UpgradeInputs */
 /** @typedef {{}} Mcpc_Cc_1Inputs */
 /** @typedef {{}} Mcpc_Cc_2Inputs */
+/** @typedef {{}} Mcpc_Cc_FilesInputs */
 /** @typedef {{}} Mcpc_Cc_NoteInputs */
 /** @typedef {{}} Mcpc_Chatgpt_1Inputs */
 /** @typedef {{}} Mcpc_Chatgpt_2Inputs */
 /** @typedef {{}} Mcpc_Chatgpt_3Inputs */
+/** @typedef {{}} Mcpc_Chatgpt_FilesInputs */
 /** @typedef {{}} Mcpc_Chatgpt_NoteInputs */
 /** @typedef {{}} Mcpc_Claude_1Inputs */
 /** @typedef {{}} Mcpc_Claude_2Inputs */
 /** @typedef {{}} Mcpc_Claude_3Inputs */
+/** @typedef {{}} Mcpc_Claude_FilesInputs */
 /** @typedef {{}} Mcpc_Claude_NoteInputs */
 /** @typedef {{}} Mcpc_Codex_1Inputs */
 /** @typedef {{}} Mcpc_Codex_2Inputs */
+/** @typedef {{}} Mcpc_Codex_FilesInputs */
 /** @typedef {{}} Mcpc_Codex_NoteInputs */
 /** @typedef {{}} Mcpc_Cursor_1Inputs */
 /** @typedef {{}} Mcpc_Cursor_2Inputs */
@@ -812,6 +839,7 @@
 /** @typedef {{ label: NonNullable<unknown> }} Mcpg_Copy_LabelInputs */
 /** @typedef {{}} Mcpg_DiffersInputs */
 /** @typedef {{ client: NonNullable<unknown> }} Mcpg_DocsInputs */
+/** @typedef {{}} Mcpg_Files_TitleInputs */
 /** @typedef {{}} Mcpg_KeyInputs */
 /** @typedef {{}} Mcpg_OauthInputs */
 /** @typedef {{}} Md_Claude_BalanceInputs */
@@ -1061,6 +1089,10 @@
 /** @typedef {{}} Pe_BackInputs */
 /** @typedef {{}} Pe_Condition_FailedInputs */
 /** @typedef {{}} Pe_Condition_PlaceholderInputs */
+/** @typedef {{}} Pe_Connector_ConnectInputs */
+/** @typedef {{}} Pe_Connector_Not_ConnectedInputs */
+/** @typedef {{}} Pe_Connectors_HintInputs */
+/** @typedef {{}} Pe_Connectors_TitleInputs */
 /** @typedef {{}} Pe_CreateInputs */
 /** @typedef {{}} Pe_DeleteInputs */
 /** @typedef {{}} Pe_Delete_BodyInputs */
@@ -1162,10 +1194,14 @@
 /** @typedef {{}} Plan_Tagline_TeamInputs */
 /** @typedef {{}} Ppv_Add_OneInputs */
 /** @typedef {{}} Ppv_All_PersonasInputs */
+/** @typedef {{}} Ppv_Connectors_Title_HintInputs */
 /** @typedef {{}} Ppv_Download_TitleInputs */
 /** @typedef {{}} Ppv_EmptyInputs */
 /** @typedef {{}} Ppv_IfInputs */
 /** @typedef {{}} Ppv_LoadsInputs */
+/** @typedef {{}} Ps_Bulk_Access_BodyInputs */
+/** @typedef {{}} Ps_Bulk_Access_HintInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Ps_Bulk_Access_TitleInputs */
 /** @typedef {{}} Ps_Create_FirstInputs */
 /** @typedef {{}} Ps_Delete_Body_ManyInputs */
 /** @typedef {{}} Ps_Delete_Body_OneInputs */
@@ -1198,6 +1234,7 @@
 /** @typedef {{}} Ps_Load_FailedInputs */
 /** @typedef {{}} Ps_LoadingInputs */
 /** @typedef {{}} Ps_Loads_NothingInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Ps_Lose_SightInputs */
 /** @typedef {{}} Ps_NewInputs */
 /** @typedef {{}} Ps_No_FavouritesInputs */
 /** @typedef {{}} Ps_No_MatchInputs */
@@ -1220,6 +1257,7 @@
 /** @typedef {{}} Pv_DuplicateInputs */
 /** @typedef {{}} Pv_EditInputs */
 /** @typedef {{}} Pv_FavouriteInputs */
+/** @typedef {{}} Pv_InfoInputs */
 /** @typedef {{}} Pv_Loaded_ByInputs */
 /** @typedef {{}} Pv_No_BlanksInputs */
 /** @typedef {{}} Pv_No_PersonaInputs */
@@ -1383,6 +1421,7 @@
 /** @typedef {{}} St_Tab_GeneralInputs */
 /** @typedef {{}} St_Tab_PlansInputs */
 /** @typedef {{}} St_Tab_ProfileInputs */
+/** @typedef {{}} St_Tab_ProvidersInputs */
 /** @typedef {{}} St_Tab_SecurityInputs */
 /** @typedef {{}} St_Tab_TeamInputs */
 /** @typedef {{}} St_TitleInputs */
@@ -1727,6 +1766,7 @@
 /** @typedef {{ provider: NonNullable<unknown> }} Sw_Remove_SavedInputs */
 /** @typedef {{}} Sw_RemovingInputs */
 /** @typedef {{}} Sw_Settings_ApiInputs */
+/** @typedef {{}} Sw_Settings_ProvidersInputs */
 /** @typedef {{}} Sw_SkipInputs */
 /** @typedef {{}} Sw_StandsInputs */
 /** @typedef {{}} Sw_Start_NowInputs */
@@ -2094,7 +2134,7 @@ export const ai_own_key_title = /** @type {(inputs: Ai_Own_Key_TitleInputs) => L
 };
 
 export const aierr_alternative = /** @type {(inputs: Aierr_AlternativeInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (` Du kannst das Modell unter Einstellungen → Allgemein → Standard-KI-Modell wechseln.`)
+	return /** @type {LocalizedString} */ (` Du kannst das Modell unter Einstellungen → KI-Anbieter → Standard-KI-Modell wechseln.`)
 };
 
 export const aierr_busy = /** @type {(inputs: Aierr_BusyInputs) => LocalizedString} */ (i) => {
@@ -2129,6 +2169,14 @@ export const aierr_refused_key_next = /** @type {(inputs: Aierr_Refused_Key_Next
 	return /** @type {LocalizedString} */ (`Prüf den API-Schlüssel für diesen Anbieter in den Einstellungen – er ist vielleicht falsch, widerrufen oder sein Kontingent ist aufgebraucht.`)
 };
 
+export const aierr_too_large = /** @type {(inputs: Aierr_Too_LargeInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Die Anfrage ist für ${i?.provider} zu groß.`)
+};
+
+export const aierr_too_large_next = /** @type {(inputs: Aierr_Too_Large_NextInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Meist liefert ein Connector zu viele Daten: Grenze die Abfrage ein, zum Beispiel auf einen kürzeren Zeitraum oder weniger Datensätze. Bei einem sehr langen Chat hilft ein neuer, er startet ohne Connectoren.`)
+};
+
 export const aierr_unknown_model = /** @type {(inputs: Aierr_Unknown_ModelInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`${i?.provider} kennt dieses Modell nicht.`)
 };
@@ -2138,7 +2186,7 @@ export const aierr_unknown_model_next = /** @type {(inputs: Aierr_Unknown_Model_
 };
 
 export const am_add_key = /** @type {(inputs: Am_Add_KeyInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Anbieter-Schlüssel im Reiter API hinzufügen →`)
+	return /** @type {LocalizedString} */ (`Anbieter-Schlüssel oben hinzufügen ↑`)
 };
 
 export const am_auto_hint = /** @type {(inputs: Am_Auto_HintInputs) => LocalizedString} */ () => {
@@ -2591,11 +2639,47 @@ export const bulk_deselect_all = /** @type {(inputs: Bulk_Deselect_AllInputs) =>
 	return /** @type {LocalizedString} */ (`Auswahl aufheben`)
 };
 
+export const bulk_edit_tag = /** @type {(inputs: Bulk_Edit_TagInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Tag bearbeiten`)
+};
+
+export const bulk_editors = /** @type {(inputs: Bulk_EditorsInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Wer bearbeiten darf …`)
+};
+
+export const bulk_editors_body = /** @type {(inputs: Bulk_Editors_BodyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Das ersetzt die Liste jedes ausgewählten Eintrags, dessen Eigentümer du bist. Als Admin gilt das für alle. Andere werden übersprungen.`)
+};
+
+export const bulk_editors_changed = /** @type {(inputs: Bulk_Editors_ChangedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Bearbeitungsrecht geändert`)
+};
+
+export const bulk_editors_hint_persona = /** @type {(inputs: Bulk_Editors_Hint_PersonaInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Wer diese Personas und ihre Playbooks ändern darf. Alle, die sie sehen, können sie weiter nutzen.`)
+};
+
+export const bulk_editors_hint_playbook = /** @type {(inputs: Bulk_Editors_Hint_PlaybookInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Wer diese Playbooks ändern darf. Alle, die sie sehen, können sie weiter nutzen.`)
+};
+
+export const bulk_editors_owner_only = /** @type {(inputs: Bulk_Editors_Owner_OnlyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Niemand ausgewählt: Dann darf jeden Eintrag nur sein eigener Eigentümer bearbeiten, dazu alle Admins.`)
+};
+
+export const bulk_editors_title = /** @type {(inputs: Bulk_Editors_TitleInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Wer ${i?.things} bearbeiten darf`)
+};
+
 export const bulk_export = /** @type {(inputs: Bulk_ExportInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Exportieren`)
 };
 
 export const bulk_remove_tag = /** @type {(inputs: Bulk_Remove_TagInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Tag entfernen`)
+};
+
+export const bulk_remove_tag_all = /** @type {(inputs: Bulk_Remove_Tag_AllInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Tag entfernen`)
 };
 
@@ -2632,6 +2716,10 @@ export const bulk_selected_playbook = /** @type {(inputs: Bulk_Selected_Playbook
 };
 
 export const bulk_set_tag = /** @type {(inputs: Bulk_Set_TagInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Tag setzen`)
+};
+
+export const bulk_set_tag_group = /** @type {(inputs: Bulk_Set_Tag_GroupInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Tag setzen`)
 };
 
@@ -3078,20 +3166,8 @@ export const chat_choose_workspace = /** @type {(inputs: Chat_Choose_WorkspaceIn
 	return /** @type {LocalizedString} */ (`Aus dem Workspace wählen`)
 };
 
-export const chat_connectors_active = /** @type {(inputs: Chat_Connectors_ActiveInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Deine MCP-Connectors sind aktiv`)
-};
-
-export const chat_connectors_image_models = /** @type {(inputs: Chat_Connectors_Image_ModelsInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Bildmodelle können sie nicht nutzen`)
-};
-
-export const chat_connectors_inactive = /** @type {(inputs: Chat_Connectors_InactiveInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Deine MCP-Connectors sind inaktiv`)
-};
-
-export const chat_connectors_inactive_label = /** @type {(inputs: Chat_Connectors_Inactive_LabelInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Deine MCP-Connectors sind inaktiv – Bildmodelle können sie nicht nutzen`)
+export const chat_connectors_fetched = /** @type {(inputs: Chat_Connectors_FetchedInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Für diesen Chat zugeschaltet: ${i?.list}.`)
 };
 
 export const chat_copied = /** @type {(inputs: Chat_CopiedInputs) => LocalizedString} */ () => {
@@ -3225,6 +3301,14 @@ export const chat_persona = /** @type {(inputs: Chat_PersonaInputs) => Localized
 	return /** @type {LocalizedString} */ (`Persona`)
 };
 
+export const chat_persona_connectors_connect = /** @type {(inputs: Chat_Persona_Connectors_ConnectInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Connectors verbinden`)
+};
+
+export const chat_persona_connectors_missing = /** @type {(inputs: Chat_Persona_Connectors_MissingInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Die Persona „${i?.persona}“ arbeitet mit ${i?.list}. Das hast du nicht verbunden, deshalb antwortet sie ohne.`)
+};
+
 export const chat_private_expiry = /** @type {(inputs: Chat_Private_ExpiryInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Private Chats werden nach 30 Tagen automatisch gelöscht`)
 };
@@ -3301,6 +3385,10 @@ export const chat_start_hint_persona = /** @type {(inputs: Chat_Start_Hint_Perso
 	return /** @type {LocalizedString} */ (`Chatte mit ${i?.model} als ${i?.persona}. Schreib unten eine Nachricht.`)
 };
 
+export const chat_still_working = /** @type {(inputs: Chat_Still_WorkingInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Arbeitet noch: eine längere Aufgabe, bis zu 10 Minuten.`)
+};
+
 export const chat_stop = /** @type {(inputs: Chat_StopInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Stopp`)
 };
@@ -3345,12 +3433,32 @@ export const chat_time_minutes = /** @type {(inputs: Chat_Time_MinutesInputs) =>
 	return /** @type {LocalizedString} */ (`vor ${i?.count} Min.`)
 };
 
+export const chat_tool_cap_empty = /** @type {(inputs: Chat_Tool_Cap_EmptyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Das Modell hat nach dem Sammeln keine Antwort geschrieben. Grenze die Anfrage ein, zum Beispiel auf einen kürzeren Zeitraum, oder wähle ein anderes Modell.`)
+};
+
+export const chat_tool_cap_loop = /** @type {(inputs: Chat_Tool_Cap_LoopInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Sqemes hat die Werkzeugnutzung beendet, weil das Modell denselben Schritt wiederholt hat, und mit dem Vorhandenen geantwortet.`)
+};
+
 export const chat_tool_cap_rounds = /** @type {(inputs: Chat_Tool_Cap_RoundsInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`Sqemes hat nach ${i?.rounds} Runden Werkzeugnutzung aufgehört und mit dem bisher Geladenen geantwortet.`)
 };
 
 export const chat_tool_cap_time = /** @type {(inputs: Chat_Tool_Cap_TimeInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Sqemes hatte keine Zeit mehr für weitere Werkzeugnutzung und hat mit dem bisher Geladenen geantwortet.`)
+};
+
+export const chat_tool_truncated = /** @type {(inputs: Chat_Tool_TruncatedInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Ein Schritt wurde an der Ausgabegrenze abgeschnitten und nicht ausgeführt (${i?.tools}) – der Inhalt war zu groß, um ihn in einem Zug zu schreiben. Dadurch wurde nichts geändert.`)
+};
+
+export const chat_tools_refused_all = /** @type {(inputs: Chat_Tools_Refused_AllInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Ohne Bibliothek und Connectors beantwortet: Das gewählte Modell hat die Werkzeuge abgelehnt. Mit einem anderen Modell kann es klappen.`)
+};
+
+export const chat_tools_refused_connectors = /** @type {(inputs: Chat_Tools_Refused_ConnectorsInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Ohne die Connectors ${i?.list} beantwortet: Das gewählte Modell hat ihre Werkzeuge abgelehnt. Mit einem anderen Modell kann es klappen.`)
 };
 
 export const chat_type_message = /** @type {(inputs: Chat_Type_MessageInputs) => LocalizedString} */ () => {
@@ -3398,7 +3506,7 @@ export const chat_web_label = /** @type {(inputs: Chat_Web_LabelInputs) => Local
 };
 
 export const chat_web_needs_key = /** @type {(inputs: Chat_Web_Needs_KeyInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Die Websuche braucht einen Suchschlüssel – hinterlege ihn unter Einstellungen → API & MCP → Websuche`)
+	return /** @type {LocalizedString} */ (`Die Websuche braucht einen Suchschlüssel – hinterlege ihn unter Einstellungen → KI-Anbieter → Websuche`)
 };
 
 export const chat_web_on = /** @type {(inputs: Chat_Web_OnInputs) => LocalizedString} */ () => {
@@ -4582,6 +4690,30 @@ export const filepick_title = /** @type {(inputs: Filepick_TitleInputs) => Local
 	return /** @type {LocalizedString} */ (`Workspace-Dateien anhängen`)
 };
 
+export const flt_owner_all = /** @type {(inputs: Flt_Owner_AllInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Alle Eigentümer`)
+};
+
+export const flt_owner_gone = /** @type {(inputs: Flt_Owner_GoneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Nicht mehr hier oder nicht erfasst`)
+};
+
+export const flt_owner_label = /** @type {(inputs: Flt_Owner_LabelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Eigentümer`)
+};
+
+export const flt_owner_you = /** @type {(inputs: Flt_Owner_YouInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`${i?.name} (du)`)
+};
+
+export const flt_unused = /** @type {(inputs: Flt_UnusedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`In keiner Persona`)
+};
+
+export const flt_unused_title = /** @type {(inputs: Flt_Unused_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Nur Playbooks, die keine Persona lädt. Personas, die du nicht sehen kannst, zählen nicht.`)
+};
+
 export const ftag_added = /** @type {(inputs: Ftag_AddedInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`„${i?.tag}“ zu ${i?.files} hinzugefügt.`)
 };
@@ -5198,6 +5330,10 @@ export const mcpc_cc_2 = /** @type {(inputs: Mcpc_Cc_2Inputs) => LocalizedString
 	return /** @type {LocalizedString} */ (`Führ in Claude Code /mcp aus, wähl sqemes und melde dich mit deinem sqemes-Konto an.`)
 };
 
+export const mcpc_cc_files = /** @type {(inputs: Mcpc_Cc_FilesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Lokal ist nichts nötig. In Claude Code im Web gibst du diese Domain in der Umgebung unter Network access → Allowed domains frei, sonst lassen sich Dateien aus Skills weder herunter- noch hochladen.`)
+};
+
 export const mcpc_cc_note = /** @type {(inputs: Mcpc_Cc_NoteInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Füg --scope user hinzu, um ihn in jedem Projekt zu nutzen. Ohne Browser hängst du stattdessen --header "Authorization: Bearer $SQEMES_MCP_KEY" mit einem Schlüssel an.`)
 };
@@ -5212,6 +5348,10 @@ export const mcpc_chatgpt_2 = /** @type {(inputs: Mcpc_Chatgpt_2Inputs) => Local
 
 export const mcpc_chatgpt_3 = /** @type {(inputs: Mcpc_Chatgpt_3Inputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Melde dich mit deinem sqemes-Konto an, wenn ChatGPT danach fragt.`)
+};
+
+export const mcpc_chatgpt_files = /** @type {(inputs: Mcpc_Chatgpt_FilesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`ChatGPT verarbeitet Dateien in seinem Code-Werkzeug. Das klappt im Modus Work, sobald „Work network access“ eingeschaltet ist (Settings → Data controls; bei Business oder Enterprise steuert das ein Admin). Im Chat-Modus hat das Code-Werkzeug kein Internet; nutz dort die Dateien-Seite.`)
 };
 
 export const mcpc_chatgpt_note = /** @type {(inputs: Mcpc_Chatgpt_NoteInputs) => LocalizedString} */ () => {
@@ -5230,6 +5370,10 @@ export const mcpc_claude_3 = /** @type {(inputs: Mcpc_Claude_3Inputs) => Localiz
 	return /** @type {LocalizedString} */ (`Wähl die Anmeldung, melde dich mit deinem sqemes-Konto an und wähl den Workspace.`)
 };
 
+export const mcpc_claude_files = /** @type {(inputs: Mcpc_Claude_FilesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Claude verarbeitet Dateien in seiner Code-Sandbox, und die erreicht nur freigegebene Domains. Gib diese Domain einmal frei: Bei Team oder Enterprise trägt der Eigentümer der Organisation sie unter Organization settings → Capabilities ein (package managers and specific domains), bei Pro oder Max schaltest du unter Settings → Capabilities den Netzwerkzugriff ein. Ohne Freigabe liest Claude trotzdem jede Textdatei eines Skills.`)
+};
+
 export const mcpc_claude_note = /** @type {(inputs: Mcpc_Claude_NoteInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`In Claude Team oder Enterprise fügt ein Eigentümer der Organisation den Connector einmal unter Organization settings → Connectors → Add → Custom → Web hinzu; alle verbinden ihn dann unter Customize → Connectors.`)
 };
@@ -5240,6 +5384,10 @@ export const mcpc_codex_1 = /** @type {(inputs: Mcpc_Codex_1Inputs) => Localized
 
 export const mcpc_codex_2 = /** @type {(inputs: Mcpc_Codex_2Inputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Führ codex mcp login sqemes aus und melde dich mit deinem sqemes-Konto an.`)
+};
+
+export const mcpc_codex_files = /** @type {(inputs: Mcpc_Codex_FilesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Lokal ist nichts nötig. In Codex Cloud trägst du diese Domain in der Umgebung unter Agent internet access → Domain allowlist ein. Der Download wurde dort getestet, der Upload noch nicht.`)
 };
 
 export const mcpc_codex_note = /** @type {(inputs: Mcpc_Codex_NoteInputs) => LocalizedString} */ () => {
@@ -5300,6 +5448,10 @@ export const mcpg_differs = /** @type {(inputs: Mcpg_DiffersInputs) => Localized
 
 export const mcpg_docs = /** @type {(inputs: Mcpg_DocsInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`Dokumentation von ${i?.client}`)
+};
+
+export const mcpg_files_title = /** @type {(inputs: Mcpg_Files_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Dateien aus Skills`)
 };
 
 export const mcpg_key = /** @type {(inputs: Mcpg_KeyInputs) => LocalizedString} */ () => {
@@ -6334,6 +6486,22 @@ export const pe_condition_placeholder = /** @type {(inputs: Pe_Condition_Placeho
 	return /** @type {LocalizedString} */ (`wenn jemand ein Angebot gestaltet haben möchte`)
 };
 
+export const pe_connector_connect = /** @type {(inputs: Pe_Connector_ConnectInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Verbinden`)
+};
+
+export const pe_connector_not_connected = /** @type {(inputs: Pe_Connector_Not_ConnectedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`nicht verbunden`)
+};
+
+export const pe_connectors_hint = /** @type {(inputs: Pe_Connectors_HintInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Nur für sqemes Chat: Wählt jemand die Persona dort oder lädt die KI sie im Gespräch, wird die eigene Verbindung zu diesen Diensten genutzt, sonst eine geteilte. In Claude, ChatGPT und anderen Clients über MCP ändert sich nichts, die Persona empfiehlt die Dienste dort nur.`)
+};
+
+export const pe_connectors_title = /** @type {(inputs: Pe_Connectors_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Connectors`)
+};
+
 export const pe_create = /** @type {(inputs: Pe_CreateInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Persona erstellen`)
 };
@@ -6427,7 +6595,7 @@ export const pe_name_needed = /** @type {(inputs: Pe_Name_NeededInputs) => Local
 };
 
 export const pe_name_placeholder = /** @type {(inputs: Pe_Name_PlaceholderInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Vertrieb`)
+	return /** @type {LocalizedString} */ (`Name der Persona`)
 };
 
 export const pe_new_title = /** @type {(inputs: Pe_New_TitleInputs) => LocalizedString} */ () => {
@@ -6741,6 +6909,10 @@ export const ppv_all_personas = /** @type {(inputs: Ppv_All_PersonasInputs) => L
 	return /** @type {LocalizedString} */ (`Alle Personas`)
 };
 
+export const ppv_connectors_title_hint = /** @type {(inputs: Ppv_Connectors_Title_HintInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Gilt nur für sqemes Chat. In Claude, ChatGPT und anderen Clients über MCP empfiehlt die Persona diese Dienste nur.`)
+};
+
 export const ppv_download_title = /** @type {(inputs: Ppv_Download_TitleInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Persona mit ihren Playbooks herunterladen (.sqemes.zip)`)
 };
@@ -6755,6 +6927,21 @@ export const ppv_if = /** @type {(inputs: Ppv_IfInputs) => LocalizedString} */ (
 
 export const ppv_loads = /** @type {(inputs: Ppv_LoadsInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Lädt`)
+};
+
+export const ps_bulk_access_body = /** @type {(inputs: Ps_Bulk_Access_BodyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Das ersetzt den bisherigen Zugriff jeder ausgewählten Persona, die du ändern darfst. Die Playbooks darin behalten ihren eigenen Zugriff: Wer die Persona sieht, ein Playbook darin aber nicht, bekommt dieses Playbook nicht geladen.`)
+};
+
+export const ps_bulk_access_hint = /** @type {(inputs: Ps_Bulk_Access_HintInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Wer diese Personas sehen und nutzen kann`)
+};
+
+export const ps_bulk_access_title = /** @type {(inputs: Ps_Bulk_Access_TitleInputs) => LocalizedString} */ (i) => {
+	const countPlural = registry.plural("de", i?.count, {}, true);
+	if (countPlural === "one") return /** @type {LocalizedString} */ (`Zugriff für ${i?.count} Persona festlegen`);
+	if (countPlural === "other") return /** @type {LocalizedString} */ (`Zugriff für ${i?.count} Personas festlegen`);
+	return /** @type {LocalizedString} */ ("ps_bulk_access_title");
 };
 
 export const ps_create_first = /** @type {(inputs: Ps_Create_FirstInputs) => LocalizedString} */ () => {
@@ -6885,6 +7072,13 @@ export const ps_loads_nothing = /** @type {(inputs: Ps_Loads_NothingInputs) => L
 	return /** @type {LocalizedString} */ (`Lädt noch nichts`)
 };
 
+export const ps_lose_sight = /** @type {(inputs: Ps_Lose_SightInputs) => LocalizedString} */ (i) => {
+	const countPlural = registry.plural("de", i?.count, {}, true);
+	if (countPlural === "one") return /** @type {LocalizedString} */ (`Du bist nicht genannt und siehst ${i?.count} dieser Personas danach nicht mehr, nämlich die, die du nicht erstellt hast.`);
+	if (countPlural === "other") return /** @type {LocalizedString} */ (`Du bist nicht genannt und siehst ${i?.count} dieser Personas danach nicht mehr, nämlich die, die du nicht erstellt hast.`);
+	return /** @type {LocalizedString} */ ("ps_lose_sight");
+};
+
 export const ps_new = /** @type {(inputs: Ps_NewInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Neue Persona`)
 };
@@ -6971,6 +7165,10 @@ export const pv_edit = /** @type {(inputs: Pv_EditInputs) => LocalizedString} */
 
 export const pv_favourite = /** @type {(inputs: Pv_FavouriteInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Zu den Favoriten hinzufügen`)
+};
+
+export const pv_info = /** @type {(inputs: Pv_InfoInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Info`)
 };
 
 export const pv_loaded_by = /** @type {(inputs: Pv_Loaded_ByInputs) => LocalizedString} */ () => {
@@ -7322,11 +7520,11 @@ export const server_connector_refused_one = /** @type {(inputs: Server_Connector
 };
 
 export const server_web_allowance = /** @type {(inputs: Server_Web_AllowanceInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Die Websuchen in deinem Plan sind für diesen Monat aufgebraucht. Ein Admin des Workspace kann unter Einstellungen → API & MCP → Websuche einen eigenen Suchschlüssel hinterlegen oder den Plan erweitern.`)
+	return /** @type {LocalizedString} */ (`Die Websuchen in deinem Plan sind für diesen Monat aufgebraucht. Ein Admin des Workspace kann unter Einstellungen → KI-Anbieter → Websuche einen eigenen Suchschlüssel hinterlegen oder den Plan erweitern.`)
 };
 
 export const server_web_not_setup = /** @type {(inputs: Server_Web_Not_SetupInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Die Websuche ist hier nicht eingerichtet. Ein Admin des Workspace kann unter Einstellungen → API & MCP → Websuche einen Suchschlüssel hinterlegen.`)
+	return /** @type {LocalizedString} */ (`Die Websuche ist hier nicht eingerichtet. Ein Admin des Workspace kann unter Einstellungen → KI-Anbieter → Websuche einen Suchschlüssel hinterlegen.`)
 };
 
 export const settings_language_field_label = /** @type {(inputs: Settings_Language_Field_LabelInputs) => LocalizedString} */ () => {
@@ -7478,7 +7676,7 @@ export const srv_no_billing = /** @type {(inputs: Srv_No_BillingInputs) => Local
 };
 
 export const srv_no_key = /** @type {(inputs: Srv_No_KeyInputs) => LocalizedString} */ (i) => {
-	return /** @type {LocalizedString} */ (`Für ${i?.provider} ist kein API-Schlüssel hinterlegt. Füge ihn unter Einstellungen → API & MCP hinzu.`)
+	return /** @type {LocalizedString} */ (`Für ${i?.provider} ist kein API-Schlüssel hinterlegt. Füge ihn unter Einstellungen → KI-Anbieter hinzu.`)
 };
 
 export const srv_no_subscription = /** @type {(inputs: Srv_No_SubscriptionInputs) => LocalizedString} */ () => {
@@ -7626,6 +7824,10 @@ export const st_tab_plans = /** @type {(inputs: St_Tab_PlansInputs) => Localized
 
 export const st_tab_profile = /** @type {(inputs: St_Tab_ProfileInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Mein Profil`)
+};
+
+export const st_tab_providers = /** @type {(inputs: St_Tab_ProvidersInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`KI-Anbieter`)
 };
 
 export const st_tab_security = /** @type {(inputs: St_Tab_SecurityInputs) => LocalizedString} */ () => {
@@ -8912,7 +9114,7 @@ export const sw_key_cloud_nochat = /** @type {(inputs: Sw_Key_Cloud_NochatInputs
 };
 
 export const sw_key_optional_body = /** @type {(inputs: Sw_Key_Optional_BodyInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Optional – unbegrenzt KI mit deinem eigenen ChatGPT-, Claude-, Gemini- oder Mistral-Konto. Das geht auch jederzeit später unter Einstellungen → API & MCP.`)
+	return /** @type {LocalizedString} */ (`Optional – unbegrenzt KI mit deinem eigenen ChatGPT-, Claude-, Gemini- oder Mistral-Konto. Das geht auch jederzeit später unter Einstellungen → KI-Anbieter.`)
 };
 
 export const sw_key_optional_title = /** @type {(inputs: Sw_Key_Optional_TitleInputs) => LocalizedString} */ () => {
@@ -9020,6 +9222,10 @@ export const sw_removing = /** @type {(inputs: Sw_RemovingInputs) => LocalizedSt
 
 export const sw_settings_api = /** @type {(inputs: Sw_Settings_ApiInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Einstellungen → API & MCP`)
+};
+
+export const sw_settings_providers = /** @type {(inputs: Sw_Settings_ProvidersInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Einstellungen → KI-Anbieter`)
 };
 
 export const sw_skip = /** @type {(inputs: Sw_SkipInputs) => LocalizedString} */ () => {
@@ -9934,7 +10140,7 @@ export const wu_not_readable = /** @type {(inputs: Wu_Not_ReadableInputs) => Loc
 };
 
 export const wu_pdf_provider = /** @type {(inputs: Wu_Pdf_ProviderInputs) => LocalizedString} */ (i) => {
-	return /** @type {LocalizedString} */ (`${i?.name} ist ein PDF, und ${i?.provider} kann keine Dokumente annehmen – es würde stillschweigend wegfallen und das Playbook so geschrieben, als hättest du nichts angehängt. Wähl unter Einstellungen → Allgemein → Standard-KI-Modell ein Modell von Gemini, OpenAI, Claude, Mistral oder OpenRouter.`)
+	return /** @type {LocalizedString} */ (`${i?.name} ist ein PDF, und ${i?.provider} kann keine Dokumente annehmen – es würde stillschweigend wegfallen und das Playbook so geschrieben, als hättest du nichts angehängt. Wähl unter Einstellungen → KI-Anbieter → Standard-KI-Modell ein Modell von Gemini, OpenAI, Claude, Mistral oder OpenRouter.`)
 };
 
 export const wu_selected_provider = /** @type {(inputs: Wu_Selected_ProviderInputs) => LocalizedString} */ () => {

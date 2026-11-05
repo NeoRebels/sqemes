@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { IMPROVEMENT_HINT } from '../../supabase/functions/_shared/libraryPrompt';
 import {
   createLibraryReader, LibraryNotFound, LibraryBadRequest,
   toSlug, buildPreview, renderContextBlocks, composePersona, hiddenFromCaller,
@@ -187,6 +188,13 @@ describe('createLibraryReader — templates', () => {
     const lib = await build();
     expect((await lib.getTemplate({ id: 't-open' })).name).toBe('open_brief');
     expect((await lib.getTemplate({ name: 'open_brief' })).id).toBe('t-open');
+  });
+
+  it('SQEM-623 — an opened template carries the improvement hint as its LAST field', async () => {
+    const lib = await build();
+    const t = await lib.getTemplate({ id: 't-open' });
+    expect(t.afterUse).toBe(IMPROVEMENT_HINT);
+    expect(Object.keys(t).at(-1)).toBe('afterUse');
   });
 
   it('neither id nor name is a bad request, not a not-found', async () => {

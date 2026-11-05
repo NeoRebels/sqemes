@@ -119,7 +119,7 @@ describe('loading and routing', () => {
   const base = (): ToolRuntime => ({
     definitions: [{ name: 'search_templates', description: 'lib', parameters: { type: 'object', properties: {} } }],
     maxRounds: 6, deadline: Date.now() + 1e6,
-    stats: { rounds: 0, calls: 0, byTool: {}, cappedAt: null, cappedBy: null, toolsRefused: false },
+    stats: { rounds: 0, calls: 0, byTool: {}, cappedAt: null, cappedBy: null, toolsRefused: false, refusedConnectors: [], stopReason: null, truncated: {}, libraryRounds: 0, nativeConnectorCalls: 0 },
     execute: vi.fn(async () => 'library answer'),
   });
   it('⛔ a connector that fails to list is left out and named — the others still work', async () => {
@@ -130,6 +130,11 @@ describe('loading and routing', () => {
     expect(loaded.failed).toEqual(['Dead']);
     expect(loaded.definitions.map(d => d.name)).toEqual(['mcp0__search', 'mcp0__send_mail']);
     expect(loaded.definitions[0].description).toBe('[Nifty] does search');
+  });
+  it('SQEM-651 — a connector fetched later numbers on after the ones already loaded', async () => {
+    const { fetchImpl } = fakeServer();
+    const loaded = await loadConnectorTools([conn()], { fetchImpl, offset: 2 });
+    expect(loaded.definitions.map(d => d.name)).toEqual(['mcp2__search', 'mcp2__send_mail']);
   });
   it('the merged runtime routes connector names to MCP and everything else to the library', async () => {
     const { fetchImpl } = fakeServer();
@@ -153,12 +158,16 @@ describe('loading and routing', () => {
 
 describe('wiring', () => {
   const fn = readFileSync(resolve(__dirname, '../../supabase/functions/chat-message/index.ts'), 'utf8');
-  it('connectors are resolved for every provider, and loaded for all but Claude/OpenAI', () => {
+  it('connectors are resolved for every provider, and loaded through sqemes for all of them (SQEM-652)', () => {
     expect(fn).toMatch(/const connectors = \(Array\.isArray\(connectorIds\) && connectorIds\.length > 0\)/);
     // SQEM-594 — `base` is the library runtime plus, for a web message, the web tools.
-    expect(fn).toMatch(/if \(base && connectors\?\.length && provider !== 'claude' && provider !== 'openai'\)/);
-    expect(fn).toMatch(/callGemini\(apiKey, modelId, instruction, messages, false, onDelta, runtime, cancel\.signal, locale\)/); // SQEM-604 — + locale
-    expect([...fn.matchAll(/onDelta, runtime, cancel\.signal, locale\)\)/g)]).toHaveLength(4);
+    expect(fn).toMatch(/if \(base && connectors\?\.length\)/);
+    expect(fn).toMatch(/callClaude\(apiKey, modelId, instruction, messages, onDelta, runtime, cancel\.signal, locale, resume, \{ stable: stableInstruction, changing: changingInstruction \}\)/);
+    expect(fn).toMatch(/callOpenAIResponses\(apiKey, modelId, instruction, messages, onDelta, runtime, cancel\.signal, locale, resume\)/);
+    // SQEM-604 — + locale. SQEM-649 — + resume; the four chat-completions providers share one call now.
+    expect(fn).toMatch(/callGemini\(apiKey, modelId, instruction, messages, false, onDelta, runtime, cancel\.signal, locale, resume\)/);
+    expect(fn).toMatch(/callOpenAICompatible\(apiKey, modelId, endpoint, instruction, messages, provider, onDelta, runtime, cancel\.signal, locale, resume\)/);
+    for (const p of ['deepseek', 'mistral', 'grok', 'openrouter']) expect(fn).toMatch(new RegExp(`\\n  ${p}: 'https://`));
     expect(fn).toMatch(/if \(unreachable\.length\) result \+= connectorRefusedNotice\(unreachable, locale\);/);
   });
 });

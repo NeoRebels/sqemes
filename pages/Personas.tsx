@@ -8,11 +8,11 @@
 // If personas ever reach the Dashboard, this is the moment to reconsider — not before.
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Plus, Loader2, Sparkles, Upload, Star, Bot } from 'lucide-react';
+import { Plus, Loader2, Sparkles, Upload, Star, Bot, User } from 'lucide-react';
 import { useWorkspace, useUI, usePrompts, useData } from '../store';
 import { can } from '../lib/permissions';
 import { fetchPersonas, duplicatePersona, deletePersona, setPersonaFavorite, updatePersona } from '../lib/api/personas';
-import { collectWorkspaceTags } from '../lib/workspaceTags';
+import { collectWorkspaceTags, withRegistry } from '../lib/workspaceTags';
 import TagFilter from '../components/ui/TagFilter';
 import { fetchRestrictedPersonaIds } from '../lib/api/personaAccess';
 import { fetchCanEditMany } from '../lib/api/editors';
@@ -25,14 +25,20 @@ import type { Persona } from '../types';
 import PersonaPreview from '../components/PersonaPreview';
 import EmptyState from '../components/ui/EmptyState';
 import SearchInput from '../components/ui/SearchInput';
+import SelectFilter from '../components/ui/SelectFilter';
+import { matchesOwner, ownerOptions } from '../lib/listFilters';
 import PageHeader from '../components/ui/PageHeader';
 import Checkbox from '../components/ui/Checkbox';
 import BulkActionBar from '../components/ui/BulkActionBar';
+import BulkEditorsModal from '../components/BulkEditorsModal';
+import BulkAccessModal from '../components/BulkAccessModal';
+import { isMultiSeat } from '../lib/templateAccessScope';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import PersonaWizardModal from '../components/PersonaWizardModal';
 import { IS_SELF_HOSTED } from '../lib/env';
 import { errorMessage } from '../lib/errorMessage';
 import { m } from '../lib/i18n';
+import { fetchConnectors, type Connector } from '../lib/api/connectors';
 
 const toSlug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'persona';
 
@@ -110,12 +116,15 @@ export default function Personas() {
   const [search, setSearch] = useState('');
   // SQEM-393 — the two filters the Playbooks archive has had since SQEM-071/087.
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [ownerFilter, setOwnerFilter] = useState<string | null>(null); // SQEM-620 — a member id, OWNER_GONE, or all
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Persona[] | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [tagBusy, setTagBusy] = useState(false); // SQEM-564 — bulk tag
+  const [bulkEditorsOpen, setBulkEditorsOpen] = useState(false); // SQEM-621
+  const [bulkAccessOpen, setBulkAccessOpen] = useState(false); // SQEM-646
   const [wizardOpen, setWizardOpen] = useState(false);
   const [restrictedIds, setRestrictedIds] = useState<Map<string, AccessBadgeMode>>(new Map()); // SQEM-400 — the word per persona
   const [importData, setImportData] = useState<{ zip: any; manifest: BundleManifest } | null>(null);
@@ -133,6 +142,16 @@ export default function Personas() {
   const visiblePlaybookIds = useMemo(() => new Set(prompts.map(p => p.id)), [prompts]);
 
   const canEdit = can(currentUser, workspace, 'prompts:edit');
+
+  // SQEM-643 — the viewer's own and shared connectors, once, so the preview can say which of a persona's
+  // services they have not connected. Stays null on failure: then the preview marks nothing.
+  const [viewerConnectors, setViewerConnectors] = useState<Connector[] | null>(null);
+  useEffect(() => {
+    if (!workspace?.id) return;
+    let cancelled = false;
+    fetchConnectors(workspace.id).then(cs => { if (!cancelled) setViewerConnectors(cs); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [workspace?.id]);
 
   useEffect(() => {
     if (!workspace?.id) return;
@@ -165,17 +184,26 @@ export default function Personas() {
     [prompts, workspaceFiles, personas],
   );
 
+  // SQEM-620 — the same owner filter as on Playbooks, shown only from two owners on.
+  const memberIds = useMemo(() => new Set((workspace?.members ?? []).map(mb => mb.id)), [workspace?.members]);
+  const owners = useMemo(
+    () => ownerOptions(personas ?? [], workspace?.members ?? [], currentUser?.id, { you: name => m.flt_owner_you({ name }), gone: m.flt_owner_gone() }),
+    [personas, workspace?.members, currentUser?.id],
+  );
+  const activeOwner = owners.length > 0 ? ownerFilter : null;
+
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (personas ?? []).filter(p => {
       if (showFavoritesOnly && !p.isFavorite) return false;
+      if (!matchesOwner(p.createdBy, activeOwner, memberIds)) return false;
       if (selectedTag && !p.tags.includes(selectedTag)) return false;
       if (!q) return true;
       return p.title.toLowerCase().includes(q) ||
         p.description.toLowerCase().includes(q) ||
         p.routes.some(r => (r.templateTitle || '').toLowerCase().includes(q));
     });
-  }, [personas, search, showFavoritesOnly, selectedTag]);
+  }, [personas, search, showFavoritesOnly, activeOwner, memberIds, selectedTag]);
 
   // SQEM-393 — optimistic, then the row; on failure the state goes back and the toast says so.
   // The same shape as `toggleFavorite` in `store/prompts.tsx`, kept here because personas are not
@@ -405,6 +433,9 @@ export default function Personas() {
             <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-current' : ''}`} />
             {m.pb_favorites()}
           </button>
+          {owners.length > 0 && (
+            <SelectFilter icon={User} ariaLabel={m.flt_owner_label()} allLabel={m.flt_owner_all()} options={owners} value={activeOwner} onChange={setOwnerFilter} />
+          )}
           {allTags.length > 0 && (
             <TagFilter tags={allTags} value={selectedTag} onChange={setSelectedTag} />
           )}
@@ -424,14 +455,34 @@ export default function Personas() {
           noun="persona"
           onExport={() => void handleExport((personas ?? []).filter(p => selectedIds.has(p.id)))}
           exporting={exporting}
-          addableTags={allTags}
-          removableTags={[...new Set((personas ?? []).filter(p => selectedIds.has(p.id)).map(p => p.tags[0]).filter((t): t is string => !!t))].sort()}
-          addTagLabel={m.bulk_set_tag()}
-          onAddTag={tag => void bulkSetTag(tag, [...selectedIds])}
-          onRemoveTag={tag => void bulkSetTag(null, (personas ?? []).filter(p => selectedIds.has(p.id) && p.tags[0] === tag).map(p => p.id))}
+          addableTags={withRegistry(allTags, workspace.tags)}
+          // SQEM-646 — one "Edit tag" list: remove (only where a tag is set) or set (replaces).
+          onEditTag={tag => void bulkSetTag(tag, tag
+            ? [...selectedIds]
+            : (personas ?? []).filter(p => selectedIds.has(p.id) && p.tags[0]).map(p => p.id))}
+          hasTaggedSelection={(personas ?? []).some(p => selectedIds.has(p.id) && !!p.tags[0])}
           tagBusy={tagBusy}
+          onAccess={!IS_SELF_HOSTED && isMultiSeat(workspace) ? () => setBulkAccessOpen(true) : undefined}
+          onEditors={!IS_SELF_HOSTED && isMultiSeat(workspace) ? () => setBulkEditorsOpen(true) : undefined}
         />
       )}
+
+      {/* SQEM-646 — access for several personas at once: the dialog the Playbooks page uses. */}
+      <BulkAccessModal
+        open={bulkAccessOpen}
+        onClose={() => setBulkAccessOpen(false)}
+        kind="persona"
+        items={(personas ?? []).filter(p => selectedIds.has(p.id)).map(p => ({ id: p.id, createdBy: p.createdBy || null }))}
+        onDone={() => { if (workspace?.id) fetchRestrictedPersonaIds(workspace.id).then(setRestrictedIds).catch(() => {}); }}
+      />
+
+      {/* SQEM-621 — who may change several personas at once (Cloud, multi-seat — as in the editor). */}
+      <BulkEditorsModal
+        open={bulkEditorsOpen}
+        onClose={() => setBulkEditorsOpen(false)}
+        kind="persona"
+        items={(personas ?? []).filter(p => selectedIds.has(p.id)).map(p => ({ id: p.id, createdBy: p.createdBy || null }))}
+      />
 
       {personas === null && (
         <div className="flex items-center gap-2 text-ink-subtle text-sm py-20 justify-center">
@@ -472,9 +523,9 @@ export default function Personas() {
 
       {personas !== null && personas.length > 0 && visible.length === 0 && (
         <EmptyState
-          icon={showFavoritesOnly ? <Star className="w-8 h-8 text-amber-300" /> : <Bot className="w-8 h-8" />}
-          title={showFavoritesOnly ? m.ps_no_favourites() : m.ps_nothing_matches()}
-          description={showFavoritesOnly ? m.ps_star_hint() : m.ps_no_match()}
+          icon={showFavoritesOnly && !activeOwner ? <Star className="w-8 h-8 text-amber-300" /> : <Bot className="w-8 h-8" />}
+          title={showFavoritesOnly && !activeOwner ? m.ps_no_favourites() : m.ps_nothing_matches()}
+          description={showFavoritesOnly && !activeOwner ? m.ps_star_hint() : m.ps_no_match()}
         />
       )}
 
@@ -501,6 +552,9 @@ export default function Personas() {
             <div className={`lg:sticky lg:top-4 ${showPreviewOnMobile ? '' : 'hidden lg:block'}`}>
               <PersonaPreview
                 persona={selectedPersona}
+                members={workspace?.members ?? []}
+                connectors={viewerConnectors}
+                currentUserId={currentUser.id}
                 canEdit={canEdit}
                 accessMode={restrictedIds.get(selectedPersona.id)}
                 workspaceTags={workspace.tags}

@@ -23,9 +23,9 @@ describe('SQEM-536 — the no-key hint', () => {
   });
 
   it('the button goes to the tab that holds the provider keys', () => {
-    expect(PROVIDER_KEYS_TAB).toBe('api');
+    expect(PROVIDER_KEYS_TAB).toBe('providers'); // SQEM-618 — its own tab
     const settings = readFileSync(resolve(__dirname, '../../pages/Settings.tsx'), 'utf8');
-    expect(settings).toMatch(/activeTab === 'api'[\s\S]{0,2000}AI provider keys/);
+    expect(settings).toMatch(/activeTab === 'providers' && can\(currentUser, workspace, 'api-keys:manage'\)[\s\S]{0,3000}m\.sta_provider_title\(\)/);
   });
 
   it('Chat decides by api-keys:manage and drops the stale wording', () => {

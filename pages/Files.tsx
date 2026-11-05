@@ -18,7 +18,7 @@ import Modal from '../components/ui/Modal';
 import { useData, useWorkspace, useUI, usePrompts } from '../store';
 import { uploadWorkspaceFile, updateWorkspaceFile, getWorkspaceFileSignedUrl, getWorkspaceFileUsage } from '../lib/api/files';
 import { planTagChange, tagChangeSummary, tagsOnSelection } from '../lib/fileTags';
-import { collectWorkspaceTags } from '../lib/workspaceTags';
+import { collectWorkspaceTags, withRegistry } from '../lib/workspaceTags';
 import { FILE_ACCEPT_STRING, isImageType, isMediaFile, fileTypeLabel, MAX_FILE_SIZE_MB } from '../lib/uploadTypes';
 import type { WorkspaceFile } from '../types';
 import Checkbox from '../components/ui/Checkbox';
@@ -668,7 +668,7 @@ export default function Files() {
           onDelete={() => setBulkConfirm(true)}
           onClear={() => setSelectedIds(new Set())}
           noun="file"
-          addableTags={allTags}
+          addableTags={withRegistry(allTags, workspace.tags)}
           removableTags={tagsOnSelection(workspaceFiles, selectedIds)}
           onAddTag={tag => handleBulkTag(tag, 'add')}
           onRemoveTag={tag => handleBulkTag(tag, 'remove')}

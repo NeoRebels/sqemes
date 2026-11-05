@@ -414,6 +414,7 @@ export type Database = {
           model: string;
           assistant_id: string | null;
           applied_skill_ids: string[];
+          connector_ids: string[];
           persona_id: string | null;
           visibility: 'private' | 'workspace';
           is_generating: boolean;
@@ -429,6 +430,7 @@ export type Database = {
           model?: string;
           assistant_id?: string | null;
           applied_skill_ids?: string[];
+          connector_ids?: string[];
           persona_id?: string | null;
           visibility?: 'private' | 'workspace';
           is_generating?: boolean;
@@ -444,6 +446,7 @@ export type Database = {
           model?: string;
           assistant_id?: string | null;
           applied_skill_ids?: string[];
+          connector_ids?: string[];
           persona_id?: string | null;
           visibility?: 'private' | 'workspace';
           is_generating?: boolean;
@@ -597,6 +600,7 @@ export type Database = {
           title: string;
           description: string;
           content: string;
+          connectors: Json;
           tags: string[];
           created_by: string | null;
           ai_generated_at: string | null;
@@ -610,6 +614,7 @@ export type Database = {
           title: string;
           description?: string;
           content?: string;
+          connectors?: Json;
           tags?: string[];
           created_by?: string | null;
           ai_generated_at?: string | null;
@@ -623,6 +628,7 @@ export type Database = {
           title?: string;
           description?: string;
           content?: string;
+          connectors?: Json;
           tags?: string[];
           created_by?: string | null;
           ai_generated_at?: string | null;

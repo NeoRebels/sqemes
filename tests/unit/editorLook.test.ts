@@ -17,7 +17,7 @@ describe('SQEM-550 (c) — the editor', () => {
     const block = src.slice(head, toolbar);
     expect(block).toMatch(/<label htmlFor="template-editor-title" className="sr-only">\{txt\.ed_title_label\(\)\}<\/label>/);
     expect(en.ed_title_label).toBe('Title'); // SQEM-605
-    expect(block).toMatch(/<input id="template-editor-title"\s+className="[^"]*font-display/);
+    expect(block).toMatch(/<input id="template-editor-title"[\s\S]{0,200}className="[^"]*font-display/);
     expect(block).toMatch(/<KindBadge kind=\{formData\.kind\} \/>/);
     expect(src.match(/id="template-editor-title"/g)).toHaveLength(1); // moved, not copied
   });

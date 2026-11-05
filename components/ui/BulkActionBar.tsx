@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, X, Download, Loader2, Tag as TagIcon, Lock } from 'lucide-react';
+import { Trash2, X, Download, Loader2, Tag as TagIcon, Lock, UserPen } from 'lucide-react';
 import { m } from '../../lib/i18n';
 import type { BulkNoun } from '../../lib/bulkApply';
 
@@ -15,6 +15,9 @@ const SELECTED: Record<BulkNoun, (i: { count: number }) => string> = {
 // gets wrong once and then avoids. Each lists only what it can act on, so neither ever no-ops.
 // SQEM-564 — Playbooks and Personas use the tag actions too. They carry ONE tag, so there the first
 // control is "Set tag" (it replaces) — `addTagLabel`. And an optional "Access…" (Playbooks only).
+
+/** SQEM-646 — the "Remove tag" entry's value; a real tag can never carry it (tags come from the vocabulary). */
+const REMOVE_TAG = '\u0000remove';
 
 export default function BulkActionBar({
   count,
@@ -33,6 +36,9 @@ export default function BulkActionBar({
   tagBusy,
   addTagLabel = m.bulk_add_tag(),
   onAccess,
+  onEditors,
+  onEditTag,
+  hasTaggedSelection = false,
 }: {
   count: number;
   total: number;
@@ -55,6 +61,16 @@ export default function BulkActionBar({
   addTagLabel?: string;
   /** SQEM-564 — opens the bulk access dialog. Absent = no button. */
   onAccess?: () => void;
+  /** SQEM-621 — opens the bulk "who can edit" dialog. Absent = no button. */
+  onEditors?: () => void;
+  /**
+   * SQEM-646 — ONE "Edit tag" list for items that carry a single tag (Playbooks, Personas): "Remove tag"
+   * first (null), then the workspace tags to set. Replaces the add/remove pair; Files, whose items carry
+   * several tags, keep the pair (removing there needs to know WHICH tag).
+   */
+  onEditTag?: (tag: string | null) => void;
+  /** Whether any selected item carries a tag — "Remove tag" is greyed out otherwise. */
+  hasTaggedSelection?: boolean;
 }) {
   // A select that fires and resets: its value is an action, not a state, so it must not appear to
   // remember a choice that has already been applied.
@@ -94,8 +110,35 @@ export default function BulkActionBar({
       </button>
       <div className="flex-1" />
       {tagBusy && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-300" />}
-      {onAddTag && tagSelect(addTagLabel, addableTags ?? [], onAddTag)}
-      {onRemoveTag && (removableTags?.length ?? 0) > 0 && tagSelect(m.bulk_remove_tag(), removableTags ?? [], onRemoveTag)}
+      {onEditTag ? (
+        <div className="relative flex items-center">
+          <TagIcon className="absolute left-2.5 w-3.5 h-3.5 text-slate-300 pointer-events-none" />
+          <select
+            value=""
+            disabled={tagBusy || ((addableTags ?? []).length === 0 && !hasTaggedSelection)}
+            onChange={e => {
+              const v = e.target.value; e.target.value = '';
+              if (v === REMOVE_TAG) onEditTag(null);
+              else if (v) onEditTag(v);
+            }}
+            aria-label={m.bulk_edit_tag()}
+            className="pl-7 pr-6 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg appearance-none cursor-pointer outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <option value="">{m.bulk_edit_tag()}</option>
+            <option value={REMOVE_TAG} disabled={!hasTaggedSelection} className="text-slate-900">{m.bulk_remove_tag_all()}</option>
+            {(addableTags ?? []).length > 0 && (
+              <optgroup label={m.bulk_set_tag_group()} className="text-slate-900">
+                {(addableTags ?? []).map(t => <option key={t} value={t} className="text-slate-900">{t}</option>)}
+              </optgroup>
+            )}
+          </select>
+        </div>
+      ) : (
+        <>
+          {onAddTag && tagSelect(addTagLabel, addableTags ?? [], onAddTag)}
+          {onRemoveTag && (removableTags?.length ?? 0) > 0 && tagSelect(m.bulk_remove_tag(), removableTags ?? [], onRemoveTag)}
+        </>
+      )}
       {onAccess && (
         <button
           type="button"
@@ -104,6 +147,16 @@ export default function BulkActionBar({
           className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
         >
           <Lock className="w-3.5 h-3.5" /> {m.bulk_access()}
+        </button>
+      )}
+      {onEditors && (
+        <button
+          type="button"
+          onClick={onEditors}
+          disabled={tagBusy}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
+        >
+          <UserPen className="w-3.5 h-3.5" /> {m.bulk_editors()}
         </button>
       )}
       {onExport && (

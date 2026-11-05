@@ -95,3 +95,27 @@ export function withLibraryPrompt(systemInstruction: string | undefined): string
     ? `${LIBRARY_SYSTEM_PROMPT}\n\n${systemInstruction}`
     : LIBRARY_SYSTEM_PROMPT;
 }
+
+/**
+ * SQEM-623 — the improvement hint: what the model does AFTER it has worked with a playbook or persona.
+ *
+ * ⭐ **Served in the tool RESULT, not in the pasted text above.** `get_template` returns it as
+ * `afterUse`, `get_persona` (and the persona a person applies in Chat, `lib/personaChat.ts`) ends with it —
+ * one constant, read by `libraryQueries.ts`, so MCP and Chat cannot drift. A result is the one lever the
+ * server changes for everyone at once, including people who pasted an older `LIBRARY_SYSTEM_PROMPT`.
+ * SQEM-468 measured that a result arrives too late to *trigger* a call; this hint never has to — it acts
+ * only once a playbook is already loaded, which is exactly when the result is there.
+ *
+ * ⛔ **A link in the pasted text was considered and rejected (2026-10-30):** a model treats fetched web
+ * content as data rather than instructions (prompt-injection defence), it needs a web tool the client may
+ * not have, and this module ships to self-host, where no product URL may appear.
+ *
+ * ⛔ **Nothing changes without the person's explicit yes, and deletion is never offered**
+ * (2026-10-30): removing a playbook belongs to the review flow (SQEM-478), not to a passing suggestion.
+ * The write itself is still gated by the server (`TOOL_CAPABILITY`; Chat offers a member no write tool),
+ * so the last sentence only tells the model what to say when it cannot act.
+ *
+ * ⚠️ Every loaded playbook and persona pays these ~100 tokens. `tests/unit/improvementHint.test.ts` caps
+ * the length at 400 characters — raise it only with a reason.
+ */
+export const IMPROVEMENT_HINT = 'Only if the person corrected this playbook or persona, or a step in it proved outdated, missing or duplicated: end your answer by asking in one sentence whether to update it or create a new one. Otherwise say nothing about changing it. Change nothing without their explicit yes; ask at most once, never after a no. Never offer to delete. If they cannot edit it, suggest telling someone who can.';

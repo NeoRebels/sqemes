@@ -112,7 +112,7 @@ describe('SQEM-551 — wiring', () => {
   });
 
   it('the client hands the extra field to Chat and stores both kinds', () => {
-    expect(read('lib/realtimeJob.ts')).toMatch(/onResultMeta\?\.\(\{ loadedTemplateIds: payload\.loadedTemplateIds, libraryChanges: payload\.libraryChanges, webSources: payload\.webSources, generatedFiles: payload\.generatedFiles \}\);\s*resolve\(/);
+    expect(read('lib/realtimeJob.ts')).toMatch(/onResultMeta\?\.\(\{ loadedTemplateIds: payload\.loadedTemplateIds, libraryChanges: payload\.libraryChanges, webSources: payload\.webSources, generatedFiles: payload\.generatedFiles, connectorIds: payload\.connectorIds \}\);\s*resolve\(/);
     const api = read('lib/api/chatSessions.ts');
     expect(api).toMatch(/\.\.\.messagePlaybookFields\(row\)/);
     expect(api).toMatch(/playbook_ref: extra\.playbookRef/);

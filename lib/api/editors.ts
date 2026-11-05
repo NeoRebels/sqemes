@@ -61,6 +61,22 @@ export async function fetchEditRights(kind: EditorKind, id: string): Promise<{ c
 }
 
 /**
+ * SQEM-621 — whose editor LIST the person may set (`can_manage_*_editors`: the owner or an admin). Stricter
+ * than `fetchCanEditMany`, because RLS on the editor tables is. ⛔ Fails CLOSED like it: an id that could
+ * not be checked is skipped and reported, never written.
+ */
+export async function fetchCanManageEditorsMany(kind: EditorKind, ids: string[]): Promise<Set<string>> {
+  const results = await runLimited(ids, 4, async id => {
+    const { data, error } = await client.rpc(
+      kind === 'template' ? 'can_manage_template_editors' : 'can_manage_persona_editors',
+      kind === 'template' ? { p_template_id: id } : { p_persona_id: id },
+    );
+    return !error && data === true;
+  });
+  return new Set(ids.filter((_, i) => results[i].status === 'fulfilled' && (results[i] as PromiseFulfilledResult<boolean>).value));
+}
+
+/**
  * SQEM-564 — which of these the person may change, asked of the database one id at a time (at most four
  * in flight). ⛔ Fails CLOSED, the opposite of `fetchEditRights`: this decides what a bulk action WRITES
  * and reports, and an id that could not be checked is skipped rather than announced as changed.

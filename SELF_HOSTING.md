@@ -155,6 +155,15 @@ you do not need `selfhost/` at all.
 - **Docker** (optional) — to build/serve the frontend via the bundled `Dockerfile`.
 - At least one **AI provider key** (BYOK) to actually run prompts — added later in the UI.
 
+⚠️ **Edge functions must be allowed to run for a few minutes.** A Chat answer that uses several tools
+works in the background after the request returns, and is handed to a fresh invocation when it runs
+long. The bundled stack (Path B) allows 400 s per worker since v1.11.35. On Supabase Cloud the plan
+sets the limit (150 s on the free plan). On a self-hosted Supabase the main function's
+`workerTimeoutMs` sets it — Supabase's template uses 60 s, which in practice ends background work
+after well under a minute; raise it to 400 s (`400 * 1000`) as `selfhost/edge-main/index.ts` does, and pass
+`forceCreate: true` for requests carrying `?handover=1`, so a long answer handed to a new invocation
+gets a fresh worker instead of the one that is already running.
+
 ---
 
 ## Path A — setup
@@ -250,7 +259,7 @@ npm run build        # → dist/
 ```
 
 ### 8. First run
-Sign up (creates your workspace), then **Settings → Integrations → add an AI provider key**
+Sign up (creates your workspace), then **Settings → AI providers → add an AI provider key**
 (BYOK). You can now author playbooks, chat, and connect the MCP server / extension.
 
 ---
@@ -258,13 +267,13 @@ Sign up (creates your workspace), then **Settings → Integrations → add an AI
 ## Bring Your Own Keys (BYOK)
 
 Without `MISTRAL_API_KEY` there is no funded "sqemes AI" model — every workspace uses its own
-provider keys (added in Settings → API & MCP), encrypted at rest with `API_KEY_ENCRYPTION_KEY`.
+provider keys (added in Settings → AI providers), encrypted at rest with `API_KEY_ENCRYPTION_KEY`.
 
 ### Web search in Chat
 
 Chat can search the web with every text model — switch on the globe next to the message box; it applies
 to that one message. On a self-hosted instance it needs a **search key of the workspace's own**: Settings
-→ API & MCP → **Web search**, choose **Linkup** or **Brave Search** and paste the key (one search key per
+→ AI providers → **Web search**, choose **Linkup** or **Brave Search** and paste the key (one search key per
 workspace; saving one replaces the other). Without a key the globe stays disabled and says where to add
 one. Queries go to the provider you chose; search results are never stored — only the queries and the
 addresses of pages that were read are kept with the answer. With a Brave key, Brave's terms apply between
@@ -285,7 +294,7 @@ stored as a file.
 |---|---|
 | `STRIPE_*` | No billing UI/flows; `SELF_HOSTED=true` removes the paywall entirely. |
 | `MISTRAL_API_KEY` | No funded "sqemes AI"; BYOK only. |
-| `LINKUP_API_KEY` | No included web search; Chat searches the web only with a workspace's own search key (Settings → API & MCP → Web search). |
+| `LINKUP_API_KEY` | No included web search; Chat searches the web only with a workspace's own search key (Settings → AI providers → Web search). |
 | `RESEND_API_KEY` | Invite emails don't send — the app shows a **copyable invite link** instead (SQEM-112). |
 | `VITE_SENTRY_DSN` | No Sentry; structured console logging remains. |
 | `PUBLIC_API_URL` | MCP/OAuth advertise the raw Supabase project URL instead of a custom domain. |
@@ -379,6 +388,12 @@ Atlassian, monday.com, Airtable, Sentry and others); add it by its URL.
 Microsoft 365, Atlassian, Linear, Notion and the rest — and the edge functions behind the Microsoft
 and Shopify ones — are not in this distribution; Settings → Connectors says so in one line. A
 connector you add yourself by URL is the same connector a tile would have created.
+
+**In Chat the AI fetches a connector when a question needs it** (since v1.11.35): it sees every
+connector the person may use by name, adds one from the next step of the answer, and keeps it for that
+chat; a line under the answer names it. There is nothing to switch on. Every connector result is
+shortened to 60,000 characters before it reaches the model, with every provider, so one large result
+cannot overflow a chat.
 
 Each connector is configured **per workspace in the UI**. Where a provider needs OAuth credentials you
 register them yourself, so the redirect URI points at *your* instance; the dialog shows you the exact
@@ -481,7 +496,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.11.34       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.11.35       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### ⛔ 3a. Before v1.11.9: count your workspace-wide MCP keys
@@ -685,7 +700,7 @@ If you would rather it did not, block `/#/library/` at your reverse proxy — bu
 reaches the server, so the block has to happen in the browser or not at all. Removing the route in a
 fork is the reliable way.
 
-*Last updated: 2026-10-27 (SQEM-614: version pin v1.11.34 — sqemes in German: every person chooses English or German under My Profile, admins set a workspace default under Settings → General, and without a choice everything stays in English; messages from the server follow the same language; legal texts, e-mails, the browser extension and MCP stay in English. Before that, SQEM-598: version pin v1.11.33 — web search in Chat with your own Linkup or Brave key, files from Chat (Word, PDF, Excel, PowerPoint, Markdown, text) with a preview beside the chat, and a document style under Settings → Brand. Before that, SQEM-597: document style for files from Chat, also on self-host. Before that, SQEM-594: web search in Chat with a workspace's own Linkup or Brave key; "Settings → Integrations" corrected to API & MCP. Before that, SQEM-593: version pin v1.11.32 — fonts, logos and other binary files uploaded over MCP keep their folder in the file name, so a downloaded skill finds them again. Before that, SQEM-591: version pin v1.11.31 — connectors work with every text model, a Stop button that really stops an answer, no two-minute cut-off for models that think long, custom connectors show their logo, the playbook editor opens on Test. SQEM-589: one-click connector apps are part of sqemes Cloud — the Connectors section now describes custom connectors only. Before that, SQEM-580: version pin v1.11.30 — OpenRouter shows only the models you add and its image models work; a connector OpenAI cannot reach is left out instead of failing the answer, and errors inside an OpenAI stream are reported; the Start card shows your pinned chats; History deletes several chats at once; one default AI model for chats and writing; mobile polish. Before that, SQEM-566: version pin v1.11.29 — every MCP tool in sqemes Chat by role, with a card for what an answer changed; a History page with delete; bulk tag and access actions; the Files filter Media/Documents; a refreshed model list with image models routed again. Before that, SQEM-559: version pin v1.11.28 — a new design (new typefaces served from the image, Work | Manage navigation, an Overview page), playbook versions with restore, “Who can edit” with a workspace default, a Security tab, and the playbook card in Chat. Before that, SQEM-531: v1.11.27 — the file list checks access once per query, an MCP call carries at most 5 MB (larger files go through create_upload_url), a failed import removes what it created, and sqemes is described as the AI Management OS.)*
+*Last updated: 2026-11-04 (SQEM-656: version pin v1.11.35 — Chat answers keep working on long tasks, the AI fetches connectors when a question needs them, large connector results are shortened, personas can name the connector services they work with, prompt caching) · 2026-11-02 (SQEM-618: AI provider and web search keys moved to Settings → AI providers) · 2026-10-27 (SQEM-614: version pin v1.11.34 — sqemes in German: every person chooses English or German under My Profile, admins set a workspace default under Settings → General, and without a choice everything stays in English; messages from the server follow the same language; legal texts, e-mails, the browser extension and MCP stay in English. Before that, SQEM-598: version pin v1.11.33 — web search in Chat with your own Linkup or Brave key, files from Chat (Word, PDF, Excel, PowerPoint, Markdown, text) with a preview beside the chat, and a document style under Settings → Brand. Before that, SQEM-597: document style for files from Chat, also on self-host. Before that, SQEM-594: web search in Chat with a workspace's own Linkup or Brave key; "Settings → Integrations" corrected to API & MCP. Before that, SQEM-593: version pin v1.11.32 — fonts, logos and other binary files uploaded over MCP keep their folder in the file name, so a downloaded skill finds them again. Before that, SQEM-591: version pin v1.11.31 — connectors work with every text model, a Stop button that really stops an answer, no two-minute cut-off for models that think long, custom connectors show their logo, the playbook editor opens on Test. SQEM-589: one-click connector apps are part of sqemes Cloud — the Connectors section now describes custom connectors only. Before that, SQEM-580: version pin v1.11.30 — OpenRouter shows only the models you add and its image models work; a connector OpenAI cannot reach is left out instead of failing the answer, and errors inside an OpenAI stream are reported; the Start card shows your pinned chats; History deletes several chats at once; one default AI model for chats and writing; mobile polish. Before that, SQEM-566: version pin v1.11.29 — every MCP tool in sqemes Chat by role, with a card for what an answer changed; a History page with delete; bulk tag and access actions; the Files filter Media/Documents; a refreshed model list with image models routed again. Before that, SQEM-559: version pin v1.11.28 — a new design (new typefaces served from the image, Work | Manage navigation, an Overview page), playbook versions with restore, “Who can edit” with a workspace default, a Security tab, and the playbook card in Chat. Before that, SQEM-531: v1.11.27 — the file list checks access once per query, an MCP call carries at most 5 MB (larger files go through create_upload_url), a failed import removes what it created, and sqemes is described as the AI Management OS.)*
 `/playbooks` and every old link redirects. Nothing changes for an operator. Earlier the same day
 (SQEM-390) — the assistant template kind is gone: on upgrade the migration
 turns every assistant into a skill with the same text, and a role is a persona. Earlier: 2026-08-19

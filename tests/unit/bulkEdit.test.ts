@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runLimited, applyToEditable, bulkSummary, wouldLoseSight } from '../../lib/bulkApply';
-import { en } from './i18nText';
+import { en, de } from './i18nText';
 
 /**
  * SQEM-564 — access for several playbooks at once, one tag for several playbooks or personas.
@@ -82,43 +82,46 @@ describe('SQEM-564 — the wiring', () => {
   const personas = read('pages/Personas.tsx');
   const bar = read('components/ui/BulkActionBar.tsx');
   const editors = read('lib/api/editors.ts');
+  // SQEM-646 — the access dialog moved out of Templates.tsx so the Personas page shares it.
+  const dialog = read('components/BulkAccessModal.tsx');
 
-  it('Playbooks: "Set tag", "Remove tag" only for tags the selection carries, and "Access…"', () => {
-    expect(templates).toMatch(/addTagLabel=\{m\.bulk_set_tag\(\)\}/);
-    expect(en.bulk_set_tag).toBe('Set tag'); // SQEM-605
-    expect(templates).toMatch(/onRemoveTag=\{tag => void handleBulkTag\(null, selectedPrompts\.filter\(p => p\.tag === tag\)/);
-    expect(templates).toMatch(/onAccess=\{canBulkAccess \? openBulkAccess : undefined\}/);
+  it('Playbooks: one "Edit tag" list (SQEM-646) — remove only where a tag is set — and "Access…"', () => {
+    expect(templates).toMatch(/onEditTag=\{tag => void handleBulkTag\(tag, tag \? selectedPrompts\.map\(p => p\.id\) : selectedPrompts\.filter\(p => p\.tag\)\.map\(p => p\.id\)\)\}/);
+    expect(templates).toMatch(/onAccess=\{canBulkAccess \? \(\) => setBulkAccessOpen\(true\) : undefined\}/);
+    expect(templates).toMatch(/<BulkAccessModal[\s\S]{0,160}kind="template"/);
   });
 
   it('⛔ "Access…" only where the editor offers access at all: Cloud and multi-seat', () => {
     expect(templates).toMatch(/const canBulkAccess = canEdit && !IS_SELF_HOSTED && isMultiSeat\(workspace\);/);
+    expect(personas).toMatch(/onAccess=\{!IS_SELF_HOSTED && isMultiSeat\(workspace\) \? \(\) => setBulkAccessOpen\(true\) : undefined\}/);
   });
 
   it('⛔ no "Only me" in bulk — no allowPrivate, and Apply waits until someone is named', () => {
-    // SQEM-604/605 — the dialog is found by its key now; the words live in messages/.
-    const dialog = templates.slice(templates.indexOf('m.pb_bulk_access_title({ count: selectedIds.size })'), templates.indexOf('Publish to Marketplace (SQEM-163)'));
     expect(dialog).toMatch(/<TemplateAccessControl/);
     expect(dialog).not.toMatch(/allowPrivate/);
-    expect(dialog).toMatch(/disabled=\{bulkAccessIncomplete\}/);
-    expect(templates).toMatch(/bulkAccess\.mode === 'restricted'\s*&& bulkAccess\.userIds\.length === 0 && \(bulkAccess\.groupIds \?\? \[\]\)\.length === 0/);
+    expect(dialog).toMatch(/disabled=\{incomplete\}/);
+    expect(dialog).toMatch(/value\.mode === 'restricted' && value\.userIds\.length === 0 && \(value\.groupIds \?\? \[\]\)\.length === 0/);
   });
 
-  it('the dialog says it replaces, and how many playbooks the person would stop seeing', () => {
-    expect(templates).toMatch(/m\.pb_bulk_access_body\(\)/);
+  it('the dialog says it replaces, and how many items the person would stop seeing', () => {
+    expect(dialog).toMatch(/m\.pb_bulk_access_body\(\)/);
+    expect(dialog).toMatch(/m\.ps_bulk_access_body\(\)/);
     expect(en.pb_bulk_access_body).toMatch(/^This replaces the current access of every selected playbook you may change/);
-    expect(templates).toMatch(/m\.pb_lose_sight\(\{ count: loseSight \}\)/);
+    expect(dialog).toMatch(/m\.pb_lose_sight\(\{ count: loseSight \}\)/);
+    expect(dialog).toMatch(/m\.ps_lose_sight\(\{ count: loseSight \}\)/);
     expect(JSON.stringify(en.pb_lose_sight)).toMatch(/you will no longer see \{count\}/);
   });
 
-  it('access is written per playbook through the edit-right check, each with its own owner stripped', () => {
-    expect(templates).toMatch(/applyToEditable\(\s*\[\.\.\.byId\.keys\(\)\],\s*ids => fetchCanEditMany\('template', ids\)/);
-    expect(templates).toMatch(/accessValueToAccess\(bulkAccess, byId\.get\(id\)\?\.createdBy \|\| null\)/);
+  it('access is written per item through the edit-right check, each with its own owner stripped', () => {
+    expect(dialog).toMatch(/ids => fetchCanEditMany\(kind, ids\)/);
+    expect(dialog).toMatch(/setTemplateAccess\(id, workspace\.id, accessValueToAccess\(value, owners\.get\(id\) \?\? null\)\)/);
+    expect(dialog).toMatch(/setPersonaAccess\(id, workspace\.id, accessValueToPersonaAccess\(value, owners\.get\(id\) \?\? null\)\)/);
   });
 
-  it('Personas: the same tag actions, through can_edit_persona', () => {
-    expect(personas).toMatch(/addTagLabel=\{m\.bulk_set_tag\(\)\}/); // SQEM-605
+  it('Personas: the same tag actions and, since SQEM-646, access — through can_edit_persona', () => {
     expect(personas).toMatch(/fetchCanEditMany\('persona', list\)/);
-    expect(personas).not.toMatch(/onAccess=/); // by design: no bulk access for personas
+    expect(personas).toMatch(/onEditTag=\{tag => void bulkSetTag\(tag, tag/);
+    expect(personas).toMatch(/<BulkAccessModal[\s\S]{0,160}kind="persona"/);
   });
 
   it('the bar keeps "Add tag" for Files and only shows "Access…" when asked to', () => {
@@ -129,5 +132,32 @@ describe('SQEM-564 — the wiring', () => {
 
   it('⛔ fetchCanEditMany fails CLOSED — an id it could not check is skipped', () => {
     expect(editors).toMatch(/return !error && data === true;/);
+  });
+});
+
+describe('SQEM-646 — "Edit tag" as one list', () => {
+  const bar = read('components/ui/BulkActionBar.tsx');
+
+  it('"Remove tag" first, then the tags to set; remove greyed out when no selected item has a tag', () => {
+    const list = bar.slice(bar.indexOf('{onEditTag ? ('), bar.indexOf(') : (', bar.indexOf('{onEditTag ? (')));
+    expect(list.indexOf('m.bulk_remove_tag_all()')).toBeGreaterThan(list.indexOf('m.bulk_edit_tag()'));
+    expect(list.indexOf('m.bulk_remove_tag_all()')).toBeLessThan(list.indexOf('m.bulk_set_tag_group()'));
+    expect(list).toMatch(/<option value=\{REMOVE_TAG\} disabled=\{!hasTaggedSelection\}/);
+    expect(list).toMatch(/if \(v === REMOVE_TAG\) onEditTag\(null\);/);
+    expect(list).toMatch(/e\.target\.value = ''/); // fires and resets, like the old lists
+  });
+
+  it('Files keep the add/remove pair (several tags per file)', () => {
+    expect(read('pages/Files.tsx')).toMatch(/onAddTag=/);
+    expect(read('pages/Files.tsx')).not.toMatch(/onEditTag=/);
+  });
+
+  it('texts in both languages', () => {
+    for (const k of ['bulk_edit_tag', 'bulk_remove_tag_all', 'bulk_set_tag_group', 'ps_bulk_access_title', 'ps_bulk_access_body', 'ps_bulk_access_hint', 'ps_lose_sight'] as const) {
+      expect(en[k], k).toBeTruthy();
+      expect(de[k], k).toBeTruthy();
+    }
+    expect(de.bulk_edit_tag).toBe('Tag bearbeiten');
+    expect(de.bulk_remove_tag_all).toBe('Tag entfernen');
   });
 });

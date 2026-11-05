@@ -3,6 +3,8 @@ import { Link } from 'react-router';
 import { ArrowLeft, Copy, Edit, FolderDown, Play, Star, Store, Trash2 } from 'lucide-react';
 import KindBadge from './ui/KindBadge';
 import AccessBadge from './ui/AccessBadge';
+import OwnerLine from './OwnerLine';
+import type { OwnerMember } from '../lib/listFilters';
 import TagEditor from './ui/TagEditor';
 import type { AccessBadgeMode } from '../lib/accessBadge';
 import { IS_SELF_HOSTED } from '../lib/env';
@@ -29,7 +31,7 @@ export function blanksIn(content: string): string[] {
 const ACTION = 'inline-flex items-center gap-1.5 px-3 py-2 rounded-control text-sm font-medium text-ink-muted hover:text-ink-strong hover:bg-surface-sunken transition-colors';
 
 export default function PlaybookPreview({
-  prompt, canEdit, accessMode, workspaceTags, loadedBy, showPublish,
+  prompt, canEdit, accessMode, workspaceTags, loadedBy, showPublish, members,
   onUse, onDuplicate, onExport, onPublish, onDelete, onSetTag, onFavorite, onBack,
 }: {
   prompt: Prompt;
@@ -38,6 +40,8 @@ export default function PlaybookPreview({
   workspaceTags: string[];
   loadedBy: LoadedBy[];
   showPublish: boolean;
+  /** SQEM-620 — to name the owner in the Info box. */
+  members: ReadonlyArray<OwnerMember & { avatar?: string | null }>;
   onUse: (prompt: Prompt) => void;
   onDuplicate: (prompt: Prompt) => void;
   onExport: (prompt: Prompt) => void;
@@ -50,12 +54,17 @@ export default function PlaybookPreview({
 }) {
   const blanks = prompt.kind === 'prompt' ? blanksIn(prompt.content) : [];
   return (
-    <article aria-labelledby="playbook-preview-title" className="rounded-card border border-line bg-surface-raised p-5 md:p-6">
+    <article aria-labelledby="playbook-preview-title" className="rounded-card border border-line bg-surface-raised p-5 md:p-6 [container-type:inline-size]">
       <button type="button" onClick={onBack} className="lg:hidden mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink-strong">
         <ArrowLeft className="w-4 h-4" /> {txt.pv_all_playbooks()}
       </button>
 
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+      {/* SQEM-630 — the title and the actions side by side only when the PREVIEW is wide enough (40rem),
+          not the window: beside the list and the sidebar it was ~70 px at 768 and ~210 px at 1280, and the
+          title broke one letter per line next to the buttons. Window breakpoints were tried first and
+          measured wrong at 768 and 1280. The article is the container (`[container-type:inline-size]`);
+          Tailwind 3.4 writes the query as an arbitrary variant, no plugin needed. */}
+      <div className="flex flex-col gap-4 justify-between [@container(min-width:40rem)]:flex-row [@container(min-width:40rem)]:items-start">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-2">
             <KindBadge kind={prompt.kind} />
@@ -71,7 +80,7 @@ export default function PlaybookPreview({
           <h2 id="playbook-preview-title" className="font-display text-2xl md:text-3xl font-semibold tracking-tight text-ink-strong break-words">{prompt.title}</h2>
           {prompt.description && <p className="mt-1 text-ink-muted">{prompt.description}</p>}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           <button
             type="button"
             onClick={() => onFavorite(prompt)}
@@ -108,12 +117,25 @@ export default function PlaybookPreview({
             )}
           </dd>
         </div>
+        {/* SQEM-620 — "Info": the blanks (or how a skill applies) and the owner, in one box. The owner
+            asked for no third column (2026-11-03): three boxes side by side were too narrow to read. */}
         <div className="rounded-card bg-surface-sunken p-4">
-          <dt className="text-2xs font-bold uppercase tracking-wider text-ink-subtle mb-1.5">{prompt.kind === 'prompt' ? txt.pv_blanks() : txt.pv_applied_as()}</dt>
+          <dt className="text-2xs font-bold uppercase tracking-wider text-ink-subtle mb-1.5">{txt.pv_info()}</dt>
           <dd className="text-sm text-ink">
-            {prompt.kind === 'skill'
-              ? txt.pv_skill_knowledge()
-              : blanks.length === 0 ? <span className="text-ink-muted">{txt.pv_no_blanks()}</span> : blanks.join(' · ')}
+            <dl className="space-y-2">
+              <div>
+                <dt className="text-xs font-semibold text-ink-subtle">{prompt.kind === 'prompt' ? txt.pv_blanks() : txt.pv_applied_as()}</dt>
+                <dd>
+                  {prompt.kind === 'skill'
+                    ? txt.pv_skill_knowledge()
+                    : blanks.length === 0 ? <span className="text-ink-muted">{txt.pv_no_blanks()}</span> : blanks.join(' · ')}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold text-ink-subtle">{txt.ed_owner()}</dt>
+                <dd className="mt-0.5"><OwnerLine createdBy={prompt.createdBy} members={members} /></dd>
+              </div>
+            </dl>
           </dd>
         </div>
       </dl>

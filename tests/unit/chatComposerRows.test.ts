@@ -47,7 +47,7 @@ describe('SQEM-401 — two rows on a phone, one row on a desktop', () => {
     expect(toolsBody).toMatch(/<Paperclip /);
     expect(toolsBody).toMatch(/title=\{txt\.chat_use_playbook\(\)\}/); // SQEM-544 — was "Use template"
     expect(en.chat_use_playbook).toBe('Use playbook  (/)'); // SQEM-604 — the words live in messages/
-    expect(toolsBody).toMatch(/<Plug /);
+    expect(toolsBody).not.toMatch(/<Plug /); // SQEM-651 — the connector icon is gone
     expect(toolsBody).not.toMatch(/<textarea/);
   });
 
@@ -64,15 +64,18 @@ describe('SQEM-401 — two rows on a phone, one row on a desktop', () => {
   });
 
   it('⚠️ the attach menu anchors to the button\'s centre on a phone and to its left edge from md up', () => {
-    // ⚠️ This counted TWO menus until SQEM-436. The connectors menu was the second, and it is gone —
-    // connectors are always active now, so the icon is a status and opens nothing. The rule itself is
-    // unchanged and still matters for the one menu that is left: anchored left on a phone, a menu
-    // opens off the edge of the screen.
-    const menus = src.match(/absolute bottom-full left-1\/2 -translate-x-1\/2 md:left-0 md:translate-x-0 mb-2 w-64/g) ?? [];
+    // SQEM-436 took the connectors menu away (status only), SQEM-635 brought it back as switches, and
+    // SQEM-651 removed it for good: one menu again. Anchored left on a phone, a menu opens off the screen.
+    const menus = src.match(/absolute bottom-full left-1\/2 -translate-x-1\/2 md:left-0 md:translate-x-0 mb-2 w-(64|72)/g) ?? [];
     expect(menus.length, 'attach menu').toBe(1);
     expect(src).not.toMatch(/absolute bottom-full left-0 mb-2/);
-    // The connector tooltip is centred too — it has no md: variant because it is never wider than
-    // its anchor's row.
-    expect(src).toMatch(/absolute bottom-full left-1\/2 -translate-x-1\/2 mb-2 w-max/);
+  });
+
+  it('⛔ no element carries an `animate-*` class and a `translate-*` class at once (SQEM-636)', () => {
+    // `animate-scale-up` holds `transform` with `forwards` and so cancels `-translate-x-1/2`: the
+    // attach menu ran 37 px off a 390 px screen (measured). Position outside, animate inside.
+    const classLists = CHAT.match(/className=("[^"]*"|`[^`]*`|\{[^}]*\})/g) ?? [];
+    const both = classLists.filter(c => /\banimate-/.test(c) && /-?translate-[xy]/.test(c));
+    expect(both).toEqual([]);
   });
 });

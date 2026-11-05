@@ -22,7 +22,8 @@
  * Every event a job can broadcast. **The client must listen for all of them** —
  * `tests/unit/jobEvents.test.ts` checks that against `lib/realtimeJob.ts`.
  */
-export const JOB_EVENTS = ['delta', 'result'] as const;
+// SQEM-649 — `continued`: the answer goes on in a new invocation; the browser moves its deadline.
+export const JOB_EVENTS = ['delta', 'continued', 'result'] as const;
 
 export type JobEvent = typeof JOB_EVENTS[number];
 
@@ -34,5 +35,7 @@ export type JobEvent = typeof JOB_EVENTS[number];
  * carrying `delta` **is** a delta; everything else — `result`, `error` — is terminal.
  */
 export function jobEventFor(payload: Record<string, unknown>): JobEvent {
-  return 'delta' in payload ? 'delta' : 'result';
+  if ('delta' in payload) return 'delta';
+  if ('continued' in payload) return 'continued'; // SQEM-649 — not terminal
+  return 'result';
 }

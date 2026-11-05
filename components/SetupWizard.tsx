@@ -125,7 +125,7 @@ const CHANNELS: { id: Channel; title: () => string; text: () => string; name: ()
  * instance would finish onboarding with no place to put a key at all.
  */
 const STEPS_FOR = (channels: Channel[], keyRequired: boolean): { id: StepId; label: string }[] => [
-  // Round 2 (owner, 2026-09-12): a welcome screen first. The first cut squeezed the why into the
+  // Round 2 (2026-09-12): a welcome screen first. The first cut squeezed the why into the
   // header and opened straight on the brand form — "thrown into cold water", and a crowded modal.
   { id: 'welcome', label: m.sw_step_welcome() },
   ...(IS_SELF_HOSTED ? [] : [{ id: 'templates' as const, label: m.sw_step_templates() }]),
@@ -866,10 +866,10 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                       {configured.size > 0
                         ? m.sw_chat_own_key()
                         : keyMode === 'credits'
-                          ? <>{m.sw_chat_credits()} <Link to="/settings" onClick={closeOnly} className="font-semibold text-accent hover:underline">{m.sw_settings_api()}</Link>.</>
+                          ? <>{m.sw_chat_credits()} <Link to="/settings" state={{ initialTab: 'providers' }} onClick={closeOnly} className="font-semibold text-accent hover:underline">{m.sw_settings_providers()}</Link>.</>
                           : keyMode === 'included'
                             ? m.sw_chat_included()
-                            : <>{m.sw_chat_needs_key()} <Link to="/settings" onClick={closeOnly} className="font-semibold text-accent hover:underline">{m.sw_settings_api()}</Link>.</>}
+                            : <>{m.sw_chat_needs_key()} <Link to="/settings" state={{ initialTab: 'providers' }} onClick={closeOnly} className="font-semibold text-accent hover:underline">{m.sw_settings_providers()}</Link>.</>}
                     </p>
                   </div>
                 </li>
@@ -888,7 +888,7 @@ const SetupWizard = ({ onClose }: SetupWizardProps) => {
                   <p className="text-xs text-ink-muted mt-0.5">
                     {configured.size > 0
                       ? m.sw_ai_row_set()
-                      : <>{m.sw_ai_row_notyet()} <Link to="/settings" onClick={closeOnly} className="font-semibold text-accent hover:underline">{m.sw_settings_api()}</Link>.</>}
+                      : <>{m.sw_ai_row_notyet()} <Link to="/settings" state={{ initialTab: 'providers' }} onClick={closeOnly} className="font-semibold text-accent hover:underline">{m.sw_settings_providers()}</Link>.</>}
                   </p>
                 </div>
               </li>

@@ -127,7 +127,8 @@ describe('⛔ no reader treats a binary skill file as an image or as text', () =
   });
 
   for (const [fn, call] of [
-    ['chat-message', /const messages = Array\.isArray\(body\.messages\) \? dropUnsendableInMessages\(body\.messages\)/],
+    // SQEM-649 — a continuation carries the provider's own list instead, built from cleaned parts before.
+    ['chat-message', /const messages = continuation \? \[\] : Array\.isArray\(body\.messages\) \? dropUnsendableInMessages\(body\.messages\)/],
     ['execute-step', /const promptContent = dropUnsendableParts\(body\.promptContent\)/],
   ] as const) {
     it(`${fn} cleans the parts on the way in, before any provider branch`, () => {

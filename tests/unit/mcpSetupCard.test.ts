@@ -14,12 +14,15 @@ const settings = read('pages/Settings.tsx');
 const card = settings.slice(settings.indexOf('const McpServerCard = '), settings.indexOf('const McpServerCard = ') + 9000);
 
 describe('SQEM-554 (c) — the MCP card', () => {
-  it('is the first card of the API & MCP tab, above the key cards', () => {
-    const tab = settings.slice(settings.indexOf("{activeTab === 'api' && can(currentUser, workspace, 'api-keys:own') && ("));
+  it('is the first card of the API & MCP tab, above the personal keys', () => {
+    const start = settings.indexOf("{activeTab === 'api' && can(currentUser, workspace, 'api-keys:own') && (");
+    const tab = settings.slice(start, settings.indexOf('{/* --- AI providers Tab --- */}', start));
     const mcp = tab.indexOf('<McpServerCard locked={!hasMcpAccess}');
     expect(mcp).toBeGreaterThan(-1);
-    expect(mcp).toBeLessThan(tab.indexOf('AI provider keys'));
     expect(mcp).toBeLessThan(tab.indexOf('Public API Keys'));
+    // SQEM-618 — the workspace's provider and search keys have their own tab now.
+    expect(tab).not.toContain('m.sta_provider_title()');
+    expect(tab).not.toContain('SEARCH = {');
     expect(settings.match(/<McpServerCard /g)).toHaveLength(1); // moved, not copied
   });
 

@@ -26,6 +26,10 @@ export default function McpClientGuide({ url, compact = false }: { url: string; 
   const [copied, setCopied] = useState(false);
   const client = MCP_CLIENTS.find(c => c.id === active) ?? MCP_CLIENTS[0];
   const snippet = client.snippet?.(url);
+  const [domainCopied, setDomainCopied] = useState(false);
+  // SQEM-622 — the instance's own domain (api.sqemes.com on Cloud, the operator's on self-host).
+  let domain = '';
+  try { domain = new URL(url).host; } catch { /* no valid endpoint yet — the box shows no domain line */ }
 
   return (
     <div>
@@ -35,7 +39,7 @@ export default function McpClientGuide({ url, compact = false }: { url: string; 
         <SegmentedTabs
           tabs={MCP_CLIENTS.map(c => ({ value: c.id, label: mcpClientText(c.label), icon: clientIcon(c) }))}
           value={active}
-          onChange={(v) => { setActive(v); setCopied(false); }}
+          onChange={(v) => { setActive(v); setCopied(false); setDomainCopied(false); }}
           className="w-max sm:w-auto sm:flex-wrap [&>button]:whitespace-nowrap"
         />
       </div>
@@ -62,6 +66,25 @@ export default function McpClientGuide({ url, compact = false }: { url: string; 
         )}
         {client.note && !compact && (
           <p className="text-xs text-ink-muted leading-relaxed">{mcpClientText(client.note)}</p>
+        )}
+        {/* SQEM-622/629 — without this, uploads and file downloads fail silently in the client's code sandbox. */}
+        {client.files && !compact && (
+          <div className="rounded-xl border border-line bg-surface-sunken px-4 py-3 space-y-2">
+            <p className="text-xs font-semibold text-ink">{m.mcpg_files_title()}</p>
+            <p className="text-xs text-ink-muted leading-relaxed">{mcpClientText(client.files.body)}</p>
+            {client.files.showDomain && domain && <div className="flex items-center gap-2">
+              <code className="text-xs font-mono text-ink bg-surface-raised border border-line rounded-lg px-2 py-1 break-all">{domain}</code>
+              <button
+                type="button"
+                onClick={async () => { await copyToClipboard(domain); setDomainCopied(true); setTimeout(() => setDomainCopied(false), 2000); }}
+                className="p-1.5 text-ink-subtle hover:text-ink transition-colors"
+                title={m.mcp_copy()}
+                aria-label={m.mcpg_copy_label({ label: domain })}
+              >
+                {domainCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
+            </div>}
+          </div>
         )}
         <p className="text-2xs text-ink-subtle">
           {client.auth === 'oauth' ? m.mcpg_oauth() : m.mcpg_key()}{' '}

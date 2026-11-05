@@ -39,7 +39,7 @@ docker compose up -d --build
 ```
 
 Then open **http://localhost:3000**, sign up (that creates your workspace), and go to
-**Settings → Integrations** to add an AI provider key (BYOK) to actually run prompts.
+**Settings → AI providers** to add an AI provider key (BYOK) to actually run prompts.
 
 - App: http://localhost:3000
 - Supabase API gateway (Kong): http://localhost:8000
@@ -68,7 +68,7 @@ docker compose logs -f app functions
 1. `docker compose ps` — everything `healthy`; `init` exited `0`.
 2. Sign up at http://localhost:3000 → you land in the app (no subscription gate; `SELF_HOSTED`).
 3. Create, rename, and delete a template — persists across a refresh.
-4. Settings → Integrations → add a provider key → it saves (exercises the edge functions).
+4. Settings → AI providers → add a provider key → it saves (exercises the edge functions).
 
 ## Configuration notes
 

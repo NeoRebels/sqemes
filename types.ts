@@ -171,6 +171,12 @@ export interface PersonaRoute {
   sortOrder: number;
 }
 
+/** SQEM-641 — a connector service a persona works with; the key is computed by `connectorServiceKey`. */
+export interface PersonaConnector {
+  key: string;
+  name: string;
+}
+
 export interface Persona {
   id: string;
   workspaceId: string;
@@ -184,6 +190,12 @@ export interface Persona {
   content: string;
   tags: string[];
   routes: PersonaRoute[];
+  /**
+   * SQEM-641 — the connector SERVICES this role works with (`{ key, name }`, see
+   * `_shared/connectorService.ts`). In Chat each person's own connection — or a shared one — is
+   * switched on; a service they have not connected is said in the chat. Over MCP only named.
+   */
+  connectors: PersonaConnector[];
   /** SQEM-265 — set when the wizard generated it. NULL is "not known to be generated". */
   aiGeneratedAt?: string | null;
   createdAt: string;

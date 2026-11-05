@@ -146,7 +146,11 @@ Deno.serve(async (req: Request) => {
   console.error(`serving the request with ${servicePath}`)
 
   const memoryLimitMb = 150
-  const workerTimeoutMs = 1 * 60 * 1000
+  // SQEM-656 — 400 s, the same wall clock as sqemes Cloud. The template value (60 s) ended background
+  // work after under 40 s (measured 2026-11-04 on edge-runtime v1.74.0), so a chat answer that needed
+  // longer never arrived, and an answer could not be handed to a new invocation (SQEM-649). A worker
+  // still ends as soon as its work is done; this only bounds long work.
+  const workerTimeoutMs = 400 * 1000
   const noModuleCache = false
   const importMapPath = null
   const envVarsObj = Deno.env.toObject()
@@ -155,6 +159,11 @@ Deno.serve(async (req: Request) => {
   try {
     const worker = await EdgeRuntime.userWorkers.create({
       servicePath,
+      // SQEM-656 — a chat answer handed to a new invocation (SQEM-649, `?handover=1`) gets a FRESH
+      // worker with its own 400 s. Without it the self-call reused the running worker (measured
+      // 2026-11-04), and every part of one answer shared one worker's clock. On Cloud the platform
+      // starts a new worker by itself; the parameter changes nothing there.
+      forceCreate: url.searchParams.get('handover') === '1',
       memoryLimitMb,
       workerTimeoutMs,
       noModuleCache,

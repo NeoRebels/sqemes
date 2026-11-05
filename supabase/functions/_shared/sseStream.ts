@@ -111,6 +111,20 @@ export async function readSSE(
 // Anything unexpected returns null rather than throwing — a provider that adds a new event type
 // should cost nothing.
 
+/**
+ * SQEM-637 — why a provider stopped writing, from one chunk or one whole response body, in any of the
+ * three shapes: Gemini `candidates[0].finishReason`, Claude `stop_reason` (body) or `delta.stop_reason`
+ * (`message_delta`), OpenAI-shaped `choices[0].finish_reason`. Null when the chunk does not say.
+ *
+ * ⚠️ Logged, never acted on: on 2026-11-03 Gemini returned an empty answer after the tool cap, and
+ * nothing recorded why — a guess about the reason is all that could be written down.
+ */
+export function stopReasonOf(chunk: unknown): string | null {
+  const c = chunk as any;
+  const r = c?.candidates?.[0]?.finishReason ?? c?.stop_reason ?? c?.delta?.stop_reason ?? c?.choices?.[0]?.finish_reason;
+  return typeof r === 'string' && r ? r : null;
+}
+
 /** Gemini `streamGenerateContent?alt=sse`. */
 export const geminiDelta: DeltaExtractor = (chunk) => {
   const parts = (chunk as { candidates?: { content?: { parts?: { text?: string }[] } }[] })

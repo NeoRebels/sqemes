@@ -17,13 +17,14 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), 'utf8');
  * - inline rename: a chat in the chat list, a file in Files;
  * - search inside a picker: playbook pick in the launch dialog, the persona wizard, the access
  *   dialog's people search, the persona editor's route picker;
- * - compact: the connector tile's form (two), the copy-a-URL field in Settings, a route's condition
- *   field in the persona editor, the test chat's composer, the marketplace admin's raw-JSON box.
+ * - compact: the connector tile's form (two), the copy-a-URL field in Settings, the test chat's
+ *   composer, the marketplace admin's raw-JSON box. (A route's condition in the persona editor was one
+ *   until SQEM-617 made it `ui/Textarea`.)
  */
 const EXCEPTION_COUNT: Record<string, number> = {
   'pages/Chat.tsx': 1,
   'pages/Files.tsx': 1,
-  'pages/PersonaEditor.tsx': 3,
+  'pages/PersonaEditor.tsx': 2,
   'pages/Settings.tsx': 1,
   'pages/TemplateEditor.tsx': 1,
   'components/ConnectorsCard.tsx': 2,

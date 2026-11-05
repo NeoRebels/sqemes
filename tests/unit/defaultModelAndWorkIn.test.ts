@@ -23,10 +23,10 @@ describe('SQEM-577 — the default AI model is also where a chat starts', () => 
     expect(en.am_desc).toMatch(/^New chats start with this model/);
     expect(card).not.toMatch(/AI for authoring|It does not affect Chat/);
     expect(read('lib/wizardUploads.ts')).toMatch(/m\.wu_pdf_provider\(/); // SQEM-610
-    expect(en.wu_pdf_provider).toMatch(/Settings → General → Default AI model/);
+    expect(en.wu_pdf_provider).toMatch(/Settings → AI providers → Default AI model/); // SQEM-631 — moved there
     // SQEM-604 — aiErrors' words live in messages/; the code must still use that sentence.
     expect(read('lib/aiErrors.ts')).toMatch(/txt\.aierr_alternative\(\)/);
-    expect(en.aierr_alternative).toMatch(/Settings → General → Default AI model/);
+    expect(en.aierr_alternative).toMatch(/Settings → AI providers → Default AI model/); // SQEM-631 — moved there
   });
 });
 

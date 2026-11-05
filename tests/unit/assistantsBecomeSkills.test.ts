@@ -138,7 +138,7 @@ describe('SQEM-390 — the surfaces', () => {
     const api = code(read('lib/api/chatSessions.ts'));
     expect(api).not.toMatch(/assistant_id: assistantId/);
     expect(api).not.toMatch(/assistantId\?: string/);
-    expect(api).toMatch(/select\('applied_skill_ids, persona_id'\)/);
+    expect(api).toMatch(/select\('applied_skill_ids, persona_id(, connector_ids)?'\)/);
   });
 
   it('the editor offers two kinds and no brand-voice builder', () => {

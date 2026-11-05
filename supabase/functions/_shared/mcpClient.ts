@@ -19,8 +19,13 @@ export const MCP_PROTOCOL = '2024-11-05';
 export const MCP_LIST_TIMEOUT_MS = 10_000;
 /** One tool call. Real work happens here (a search, a mail fetch), so more room than the handshake. */
 export const MCP_CALL_TIMEOUT_MS = 60_000;
-/** A tool result goes back into every later request of the turn — bounded like the library's. */
-export const MCP_RESULT_MAX_CHARS = 20_000;
+/**
+ * A tool result goes back into every later request of the turn — bounded like the library's.
+ * SQEM-652 — 60,000 (was 20,000), the library's own number, decided 2026-11-04. Not 100,000: the bound is
+ * for EVERY model, an answer across several systems keeps eight to ten results, and the credits model
+ * (Mistral Small) holds about 128,000 tokens — ten results of ~25,000 tokens each would not fit.
+ */
+export const MCP_RESULT_MAX_CHARS = 60_000;
 /** At most this many pages of `tools/list`. A server with more is offering more than a model can use. */
 const MAX_LIST_PAGES = 5;
 
@@ -152,7 +157,13 @@ export function sanitizeSchema(schema: unknown, depth = 0): Record<string, unkno
   if (!type) type = s.properties ? 'object' : s.items ? 'array' : 'string';
   const out: Record<string, unknown> = { type };
   if (typeof s.description === 'string') out.description = s.description.slice(0, 1000);
-  if (Array.isArray(s.enum) && s.enum.every((e: unknown) => typeof e === 'string')) out.enum = s.enum;
+  // SQEM-638 — Gemini rejects the WHOLE request over one empty enum value ("enum[0]: cannot be empty",
+  // one customer, 2026-11-03, five times in a row). An empty value never meant anything; drop it, and the enum
+  // with it when nothing is left.
+  if (Array.isArray(s.enum) && s.enum.every((e: unknown) => typeof e === 'string')) {
+    const values = (s.enum as string[]).filter(e => e !== '');
+    if (values.length) out.enum = values;
+  }
   if (typeof s.format === 'string' && ['date-time', 'date', 'enum'].includes(s.format)) out.format = s.format;
   if (type === 'object') {
     const props: Record<string, unknown> = {};
@@ -183,7 +194,8 @@ export interface LoadedConnectorTools {
 /** List every connector's tools in parallel; a connector that fails is left out, not fatal. */
 export async function loadConnectorTools(
   connectors: McpConnectorInput[],
-  { signal, fetchImpl }: { signal?: AbortSignal; fetchImpl?: Fetch } = {},
+  // SQEM-651 — `offset`: a connector fetched later in the answer numbers on after the ones already loaded.
+  { signal, fetchImpl, offset = 0 }: { signal?: AbortSignal; fetchImpl?: Fetch; offset?: number } = {},
 ): Promise<LoadedConnectorTools> {
   const definitions: ToolDefinition[] = [];
   const routes = new Map<string, { session: McpSession; tool: string }>();
@@ -199,7 +211,7 @@ export async function loadConnectorTools(
       return;
     }
     for (const t of r.value.tools) {
-      const name = connectorFunctionName(i, t.name);
+      const name = connectorFunctionName(offset + i, t.name);
       if (routes.has(name)) continue; // two tools that sanitise to one name: the first wins
       routes.set(name, { session: r.value.session, tool: t.name });
       const params = sanitizeSchema(t.inputSchema ?? { type: 'object', properties: {} });

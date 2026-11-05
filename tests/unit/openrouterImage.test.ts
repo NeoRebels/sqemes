@@ -73,7 +73,8 @@ describe('wiring', () => {
   for (const fn of ['chat-message', 'execute-step']) {
     it(`${fn}: the image branch runs before the text job`, () => {
       const src = read(`supabase/functions/${fn}/index.ts`);
-      const branch = src.indexOf("provider === 'openrouter' ? await openRouterImageModel(");
+      // SQEM-649 — chat-message: never on a continuation (that one is always a text job).
+      const branch = src.search(/provider === 'openrouter'( && !continuation)? \? await openRouterImageModel\(/);
       expect(branch).toBeGreaterThan(-1);
       expect(branch).toBeLessThan(src.indexOf('EdgeRuntime.waitUntil(runAndBroadcast('));
     });

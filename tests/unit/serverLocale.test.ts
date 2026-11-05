@@ -81,7 +81,7 @@ describe('SQEM-612 — the server reads it', () => {
   });
 
   it('the missing-key hint names the real settings tab', () => {
-    expect(en.srv_no_key).toBe('No API key configured for {provider}. Add it in Settings → API & MCP.');
+    expect(en.srv_no_key).toBe('No API key configured for {provider}. Add it in Settings → AI providers.'); // SQEM-618
     expect(en.srv_no_key).not.toMatch(/LLM API Keys/);
   });
 

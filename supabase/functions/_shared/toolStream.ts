@@ -53,6 +53,23 @@ export interface ToolAccumulator {
  * ⚠️ An empty string means "no arguments" and must become `{}`, not a parse error: a tool with no
  * required parameters (`list_personas`) is called exactly that way by several providers.
  */
+/**
+ * SQEM-616 — a call whose arguments were cut off mid-stream.
+ *
+ * ⛔ **The failure this catches is silent everywhere else.** A provider stops writing at its output
+ * limit (Claude `stop_reason: max_tokens`, OpenAI-compatible `finish_reason: length`), possibly in the
+ * middle of a tool call's JSON. `parseToolArgs` turns that into `{}`, the tool answers "name is
+ * required", the model writes the same oversized call again, and the time budget runs out — seen on
+ * 2026-10-28: two `upload_file` attempts of a 17 KB product list, an empty answer, and no
+ * word about why. Decided on the argument text rather than on each provider's stop reason: non-empty
+ * and not valid JSON means the call cannot be what the model meant, whichever provider sent it.
+ */
+export function isTruncatedArgs(args: string): boolean {
+  const text = (args || '').trim();
+  if (!text) return false; // a no-argument call
+  try { JSON.parse(text); return false; } catch { return true; }
+}
+
 export function parseToolArgs(args: string): Record<string, unknown> {
   const text = (args || '').trim();
   if (!text) return {};

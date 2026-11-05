@@ -17,7 +17,8 @@ import PageHeader from '../../components/ui/PageHeader';
 
 const ROOT = resolve(__dirname, '../../');
 /** The exact wrapper line the four pages used to carry — now allowed in the component only. */
-const RAW_HEADER = 'flex flex-col sm:flex-row sm:items-end justify-between mb-8 md:mb-10 gap-4';
+// SQEM-632 — the row inside the size container; the container itself carries the bottom margin.
+const RAW_HEADER = 'flex flex-col [@container(min-width:56rem)]:flex-row [@container(min-width:56rem)]:items-end justify-between gap-4';
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
@@ -57,11 +58,16 @@ describe('SQEM-384 — PageHeader renders title, subtitle and actions', () => {
   it('renders no actions column when actions is falsy (a `canEdit &&` guard)', () => {
     const el = mount(React.createElement(PageHeader, { title: 'Files', actions: false }));
     // Exactly one child of the header row: the text block.
-    expect(el.firstElementChild!.children.length).toBe(1);
+    expect(el.firstElementChild!.firstElementChild!.children.length).toBe(1);
   });
 });
 
 describe('⛔ SQEM-384 — the 50/50 split, and why a label can no longer wrap', () => {
+  it('SQEM-632 — the split follows the header width (a size container), not the window', () => {
+    const el = mount(React.createElement(PageHeader, { title: 'T', actions: React.createElement('button', null, 'A') }));
+    expect(classes(el.firstElementChild)).toContain('[container-type:inline-size]');
+  });
+
   function halves() {
     const el = mount(
       React.createElement(PageHeader, {
@@ -70,13 +76,13 @@ describe('⛔ SQEM-384 — the 50/50 split, and why a label can no longer wrap',
         actions: React.createElement('button', null, 'A'),
       }),
     );
-    const row = el.firstElementChild!;
+    const row = el.firstElementChild!.firstElementChild!; // SQEM-632 — inside the size container
     return { text: row.children[0], actions: row.children[1] };
   }
 
   it('the text block is capped at half and may shrink below its content', () => {
     const { text } = halves();
-    expect(classes(text)).toContain('sm:w-1/2');
+    expect(classes(text)).toContain('[@container(min-width:56rem)]:w-1/2');
     // Without `min-w-0` a flex item refuses to shrink below its content — the text would win the
     // fight for space and the buttons would wrap, which is the bug.
     expect(classes(text)).toContain('min-w-0');
@@ -85,14 +91,14 @@ describe('⛔ SQEM-384 — the 50/50 split, and why a label can no longer wrap',
   it('the actions block takes half, right-aligned, and its labels never wrap — on any width', () => {
     const { actions } = halves();
     const c = classes(actions);
-    expect(c).toContain('sm:w-1/2');
-    expect(c).toContain('sm:justify-end');
+    expect(c).toContain('[@container(min-width:56rem)]:w-1/2');
+    expect(c).toContain('[@container(min-width:56rem)]:justify-end');
     // `white-space` is inherited: one class on the wrapper covers every button label inside it.
     expect(c).toContain('whitespace-nowrap');
-    // ⛔ On a phone the ROW wraps instead (owner's screenshots, 2026-09-12: three buttons, two-line
-    // labels). From `sm` up it is one row again.
+    // ⛔ The ROW wraps instead (seen 2026-09-12: three buttons, two-line labels) — on
+    // every width since SQEM-632: a nowrap row wider than its half ran over the subtitle at ~1040 px.
     expect(c).toContain('flex-wrap');
-    expect(c).toContain('sm:flex-nowrap');
+    expect(c).not.toContain('sm:flex-nowrap');
   });
 });
 

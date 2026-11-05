@@ -28,7 +28,7 @@ import { classifySkillFile, extensionOf, sniffBinaryMime, TEXT_EXT_TO_MIME, STOR
 import { readSkillMd, toSlug as skillSlug, withoutOwnFrontmatter, buildSkillMd } from './skillMd.ts';
 import { relativeSkillPaths, uploadedFileName } from './skillPaths.ts';
 import { isTextContentMime, deliveryOf } from './skillFile.ts';
-import { onPublicHost, dailyLimitMessage, MAX_PATHS_PER_CALL } from './fileLinks.ts';
+import { onPublicHost, dailyLimitMessage, MAX_PATHS_PER_CALL, sandboxReachHint } from './fileLinks.ts';
 import {
   findSkillRoot,
   isArchiveJunk,
@@ -372,7 +372,7 @@ export async function runLibraryTool(
     if (insertErr || !inserted)
       return rpcError(id, -32603, `Failed to create persona: ${insertErr?.message ?? 'unknown error'}`);
 
-    // ⛔ No `persona_access` row is written, and that is a decision (owner, 2026-09-08), not an
+    // ⛔ No `persona_access` row is written, and that is a decision (2026-09-08), not an
     // omission: a persona starts open. Templates seed `workspaces.default_template_access` at
     // this point; personas have no equivalent and are not getting one, because a persona hands
     // out no access of its own — SQEM-326 filters every route against the CALLER, and hides a
@@ -609,6 +609,7 @@ export async function runLibraryTool(
         expiresInSeconds: LINK_EXPIRY_SECONDS,
         howTo: 'GET the url (no auth header) and save the bytes under the file\'s path. One file per link, valid 15 minutes.'
           + (isText ? ' Ask again with as: "text" to read it instead.' : ''),
+        ifUnreachable: sandboxReachHint(url), // SQEM-622
       }, null, 2) }];
       // An image is also shown, so a model that cannot fetch still sees it (≤ 5 MB).
       if (meta.mimeType.startsWith('image/') && meta.sizeBytes <= 5 * 1024 * 1024) {
@@ -639,6 +640,8 @@ export async function runLibraryTool(
         skillMd: buildSkillMd({ title: sk.title, description: sk.description, content: sk.content }),
         files: sk.files.map((f, i) => ({ path: paths[i], sizeBytes: f.sizeBytes, mimeType: f.mimeType, url: links.get(f.storagePath) ?? null })),
         expiresInSeconds: LINK_EXPIRY_SECONDS,
+        // SQEM-622 — the host of the links themselves (all share one).
+        ...(links.size ? { ifUnreachable: sandboxReachHint([...links.values()][0]) } : {}),
       }, null, 2) }] });
     } catch (err) {
       if (err instanceof DownloadLimitReached) return rpcError(id, -32603, err.message);
@@ -1088,14 +1091,16 @@ export async function runLibraryTool(
     // SQEM-522 — on the public host like every download link (SQEM-514). This line handed out the raw
     // storage URL (`*.supabase.co`, on self-host the internal one) since SQEM-059, so a sandbox that
     // allows only api.sqemes.com — what Help Center 54 tells admins to allow — could read but not upload.
+    const uploadUrl = onPublicHost(signed.signedUrl, Deno.env.get('PUBLIC_API_URL') ?? null);
     return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
       fileId,
-      uploadUrl:        onPublicHost(signed.signedUrl, Deno.env.get('PUBLIC_API_URL') ?? null),
+      uploadUrl,
       token:            signed.token,
       path:             storagePath,
       contentType:      putType,
       expiresInSeconds: 7200,
       instructions:     `PUT the raw file bytes to uploadUrl with Content-Type: ${putType}, then call finalize_upload with this fileId.`,
+      ifUnreachable:    sandboxReachHint(uploadUrl), // SQEM-622
     }, null, 2) }] });
   }
 
@@ -1130,8 +1135,10 @@ export async function runLibraryTool(
 
     const obj = (objects || []).find((o: any) => o.id && o.name);
     if (!obj) {
+      // SQEM-622 — the usual reason in a Claude sandbox is that the PUT never left it; say how to fix it.
+      const apiBase = Deno.env.get('PUBLIC_API_URL') ?? Deno.env.get('SUPABASE_URL') ?? '';
       return rpcError(id, -32602,
-        'No uploaded file found for this fileId. PUT the bytes to the create_upload_url first.');
+        'No uploaded file found for this fileId. PUT the bytes to the create_upload_url first. ' + sandboxReachHint(apiBase));
     }
 
     const storagePath = `${workspaceId}/${fileId}/${obj.name}`;

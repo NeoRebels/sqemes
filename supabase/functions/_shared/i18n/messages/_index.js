@@ -44,6 +44,8 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{ detail: NonNullable<unknown> }} Aierr_QuotedInputs */
 /** @typedef {{ provider: NonNullable<unknown> }} Aierr_Refused_KeyInputs */
 /** @typedef {{}} Aierr_Refused_Key_NextInputs */
+/** @typedef {{ provider: NonNullable<unknown> }} Aierr_Too_LargeInputs */
+/** @typedef {{}} Aierr_Too_Large_NextInputs */
 /** @typedef {{ provider: NonNullable<unknown> }} Aierr_Unknown_ModelInputs */
 /** @typedef {{}} Aierr_Unknown_Model_NextInputs */
 /** @typedef {{}} Am_Add_KeyInputs */
@@ -158,14 +160,24 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Bulk_ClearInputs */
 /** @typedef {{}} Bulk_DeleteInputs */
 /** @typedef {{}} Bulk_Deselect_AllInputs */
+/** @typedef {{}} Bulk_Edit_TagInputs */
+/** @typedef {{}} Bulk_EditorsInputs */
+/** @typedef {{}} Bulk_Editors_BodyInputs */
+/** @typedef {{}} Bulk_Editors_ChangedInputs */
+/** @typedef {{}} Bulk_Editors_Hint_PersonaInputs */
+/** @typedef {{}} Bulk_Editors_Hint_PlaybookInputs */
+/** @typedef {{}} Bulk_Editors_Owner_OnlyInputs */
+/** @typedef {{ things: NonNullable<unknown> }} Bulk_Editors_TitleInputs */
 /** @typedef {{}} Bulk_ExportInputs */
 /** @typedef {{}} Bulk_Remove_TagInputs */
+/** @typedef {{}} Bulk_Remove_Tag_AllInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Bulk_Select_AllInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Bulk_Selected_ChatInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Bulk_Selected_FileInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Bulk_Selected_PersonaInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Bulk_Selected_PlaybookInputs */
 /** @typedef {{}} Bulk_Set_TagInputs */
+/** @typedef {{}} Bulk_Set_Tag_GroupInputs */
 /** @typedef {{ done: NonNullable<unknown>, things: NonNullable<unknown> }} Bulksum_DoneInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Bulksum_FailedInputs */
 /** @typedef {{}} Bulksum_NothingInputs */
@@ -276,10 +288,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Chat_Back_To_StartInputs */
 /** @typedef {{}} Chat_CancelInputs */
 /** @typedef {{}} Chat_Choose_WorkspaceInputs */
-/** @typedef {{}} Chat_Connectors_ActiveInputs */
-/** @typedef {{}} Chat_Connectors_Image_ModelsInputs */
-/** @typedef {{}} Chat_Connectors_InactiveInputs */
-/** @typedef {{}} Chat_Connectors_Inactive_LabelInputs */
+/** @typedef {{ list: NonNullable<unknown> }} Chat_Connectors_FetchedInputs */
 /** @typedef {{}} Chat_CopiedInputs */
 /** @typedef {{}} Chat_CopyInputs */
 /** @typedef {{}} Chat_Copy_FailedInputs */
@@ -312,6 +321,8 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Chat_No_Shared_HintInputs */
 /** @typedef {{}} Chat_Not_AuthenticatedInputs */
 /** @typedef {{}} Chat_PersonaInputs */
+/** @typedef {{}} Chat_Persona_Connectors_ConnectInputs */
+/** @typedef {{ persona: NonNullable<unknown>, list: NonNullable<unknown> }} Chat_Persona_Connectors_MissingInputs */
 /** @typedef {{}} Chat_Private_ExpiryInputs */
 /** @typedef {{}} Chat_RemoveInputs */
 /** @typedef {{}} Chat_RenameInputs */
@@ -331,6 +342,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Chat_Start_ConversationInputs */
 /** @typedef {{ model: NonNullable<unknown> }} Chat_Start_HintInputs */
 /** @typedef {{ model: NonNullable<unknown>, persona: NonNullable<unknown> }} Chat_Start_Hint_PersonaInputs */
+/** @typedef {{}} Chat_Still_WorkingInputs */
 /** @typedef {{}} Chat_StopInputs */
 /** @typedef {{}} Chat_Stop_LabelInputs */
 /** @typedef {{}} Chat_StoppedInputs */
@@ -342,8 +354,13 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{ count: NonNullable<unknown> }} Chat_Time_HoursInputs */
 /** @typedef {{}} Chat_Time_Just_NowInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Chat_Time_MinutesInputs */
+/** @typedef {{}} Chat_Tool_Cap_EmptyInputs */
+/** @typedef {{}} Chat_Tool_Cap_LoopInputs */
 /** @typedef {{ rounds: NonNullable<unknown> }} Chat_Tool_Cap_RoundsInputs */
 /** @typedef {{}} Chat_Tool_Cap_TimeInputs */
+/** @typedef {{ tools: NonNullable<unknown> }} Chat_Tool_TruncatedInputs */
+/** @typedef {{}} Chat_Tools_Refused_AllInputs */
+/** @typedef {{ list: NonNullable<unknown> }} Chat_Tools_Refused_ConnectorsInputs */
 /** @typedef {{}} Chat_Type_MessageInputs */
 /** @typedef {{}} Chat_Unsupported_FileInputs */
 /** @typedef {{}} Chat_Update_FailedInputs */
@@ -637,6 +654,12 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Filepick_NoneInputs */
 /** @typedef {{}} Filepick_SearchInputs */
 /** @typedef {{}} Filepick_TitleInputs */
+/** @typedef {{}} Flt_Owner_AllInputs */
+/** @typedef {{}} Flt_Owner_GoneInputs */
+/** @typedef {{}} Flt_Owner_LabelInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Flt_Owner_YouInputs */
+/** @typedef {{}} Flt_UnusedInputs */
+/** @typedef {{}} Flt_Unused_TitleInputs */
 /** @typedef {{ tag: NonNullable<unknown>, files: NonNullable<unknown> }} Ftag_AddedInputs */
 /** @typedef {{ tag: NonNullable<unknown>, done: NonNullable<unknown>, files: NonNullable<unknown> }} Ftag_Added_PartialInputs */
 /** @typedef {{ tag: NonNullable<unknown> }} Ftag_Nothing_AddInputs */
@@ -788,17 +811,21 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Mcp_UpgradeInputs */
 /** @typedef {{}} Mcpc_Cc_1Inputs */
 /** @typedef {{}} Mcpc_Cc_2Inputs */
+/** @typedef {{}} Mcpc_Cc_FilesInputs */
 /** @typedef {{}} Mcpc_Cc_NoteInputs */
 /** @typedef {{}} Mcpc_Chatgpt_1Inputs */
 /** @typedef {{}} Mcpc_Chatgpt_2Inputs */
 /** @typedef {{}} Mcpc_Chatgpt_3Inputs */
+/** @typedef {{}} Mcpc_Chatgpt_FilesInputs */
 /** @typedef {{}} Mcpc_Chatgpt_NoteInputs */
 /** @typedef {{}} Mcpc_Claude_1Inputs */
 /** @typedef {{}} Mcpc_Claude_2Inputs */
 /** @typedef {{}} Mcpc_Claude_3Inputs */
+/** @typedef {{}} Mcpc_Claude_FilesInputs */
 /** @typedef {{}} Mcpc_Claude_NoteInputs */
 /** @typedef {{}} Mcpc_Codex_1Inputs */
 /** @typedef {{}} Mcpc_Codex_2Inputs */
+/** @typedef {{}} Mcpc_Codex_FilesInputs */
 /** @typedef {{}} Mcpc_Codex_NoteInputs */
 /** @typedef {{}} Mcpc_Cursor_1Inputs */
 /** @typedef {{}} Mcpc_Cursor_2Inputs */
@@ -814,6 +841,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{ label: NonNullable<unknown> }} Mcpg_Copy_LabelInputs */
 /** @typedef {{}} Mcpg_DiffersInputs */
 /** @typedef {{ client: NonNullable<unknown> }} Mcpg_DocsInputs */
+/** @typedef {{}} Mcpg_Files_TitleInputs */
 /** @typedef {{}} Mcpg_KeyInputs */
 /** @typedef {{}} Mcpg_OauthInputs */
 /** @typedef {{}} Md_Claude_BalanceInputs */
@@ -1063,6 +1091,10 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Pe_BackInputs */
 /** @typedef {{}} Pe_Condition_FailedInputs */
 /** @typedef {{}} Pe_Condition_PlaceholderInputs */
+/** @typedef {{}} Pe_Connector_ConnectInputs */
+/** @typedef {{}} Pe_Connector_Not_ConnectedInputs */
+/** @typedef {{}} Pe_Connectors_HintInputs */
+/** @typedef {{}} Pe_Connectors_TitleInputs */
 /** @typedef {{}} Pe_CreateInputs */
 /** @typedef {{}} Pe_DeleteInputs */
 /** @typedef {{}} Pe_Delete_BodyInputs */
@@ -1164,10 +1196,14 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Plan_Tagline_TeamInputs */
 /** @typedef {{}} Ppv_Add_OneInputs */
 /** @typedef {{}} Ppv_All_PersonasInputs */
+/** @typedef {{}} Ppv_Connectors_Title_HintInputs */
 /** @typedef {{}} Ppv_Download_TitleInputs */
 /** @typedef {{}} Ppv_EmptyInputs */
 /** @typedef {{}} Ppv_IfInputs */
 /** @typedef {{}} Ppv_LoadsInputs */
+/** @typedef {{}} Ps_Bulk_Access_BodyInputs */
+/** @typedef {{}} Ps_Bulk_Access_HintInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Ps_Bulk_Access_TitleInputs */
 /** @typedef {{}} Ps_Create_FirstInputs */
 /** @typedef {{}} Ps_Delete_Body_ManyInputs */
 /** @typedef {{}} Ps_Delete_Body_OneInputs */
@@ -1200,6 +1236,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Ps_Load_FailedInputs */
 /** @typedef {{}} Ps_LoadingInputs */
 /** @typedef {{}} Ps_Loads_NothingInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Ps_Lose_SightInputs */
 /** @typedef {{}} Ps_NewInputs */
 /** @typedef {{}} Ps_No_FavouritesInputs */
 /** @typedef {{}} Ps_No_MatchInputs */
@@ -1222,6 +1259,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Pv_DuplicateInputs */
 /** @typedef {{}} Pv_EditInputs */
 /** @typedef {{}} Pv_FavouriteInputs */
+/** @typedef {{}} Pv_InfoInputs */
 /** @typedef {{}} Pv_Loaded_ByInputs */
 /** @typedef {{}} Pv_No_BlanksInputs */
 /** @typedef {{}} Pv_No_PersonaInputs */
@@ -1385,6 +1423,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} St_Tab_GeneralInputs */
 /** @typedef {{}} St_Tab_PlansInputs */
 /** @typedef {{}} St_Tab_ProfileInputs */
+/** @typedef {{}} St_Tab_ProvidersInputs */
 /** @typedef {{}} St_Tab_SecurityInputs */
 /** @typedef {{}} St_Tab_TeamInputs */
 /** @typedef {{}} St_TitleInputs */
@@ -1729,6 +1768,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{ provider: NonNullable<unknown> }} Sw_Remove_SavedInputs */
 /** @typedef {{}} Sw_RemovingInputs */
 /** @typedef {{}} Sw_Settings_ApiInputs */
+/** @typedef {{}} Sw_Settings_ProvidersInputs */
 /** @typedef {{}} Sw_SkipInputs */
 /** @typedef {{}} Sw_StandsInputs */
 /** @typedef {{}} Sw_Start_NowInputs */
@@ -2423,7 +2463,7 @@ export const ai_own_key_title = /** @type {((inputs?: Ai_Own_Key_TitleInputs, op
 /**
 * | output |
 * | --- |
-* | "You can switch the model under Settings → General → Default AI model." |
+* | "You can switch the model under Settings → AI providers → Default AI model." |
 *
 * @param {Aierr_AlternativeInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -2549,6 +2589,34 @@ export const aierr_refused_key_next = /** @type {((inputs?: Aierr_Refused_Key_Ne
 /**
 * | output |
 * | --- |
+* | "The request is too large for {provider}." |
+*
+* @param {Aierr_Too_LargeInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const aierr_too_large = /** @type {((inputs: Aierr_Too_LargeInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Aierr_Too_LargeInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.aierr_too_large(inputs)
+	return __en.aierr_too_large(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Usually a connector returned too much data: narrow the request, for example to a shorter period or fewer records. If the chat is very long, start a new one; ..." |
+*
+* @param {Aierr_Too_Large_NextInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const aierr_too_large_next = /** @type {((inputs?: Aierr_Too_Large_NextInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Aierr_Too_Large_NextInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.aierr_too_large_next(inputs)
+	return __en.aierr_too_large_next(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "{provider} does not know this model." |
 *
 * @param {Aierr_Unknown_ModelInputs} inputs
@@ -2577,7 +2645,7 @@ export const aierr_unknown_model_next = /** @type {((inputs?: Aierr_Unknown_Mode
 /**
 * | output |
 * | --- |
-* | "Add a provider key in the API tab →" |
+* | "Add a provider key above ↑" |
 *
 * @param {Am_Add_KeyInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -4147,6 +4215,118 @@ export const bulk_deselect_all = /** @type {((inputs?: Bulk_Deselect_AllInputs, 
 /**
 * | output |
 * | --- |
+* | "Edit tag" |
+*
+* @param {Bulk_Edit_TagInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const bulk_edit_tag = /** @type {((inputs?: Bulk_Edit_TagInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Bulk_Edit_TagInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.bulk_edit_tag(inputs)
+	return __en.bulk_edit_tag(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Who can edit …" |
+*
+* @param {Bulk_EditorsInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const bulk_editors = /** @type {((inputs?: Bulk_EditorsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Bulk_EditorsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.bulk_editors(inputs)
+	return __en.bulk_editors(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "This replaces the list of every selected item you own. As an admin, of every one. Others are skipped." |
+*
+* @param {Bulk_Editors_BodyInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const bulk_editors_body = /** @type {((inputs?: Bulk_Editors_BodyInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Bulk_Editors_BodyInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.bulk_editors_body(inputs)
+	return __en.bulk_editors_body(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Edit rights changed" |
+*
+* @param {Bulk_Editors_ChangedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const bulk_editors_changed = /** @type {((inputs?: Bulk_Editors_ChangedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Bulk_Editors_ChangedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.bulk_editors_changed(inputs)
+	return __en.bulk_editors_changed(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Who may change these personas and their playbooks. Everyone who can see them can still use them." |
+*
+* @param {Bulk_Editors_Hint_PersonaInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const bulk_editors_hint_persona = /** @type {((inputs?: Bulk_Editors_Hint_PersonaInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Bulk_Editors_Hint_PersonaInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.bulk_editors_hint_persona(inputs)
+	return __en.bulk_editors_hint_persona(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Who may change these playbooks. Everyone who can see them can still use them." |
+*
+* @param {Bulk_Editors_Hint_PlaybookInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const bulk_editors_hint_playbook = /** @type {((inputs?: Bulk_Editors_Hint_PlaybookInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Bulk_Editors_Hint_PlaybookInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.bulk_editors_hint_playbook(inputs)
+	return __en.bulk_editors_hint_playbook(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Nobody selected: each item can then be edited only by its own owner, plus every admin." |
+*
+* @param {Bulk_Editors_Owner_OnlyInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const bulk_editors_owner_only = /** @type {((inputs?: Bulk_Editors_Owner_OnlyInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Bulk_Editors_Owner_OnlyInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.bulk_editors_owner_only(inputs)
+	return __en.bulk_editors_owner_only(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Who can edit {things}" |
+*
+* @param {Bulk_Editors_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const bulk_editors_title = /** @type {((inputs: Bulk_Editors_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Bulk_Editors_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.bulk_editors_title(inputs)
+	return __en.bulk_editors_title(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Export" |
 *
 * @param {Bulk_ExportInputs} inputs
@@ -4171,6 +4351,20 @@ export const bulk_remove_tag = /** @type {((inputs?: Bulk_Remove_TagInputs, opti
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.bulk_remove_tag(inputs)
 	return __en.bulk_remove_tag(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Remove tag" |
+*
+* @param {Bulk_Remove_Tag_AllInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const bulk_remove_tag_all = /** @type {((inputs?: Bulk_Remove_Tag_AllInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Bulk_Remove_Tag_AllInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.bulk_remove_tag_all(inputs)
+	return __en.bulk_remove_tag_all(inputs)
 });
 /**
 * | output |
@@ -4259,6 +4453,20 @@ export const bulk_set_tag = /** @type {((inputs?: Bulk_Set_TagInputs, options?: 
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.bulk_set_tag(inputs)
 	return __en.bulk_set_tag(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Set tag" |
+*
+* @param {Bulk_Set_Tag_GroupInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const bulk_set_tag_group = /** @type {((inputs?: Bulk_Set_Tag_GroupInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Bulk_Set_Tag_GroupInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.bulk_set_tag_group(inputs)
+	return __en.bulk_set_tag_group(inputs)
 });
 /**
 * | output |
@@ -5804,58 +6012,16 @@ export const chat_choose_workspace = /** @type {((inputs?: Chat_Choose_Workspace
 /**
 * | output |
 * | --- |
-* | "Your MCP Connectors are active" |
+* | "Connected for this chat: {list}." |
 *
-* @param {Chat_Connectors_ActiveInputs} inputs
+* @param {Chat_Connectors_FetchedInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
 * @returns {LocalizedString}
 */
-export const chat_connectors_active = /** @type {((inputs?: Chat_Connectors_ActiveInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Connectors_ActiveInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+export const chat_connectors_fetched = /** @type {((inputs: Chat_Connectors_FetchedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Connectors_FetchedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
-	if (locale === "de") return __de.chat_connectors_active(inputs)
-	return __en.chat_connectors_active(inputs)
-});
-/**
-* | output |
-* | --- |
-* | "image models cannot use them" |
-*
-* @param {Chat_Connectors_Image_ModelsInputs} inputs
-* @param {{ locale?: "en" | "de" }} options
-* @returns {LocalizedString}
-*/
-export const chat_connectors_image_models = /** @type {((inputs?: Chat_Connectors_Image_ModelsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Connectors_Image_ModelsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
-	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
-	if (locale === "de") return __de.chat_connectors_image_models(inputs)
-	return __en.chat_connectors_image_models(inputs)
-});
-/**
-* | output |
-* | --- |
-* | "Your MCP Connectors are inactive" |
-*
-* @param {Chat_Connectors_InactiveInputs} inputs
-* @param {{ locale?: "en" | "de" }} options
-* @returns {LocalizedString}
-*/
-export const chat_connectors_inactive = /** @type {((inputs?: Chat_Connectors_InactiveInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Connectors_InactiveInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
-	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
-	if (locale === "de") return __de.chat_connectors_inactive(inputs)
-	return __en.chat_connectors_inactive(inputs)
-});
-/**
-* | output |
-* | --- |
-* | "Your MCP Connectors are inactive — image models cannot use them" |
-*
-* @param {Chat_Connectors_Inactive_LabelInputs} inputs
-* @param {{ locale?: "en" | "de" }} options
-* @returns {LocalizedString}
-*/
-export const chat_connectors_inactive_label = /** @type {((inputs?: Chat_Connectors_Inactive_LabelInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Connectors_Inactive_LabelInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
-	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
-	if (locale === "de") return __de.chat_connectors_inactive_label(inputs)
-	return __en.chat_connectors_inactive_label(inputs)
+	if (locale === "de") return __de.chat_connectors_fetched(inputs)
+	return __en.chat_connectors_fetched(inputs)
 });
 /**
 * | output |
@@ -6309,6 +6475,34 @@ export const chat_persona = /** @type {((inputs?: Chat_PersonaInputs, options?: 
 /**
 * | output |
 * | --- |
+* | "Connect connectors" |
+*
+* @param {Chat_Persona_Connectors_ConnectInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_persona_connectors_connect = /** @type {((inputs?: Chat_Persona_Connectors_ConnectInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Persona_Connectors_ConnectInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_persona_connectors_connect(inputs)
+	return __en.chat_persona_connectors_connect(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "The persona “{persona}” works with {list}. You have not connected it, so it answers without." |
+*
+* @param {Chat_Persona_Connectors_MissingInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_persona_connectors_missing = /** @type {((inputs: Chat_Persona_Connectors_MissingInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Persona_Connectors_MissingInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_persona_connectors_missing(inputs)
+	return __en.chat_persona_connectors_missing(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Private chats auto-delete after 30 days" |
 *
 * @param {Chat_Private_ExpiryInputs} inputs
@@ -6575,6 +6769,20 @@ export const chat_start_hint_persona = /** @type {((inputs: Chat_Start_Hint_Pers
 /**
 * | output |
 * | --- |
+* | "Still working on it: a longer task, up to 10 minutes." |
+*
+* @param {Chat_Still_WorkingInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_still_working = /** @type {((inputs?: Chat_Still_WorkingInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Still_WorkingInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_still_working(inputs)
+	return __en.chat_still_working(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Stop" |
 *
 * @param {Chat_StopInputs} inputs
@@ -6729,6 +6937,34 @@ export const chat_time_minutes = /** @type {((inputs: Chat_Time_MinutesInputs, o
 /**
 * | output |
 * | --- |
+* | "The model wrote no answer after gathering. Narrow the request, for example to a shorter period, or choose another model." |
+*
+* @param {Chat_Tool_Cap_EmptyInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_tool_cap_empty = /** @type {((inputs?: Chat_Tool_Cap_EmptyInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Tool_Cap_EmptyInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_tool_cap_empty(inputs)
+	return __en.chat_tool_cap_empty(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sqemes stopped using tools because the model kept repeating the same step, and answered with what it had." |
+*
+* @param {Chat_Tool_Cap_LoopInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_tool_cap_loop = /** @type {((inputs?: Chat_Tool_Cap_LoopInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Tool_Cap_LoopInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_tool_cap_loop(inputs)
+	return __en.chat_tool_cap_loop(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Sqemes stopped after {rounds} rounds of tool use and answered with what had been loaded." |
 *
 * @param {Chat_Tool_Cap_RoundsInputs} inputs
@@ -6753,6 +6989,48 @@ export const chat_tool_cap_time = /** @type {((inputs?: Chat_Tool_Cap_TimeInputs
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.chat_tool_cap_time(inputs)
 	return __en.chat_tool_cap_time(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "A step was cut off at the output limit and not carried out ({tools}) — the content was too large to write in one go. Nothing was changed by it." |
+*
+* @param {Chat_Tool_TruncatedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_tool_truncated = /** @type {((inputs: Chat_Tool_TruncatedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Tool_TruncatedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_tool_truncated(inputs)
+	return __en.chat_tool_truncated(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Answered without your library and connectors: the selected model refused the tools. Another model may work." |
+*
+* @param {Chat_Tools_Refused_AllInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_tools_refused_all = /** @type {((inputs?: Chat_Tools_Refused_AllInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Tools_Refused_AllInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_tools_refused_all(inputs)
+	return __en.chat_tools_refused_all(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Answered without the connectors {list}: the selected model refused their tools. Another model may work." |
+*
+* @param {Chat_Tools_Refused_ConnectorsInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_tools_refused_connectors = /** @type {((inputs: Chat_Tools_Refused_ConnectorsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Tools_Refused_ConnectorsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_tools_refused_connectors(inputs)
+	return __en.chat_tools_refused_connectors(inputs)
 });
 /**
 * | output |
@@ -6911,7 +7189,7 @@ export const chat_web_label = /** @type {((inputs?: Chat_Web_LabelInputs, option
 /**
 * | output |
 * | --- |
-* | "Web search needs a search key — add one in Settings → API & MCP → Web search" |
+* | "Web search needs a search key — add one in Settings → AI providers → Web search" |
 *
 * @param {Chat_Web_Needs_KeyInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -10878,6 +11156,90 @@ export const filepick_title = /** @type {((inputs?: Filepick_TitleInputs, option
 /**
 * | output |
 * | --- |
+* | "All owners" |
+*
+* @param {Flt_Owner_AllInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const flt_owner_all = /** @type {((inputs?: Flt_Owner_AllInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Flt_Owner_AllInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.flt_owner_all(inputs)
+	return __en.flt_owner_all(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "No longer here or not recorded" |
+*
+* @param {Flt_Owner_GoneInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const flt_owner_gone = /** @type {((inputs?: Flt_Owner_GoneInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Flt_Owner_GoneInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.flt_owner_gone(inputs)
+	return __en.flt_owner_gone(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Owner" |
+*
+* @param {Flt_Owner_LabelInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const flt_owner_label = /** @type {((inputs?: Flt_Owner_LabelInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Flt_Owner_LabelInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.flt_owner_label(inputs)
+	return __en.flt_owner_label(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "{name} (you)" |
+*
+* @param {Flt_Owner_YouInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const flt_owner_you = /** @type {((inputs: Flt_Owner_YouInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Flt_Owner_YouInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.flt_owner_you(inputs)
+	return __en.flt_owner_you(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Not in a persona" |
+*
+* @param {Flt_UnusedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const flt_unused = /** @type {((inputs?: Flt_UnusedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Flt_UnusedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.flt_unused(inputs)
+	return __en.flt_unused(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Only playbooks no persona loads. Personas you cannot see do not count." |
+*
+* @param {Flt_Unused_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const flt_unused_title = /** @type {((inputs?: Flt_Unused_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Flt_Unused_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.flt_unused_title(inputs)
+	return __en.flt_unused_title(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Added “{tag}” to {files}." |
 *
 * @param {Ftag_AddedInputs} inputs
@@ -12996,6 +13358,20 @@ export const mcpc_cc_2 = /** @type {((inputs?: Mcpc_Cc_2Inputs, options?: { loca
 /**
 * | output |
 * | --- |
+* | "Locally nothing is needed. In Claude Code on the web, allow this domain under the environment’s Network access → Allowed domains, or files from skills cannot..." |
+*
+* @param {Mcpc_Cc_FilesInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mcpc_cc_files = /** @type {((inputs?: Mcpc_Cc_FilesInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mcpc_Cc_FilesInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mcpc_cc_files(inputs)
+	return __en.mcpc_cc_files(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Add --scope user to use it in every project. Without a browser, add --header \"Authorization: Bearer $SQEMES_MCP_KEY\" with a key instead." |
 *
 * @param {Mcpc_Cc_NoteInputs} inputs
@@ -13048,6 +13424,20 @@ export const mcpc_chatgpt_3 = /** @type {((inputs?: Mcpc_Chatgpt_3Inputs, option
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.mcpc_chatgpt_3(inputs)
 	return __en.mcpc_chatgpt_3(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "ChatGPT handles files in its code tool. That works in Work mode once Work network access is on (Settings → Data controls; on Business or Enterprise an admin ..." |
+*
+* @param {Mcpc_Chatgpt_FilesInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mcpc_chatgpt_files = /** @type {((inputs?: Mcpc_Chatgpt_FilesInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mcpc_Chatgpt_FilesInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mcpc_chatgpt_files(inputs)
+	return __en.mcpc_chatgpt_files(inputs)
 });
 /**
 * | output |
@@ -13108,6 +13498,20 @@ export const mcpc_claude_3 = /** @type {((inputs?: Mcpc_Claude_3Inputs, options?
 /**
 * | output |
 * | --- |
+* | "Claude handles files in its code sandbox, which only reaches allowed domains. Allow this domain once — on Team or Enterprise an owner adds it under Organizat..." |
+*
+* @param {Mcpc_Claude_FilesInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mcpc_claude_files = /** @type {((inputs?: Mcpc_Claude_FilesInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mcpc_Claude_FilesInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mcpc_claude_files(inputs)
+	return __en.mcpc_claude_files(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "On Claude Team or Enterprise an owner adds the connector once under Organization settings → Connectors → Add → Custom → Web; everyone then connects it under ..." |
 *
 * @param {Mcpc_Claude_NoteInputs} inputs
@@ -13146,6 +13550,20 @@ export const mcpc_codex_2 = /** @type {((inputs?: Mcpc_Codex_2Inputs, options?: 
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.mcpc_codex_2(inputs)
 	return __en.mcpc_codex_2(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Locally nothing is needed. In Codex Cloud, add this domain to the environment’s Agent internet access → Domain allowlist. Downloads were tested there; upload..." |
+*
+* @param {Mcpc_Codex_FilesInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mcpc_codex_files = /** @type {((inputs?: Mcpc_Codex_FilesInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mcpc_Codex_FilesInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mcpc_codex_files(inputs)
+	return __en.mcpc_codex_files(inputs)
 });
 /**
 * | output |
@@ -13356,6 +13774,20 @@ export const mcpg_docs = /** @type {((inputs: Mcpg_DocsInputs, options?: { local
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.mcpg_docs(inputs)
 	return __en.mcpg_docs(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Files from skills" |
+*
+* @param {Mcpg_Files_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mcpg_files_title = /** @type {((inputs?: Mcpg_Files_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mcpg_Files_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mcpg_files_title(inputs)
+	return __en.mcpg_files_title(inputs)
 });
 /**
 * | output |
@@ -16858,6 +17290,62 @@ export const pe_condition_placeholder = /** @type {((inputs?: Pe_Condition_Place
 /**
 * | output |
 * | --- |
+* | "Connect" |
+*
+* @param {Pe_Connector_ConnectInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const pe_connector_connect = /** @type {((inputs?: Pe_Connector_ConnectInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Pe_Connector_ConnectInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.pe_connector_connect(inputs)
+	return __en.pe_connector_connect(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "not connected" |
+*
+* @param {Pe_Connector_Not_ConnectedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const pe_connector_not_connected = /** @type {((inputs?: Pe_Connector_Not_ConnectedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Pe_Connector_Not_ConnectedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.pe_connector_not_connected(inputs)
+	return __en.pe_connector_not_connected(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "sqemes Chat only: when someone chooses the persona there, or the AI loads it during a conversation, their own connection to these services is used, otherwise..." |
+*
+* @param {Pe_Connectors_HintInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const pe_connectors_hint = /** @type {((inputs?: Pe_Connectors_HintInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Pe_Connectors_HintInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.pe_connectors_hint(inputs)
+	return __en.pe_connectors_hint(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Connectors" |
+*
+* @param {Pe_Connectors_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const pe_connectors_title = /** @type {((inputs?: Pe_Connectors_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Pe_Connectors_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.pe_connectors_title(inputs)
+	return __en.pe_connectors_title(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Create persona" |
 *
 * @param {Pe_CreateInputs} inputs
@@ -17180,7 +17668,7 @@ export const pe_name_needed = /** @type {((inputs?: Pe_Name_NeededInputs, option
 /**
 * | output |
 * | --- |
-* | "Sales" |
+* | "Persona name" |
 *
 * @param {Pe_Name_PlaceholderInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -18272,6 +18760,20 @@ export const ppv_all_personas = /** @type {((inputs?: Ppv_All_PersonasInputs, op
 /**
 * | output |
 * | --- |
+* | "sqemes Chat only. In Claude, ChatGPT and other clients over MCP the persona only recommends these services." |
+*
+* @param {Ppv_Connectors_Title_HintInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const ppv_connectors_title_hint = /** @type {((inputs?: Ppv_Connectors_Title_HintInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Ppv_Connectors_Title_HintInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.ppv_connectors_title_hint(inputs)
+	return __en.ppv_connectors_title_hint(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Download persona with its playbooks (.sqemes.zip)" |
 *
 * @param {Ppv_Download_TitleInputs} inputs
@@ -18324,6 +18826,49 @@ export const ppv_loads = /** @type {((inputs?: Ppv_LoadsInputs, options?: { loca
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.ppv_loads(inputs)
 	return __en.ppv_loads(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "This replaces the access of every selected persona you may change. The playbooks in it keep their own access: someone who can see the persona but not one of ..." |
+*
+* @param {Ps_Bulk_Access_BodyInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const ps_bulk_access_body = /** @type {((inputs?: Ps_Bulk_Access_BodyInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Ps_Bulk_Access_BodyInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.ps_bulk_access_body(inputs)
+	return __en.ps_bulk_access_body(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Who can see and use these personas" |
+*
+* @param {Ps_Bulk_Access_HintInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const ps_bulk_access_hint = /** @type {((inputs?: Ps_Bulk_Access_HintInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Ps_Bulk_Access_HintInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.ps_bulk_access_hint(inputs)
+	return __en.ps_bulk_access_hint(inputs)
+});
+/**
+* | countPlural | output |
+* | --- | --- |
+* | "one" | "Set access for {count} persona" |
+* | "other" | "Set access for {count} personas" |
+*
+* @param {Ps_Bulk_Access_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const ps_bulk_access_title = /** @type {((inputs: Ps_Bulk_Access_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Ps_Bulk_Access_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.ps_bulk_access_title(inputs)
+	return __en.ps_bulk_access_title(inputs)
 });
 /**
 * | output |
@@ -18774,6 +19319,21 @@ export const ps_loads_nothing = /** @type {((inputs?: Ps_Loads_NothingInputs, op
 	return __en.ps_loads_nothing(inputs)
 });
 /**
+* | countPlural | output |
+* | --- | --- |
+* | "one" | "You are not named, so you will no longer see {count} of these personas: the one you did not create." |
+* | "other" | "You are not named, so you will no longer see {count} of these personas: the ones you did not create." |
+*
+* @param {Ps_Lose_SightInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const ps_lose_sight = /** @type {((inputs: Ps_Lose_SightInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Ps_Lose_SightInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.ps_lose_sight(inputs)
+	return __en.ps_lose_sight(inputs)
+});
+/**
 * | output |
 * | --- |
 * | "New Persona" |
@@ -19080,6 +19640,20 @@ export const pv_favourite = /** @type {((inputs?: Pv_FavouriteInputs, options?: 
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.pv_favourite(inputs)
 	return __en.pv_favourite(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Info" |
+*
+* @param {Pv_InfoInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const pv_info = /** @type {((inputs?: Pv_InfoInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Pv_InfoInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.pv_info(inputs)
+	return __en.pv_info(inputs)
 });
 /**
 * | output |
@@ -20302,7 +20876,7 @@ export const server_connector_refused_one = /** @type {((inputs: Server_Connecto
 /**
 * | output |
 * | --- |
-* | "The web searches included in your plan are used up for this month. A workspace admin can add an own search key in Settings → API & MCP → Web search, or upgra..." |
+* | "The web searches included in your plan are used up for this month. A workspace admin can add an own search key in Settings → AI providers → Web search, or up..." |
 *
 * @param {Server_Web_AllowanceInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -20316,7 +20890,7 @@ export const server_web_allowance = /** @type {((inputs?: Server_Web_AllowanceIn
 /**
 * | output |
 * | --- |
-* | "Web search is not set up here. A workspace admin can add a search key in Settings → API & MCP → Web search." |
+* | "Web search is not set up here. A workspace admin can add a search key in Settings → AI providers → Web search." |
 *
 * @param {Server_Web_Not_SetupInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -20848,7 +21422,7 @@ export const srv_no_billing = /** @type {((inputs?: Srv_No_BillingInputs, option
 /**
 * | output |
 * | --- |
-* | "No API key configured for {provider}. Add it in Settings → API & MCP." |
+* | "No API key configured for {provider}. Add it in Settings → AI providers." |
 *
 * @param {Srv_No_KeyInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -21363,6 +21937,20 @@ export const st_tab_profile = /** @type {((inputs?: St_Tab_ProfileInputs, option
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.st_tab_profile(inputs)
 	return __en.st_tab_profile(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "AI providers" |
+*
+* @param {St_Tab_ProvidersInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const st_tab_providers = /** @type {((inputs?: St_Tab_ProvidersInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<St_Tab_ProvidersInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.st_tab_providers(inputs)
+	return __en.st_tab_providers(inputs)
 });
 /**
 * | output |
@@ -25810,7 +26398,7 @@ export const sw_key_cloud_nochat = /** @type {((inputs?: Sw_Key_Cloud_NochatInpu
 /**
 * | output |
 * | --- |
-* | "Optional — unlimited AI with your own ChatGPT, Claude, Gemini or Mistral account. You can also do this any time later in Settings → API & MCP." |
+* | "Optional — unlimited AI with your own ChatGPT, Claude, Gemini or Mistral account. You can also do this any time later in Settings → AI providers." |
 *
 * @param {Sw_Key_Optional_BodyInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -26185,6 +26773,20 @@ export const sw_settings_api = /** @type {((inputs?: Sw_Settings_ApiInputs, opti
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.sw_settings_api(inputs)
 	return __en.sw_settings_api(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Settings → AI providers" |
+*
+* @param {Sw_Settings_ProvidersInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const sw_settings_providers = /** @type {((inputs?: Sw_Settings_ProvidersInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Sw_Settings_ProvidersInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.sw_settings_providers(inputs)
+	return __en.sw_settings_providers(inputs)
 });
 /**
 * | output |

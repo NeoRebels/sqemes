@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /**
@@ -120,7 +120,11 @@ describe('SQEM-492 — invitations', () => {
 });
 
 describe('SQEM-492 — chat_sessions', () => {
-  const granted = grantList('chat_sessions', 'UPDATE');
+  // SQEM-635 — a later migration may grant one more column; those count too.
+  const later = readdirSync(resolve(ROOT, 'supabase/migrations')).filter(f => f > '20260929200000')
+    .flatMap(f => [...sqlCode(read(`supabase/migrations/${f}`)).matchAll(/grant update \(([a-z_, ]+)\) on public\.chat_sessions to authenticated/gi)])
+    .flatMap(m => m[1].split(',').map(c => c.trim()));
+  const granted = [...grantList('chat_sessions', 'UPDATE'), ...later];
 
   it('never grants ownership or placement', () => {
     for (const col of ['user_id', 'workspace_id', 'created_at', 'expires_at', 'id']) {

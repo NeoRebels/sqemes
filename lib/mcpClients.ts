@@ -39,6 +39,17 @@ export interface McpClientGuide {
    * icon for those rather than a logo from an unchecked source.
    */
   logo?: { icon: string; mono?: boolean };
+  /**
+   * SQEM-622 — the client runs code in a sandbox whose reachable domains its own settings decide, so
+   * files from skills (download links, uploads) only work once the instance's domain is allowed there;
+   * no MCP server can set this on the person's behalf. The guide shows `body` in its own box, and the
+   * domain with a copy button when `showDomain` — not for ChatGPT, where it is a switch, not a list.
+   * SQEM-629: every client measured on 2026-11-02 (SQEM-626/627) has the box — Claude (owner or
+   * settings), ChatGPT (Work mode with Work network access; Chat mode has no internet), Claude Code on
+   * the web and Codex Cloud (environment allowlist; Codex uploads unmeasured, so its text says so).
+   * Local clients (Cursor, VS Code, Other) need nothing and have no box.
+   */
+  files?: { body: string; showDomain: boolean };
 }
 
 /** The env var the key-based snippets read, named once so every snippet agrees. */
@@ -60,6 +71,10 @@ export const MCP_CLIENTS: readonly McpClientGuide[] = [
       'Choose to sign in, then sign in with your sqemes account and pick the workspace.',
     ],
     note: 'On Claude Team or Enterprise an owner adds the connector once under Organization settings → Connectors → Add → Custom → Web; everyone then connects it under Customize → Connectors.',
+    files: {
+      body: 'Claude handles files in its code sandbox, which only reaches allowed domains. Allow this domain once — on Team or Enterprise an owner adds it under Organization settings → Capabilities (package managers and specific domains); on Pro or Max, turn on network egress under Settings → Capabilities. Without it, Claude still reads every text file of a skill.',
+      showDomain: true,
+    },
   },
   {
     id: 'chatgpt',
@@ -74,6 +89,10 @@ export const MCP_CLIENTS: readonly McpClientGuide[] = [
       'Sign in with your sqemes account when ChatGPT asks.',
     ],
     note: 'Your ChatGPT workspace’s policies decide whether custom MCP servers are allowed; on a business plan an admin may have to enable it.',
+    files: {
+      body: 'ChatGPT handles files in its code tool. That works in Work mode once Work network access is on (Settings → Data controls; on Business or Enterprise an admin controls it). In Chat mode the code tool has no internet access; use the Files page there.',
+      showDomain: false,
+    },
   },
   {
     id: 'claude-code',
@@ -88,6 +107,10 @@ export const MCP_CLIENTS: readonly McpClientGuide[] = [
     ],
     snippet: (url) => ({ label: 'Terminal', code: `claude mcp add --transport http sqemes ${url}` }),
     note: 'Add --scope user to use it in every project. Without a browser, add --header "Authorization: Bearer $SQEMES_MCP_KEY" with a key instead.',
+    files: {
+      body: 'Locally nothing is needed. In Claude Code on the web, allow this domain under the environment’s Network access → Allowed domains, or files from skills cannot be downloaded or uploaded.',
+      showDomain: true,
+    },
   },
   {
     id: 'codex',
@@ -102,6 +125,10 @@ export const MCP_CLIENTS: readonly McpClientGuide[] = [
     ],
     snippet: (url) => ({ label: '~/.codex/config.toml', code: `[mcp_servers.sqemes]\nurl = "${url}"` }),
     note: `To use a key instead, add bearer_token_env_var = "${MCP_KEY_ENV}" to the table and set that variable.`,
+    files: {
+      body: 'Locally nothing is needed. In Codex Cloud, add this domain to the environment’s Agent internet access → Domain allowlist. Downloads were tested there; uploads not yet.',
+      showDomain: true,
+    },
   },
   {
     id: 'cursor',

@@ -6,6 +6,8 @@
 import { supabase } from '../supabase';
 import { m } from '../i18n';
 import type { Persona, PersonaRoute, PromptKind } from '../../types';
+import type { Json } from '../database.types';
+import { parsePersonaConnectors } from '../../supabase/functions/_shared/connectorService';
 
 export type PersonaRow = {
   id: string;
@@ -14,6 +16,8 @@ export type PersonaRow = {
   description: string;
   content: string;
   tags: string[];
+  /** SQEM-641 — optional so rows from older selects and fixtures still map. */
+  connectors?: unknown;
   created_by: string | null;
   ai_generated_at: string | null;
   usage_count: number;
@@ -45,6 +49,7 @@ export function rowToPersona(row: PersonaRow, routes: PersonaRoute[] = []): Pers
     content: row.content,
     tags: row.tags || [],
     routes,
+    connectors: parsePersonaConnectors(row.connectors),
     aiGeneratedAt: row.ai_generated_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -130,7 +135,7 @@ export async function fetchPersona(id: string): Promise<Persona | null> {
 export async function createPersona(
   workspaceId: string,
   persona: Pick<Persona, 'title' | 'description' | 'content'> &
-    Partial<Pick<Persona, 'tags' | 'routes' | 'aiGeneratedAt'>>,
+    Partial<Pick<Persona, 'tags' | 'routes' | 'aiGeneratedAt' | 'connectors'>>,
   createdBy: string | null,
 ): Promise<Persona> {
   const { data, error } = await supabase
@@ -141,6 +146,9 @@ export async function createPersona(
       description: persona.description ?? '',
       content: persona.content ?? '',
       tags: persona.tags ?? [],
+      // SQEM-639/641 — only when there are some: Vercel is live minutes before the migration, and a
+      // column that does not exist yet would fail EVERY create in that window, not just the ones using it.
+      ...(persona.connectors?.length ? { connectors: persona.connectors as unknown as Json } : {}),
       created_by: createdBy,
       ai_generated_at: persona.aiGeneratedAt ?? null,
     })
@@ -155,13 +163,14 @@ export async function createPersona(
 
 export async function updatePersona(
   id: string,
-  patch: Partial<Pick<Persona, 'title' | 'description' | 'content' | 'tags'>>,
+  patch: Partial<Pick<Persona, 'title' | 'description' | 'content' | 'tags' | 'connectors'>>,
 ): Promise<void> {
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.title !== undefined) row.title = patch.title;
   if (patch.description !== undefined) row.description = patch.description;
   if (patch.content !== undefined) row.content = patch.content;
   if (patch.tags !== undefined) row.tags = patch.tags;
+  if (patch.connectors !== undefined) row.connectors = patch.connectors; // SQEM-641
 
   // SQEM-473 — `.select('id')` so a write RLS filtered (no edit right) is noticed: no error, zero rows.
   const { data, error } = await supabase.from('personas').update(row).eq('id', id).select('id');
@@ -221,6 +230,7 @@ export async function duplicatePersona(persona: Persona, createdBy: string | nul
       content: persona.content,
       tags: persona.tags,
       routes: persona.routes,
+      connectors: persona.connectors, // SQEM-641 — services, so they mean the same for whoever copies
     },
     createdBy,
   );

@@ -50,3 +50,31 @@ export function dailyLimitMessage(usedToday: number, dayLimit: number): string {
   const mb = (n: number) => Math.round(n / 1048576);
   return `Daily download limit reached: this workspace has downloaded ${mb(usedToday)} MB of ${mb(dayLimit)} MB today. It resets at 00:00 UTC.`;
 }
+
+/**
+ * SQEM-622 — what an agent tells its person when its code sandbox cannot reach a link we handed out.
+ *
+ * ⛔ **No MCP server can fix this, and none should be able to.** Claude runs MCP calls on Anthropic's
+ * servers, but the PUT/GET on a link happens inside the code-execution sandbox, whose reachable domains
+ * are a security setting of the Claude organisation (Team/Enterprise: an owner allows a domain) or of
+ * the person (Pro/Max: one network switch). Neither is reachable from here, and the sandbox reports
+ * nothing back — a failed PUT never arrives at all. So the one thing we control is the sentence the
+ * agent reads next to the link, which it can pass on at the exact moment the upload or download fails.
+ * Measured case: IS (2026-10-30) — `curl` exit 56 on the upload link, Team plan, domain not allowed.
+ *
+ * SQEM-626 — the wording names no client and no settings path. Measured 2026-11-02:
+ * ChatGPT fails on DNS in Chat mode (no internet there) but downloads and uploads in Work mode with Work
+ * network access on (measured the same day, SQEM-627), Claude Code on
+ * the web gets a proxy 403 (environment → Network access → Allowed domains), Codex Cloud calls the tools
+ * but its default environment did not reach the host either (it did once the host was allowlisted). A Claude-only path, as SQEM-622 wrote it, sent Claude Code on the web to the
+ * wrong settings page; the agent knows its own client's settings, the hint only has to say what to allow.
+ *
+ * The host comes from the link itself, so a self-hosted instance names its own domain and no product
+ * URL is written into the source (it ships to self-host). `tests/unit/sandboxReachHint.test.ts` pins
+ * the length and that the host is the link's.
+ */
+export function sandboxReachHint(link: string): string {
+  let host = 'this server';
+  try { host = new URL(link).host || host; } catch { /* keep the neutral wording */ }
+  return `If your sandbox cannot reach this link (DNS failure, proxy 403, connection reset), ${host} is not among its allowed domains. Tell the person: allow ${host} in this client's network or egress settings, or use the sqemes Files page.`;
+}

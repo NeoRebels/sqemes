@@ -16,6 +16,8 @@ const code = (src: string) => src
   .replace(/\/\*[\s\S]*?\*\//g, '');
 
 const CHAT_FN = code(readFileSync(root('supabase/functions/chat-message/index.ts'), 'utf8'));
+// SQEM-648 — `advanceToolRound` moved here from chat-message so it can be tested by behaviour.
+const LIB_FN  = code(readFileSync(root('supabase/functions/_shared/libraryTools.ts'), 'utf8'));
 const MCP_FN  = code((readFileSync(root('supabase/functions/mcp-server/index.ts'), 'utf8') + '\n' + readFileSync(root('supabase/functions/_shared/libraryActions.ts'), 'utf8') + '\n' + readFileSync(root('supabase/functions/_shared/libraryToolDefs.ts'), 'utf8')));
 
 /** A reader that records what it was asked, so the adapter can be tested without a database. */
@@ -179,17 +181,12 @@ describe('SQEM-373 — the wiring in chat-message', () => {
     // A second `body.tools = …` is exactly how the definitions were lost. One array, appended to.
     const fn = CHAT_FN.slice(CHAT_FN.indexOf('async function callClaude'));
     const body = fn.slice(0, fn.indexOf('\n}\n'));
-    expect(body).toMatch(/const toolDefs: any\[\] = activeTools \? toClaudeTools\(activeTools\.definitions\) : \[\]/);
-    expect(body).toMatch(/toolDefs\.push\(toolset\)/);
-    expect(body).toMatch(/if \(toolDefs\.length\) body\.tools = toolDefs/);
+    // SQEM-652 — one source now: the connectors' tools are functions in the same runtime.
+    expect(body).toMatch(/if \(activeTools\) body\.tools = toClaudeTools\(activeTools\.definitions\)/);
     // ⛔ Exactly one writer of `body.tools` on this path.
     expect(body.match(/body\.tools\s*=/g) ?? []).toHaveLength(1);
-    // The connectors themselves still travel in their own field.
-    // ⚠️ SQEM-466 renamed the source to `activeConnectors`: the list shrinks when the provider
-    // refuses one, and the body must be built from what is left, not from the original. Asserting
-    // the new name on purpose — a looser `\w+\.map` would let a future change rebuild the body from
-    // the unfiltered list and this test would still pass.
-    expect(body).toMatch(/body\.mcp_servers = activeConnectors\.map/);
+    // SQEM-652 — the connectors no longer travel in their own field; they are functions in `tools`.
+    expect(body).not.toMatch(/mcp_servers/);
   });
 
   it('⛔ what makes the mixing safe: the readers filter STRICTLY on tool_use', () => {
@@ -212,19 +209,19 @@ describe('SQEM-373 — the wiring in chat-message', () => {
     // inventing library contents (SQEM-326).
     expect(CHAT_FN).toMatch(/const tools: ToolRuntime \| null = workspaceId/);
     // SQEM-594 — the library prompt is still decided by `tools` alone; the web line is added on top only for a web message.
-    expect(CHAT_FN).toMatch(/const libraryInstruction = tools \? withLibraryPrompt\(systemInstruction\) : systemInstruction/);
+    // SQEM-654 — the library rule opens the STABLE half; date and web lines follow it.
+    expect(CHAT_FN).toMatch(/const stableInstruction = tools \? withLibraryPrompt\(systemInstruction\) : systemInstruction/);
   });
 
   it('⛔ the loop has a cap, and the cap is VISIBLE', () => {
     // A model cut off mid-investigation answers confidently from half the material, and nothing in
     // the reply would say so.
-    expect(CHAT_FN).toMatch(/TOOL_ROUNDS_BYOK\s*=\s*\d+/);
-    expect(CHAT_FN).toMatch(/TOOL_ROUNDS_FUNDED\s*=\s*\d+/);
-    // SQEM-595 — 2 fired on finished file answers (lookup + create_file); 4 since.
-    expect(CHAT_FN).toMatch(/const TOOL_ROUNDS_FUNDED = 4;/);
+    // SQEM-650 — one emergency cap for every answer (was 6 / 4 on credits, SQEM-595/648).
+    expect(CHAT_FN).toMatch(/maxRounds: MAX_TOOL_ROUNDS/);
     expect(CHAT_FN).toMatch(/if \(tools\?\.stats\.cappedAt\) result \+= toolCapNotice/);
     expect(toolCapNotice(6, 'rounds')).toContain('6');
     expect(toolCapNotice(6, 'time')).toMatch(/time/);
+    expect(toolCapNotice(6, 'loop')).toMatch(/repeating/); // SQEM-650
   });
 
   it('⛔ …and a DEADLINE, because time is the constraint that actually bites', () => {
@@ -232,9 +229,9 @@ describe('SQEM-373 — the wiring in chat-message', () => {
     // client then sits on its own 180 s timeout with a spinner. A round cap cannot prevent that;
     // one slow provider call is already 120 s.
     expect(CHAT_FN).toMatch(/TOOL_BUDGET_MS\s*=\s*\d[\d_]*/);
-    const fn = CHAT_FN.slice(CHAT_FN.indexOf('function advanceToolRound'));
+    const fn = LIB_FN.slice(LIB_FN.indexOf('function advanceToolRound'));
     const body = fn.slice(0, fn.indexOf('\n}'));
-    expect(body).toMatch(/Date\.now\(\) >= tools\.deadline/);
+    expect(body).toMatch(/now\(\) >= tools\.deadline/);
     expect(body).toMatch(/cappedBy = 'time'/);
   });
 
@@ -244,14 +241,23 @@ describe('SQEM-373 — the wiring in chat-message', () => {
     expect(rt.deadline).toBe(6_000);
   });
 
-  it('⛔ the round counter drops the tools rather than asking the model to stop', () => {
-    // A model asked to stop calling tools while it can still see them calls one anyway. Taking them
-    // away is the only instruction it cannot ignore.
-    const fn = CHAT_FN.slice(CHAT_FN.indexOf('function advanceToolRound'));
+  it('⛔ the cap forbids calls in the PROVIDER\'s terms, never by asking the model (SQEM-637)', () => {
+    // SQEM-373: a model ASKED to stop calling tools while it can still see them calls one anyway, so the
+    // tools were taken away. SQEM-637: taking them away left calls in the history with no declarations,
+    // and Gemini answered that with nothing (a customer, 2026-11-03). Now the last round keeps the
+    // declarations and the API forbids calling — not a request the model can ignore — and a call that
+    // comes anyway is not executed (`final` returns before any tool runs; the next advance returns null).
+    const fn = LIB_FN.slice(LIB_FN.indexOf('function advanceToolRound'));
     const body = fn.slice(0, fn.indexOf('\n}'));
     expect(body).toMatch(/stats\.rounds \+= 1/);
-    expect(body).toMatch(/return null/);
+    expect(body).toMatch(/if \(tools\.final\) return null;/);
+    // time, rounds — and since SQEM-650 the loop: every cap keeps the tools and forbids calling
+    expect([...body.matchAll(/return \{ \.\.\.tools, final: true \}/g)]).toHaveLength(3);
     expect(body).toMatch(/cappedAt/);
+    expect(CHAT_FN).toMatch(/if \(activeTools\?\.final\) body\.toolConfig = \{ functionCallingConfig: \{ mode: 'NONE' \} \};/);
+    expect([...CHAT_FN.matchAll(/if \(activeTools\?\.final\) body\.tool_choice = 'none';/g)]).toHaveLength(2); // Responses, compatible
+    expect(CHAT_FN).toMatch(/if \(activeTools\?\.final\) body\.tool_choice = \{ type: 'none' \};/); // Claude
+    expect([...CHAT_FN.matchAll(/if \(!activeTools \|\| activeTools\.final \|\| !toolCalls\.length\)/g)]).toHaveLength(4);
   });
 
   it('⛔ every provider accumulates its answer across rounds', () => {
@@ -290,12 +296,13 @@ describe('SQEM-375 — a model that cannot do function tools', () => {
     expect(toolsWereRefused(500, 'tool service unavailable')).toBe(false);
   });
 
-  it('⛔ every provider path retries WITHOUT tools, and cannot loop doing it', () => {
-    // Four paths, one rule. `activeTools = null` is what bounds it: the retry can never take this
-    // branch again, because the branch requires tools to have been sent.
+  it('⛔ every provider path retries with fewer tools, and cannot loop doing it', () => {
+    // Four paths, one rule. SQEM-638: connectors first, then nothing (`afterToolsRefused`); the second
+    // refusal finds no connector tools and returns null, which ends the branch for good.
     const retries = [...CHAT_FN.matchAll(/if \(activeTools && toolsWereRefused\(response\.status, errText\)\)/g)];
     expect(retries).toHaveLength(4);
-    expect([...CHAT_FN.matchAll(/activeTools\.stats\.toolsRefused = true;/g)]).toHaveLength(4);
+    // SQEM-637 — refused in the last round (a provider that will not take "no calls") falls back to no tools.
+    expect([...CHAT_FN.matchAll(/activeTools = activeTools\.final \? null : afterToolsRefused\(activeTools\);/g)]).toHaveLength(4);
   });
 
   it('⛔ a refusal is LOGGED, even though it makes zero tool calls', () => {

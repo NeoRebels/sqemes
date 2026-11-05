@@ -88,6 +88,7 @@ import {
   Sparkles,
   ArrowUpRight,
   Globe,
+  Cpu,
 } from 'lucide-react';
 import Select from '../components/ui/Select';
 
@@ -97,7 +98,7 @@ type GovernanceKey = 'blockEmails' | 'blockIban' | 'blockPhone';
 const sameRoles = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && [...a].sort().join() === [...b].sort().join();
 
-type TabId = 'general' | 'brand' | 'team' | 'security' | 'plans' | 'api' | 'connectors' | 'profile';
+type TabId = 'general' | 'brand' | 'team' | 'security' | 'plans' | 'api' | 'providers' | 'connectors' | 'profile';
 
 const MASKED_KEY_RE = /(?:\u2022){4,}|^\*{4,}$/;
 
@@ -650,6 +651,7 @@ const Settings = () => {
     { id: 'security', label: m.st_tab_security(), icon: Shield },
     { id: 'plans', label: m.st_tab_plans(), icon: CreditCard },
     { id: 'api', label: m.st_tab_api(), icon: Key },
+    { id: 'providers', label: m.st_tab_providers(), icon: Cpu }, // SQEM-618
     { id: 'connectors', label: m.st_tab_connectors(), icon: Plug },
     { id: 'profile', label: m.st_tab_profile(), icon: User },
   ];
@@ -666,6 +668,7 @@ const Settings = () => {
     // SQEM-170 made Brand Cloud-only (the brand profile feeds the Cloud wizard). SQEM-597 — the Document
     // style card lives here too and works on self-host, so the tab stays; only the profile card is Cloud.
     if (tab.id === 'security' && !securityTabVisible) return false;
+    if (tab.id === 'providers' && !can(currentUser, workspace, 'api-keys:manage')) return false; // SQEM-618
     // Members (no settings:general) still get their Profile + Connectors (they may add personal ones)
     // and, since SQEM-328, **API & MCP** — the only place to obtain the key their own MCP client
     // needs. ⚠️ The tab is not the permission: the provider-keys card inside it stays behind
@@ -701,6 +704,14 @@ const Settings = () => {
 
   useEffect(() => {
     if (!can(currentUser, workspace, 'settings:general')) {
+      // SQEM-641 — a deep link to a tab this person HAS (Connectors, API & MCP) is honoured. Until then a
+      // member was always sent to My Profile, and "Connect connectors" from a persona in Chat led nowhere.
+      const requested = (location.state as { initialTab?: string } | null)?.initialTab
+        ?? new URLSearchParams(location.search).get('tab');
+      if (requested === 'connectors' || requested === 'api') {
+        if (activeTab !== requested) setActiveTab(requested);
+        return;
+      }
       if (activeTab !== 'profile' && activeTab !== 'connectors') setActiveTab('profile');
       return;
     }
@@ -714,7 +725,7 @@ const Settings = () => {
     if (location.state && (location.state as any).initialTab) {
       const requestedTab = (location.state as any).initialTab;
       // SQEM-480 — a link into Security for someone who would find it empty lands on General.
-      if (requestedTab === 'security' && !securityTabVisible) {
+      if ((requestedTab === 'security' && !securityTabVisible) || (requestedTab === 'providers' && !can(currentUser, workspace, 'api-keys:manage'))) {
         if (activeTab !== 'general') setActiveTab('general');
       } else if (!can(currentUser, workspace, 'plans:manage') && requestedTab === 'plans') {
         if (activeTab !== 'general') setActiveTab('general');
@@ -726,8 +737,8 @@ const Settings = () => {
 
     // Deep-link via URL query (e.g. opened in a new tab): ?tab=plans
     const urlTab = new URLSearchParams(location.search).get('tab');
-    if (urlTab && ['general', 'brand', 'team', 'security', 'plans', 'api', 'connectors', 'profile'].includes(urlTab) && !(IS_SELF_HOSTED && urlTab === 'brand')) {
-      if ((!can(currentUser, workspace, 'plans:manage') && urlTab === 'plans') || (urlTab === 'security' && !securityTabVisible)) {
+    if (urlTab && ['general', 'brand', 'team', 'security', 'plans', 'api', 'providers', 'connectors', 'profile'].includes(urlTab) && !(IS_SELF_HOSTED && urlTab === 'brand')) {
+      if ((!can(currentUser, workspace, 'plans:manage') && urlTab === 'plans') || (urlTab === 'security' && !securityTabVisible) || (urlTab === 'providers' && !can(currentUser, workspace, 'api-keys:manage'))) {
         if (activeTab !== 'general') setActiveTab('general');
       } else if (activeTab !== urlTab) {
         setActiveTab(urlTab as TabId);
@@ -1163,18 +1174,6 @@ const Settings = () => {
                 />
               )}
 
-              {/* SQEM-311 — which model does the writing. Deliberately NOT gated on Cloud: self-host is
-                  BYOK-only, so there is no funded fallback there and the choice matters more, not less. */}
-              {can(currentUser, workspace, 'api-keys:manage') && (
-                <AuthoringModelCard
-                  key={authoringResetKey}
-                  workspace={workspace}
-                  onSave={modelId => updateWorkspace({ authoringModelId: modelId })}
-                  onDirtyChange={setAuthoringDirty}
-                  onOpenApiKeys={() => requestTab('api')}
-                />
-              )}
-
               {/* SQEM-183 — self-host marketplace publisher token (Cloud publishes directly; self-host only) */}
               {IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
                 <Card className="p-6 md:p-8">
@@ -1327,36 +1326,10 @@ const Settings = () => {
                 </Card>
               )}
 
-              {/* SQEM-292/304 — Access groups. Admins only, enforced twice: the card is hidden here,
-                  and the RLS policies reject writes from anyone else. Hiding alone would be a
-                  suggestion; the policy is the rule.
+              {/* SQEM-619 — the access groups were here (SQEM-304); they sit on the Team tab now, under
+                  the members. */}
 
-                  SQEM-304 — moved here from the Team tab. It sat there because *a group is a set of
-                  people*, which describes what one is made of, not what it is for: a group exists to
-                  grant template access and appears nowhere else in the product. Whoever creates one
-                  is thinking about a template, so it belongs beside the setting that makes it useful.
-
-                  ⛔ **Cloud-only since SQEM-323, and the comment that stood here argued the exact
-                  opposite.** It read: *"Its own condition, deliberately outside the `!IS_SELF_HOSTED`
-                  block. Access groups are not Cloud-only — the migration ships with the bundle and
-                  the policies apply there identically."* Both of those sentences are true and the
-                  conclusion did not follow from them. **A group has exactly one consumer** —
-                  `TemplateAccessControl` — and that control is `!IS_SELF_HOSTED` in the block above
-                  *and* in `pages/TemplateEditor.tsx`. With no way to attach a group to a template,
-                  a self-hoster was maintaining objects that could never grant anything.
-
-                  ⚠️ That is worse than a missing feature: it is a feature that pretends to work.
-                  **The tables and policies still ship** — schema parity across Cloud and self-host is
-                  worth more than two unused tables, and rows an instance already created are left
-                  untouched rather than dropped: they have no consumer, so nothing is gained by a
-                  migration that cannot be undone.
-
-                  No `mt-*` here: this tab spaces its cards with `space-y-6`, unlike the Team tab. */}
-              {!IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (
-                <AccessGroupsCard workspaceId={workspace.id} members={workspace.members} />
-              )}
-
-              {/* SQEM-323 — the self-host counterpart of both blocks above, and deliberately **one**
+              {/* SQEM-323 — the self-host counterpart of the default above and of the groups, deliberately **one**
                   card for them. The default and the groups are two controls in the code and a single
                   idea to a reader — *who may use a template* — so two CTAs would nag where one
                   informs.
@@ -1678,6 +1651,29 @@ const Settings = () => {
               </Card>
             )}
 
+            {/* SQEM-292/304/619 — Access groups. Admins only, enforced twice: the card is hidden here,
+                and the RLS policies reject writes from anyone else. Hiding alone would be a
+                suggestion; the policy is the rule.
+
+                SQEM-619 — back on the Team tab, under the members (review, 2026-10-29:
+                "Gruppen und Teammitglieder, das gehört in ein Ding"). SQEM-304 had moved them to the
+                access settings on the argument that a group exists only to grant playbook access, so
+                whoever creates one is thinking about a playbook. The customer's reading won: whoever
+                looks for a group looks for people, and found it missing on the page that lists them.
+                The access default stays on the Security tab; "Create group" in both editors opens here.
+
+                ⛔ **Cloud-only since SQEM-323.** A group has exactly one consumer — `TemplateAccessControl`
+                — and that control is `!IS_SELF_HOSTED` in Settings *and* in `pages/TemplateEditor.tsx`.
+                With no way to attach a group to a template, a self-hoster would maintain objects that
+                could never grant anything. **The tables and policies still ship** — schema parity is
+                worth more than two unused tables, and existing rows are left untouched. */}
+            {/* SQEM-619 (2026-11-03) — not on Solo: one seat, nobody to put in a group. Same rule as the
+                access default (`isMultiSeat`). A downgraded workspace keeps any rule a group grants, and
+                the editor still shows it (`accessAppliesTo`), so it can still be lifted there. */}
+            {!IS_SELF_HOSTED && isMultiSeat(workspace) && can(currentUser, workspace, 'team:manage') && (
+              <AccessGroupsCard className="mt-6" workspaceId={workspace.id} members={workspace.members} />
+            )}
+
           </>)}
 
           {/* --- Plans Tab --- */}
@@ -1870,6 +1866,124 @@ const Settings = () => {
               {/* SQEM-554 (c) — MCP first: one of the three channels, and the card most people come here for. */}
               <McpServerCard locked={!hasMcpAccess} onUpgrade={() => setActiveTab('plans')} />
 
+              {/* Public API Keys */}
+              <Card className="p-6 md:p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
+                      <Zap className="w-5 h-5 text-accent" />
+                      {m.sta_public_title()}
+                    </h2>
+                    <p className="text-sm text-ink-muted mt-1">
+                      {m.sta_public_desc()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { setNewKeyName(''); setNewKeyScope(defaultScopeFor(canWriteContent)); setShowGenerateKeyModal(true); }}
+                    disabled={!hasMcpAccess}
+                    title={!hasMcpAccess ? m.sta_upgrade_for_keys() : undefined}
+                    className="flex items-center gap-2 px-4 py-2 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                  >
+                    <Plus className="w-4 h-4" /> {m.sta_generate()}
+                  </button>
+                </div>
+
+                {sqemesApiKeys.length === 0 ? (
+                  <div className="text-center py-10 border-2 border-dashed border-line-strong rounded-2xl">
+                    <Zap className="w-8 h-8 text-ink-subtle mx-auto mb-3" />
+                    <p className="text-sm font-semibold text-ink-muted">{m.sta_no_keys()}</p>
+                    <p className="text-xs text-ink-subtle mt-1">{m.sta_no_keys_hint()}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {sqemesApiKeys.map(k => {
+                      const scopes = k.scopes && k.scopes.length > 0 ? k.scopes : ['read', 'create', 'update', 'delete'];
+                      const writeScopes = scopes.filter(s => s !== 'read');
+                      // SQEM-226 — shared with the Dashboard's connection count so the two surfaces
+                      // cannot disagree about which keys are still usable. (OAuth rows expire on
+                      // connection_expires_at, not on the short access-token TTL in expires_at.)
+                      const displayExpiry = mcpKeyExpiry(k);
+                      const expired = isMcpKeyExpired(k);
+                      return (
+                      <div key={k.id} className="flex items-center justify-between gap-4 p-4 bg-surface-sunken rounded-xl border border-line">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-ink-strong truncate">{k.name}</p>
+                          <p className="text-xs font-mono text-ink-subtle mt-0.5">{k.key_prefix}</p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            {k.is_oauth && (
+                              <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-accent-soft text-accent">OAuth</span>
+                            )}
+                            {/* SQEM-143 — which templates this key exposes. */}
+                            {k.user_id
+                              ? (
+                                <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-success-soft text-ink-strong">
+                                  {k.user_id === currentUser.id ? m.sta_you() : (workspace.members?.find(member => member.id === k.user_id)?.name || m.sta_member())}
+                                </span>
+                              )
+                              : (
+                                <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-warning-soft text-ink-strong">{m.sta_workspace_wide()}</span>
+                              )}
+                            <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-line-strong text-ink">{m.ks_scope_read()}</span>
+                            {writeScopes.map(s => (
+                              <span key={s} className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-accent-soft text-accent">{SCOPE_LABEL[s]?.() ?? s}</span>
+                            ))}
+                            {displayExpiry && (
+                              <span className={`text-2xs font-bold px-1.5 py-0.5 rounded-md ${expired ? 'bg-danger-soft text-danger' : 'bg-warning-soft text-ink-strong'}`}>
+                                {expired ? m.sta_expired() : m.sta_expires({ date: new Date(displayExpiry).toLocaleDateString(getLocale()) })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 hidden sm:block">
+                          <p className="text-xs text-ink-subtle">{m.sta_created({ date: new Date(k.created_at).toLocaleDateString(getLocale()) })}</p>
+                          <p className="text-xs text-ink-subtle mt-0.5">
+                            {k.last_used_at ? m.sta_last_used({ date: new Date(k.last_used_at).toLocaleDateString(getLocale()) }) : m.sta_never_used()}
+                          </p>
+                          {idleDays(k) >= 60 && (
+                            <p className={`text-2xs font-bold mt-0.5 ${idleDays(k) >= IDLE_LIMIT_DAYS ? 'text-danger' : 'text-warning'}`}>
+                              {idleDays(k) >= IDLE_LIMIT_DAYS
+                                ? m.sta_idle_stopped()
+                                : m.sta_idle({ days: idleDays(k), limit: IDLE_LIMIT_DAYS })}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => openEditKeyScope(k)}
+                            className="p-2 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors"
+                            title={m.sta_edit_connection()}
+                          >
+                            <SlidersHorizontal className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteApiKey(k.id)}
+                            disabled={deletingKeyId === k.id}
+                            className="p-2 text-ink-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors"
+                            title={m.sta_revoke()}
+                          >
+                            {deletingKeyId === k.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+
+            </div>
+          )}
+
+          {/* --- Connectors Tab (SQEM-149) — accessible to all members (personal connectors) --- */}
+          {/* --- AI providers Tab --- */}
+          {/* SQEM-618 — the workspace's AI provider keys and its web search key have their own tab. They
+              sat under "API & MCP" below the MCP guide, where somebody sent to "add an AI provider key"
+              had to scroll past a card about something else; both are workspace-wide credentials that
+              cost money on every call, so they share one right (`api-keys:manage`, admins and editors)
+              and one place. "API & MCP" keeps what is one person's own: the MCP connection and the
+              personal API keys. Members never see this tab (SQEM-328). */}
+          {activeTab === 'providers' && can(currentUser, workspace, 'api-keys:manage') && (
+            <div className="space-y-6 animate-fade-in">
               {/* ⛔ SQEM-328 — AI provider keys stay closed to members, and the difference from the
                   cards below is not a matter of degree. A provider key is a workspace-wide
                   credential that costs money on every call and serves everybody; a public API key
@@ -1887,7 +2001,7 @@ const Settings = () => {
                           for one thing — the Dashboard says "Provider keys", the setup wizard says
                           "AI provider key". Somebody sent here by the wizard arrived at a heading
                           that did not match what sent them. One name now, and it is the plain one. */}
-                      {m.sta_provider_title()}
+                      <span id="provider-keys-title">{m.sta_provider_title()}</span>
                     </h2>
                     <p className="text-sm text-ink-muted mt-1">
                       {m.sta_provider_desc()}
@@ -1998,6 +2112,20 @@ const Settings = () => {
               </Card>
               )}
 
+              {/* SQEM-311 — which model does the writing. Deliberately NOT gated on Cloud: self-host is
+                  BYOK-only, so there is no funded fallback there and the choice matters more, not less.
+                  SQEM-631 (2026-11-03) — here, under the provider keys, not in General: the choice
+                  depends on them (no key, nothing to choose), so the tab reads top to bottom — add a key,
+                  then pick the model; web search is a topic of its own and comes last. Same right as the
+                  tab (`api-keys:manage`). "Add a key" now scrolls up to the keys instead of switching tab. */}
+              <AuthoringModelCard
+                key={authoringResetKey}
+                workspace={workspace}
+                onSave={modelId => updateWorkspace({ authoringModelId: modelId })}
+                onDirtyChange={setAuthoringDirty}
+                onOpenApiKeys={() => document.getElementById('provider-keys-title')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+              />
+
               {/* SQEM-594 — web search in Chat. ONE search key per workspace: Linkup or
                   Brave, chosen here; saving one removes the other. On Cloud sqemes provides Linkup with a
                   monthly allowance per plan, and the workspace's own key always wins over it. */}
@@ -2082,116 +2210,9 @@ const Settings = () => {
               </Card>
                 );
               })()}
-
-              {/* Public API Keys */}
-              <Card className="p-6 md:p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="font-display text-xl font-semibold text-ink-strong flex items-center gap-2">
-                      <Zap className="w-5 h-5 text-accent" />
-                      {m.sta_public_title()}
-                    </h2>
-                    <p className="text-sm text-ink-muted mt-1">
-                      {m.sta_public_desc()}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => { setNewKeyName(''); setNewKeyScope(defaultScopeFor(canWriteContent)); setShowGenerateKeyModal(true); }}
-                    disabled={!hasMcpAccess}
-                    title={!hasMcpAccess ? m.sta_upgrade_for_keys() : undefined}
-                    className="flex items-center gap-2 px-4 py-2 bg-accent-strong hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-                  >
-                    <Plus className="w-4 h-4" /> {m.sta_generate()}
-                  </button>
-                </div>
-
-                {sqemesApiKeys.length === 0 ? (
-                  <div className="text-center py-10 border-2 border-dashed border-line-strong rounded-2xl">
-                    <Zap className="w-8 h-8 text-ink-subtle mx-auto mb-3" />
-                    <p className="text-sm font-semibold text-ink-muted">{m.sta_no_keys()}</p>
-                    <p className="text-xs text-ink-subtle mt-1">{m.sta_no_keys_hint()}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {sqemesApiKeys.map(k => {
-                      const scopes = k.scopes && k.scopes.length > 0 ? k.scopes : ['read', 'create', 'update', 'delete'];
-                      const writeScopes = scopes.filter(s => s !== 'read');
-                      // SQEM-226 — shared with the Dashboard's connection count so the two surfaces
-                      // cannot disagree about which keys are still usable. (OAuth rows expire on
-                      // connection_expires_at, not on the short access-token TTL in expires_at.)
-                      const displayExpiry = mcpKeyExpiry(k);
-                      const expired = isMcpKeyExpired(k);
-                      return (
-                      <div key={k.id} className="flex items-center justify-between gap-4 p-4 bg-surface-sunken rounded-xl border border-line">
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-ink-strong truncate">{k.name}</p>
-                          <p className="text-xs font-mono text-ink-subtle mt-0.5">{k.key_prefix}</p>
-                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                            {k.is_oauth && (
-                              <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-accent-soft text-accent">OAuth</span>
-                            )}
-                            {/* SQEM-143 — which templates this key exposes. */}
-                            {k.user_id
-                              ? (
-                                <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-success-soft text-ink-strong">
-                                  {k.user_id === currentUser.id ? m.sta_you() : (workspace.members?.find(member => member.id === k.user_id)?.name || m.sta_member())}
-                                </span>
-                              )
-                              : (
-                                <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-warning-soft text-ink-strong">{m.sta_workspace_wide()}</span>
-                              )}
-                            <span className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-line-strong text-ink">{m.ks_scope_read()}</span>
-                            {writeScopes.map(s => (
-                              <span key={s} className="text-2xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-accent-soft text-accent">{SCOPE_LABEL[s]?.() ?? s}</span>
-                            ))}
-                            {displayExpiry && (
-                              <span className={`text-2xs font-bold px-1.5 py-0.5 rounded-md ${expired ? 'bg-danger-soft text-danger' : 'bg-warning-soft text-ink-strong'}`}>
-                                {expired ? m.sta_expired() : m.sta_expires({ date: new Date(displayExpiry).toLocaleDateString(getLocale()) })}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0 hidden sm:block">
-                          <p className="text-xs text-ink-subtle">{m.sta_created({ date: new Date(k.created_at).toLocaleDateString(getLocale()) })}</p>
-                          <p className="text-xs text-ink-subtle mt-0.5">
-                            {k.last_used_at ? m.sta_last_used({ date: new Date(k.last_used_at).toLocaleDateString(getLocale()) }) : m.sta_never_used()}
-                          </p>
-                          {idleDays(k) >= 60 && (
-                            <p className={`text-2xs font-bold mt-0.5 ${idleDays(k) >= IDLE_LIMIT_DAYS ? 'text-danger' : 'text-warning'}`}>
-                              {idleDays(k) >= IDLE_LIMIT_DAYS
-                                ? m.sta_idle_stopped()
-                                : m.sta_idle({ days: idleDays(k), limit: IDLE_LIMIT_DAYS })}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            onClick={() => openEditKeyScope(k)}
-                            className="p-2 text-ink-subtle hover:text-accent hover:bg-accent-soft rounded-lg transition-colors"
-                            title={m.sta_edit_connection()}
-                          >
-                            <SlidersHorizontal className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteApiKey(k.id)}
-                            disabled={deletingKeyId === k.id}
-                            className="p-2 text-ink-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors"
-                            title={m.sta_revoke()}
-                          >
-                            {deletingKeyId === k.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </Card>
-
             </div>
           )}
 
-          {/* --- Connectors Tab (SQEM-149) — accessible to all members (personal connectors) --- */}
           {activeTab === 'connectors' && (
             <div className="space-y-6 animate-fade-in">
               <ConnectorsCard workspaceId={workspace.id} currentUser={currentUser} showToast={showToast} />

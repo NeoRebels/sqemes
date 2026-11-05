@@ -16,7 +16,6 @@ const security = block("{activeTab === 'security' && securityTabVisible && (", '
 
 const CARDS: [string, string][] = [
   ['Playbook Access (workspace default)', "{!IS_SELF_HOSTED && isMultiSeat(workspace) && can(currentUser, workspace, 'team:manage') && ("],
-  ['Access groups', "{!IS_SELF_HOSTED && can(currentUser, workspace, 'team:manage') && (\n                <AccessGroupsCard"],
   // Same condition as General's Marketplace Publisher card, so pinned by its heading as well.
   ['self-host access card', '{m.sts_selfhost_title()}</h3>'], // SQEM-608 — the words live in messages/
   ['Content Governance', '{/* SQEM-170 — Content Governance is a Cloud-only feature */}\n              {!IS_SELF_HOSTED && ('],
@@ -32,7 +31,7 @@ describe('SQEM-480 — the Security tab', () => {
   }
 
   it('General keeps the workspace basics', () => {
-    for (const keep of ['m.stg_details()', '<AuthoringModelCard', 'm.stg_pub_title()', '<AboutSection />', 'm.stg_danger()']) { // SQEM-608
+    for (const keep of ['m.stg_details()', 'm.stg_pub_title()', '<AboutSection />', 'm.stg_danger()']) { // SQEM-608
       expect(general, keep).toContain(keep);
     }
   });
@@ -43,14 +42,26 @@ describe('SQEM-480 — the Security tab', () => {
   });
 
   it('deep links: ?tab=security works, and a link someone could not use lands on General', () => {
-    expect(src).toContain("['general', 'brand', 'team', 'security', 'plans', 'api', 'connectors', 'profile'].includes(urlTab)");
-    expect(src).toContain("if (requestedTab === 'security' && !securityTabVisible) {");
+    expect(src).toContain("['general', 'brand', 'team', 'security', 'plans', 'api', 'providers', 'connectors', 'profile'].includes(urlTab)");
+    expect(src).toContain("if ((requestedTab === 'security' && !securityTabVisible) || (requestedTab === 'providers' && !can(currentUser, workspace, 'api-keys:manage'))) {"); // SQEM-618 added the second
     expect(src).toContain("(urlTab === 'security' && !securityTabVisible)");
   });
 
-  it('"Create group" in both editors opens Security, where the groups are', () => {
+  // SQEM-619 — the groups moved to the Team tab, under the members (review, 2026-10-29).
+  it('SQEM-619 — the access groups sit on the Team tab, after the members, with their old condition', () => {
+    const team = block("{activeTab === 'team' && can(currentUser, workspace, 'settings:general') && (<>", '{/* --- Plans Tab --- */}');
+    // SQEM-619 (2026-11-03) — and not on Solo.
+    const cond = "{!IS_SELF_HOSTED && isMultiSeat(workspace) && can(currentUser, workspace, 'team:manage') && (\n              <AccessGroupsCard";
+    expect(team).toContain(cond);
+    expect(team.indexOf(cond)).toBeGreaterThan(team.indexOf('{m.st_tab_team()}</h2>'));
+    expect(security).not.toContain('<AccessGroupsCard');
+    expect(general).not.toContain('<AccessGroupsCard');
+    expect(src.match(/<AccessGroupsCard/g)).toHaveLength(1);
+  });
+
+  it('"Create group" in both editors opens the Team tab, where the groups are', () => {
     for (const f of ['pages/TemplateEditor.tsx', 'pages/PersonaEditor.tsx']) {
-      expect(readFileSync(f, 'utf8'), f).toContain("navigate('/settings', { state: { initialTab: 'security' } })");
+      expect(readFileSync(f, 'utf8'), f).toContain("navigate('/settings', { state: { initialTab: 'team' } })");
     }
   });
 });

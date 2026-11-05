@@ -46,7 +46,7 @@ pressing Enter with no domain runs a quick **IP-only test**.
   the server IP). No domain? Just press Enter at the prompt for the IP-only test.
 
 **When it finishes:** open your domain (or `http://<server-ip>:3000` for the IP test) and **sign up** —
-the first account creates your workspace. Then add an AI provider key under **Settings → Integrations**
+the first account creates your workspace. Then add an AI provider key under **Settings → AI providers**
 (bring-your-own-key — OpenAI, Anthropic, Gemini, Mistral, …). *(Port 8000 is the Supabase admin
 dashboard, not the app.)*
 

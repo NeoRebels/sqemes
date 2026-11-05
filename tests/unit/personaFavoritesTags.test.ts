@@ -108,8 +108,8 @@ describe('SQEM-393 — the archive and the editor', () => {
   it('the editor has the tag field, loads it, and writes it on create and update', () => {
     expect(editor).toMatch(/<TagPicker\s+value=\{tag\}\s+tags=\{workspace\.tags\}/);
     expect(editor).toMatch(/setTag\(persona\.tags\[0\] \?\? null\)/);
-    expect(editor).toMatch(/updatePersona\(id, \{ title: title\.trim\(\), description: description\.trim\(\), content, tags: tag \? \[tag\] : \[\] \}\)/);
-    expect(editor).toMatch(/content, routes, tags: tag \? \[tag\] : \[\] \}/);
+    expect(editor).toMatch(/updatePersona\(id, \{ title: title\.trim\(\), description: description\.trim\(\), content, tags: tag \? \[tag\] : \[\](, \.\.\.\(connectorsChanged \? \{ connectors: personaConnectors \} : \{\}\))? \}\)/);
+    expect(editor).toMatch(/content, routes, tags: tag \? \[tag\] : \[\](, connectors: personaConnectors)? \}/);
     // a new tag joins the workspace registry, like in the playbook editor
     expect(editor).toMatch(/updateWorkspace\(\{ tags: \[\.\.\.workspace\.tags, created\] \}\)/);
   });

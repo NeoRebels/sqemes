@@ -8,8 +8,10 @@ import type { GeneratedFile } from '../../supabase/functions/_shared/fileOutput.
 
 // SQEM-390 — `assistant_id` is optional here because the explicit column lists no longer select it;
 // the column itself stays on the table (legacy, unread) and `select('*')` still returns it.
-export type ChatSessionRow = Omit<Database['public']['Tables']['chat_sessions']['Row'], 'assistant_id'> & {
+// SQEM-635 — `connector_ids` likewise: the list queries do not select it; `fetchAppliedContext` does.
+export type ChatSessionRow = Omit<Database['public']['Tables']['chat_sessions']['Row'], 'assistant_id' | 'connector_ids'> & {
   assistant_id?: string | null;
+  connector_ids?: string[];
   profiles?: { name: string; avatar: string } | null;
 };
 
@@ -65,6 +67,8 @@ export async function createChatSession(
   appliedSkillIds?: string[],
   /** SQEM-389 — a persona applied before the first message rides along here, like the skills. */
   personaId?: string,
+  /** SQEM-635 — connectors switched on before the first message, for the same reason. */
+  connectorIds?: string[],
 ): Promise<ChatSession> {
   // SQEM-390 — `assistant_id` is no longer written: the assistant kind is gone, a skill is one of
   // `applied_skill_ids`, and the role is `persona_id`. The column stays on the table, unread.
@@ -77,6 +81,7 @@ export async function createChatSession(
       model,
       applied_skill_ids: appliedSkillIds ?? [],
       persona_id: personaId || null,
+      connector_ids: connectorIds ?? [],
     })
     .select()
     .single();
@@ -243,10 +248,10 @@ export async function unshareChatSession(sessionId: string): Promise<void> {
  */
 export async function fetchAppliedContext(
   sessionId: string,
-): Promise<{ appliedSkillIds: string[]; personaId: string | null }> {
+): Promise<{ appliedSkillIds: string[]; personaId: string | null; connectorIds: string[] }> {
   const { data, error } = await supabase
     .from('chat_sessions')
-    .select('applied_skill_ids, persona_id')
+    .select('applied_skill_ids, persona_id, connector_ids')
     .eq('id', sessionId)
     .single();
 
@@ -255,16 +260,19 @@ export async function fetchAppliedContext(
     appliedSkillIds: (data as { applied_skill_ids: string[] | null }).applied_skill_ids ?? [],
     // SQEM-389 — the persona is the session's role.
     personaId: (data as { persona_id?: string | null }).persona_id ?? null,
+    // SQEM-635 — the connectors switched on for this session; none by default.
+    connectorIds: (data as { connector_ids?: string[] | null }).connector_ids ?? [],
   };
 }
 
 /** Persists a change to what is applied. Called on apply and on remove, never on send. */
 export async function updateAppliedContext(
   sessionId: string,
-  applied: { appliedSkillIds?: string[]; personaId?: string | null },
+  applied: { appliedSkillIds?: string[]; personaId?: string | null; connectorIds?: string[] },
 ): Promise<void> {
   const patch: Record<string, unknown> = {};
   if (applied.appliedSkillIds) patch.applied_skill_ids = applied.appliedSkillIds;
+  if (applied.connectorIds) patch.connector_ids = applied.connectorIds; // SQEM-635
   if ('personaId' in applied) patch.persona_id = applied.personaId ?? null; // SQEM-389
   if (!Object.keys(patch).length) return;
 

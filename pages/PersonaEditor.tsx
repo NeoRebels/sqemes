@@ -4,10 +4,10 @@
 // how it works), on the right the ROUTES (which template, under which condition). They are stored
 // apart — see the migration header — so that deleting a template cannot leave a dead route inside a
 // paragraph, and so "Enhance with AI" can rewrite the prose without ever touching the routing.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
-  Save, Trash2, Plus, GripVertical, Sparkles, Loader2, X, AlertTriangle,
+  Save, Trash2, Plus, Sparkles, Loader2, X, AlertTriangle,
   Settings, PenTool, ListTree, Search, Wand2, UserRound, Lock,
   Bot,
 } from 'lucide-react';
@@ -19,7 +19,11 @@ import { enhancePrompt, enhanceInput, describePrompt } from '../supabase/functio
 import {
   fetchPersona, createPersona, updatePersona, setPersonaRoutes, deletePersona,
 } from '../lib/api/personas';
-import type { PersonaRoute, Prompt, PromptKind } from '../types';
+import { fetchConnectors } from '../lib/api/connectors';
+import { connectorServiceKey } from '../supabase/functions/_shared/connectorService';
+import ServiceLogo from '../components/ServiceLogo';
+import Switch from '../components/ui/Switch';
+import type { PersonaConnector, PersonaRoute, Prompt, PromptKind } from '../types';
 import FullScreenExit from '../components/ui/FullScreenExit';
 import Modal from '../components/ui/Modal';
 import ConfirmModal from '../components/ui/ConfirmModal';
@@ -44,6 +48,9 @@ import {
 import { ACCESS_BADGE_LABEL, type AccessBadgeMode } from '../lib/accessBadge';
 import { Textarea } from '../components/ui/Input';
 import { m } from '../lib/i18n';
+
+/** SQEM-617 — condition fields that are waiting to be shown before they can be fitted (see `growToFit`). */
+const waitingToFit = new WeakSet<HTMLTextAreaElement>();
 
 export default function PersonaEditor() {
   const { id } = useParams<{ id: string }>();
@@ -72,6 +79,12 @@ export default function PersonaEditor() {
   const [tag, setTag] = useState<string | null>(null);
   const [content, setContent] = useState('');
   const [routes, setRoutes] = useState<PersonaRoute[]>([]);
+  // SQEM-641 — the connector SERVICES this role works with, and the ones this editor can connect to.
+  const [personaConnectors, setPersonaConnectors] = useState<PersonaConnector[]>([]);
+  // `mcpUrl` is for the logo only (origin + path) and is never stored on the persona.
+  const [availableServices, setAvailableServices] = useState<(PersonaConnector & { mcpUrl?: string })[]>([]);
+  // Sent only when changed — see updatePersona/createPersona: before the migration the column is unknown.
+  const [connectorsChanged, setConnectorsChanged] = useState(false);
   const [loading, setLoading] = useState(!!id);
   const [saving, setSaving] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
@@ -88,13 +101,15 @@ export default function PersonaEditor() {
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [restrictedRouteIds, setRestrictedRouteIds] = useState<Map<string, AccessBadgeMode>>(new Map()); // SQEM-400 — the word per route
   const [mobileTab, setMobileTab] = useState<'details' | 'role' | 'routes'>('role');
+  // SQEM-633 — a save without a name leads INTO the field, not only to a toast about it.
+  const nameRef = useRef<HTMLInputElement>(null);
+  const [nameMissing, setNameMissing] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [picking, setPicking] = useState(false);
   const [pickSearch, setPickSearch] = useState('');
   const [pickKind, setPickKind] = useState<'all' | PromptKind>('all');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  const dragIndex = useRef<number | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -113,6 +128,7 @@ export default function PersonaEditor() {
         setTag(persona.tags[0] ?? null);
         setContent(persona.content);
         setRoutes(persona.routes);
+        setPersonaConnectors(persona.connectors);
         setOwnerId(persona.createdBy || null);
         // SQEM-326 — read the rules before the control renders, so it never shows "everyone" for a
         // persona that is restricted. Failure is deliberately loud here: silently showing the wrong
@@ -149,6 +165,44 @@ export default function PersonaEditor() {
       .then(gs => setGroups(gs.map(g => ({ id: g.id, name: g.name, memberIds: g.memberIds }))))
       .catch(() => {});
   }, [workspace?.id]);
+
+  /**
+   * SQEM-641 — every connector this person can use, shared and their own, once per SERVICE. The persona
+   * stores the service, so a colleague's own connection to it counts in their chat (SQEM-639 stored
+   * connector rows and could only offer shared ones). Silent on failure like the groups.
+   */
+  useEffect(() => {
+    if (!workspace?.id) return;
+    fetchConnectors(workspace.id)
+      .then(cs => {
+        const byKey = new Map<string, PersonaConnector & { mcpUrl?: string }>();
+        for (const c of cs) {
+          const key = connectorServiceKey(c);
+          if (!byKey.has(key)) byKey.set(key, { key, name: c.name, mcpUrl: c.mcp_url.split('?')[0] });
+        }
+        setAvailableServices([...byKey.values()]);
+      })
+      .catch(() => {});
+  }, [workspace?.id]);
+
+  // Saved services this editor has not connected stay listed, marked — never silently dropped on save.
+  const connectorRows = useMemo(() => {
+    const known = new Set(availableServices.map(s => s.key));
+    return [
+      ...availableServices.map(s => ({ key: s.key, name: s.name, mcpUrl: s.mcpUrl, connected: true })),
+      ...personaConnectors.filter(s => !known.has(s.key)).map(s => ({
+        key: s.key, name: s.name, mcpUrl: s.key.startsWith('url:') ? s.key.slice(4) : undefined, connected: false,
+      })),
+    ];
+  }, [availableServices, personaConnectors]);
+
+  const toggleConnector = (service: PersonaConnector, on: boolean) => {
+    setPersonaConnectors(prev => on
+      ? (prev.some(s => s.key === service.key) ? prev : [...prev, { key: service.key, name: service.name }])
+      : prev.filter(s => s.key !== service.key));
+    setConnectorsChanged(true);
+    setIsDirty(true);
+  };
 
   // SQEM-326 — which attached templates carry a rule, so the warning below can name them. Runs on
   // every route change because attaching a restricted template is exactly the moment the author
@@ -202,20 +256,47 @@ export default function PersonaEditor() {
     setIsDirty(true);
   };
 
+  /**
+   * SQEM-617 — fit a condition's text area to its content (on mount, as a ref, and on every edit).
+   * ⚠️ Below `xl` the playbooks rail starts hidden, and a hidden element measures 0: fitted then, the
+   * field stayed two pixels tall on a phone until somebody typed (found in the browser at 390 px). So a
+   * hidden field waits, once, until it is shown.
+   */
+  /**
+   * ⛔ SQEM-642 — stable (`useCallback`): as an inline ref it ran on EVERY render, so flipping a connector
+   * switch collapsed each condition field to `height: auto` for a moment and the column lost its scroll
+   * position (measured at 390 px: 95 → 0). `fit()` also puts the column's scroll position back, for the
+   * edits that do refit.
+   */
+  const growToFit = useCallback((el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    const fit = () => {
+      const scroller = el.closest<HTMLElement>('.overflow-y-auto');
+      const top = scroller?.scrollTop;
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight + 2}px`;
+      if (scroller && top !== undefined) scroller.scrollTop = top;
+    };
+    if (el.offsetParent !== null) { fit(); return; }
+    if (waitingToFit.has(el) || typeof ResizeObserver === 'undefined') return;
+    waitingToFit.add(el);
+    const ro = new ResizeObserver(() => {
+      if (el.offsetParent === null) return;
+      ro.disconnect();
+      waitingToFit.delete(el);
+      fit();
+    });
+    ro.observe(el);
+  }, []);
   const setCondition = (templateId: string, condition: string) => {
     setRoutes(prev => prev.map(r => r.templateId === templateId ? { ...r, condition } : r));
     setIsDirty(true);
   };
 
-  // Native HTML5 drag and drop, like every other reorderable list in this app. No DnD library:
-  // the project ships no UI component library at all, and one list is not the reason to start.
-  const onDrop = (target: number) => {
-    const from = dragIndex.current;
-    dragIndex.current = null;
-    if (from === null || from === target) return;
-    moveRoute(from, target);
-  };
-  // SQEM-540 — shared by drag-and-drop and the Move up / Move down buttons.
+  // SQEM-617 — no drag and drop here any more: the whole route card was draggable, so pressing on a
+  // condition to read or select it started a drag instead, and the order carries no weight anyway
+  // (several fitting playbooks → the model asks, `libraryPrompt.ts`). Move up / Move down stay
+  // (2026-11-02) for whoever wants a tidy order. SQEM-540 — the buttons call this.
   const moveRoute = (from: number, to: number) => {
     setRoutes(prev => moveItem(prev, from, to).map((r, i) => ({ ...r, sortOrder: i })));
     setIsDirty(true);
@@ -353,12 +434,15 @@ Rules:
   const handleSave = async () => {
     if (!title.trim()) {
       showToast(m.pe_name_needed(), 'error');
+      setNameMissing(true);
+      setMobileTab('role');
+      requestAnimationFrame(() => nameRef.current?.focus());
       return;
     }
     setSaving(true);
     try {
       if (id) {
-        await updatePersona(id, { title: title.trim(), description: description.trim(), content, tags: tag ? [tag] : [] });
+        await updatePersona(id, { title: title.trim(), description: description.trim(), content, tags: tag ? [tag] : [], ...(connectorsChanged ? { connectors: personaConnectors } : {}) });
         await setPersonaRoutes(id, routes);
         if (!IS_SELF_HOSTED) {
           await setPersonaAccess(id, workspace.id, accessValueToPersonaAccess(access, ownerId));
@@ -367,7 +451,7 @@ Rules:
       } else {
         const created = await createPersona(
           workspace.id,
-          { title: title.trim(), description: description.trim(), content, routes, tags: tag ? [tag] : [] },
+          { title: title.trim(), description: description.trim(), content, routes, tags: tag ? [tag] : [], connectors: personaConnectors },
           currentUser.id || null,
         );
         // ⚠️ Access is written AFTER the persona exists, so a failure here leaves a persona that is
@@ -388,6 +472,7 @@ Rules:
         navigate(`/personas/${created.id}/edit`, { replace: true });
       }
       setIsDirty(false);
+      setConnectorsChanged(false);
       showToast(m.pe_saved(), 'success');
     } catch (err: any) {
       showToast(err?.message || m.pe_save_failed(), 'error');
@@ -550,7 +635,7 @@ Rules:
                 members={workspace?.members}
                 groups={groups}
                 onCreateGroup={currentUser?.role === 'admin'
-                  ? () => navigate('/settings', { state: { initialTab: 'security' } }) // SQEM-480 — groups live there now
+                  ? () => navigate('/settings', { state: { initialTab: 'team' } }) // SQEM-619 — the groups live on the Team tab
                   : undefined}
                 allowPrivate
                 multiSeat={isMultiSeat(workspace)}
@@ -635,12 +720,17 @@ Rules:
             </div>
             <div className="min-w-0 flex-1">
               <label htmlFor="persona-editor-name" className="sr-only">{m.pe_name_label()}</label>
+              {/* SQEM-633 — a customer took the old placeholder ("Vertrieb") for a name already given and
+                  found no field. The placeholder now names the field, and a dashed underline shows it is
+                  one while it is empty or focused; a filled, resting title stays as quiet as a heading. */}
               <input id="persona-editor-name"
+                ref={nameRef}
                 value={title}
-                onChange={e => { setTitle(e.target.value); setIsDirty(true); }}
+                onChange={e => { setTitle(e.target.value); setIsDirty(true); if (e.target.value.trim()) setNameMissing(false); }}
                 disabled={!canEdit}
                 placeholder={m.pe_name_placeholder()}
-                className="w-full bg-transparent font-display text-2xl md:text-3xl font-semibold tracking-tight text-ink-strong outline-none placeholder:text-ink-subtle"
+                aria-invalid={nameMissing || undefined}
+                className="w-full bg-transparent font-display text-2xl md:text-3xl font-semibold tracking-tight text-ink-strong outline-none placeholder:text-ink-subtle border-b-2 border-dashed border-transparent placeholder-shown:border-line-strong focus:border-line-strong aria-[invalid=true]:border-danger"
               />
               {description && <p className="text-sm text-ink-muted truncate">{description}</p>}
             </div>
@@ -702,16 +792,9 @@ Rules:
 
             {/* SQEM-550 (d) — redesign C: each route reads as a step of a flow — "If {condition}" →
                 "Load {playbook}" — instead of a card with the playbook on top and the condition below.
-                Same fields, same order semantics (drag, MoveButtons), same fallback note. */}
+                Same fields, same fallback note; reordered by MoveButtons only (SQEM-617). */}
             {routes.map((route, i) => (
-              <div
-                key={route.templateId}
-                draggable={canEdit}
-                onDragStart={() => { dragIndex.current = i; }}
-                onDragOver={e => e.preventDefault()}
-                onDrop={() => onDrop(i)}
-                className="relative"
-              >
+              <div key={route.templateId} className="relative">
                 <div className="rounded-card border border-line bg-surface-raised p-3">
                   <div className="flex items-center justify-between mb-1">
                     <label htmlFor={`persona-route-condition-${route.templateId}`} className="text-2xs font-bold text-ink-subtle uppercase tracking-wider">
@@ -731,13 +814,17 @@ Rules:
                       </button>
                     )}
                   </div>
-                  <input
+                  {/* SQEM-617 — a text area that grows with its content: a condition is a sentence or
+                      three, and a one-line input showed a fragment of it. */}
+                  <Textarea
                     id={`persona-route-condition-${route.templateId}`}
                     value={route.condition}
-                    onChange={e => setCondition(route.templateId, e.target.value)}
+                    ref={growToFit}
+                    onChange={e => { setCondition(route.templateId, e.target.value); growToFit(e.target); }}
                     disabled={!canEdit}
+                    rows={1}
                     placeholder={templateById.get(route.templateId)?.description || m.pe_condition_placeholder()}
-                    className="w-full px-2.5 py-2 text-sm rounded-control border border-line bg-surface-field text-ink outline-none focus:border-line-strong"
+                    className="resize-none overflow-hidden"
                   />
                   {/* ⛔ Empty is a normal, good state — not a warning. The fallback is the template's
                       own description, resolved when the persona is rendered so it never goes stale.
@@ -753,7 +840,6 @@ Rules:
                 </div>
                 <div aria-hidden className="ml-6 h-3 border-l-2 border-accent" />
                 <div className="rounded-card bg-accent-soft p-3 flex items-start gap-2">
-                  {canEdit && <GripVertical className="w-4 h-4 text-ink-subtle shrink-0 mt-0.5 cursor-grab" />}
                   <div className="min-w-0 flex-1">
                     <span className="block text-2xs font-bold text-accent uppercase tracking-wider">{m.pe_load()}</span>
                     <p className="text-sm font-semibold text-ink-strong truncate" title={route.templateTitle}>
@@ -826,6 +912,42 @@ Rules:
                     {m.pe_restricted_c()}
                   </p>
                 </div>
+              </div>
+            )}
+
+            {/* SQEM-639/641 — the connector services this role works with, in the column that already
+                answers "what does the role use". Only sqemes Chat switches them on; MCP clients get a
+                recommendation, nothing else. Hidden while there is nothing to show. */}
+            {connectorRows.length > 0 && (
+              <div className="pt-4 mt-2 border-t border-line">
+                <p className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{m.pe_connectors_title()}</p>
+                <p className="text-2xs text-slate-400 dark:text-slate-500 mt-1 mb-2">{m.pe_connectors_hint()}</p>
+                <ul className="space-y-1">
+                  {connectorRows.map((c, i) => (
+                    <li key={c.key} className="flex items-center justify-between gap-3 py-1">
+                      {/* SQEM-642 — the logo, in the frame Settings → Connectors uses, smaller. */}
+                      <ServiceLogo serviceKey={c.key} mcpUrl={c.mcpUrl} />
+                      <span id={`persona-connector-${i}`} className="text-sm text-ink truncate min-w-0 flex-1">
+                        {c.name}
+                        {!c.connected && (
+                          <span className="ml-2 text-2xs text-ink-subtle">
+                            {m.pe_connector_not_connected()} ·{' '}
+                            <button type="button" onClick={() => navigate('/settings', { state: { initialTab: 'connectors' } })} className="font-semibold text-accent hover:underline">
+                              {m.pe_connector_connect()}
+                            </button>
+                          </span>
+                        )}
+                      </span>
+                      <Switch
+                        checked={personaConnectors.some(s => s.key === c.key)}
+                        onChange={on => toggleConnector(c, on)}
+                        disabled={!canEdit}
+                        labelledBy={`persona-connector-${i}`}
+                        size="sm"
+                      />
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>

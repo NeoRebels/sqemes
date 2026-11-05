@@ -199,8 +199,9 @@ describe('wiring', () => {
   });
 
   it('⛔ Claude and OpenAI get the runtime WITH the web tools', () => {
-    expect(chat).toMatch(/callOpenAIResponses\(apiKey, modelId, instruction, messages, connectors, onDelta, base, /);
-    expect(chat).toMatch(/callClaude\(apiKey, modelId, instruction, messages, connectors, onDelta, base, /);
+    // SQEM-652 — `runtime` wraps `base` (web tools included) plus the connectors' functions.
+    expect(chat).toMatch(/callOpenAIResponses\(apiKey, modelId, instruction, messages, onDelta, runtime, /);
+    expect(chat).toMatch(/callClaude\(apiKey, modelId, instruction, messages, onDelta, runtime, /);
   });
 
   it('sends the sources with the result, never page content', () => {

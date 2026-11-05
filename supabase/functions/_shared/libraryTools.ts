@@ -20,6 +20,8 @@ import {
 import { LIBRARY_TOOL_DEFS, TOOL_CAPABILITY } from './libraryToolDefs.ts';
 import { describeChange, type LibraryChange } from './libraryChanges.ts';
 import { m, type Locale } from './locale.ts';
+import type { PersonaConnector } from './connectorService.ts';
+import { isTruncatedArgs, parseToolArgs } from './toolStream.ts';
 
 // ── Provider-neutral definitions ────────────────────────────────────────────
 
@@ -245,8 +247,8 @@ export interface ToolStats {
   byTool: Record<string, number>;
   /** Set when the cap stopped the loop — the user is told, rather than left with silence. */
   cappedAt: number | null;
-  /** Which cap fired. Logged so the two are told apart before either is tuned. */
-  cappedBy: 'rounds' | 'time' | null;
+  /** Which cap fired. Logged so they are told apart before any is tuned. SQEM-650: `loop` — a repeated call. */
+  cappedBy: 'rounds' | 'time' | 'loop' | null;
   /**
    * SQEM-375 — the provider refused the request BECAUSE tools were attached, and it was retried
    * without them.
@@ -256,6 +258,93 @@ export interface ToolStats {
    * has to be known before deciding whether `/v1/responses` is worth building.
    */
   toolsRefused: boolean;
+  /**
+   * SQEM-638 — connectors whose tools were taken out of the request because the provider refused the
+   * tool list; the library stayed. Named under the reply.
+   */
+  refusedConnectors: string[];
+  /** SQEM-637 — the provider's own reason for its last stop (`stopReasonOf`); logged, never acted on. */
+  stopReason: string | null;
+  /**
+   * SQEM-616 — calls not carried out because their arguments were cut off at the output limit
+   * (`isTruncatedArgs`), by tool. Logged, and the reply says so.
+   */
+  truncated: Record<string, number>;
+  /**
+   * SQEM-648 — rounds in which ONLY library lookups ran (`LIBRARY_LOOKUP_TOOLS`). Since SQEM-650 counted
+   * for the log only: the separate guard (8) and the work cap (6/4) gave way to loop detection and one
+   * emergency cap (`MAX_TOOL_ROUNDS`).
+   */
+  libraryRounds: number;
+  /**
+   * SQEM-648 — connector calls the PROVIDER ran itself (OpenAI `mcp_call`, Claude `mcp_tool_use`). They
+   * never pass through `execute`, so `byTool` cannot show them; without this a connector-free answer
+   * and a connector call that returned nothing looked the same in the log.
+   */
+  nativeConnectorCalls: number;
+  /**
+   * SQEM-652 — tokens the provider reported for this answer (Claude, OpenAI), summed over its rounds,
+   * for the log: the measurement "connectors through the provider vs through sqemes" rests on them.
+   */
+  inputTokens?: number;
+  outputTokens?: number;
+  /** SQEM-654 — the part of `inputTokens` the provider served from its prompt cache. */
+  cachedInputTokens?: number;
+  /** SQEM-654 — the part of `inputTokens` written into the cache (Claude only, billed at 1.25×). */
+  cacheWriteTokens?: number;
+  /**
+   * SQEM-649 — how often this answer was handed to a new invocation (`_shared/chatContinuation.ts`).
+   * Optional so a runtime built before 649 (and every test fixture) stays valid.
+   */
+  continuations?: number;
+  /**
+   * SQEM-650 — calls the model repeated with the same arguments (third time and later), by tool. The
+   * third gets the earlier result back with a note; the fourth ends the tool use (`cappedBy: 'loop'`).
+   */
+  repeated?: Record<string, number>;
+  /** SQEM-650 — set when a call came a fourth time; `advanceToolRound` then caps with `loop`. */
+  loopCall?: string | null;
+}
+
+/**
+ * SQEM-648 — the read-only library tools. A round made only of these is preparation, not work.
+ * ⚠️ Writes (`update_template`, …) are deliberately NOT here: a change counts as work.
+ */
+export const LIBRARY_LOOKUP_TOOLS: ReadonlySet<string> = new Set([
+  'search_templates', 'get_template', 'read_context_file', 'list_personas', 'get_persona',
+  // ⚠️ The chat actions (SQEM-561) add read-only tools of their own. The first version of this set
+  // missed these three; seven days of `[chat-tools]` showed `list_templates` and `list_files` in
+  // capped persona chains. A new read-only MCP tool belongs here too — the test lists them all.
+  'list_templates', 'list_files', 'download_skill',
+]);
+
+/**
+ * SQEM-650 — the emergency cap, for the whole answer across every invocation (SQEM-649).
+ *
+ * ⛔ Not a budget. Since an answer can go on for 10 minutes a round count no longer protects anything
+ * a person cares about — what does harm is a model REPEATING itself, and that is caught by name and
+ * arguments (`runToolCall`). This only catches a loop that varies its arguments. It replaced the
+ * guards of SQEM-648 (8 library rounds, 6 work rounds, 4 on credits): the Chief of Staff with „Alles“
+ * hit those on honest work, and with time no longer the end of a worker they had no reason left.
+ */
+export const MAX_TOOL_ROUNDS = 40;
+
+/** SQEM-650 — the same call this many times gets the earlier result and a note; one more ends tool use. */
+export const REPEAT_WARN_AT = 3;
+
+/**
+ * SQEM-648 — connector calls the provider ran itself: OpenAI Responses output items `mcp_call`,
+ * Claude content blocks `mcp_tool_use` (in a stream they arrive as `content_block_start.content_block`).
+ * Counting only; these are never executed here (see the `tool_use` filter in `_shared/toolStream.ts`).
+ */
+export function countNativeConnectorCalls(items: unknown): number {
+  if (!Array.isArray(items)) return 0;
+  return items.filter((i: any) => i?.type === 'mcp_call' || i?.type === 'mcp_tool_use').length;
+}
+
+/** SQEM-648 — true when every call of a round was a library lookup (an empty round is not one). */
+export function isLibraryOnlyRound(names: string[]): boolean {
+  return names.length > 0 && names.every(n => LIBRARY_LOOKUP_TOOLS.has(n));
 }
 
 export interface ToolRuntime {
@@ -269,6 +358,15 @@ export interface ToolRuntime {
    */
   maxRounds: number;
   /**
+   * SQEM-650 — how often each call (tool + arguments, `callKey`) was made in this answer, and the last
+   * result of each in THIS invocation. The counts travel with a hand-over (SQEM-649); the results do
+   * not — they are in the provider's own history already.
+   */
+  callCounts?: Record<string, number>;
+  lastResults?: Map<string, string>;
+  /** SQEM-648 — `stats.nativeConnectorCalls` at the end of the last round (bookkeeping for `advanceToolRound`). */
+  nativeCallsSeen?: number;
+  /**
    * ⛔ **The binding constraint is TIME, not rounds.** The client gives up at 180 s
    * (`CLIENT_JOB_TIMEOUT_MS.default`), and a single provider call may take 120 s. Six rounds of a
    * slow model would run past the client, which then shows a timeout while the worker is still busy
@@ -280,6 +378,25 @@ export interface ToolRuntime {
    * finishes, which is why the budget leaves headroom rather than filling the window.
    */
   deadline: number;
+  /**
+   * SQEM-637 — set by `advanceToolRound` when a cap fired: the next round is the LAST. The tools stay
+   * declared and calling them is forbidden in the provider's own words (Gemini `mode: NONE`, the others
+   * `tool_choice: none`); a call that comes anyway is not executed.
+   *
+   * ⛔ Until 2026-11-03 the last round sent no tools at all, with tool calls still in the history.
+   * Gemini answered that with nothing (a customer, 6 rounds, 14 calls, "No content generated").
+   */
+  final?: boolean;
+  /**
+   * SQEM-649 — asked when `deadline` passes: may the answer go on in a new invocation? Absent ⇒ no
+   * (the time cap as before). `chat-message` sets it from the chain's 10 minutes.
+   */
+  mayContinue?: () => boolean;
+  /**
+   * SQEM-649 — set by `advanceToolRound` instead of `final` when `mayContinue` said yes: the loop hands
+   * its state over (`ChatContinuation`) rather than starting another round in this worker.
+   */
+  handoff?: boolean;
   execute(name: string, args: Record<string, unknown>): Promise<string>;
   stats: ToolStats;
 }
@@ -304,11 +421,117 @@ function bound(text: string): string {
  * ⛔ Silence was the alternative and it is the wrong one: a model that stops mid-investigation
  * produces a confident answer built on half the material, and nothing in the reply says so.
  */
-export function toolCapNotice(rounds: number, reason: 'rounds' | 'time' = 'rounds', locale: Locale = 'en'): string {
+/**
+ * SQEM-616 — run one call the model made, unless its arguments were cut off.
+ *
+ * ⛔ A truncated call is NOT executed: `{}` would reach the tool and come back as "name is required",
+ * which the model reads as its own mistake and answers by sending the same oversized call again. The
+ * model is told what actually happened instead, so it can say so or split the work.
+ */
+export async function runToolCall(tools: ToolRuntime, call: { name: string; args: string }): Promise<string> {
+  if (isTruncatedArgs(call.args)) {
+    tools.stats.truncated[call.name] = (tools.stats.truncated[call.name] ?? 0) + 1;
+    return `Your call to ${call.name} was cut off at the output limit of one turn, so it was NOT carried out and nothing changed. `
+      + 'Its arguments were too long to write in one go. Do not send the same content again in one call — tell the user plainly '
+      + 'that the content was too large to write in one step, and offer a smaller change if one would do.';
+  }
+  // SQEM-650 — the same call with the same arguments, again and again, is the loop worth stopping.
+  const key = callKey(call.name, call.args);
+  const counts = (tools.callCounts ??= {});
+  const n = (counts[key] ?? 0) + 1;
+  counts[key] = n;
+  const earlier = tools.lastResults?.get(key);
+  if (n >= REPEAT_WARN_AT) {
+    const repeated = (tools.stats.repeated ??= {});
+    repeated[call.name] = (repeated[call.name] ?? 0) + 1;
+    if (n > REPEAT_WARN_AT) tools.stats.loopCall = call.name; // `advanceToolRound` makes the next round the last
+    const note = n > REPEAT_WARN_AT
+      ? `You have now called ${call.name} with exactly these arguments ${n} times. It was NOT run again, and no further tool calls are possible for this answer. Answer from what you have.`
+      : `You already called ${call.name} with exactly these arguments ${n - 1} times. It was not run again; the earlier result follows. Do not repeat it — use the result, try something different, or answer.`;
+    if (earlier !== undefined) return `${note}\n\n${earlier}`;
+    if (n > REPEAT_WARN_AT) return note;
+    // The earlier result is from an earlier invocation (SQEM-649): run it once more, with the note.
+  }
+  const result = await tools.execute(call.name, parseToolArgs(call.args));
+  (tools.lastResults ??= new Map()).set(key, result);
+  return n >= REPEAT_WARN_AT ? `You already called ${call.name} with exactly these arguments ${n - 1} times. Do not repeat it again.\n\n${result}` : result;
+}
+
+/**
+ * SQEM-650 — what makes two calls "the same": the tool and its arguments, with object keys sorted so
+ * `{a,b}` and `{b,a}` match. Arguments that do not parse are compared as written.
+ */
+export function callKey(name: string, args: string): string {
+  const sort = (v: unknown): unknown => Array.isArray(v) ? v.map(sort)
+    : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v as object).sort().map(k => [k, sort((v as any)[k])])) : v;
+  let canonical = args;
+  try { canonical = JSON.stringify(sort(JSON.parse(args || '{}'))); } catch { /* as written */ }
+  return `${name}\u0000${canonical}`;
+}
+
+/** SQEM-616 — the line under a reply in which a call was cut off; empty when none was. */
+export function truncatedNotice(stats: ToolStats, locale: Locale = 'en'): string {
+  const names = Object.keys(stats.truncated);
+  if (!names.length) return '';
+  return `\n\n---\n_${m.chat_tool_truncated({ tools: names.join(', ') }, { locale })}_`;
+}
+
+/** SQEM-638 — a connector's tools carry `mcp<i>__` (see `connectorFunctionName`); the library's never do. */
+const CONNECTOR_TOOL = /^mcp\d+__/;
+
+/**
+ * SQEM-638 — the next attempt after a provider refused the tool list (`toolsWereRefused`).
+ *
+ * ⛔ **Connectors go first, the library last.** Until 2026-11-03 a refusal dropped EVERY tool: one
+ * connector with a schema Gemini does not accept (an empty enum value in declaration 244 of ~250) cost
+ * the person their playbooks, personas and files as well, five times in a row, without a word. The
+ * connectors' tools are the ones that come from outside and the likely cause; the library's own are
+ * written by us. So: retry without the connector tools; refused again, retry without any (the old
+ * behaviour). Bounded — the second refusal finds no connector tools left and returns null.
+ */
+export function afterToolsRefused(tools: ToolRuntime): ToolRuntime | null {
+  const kept = tools.definitions.filter(d => !CONNECTOR_TOOL.test(d.name));
+  if (kept.length > 0 && kept.length < tools.definitions.length) {
+    const names = new Set<string>();
+    for (const d of tools.definitions) {
+      if (!CONNECTOR_TOOL.test(d.name)) continue;
+      const label = /^\[([^\]]+)\]/.exec(d.description)?.[1]; // `[Display name] …`, see loadConnectorTools
+      if (label) names.add(label);
+    }
+    tools.stats.refusedConnectors = [...names];
+    return { ...tools, definitions: kept };
+  }
+  tools.stats.toolsRefused = true;
+  return null;
+}
+
+/**
+ * SQEM-638 — the line under a reply that had to do without tools. Until then the loss was only logged,
+ * and an answer without the library reads exactly like an answer from a library that has nothing.
+ */
+export function toolsRefusedNotice(stats: ToolStats, locale: Locale = 'en'): string {
+  if (stats.toolsRefused) return `\n\n---\n_${m.chat_tools_refused_all({}, { locale })}_`;
+  if (stats.refusedConnectors.length) {
+    return `\n\n---\n_${m.chat_tools_refused_connectors({ list: stats.refusedConnectors.join(', ') }, { locale })}_`;
+  }
+  return '';
+}
+
+/**
+ * SQEM-637 — what an empty answer says. After a cap the model had material and wrote nothing, which is
+ * not the same as "no content": the person can narrow the request or switch the model.
+ */
+export function noAnswerText(stats: ToolStats | null | undefined, locale: Locale = 'en'): string {
+  return stats?.cappedAt ? m.chat_tool_cap_empty({}, { locale }) : m.chat_no_content({}, { locale });
+}
+
+export function toolCapNotice(rounds: number, reason: 'rounds' | 'time' | 'loop' = 'rounds', locale: Locale = 'en'): string {
   // SQEM-595 — the tools are no longer only library lookups. SQEM-599 — the first server text in two languages.
   const text = reason === 'time'
     ? m.chat_tool_cap_time({}, { locale })
-    : m.chat_tool_cap_rounds({ rounds }, { locale });
+    : reason === 'loop'
+      ? m.chat_tool_cap_loop({}, { locale }) // SQEM-650
+      : m.chat_tool_cap_rounds({ rounds }, { locale });
   return `\n\n---\n_${text}_`;
 }
 
@@ -341,7 +564,7 @@ export function toolsWereRefused(status: number, body: string): boolean {
 
 export function createLibraryToolRuntime(
   getReader: () => Promise<LibraryReader>,
-  { maxRounds = 6, budgetMs = 90_000, now = () => Date.now(), onTemplateLoaded, actions, onChange }:
+  { maxRounds = MAX_TOOL_ROUNDS, budgetMs = 90_000, now = () => Date.now(), onTemplateLoaded, actions, onChange, onPersonaLoaded }:
     {
       maxRounds?: number; budgetMs?: number; now?: () => number;
       /** SQEM-517 — told after a playbook was loaded, so the caller can count it. Never awaited. */
@@ -350,9 +573,14 @@ export function createLibraryToolRuntime(
       actions?: ChatActions;
       /** SQEM-561 — told after every successful change, for the card under the answer. */
       onChange?: (change: LibraryChange) => void;
+      /**
+       * SQEM-651 — a persona was loaded: Chat fetches its connector services. The text it returns is
+       * added to the persona, so the model knows what it now has and what is missing.
+       */
+      onPersonaLoaded?: (connectors: PersonaConnector[]) => Promise<string>;
     } = {},
 ): ToolRuntime {
-  const stats: ToolStats = { rounds: 0, calls: 0, byTool: {}, cappedAt: null, cappedBy: null, toolsRefused: false };
+  const stats: ToolStats = { rounds: 0, calls: 0, byTool: {}, cappedAt: null, cappedBy: null, toolsRefused: false, refusedConnectors: [], stopReason: null, truncated: {}, libraryRounds: 0, nativeConnectorCalls: 0 };
 
   let readerPromise: Promise<LibraryReader> | null = null;
   const reader = () => (readerPromise ??= getReader());
@@ -361,6 +589,8 @@ export function createLibraryToolRuntime(
   return {
     definitions: [...LIBRARY_TOOLS, ...(actions?.definitions ?? [])],
     maxRounds,
+    callCounts: {},
+    lastResults: new Map(),
     deadline: now() + budgetMs,
     stats,
 
@@ -416,11 +646,16 @@ export function createLibraryToolRuntime(
           case 'get_persona': {
             // Markdown, returned as-is: it is written to be read by the model, and wrapping it in
             // JSON would cost an escape pass for nothing.
-            const { text } = await lib.getPersona({
+            const { text, connectors } = await lib.getPersona({
               id: typeof args.id === 'string' ? args.id : undefined,
               name: typeof args.name === 'string' ? args.name : undefined,
             });
-            return bound(text);
+            // SQEM-651 — a failure to fetch never costs the persona.
+            let fetched = '';
+            if (onPersonaLoaded && connectors?.length) {
+              try { fetched = await onPersonaLoaded(connectors); } catch (e) { console.warn('[chat-connectors] persona fetch failed:', (e as Error)?.message); }
+            }
+            return bound(text + fetched);
           }
 
           default: {
@@ -456,4 +691,78 @@ export function createLibraryToolRuntime(
       }
     },
   };
+}
+
+/**
+ * SQEM-373 — count the round, and drop the tools once the cap is reached.
+ *
+ * ⛔ Returning `null` is what forces the next round to be an ANSWER: a model asked to stop calling
+ * tools while it can still see them calls one anyway. Taking them away is the only instruction it
+ * cannot ignore. `cappedAt` then puts a line in the reply, so the user is not left with a confident
+ * answer built on half the material and nothing saying so.
+ */
+export function advanceToolRound(tools: ToolRuntime, callNames: string[] = [], now: () => number = () => Date.now()): ToolRuntime | null {
+  tools.stats.rounds += 1;
+  // SQEM-648 — a round of pure library lookups is preparation; counted for the log since SQEM-650,
+  // which replaced its guard and the work cap with loop detection and `MAX_TOOL_ROUNDS`.
+  // A round in which the provider also ran a connector itself is work, whatever else it called.
+  const nativeInRound = tools.stats.nativeConnectorCalls > (tools.nativeCallsSeen ?? 0);
+  tools.nativeCallsSeen = tools.stats.nativeConnectorCalls;
+  const libraryOnly = !nativeInRound && isLibraryOnlyRound(callNames);
+  if (libraryOnly) tools.stats.libraryRounds += 1;
+  // SQEM-637 — a call returned in the last round is not executed, so there is no round after it.
+  if (tools.final) return null;
+  // SQEM-650 — a call repeated a fourth time (`runToolCall`): the next round answers —
+  // before the clock, so a loop is not handed to a new invocation first (SQEM-649).
+  if (tools.stats.loopCall) {
+    tools.stats.cappedAt = tools.stats.rounds;
+    tools.stats.cappedBy = 'loop';
+    return { ...tools, final: true };
+  }
+  // ⛔ Time first, because it is the constraint that actually bites: the client gives up at 180 s
+  // and shows a timeout while the worker is still working — and on a free-tier self-host the worker
+  // itself is killed at 150 s, broadcasting NOTHING. The round cap only guards a model that loops on
+  // cheap calls.
+  if (now() >= tools.deadline) {
+    // SQEM-649 — the worker's time is up, the chain's is not: the next round runs in a new invocation.
+    if (tools.mayContinue?.()) {
+      tools.stats.continuations = (tools.stats.continuations ?? 0) + 1;
+      return { ...tools, handoff: true };
+    }
+    tools.stats.cappedAt = tools.stats.rounds;
+    tools.stats.cappedBy = 'time';
+    return { ...tools, final: true }; // SQEM-637 — tools stay declared, calling them is forbidden
+  }
+  if (tools.stats.rounds < tools.maxRounds) return tools;
+  tools.stats.cappedAt = tools.stats.rounds;
+  tools.stats.cappedBy = 'rounds';
+  return { ...tools, final: true };
+}
+
+/**
+ * SQEM-649 — rebuild a runtime in the next invocation from the state the last one handed over.
+ *
+ * The counters come back as they were (so the round caps and the log count the WHOLE answer, not one
+ * invocation), and a refusal stays a refusal: tools the provider turned away earlier are not offered
+ * again (SQEM-638). `forceFinal` is the fallback when the hand-over itself failed — the next round is
+ * the answer, with the time notice.
+ */
+export function restoreToolRuntime(
+  runtime: ToolRuntime,
+  saved: { stats: Partial<ToolStats>; nativeCallsSeen?: number; callCounts?: Record<string, number> },
+  { forceFinal = false }: { forceFinal?: boolean } = {},
+): ToolRuntime | null {
+  Object.assign(runtime.stats, saved.stats);
+  runtime.nativeCallsSeen = saved.nativeCallsSeen ?? runtime.stats.nativeConnectorCalls;
+  if (saved.callCounts) runtime.callCounts = { ...saved.callCounts }; // SQEM-650 — repeats count across invocations
+  if (runtime.stats.toolsRefused) return null;
+  let restored: ToolRuntime = runtime.stats.refusedConnectors.length
+    ? { ...runtime, definitions: runtime.definitions.filter(d => !CONNECTOR_TOOL.test(d.name)) }
+    : runtime;
+  if (forceFinal) {
+    runtime.stats.cappedAt = runtime.stats.rounds;
+    runtime.stats.cappedBy = 'time';
+    restored = { ...restored, final: true };
+  }
+  return restored;
 }

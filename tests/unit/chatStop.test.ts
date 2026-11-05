@@ -72,7 +72,11 @@ describe('fetchWithTimeout and an outside signal', () => {
 describe('wiring', () => {
   const fn = read('supabase/functions/chat-message/index.ts');
   it('every text provider request carries the stop signal', () => {
-    expect([...fn.matchAll(/cancel\.signal[,)]/g)].length).toBe(9); // `,` since SQEM-594 passes webState after it // gemini, openai, claude, 4× compatible, + connector loading (SQEM-584), + the web tools (SQEM-594)
+    // gemini, openai, claude, the chat-completions call (one since SQEM-649, for four providers), the
+    // connector tools (SQEM-584), the web tools (SQEM-594, `,` — webState follows), the self-call (SQEM-649),
+    // and SQEM-651's fetched connectors: their tool list and the pool wrapper (one since SQEM-652, which
+    // routed Claude and OpenAI through sqemes too)
+    expect([...fn.matchAll(/cancel\.signal[,)]/g)].length).toBe(9);
     expect([...fn.matchAll(/^\s+signal,$/gm)].length).toBe(4);   // the four fetch sites
   });
   it('a stopped job broadcasts nothing and always ends its watch', () => {

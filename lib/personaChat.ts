@@ -15,7 +15,7 @@ import { composePersona, toSlug } from '../supabase/functions/_shared/libraryQue
  * The route's own denormalised title/kind fill in when the template is present but lacks a field.
  */
 export function personaInstruction(
-  persona: Pick<Persona, 'title' | 'description' | 'content' | 'routes'>,
+  persona: Pick<Persona, 'title' | 'description' | 'content' | 'routes'> & Partial<Pick<Persona, 'connectors'>>,
   templates: Pick<Prompt, 'id' | 'title' | 'kind' | 'description'>[],
 ): string {
   const byId = new Map(templates.map(t => [t.id, t]));
@@ -35,5 +35,8 @@ export function personaInstruction(
   return composePersona(
     { title: persona.title, description: persona.description, content: persona.content },
     routes,
+    // SQEM-641 — the same recommendation MCP gets: connected services are switched on for this chat, a
+    // missing one is something the model should say rather than answer around.
+    (persona.connectors ?? []).map(c => c.name),
   );
 }

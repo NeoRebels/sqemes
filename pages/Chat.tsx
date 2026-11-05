@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import { describeContextOverflow } from '../lib/aiErrors';
 import { getLocale, m as txt } from '../lib/i18n'; // SQEM-599 — the language of server notices; SQEM-604 — `txt`, because `m` is a common callback name in this file
 import { useUI, useWorkspace, useData, useChatSessions, usePrompts } from '../store';
 import { can } from '../lib/permissions';
@@ -6,7 +7,7 @@ import { checkContentViolation } from '../lib/contentGuard';
 import { IS_SELF_HOSTED, functionCallUrl } from '../lib/env';
 import { supabase } from '../lib/supabase';
 import { waitForJobResult } from '../lib/realtimeJob';
-import { clientJobTimeoutMs, clientHardCapMs } from '../supabase/functions/_shared/chatTimeouts.ts';
+import { clientJobTimeoutMs, clientHardCapMs, clientChainCapMs } from '../supabase/functions/_shared/chatTimeouts.ts';
 import { AVAILABLE_MODELS } from '../constants';
 import { buildEnabledModels, isFundedModel, isImageModel } from '../lib/enabledModels';
 import { authoringModelId } from '../lib/authoringAI';
@@ -46,8 +47,9 @@ import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import { uploadWorkspaceFile, getWorkspaceFileSignedUrl } from '../lib/api/files';
 import { fetchConnectors, type Connector } from '../lib/api/connectors';
+import { resolvePersonaConnectors } from '../supabase/functions/_shared/connectorService';
 import { WorkspaceFilePickerModal } from '../components/WorkspaceFilePickerModal';
-import type { ChatSession, Persona, PlaybookRef, Prompt, PromptKind, WorkspaceFile } from '../types';
+import type { ChatSession, Persona, PersonaConnector, PlaybookRef, Prompt, PromptKind, WorkspaceFile } from '../types';
 import { ModelSelect } from '../components/ModelSelect';
 import { PersonaSelect } from '../components/PersonaSelect';
 import TemplateLaunchModal, { type ContextImage } from '../components/TemplateLaunchModal';
@@ -163,6 +165,7 @@ interface ChatMsg {
   libraryChanges?: LibraryChange[];   // SQEM-561 — answer: what the model changed in the library
   webSources?: WebSources | null;     // SQEM-594 — answer: what it searched for and read
   generatedFiles?: GeneratedFile[];   // SQEM-595 — answer: files it handed out (built on download)
+  continuing?: boolean;               // SQEM-649 — answer: handed to a new invocation, still being worked on
 }
 
 // SQEM-185 — a memoized single message. Extracting this out of the Chat component means composer
@@ -187,6 +190,25 @@ interface MessageItemProps {
   libraryTitle: (c: LibraryChange) => string | undefined;
   /** SQEM-595 — open a generated file in the preview beside the chat (stable callback). */
   onOpenFile: (f: GeneratedFile) => void;
+}
+
+/**
+ * SQEM-641 — the persona works with a service this person has not connected. Said in the conversation
+ * with a way to connect it, never as an entry in the plug menu (2026-11-03: that list would only
+ * grow). The model is told the same through the persona text and says so in its answer.
+ */
+function PersonaConnectorNotice({ persona, services, onConnect }: { persona: string; services: string[]; onConnect: () => void }) {
+  return (
+    <div role="note" className="flex items-start gap-2.5 rounded-xl border border-line bg-surface-sunken px-3.5 py-3 text-sm text-ink">
+      <Plug className="w-4 h-4 mt-0.5 shrink-0 text-ink-subtle" />
+      <p className="min-w-0">
+        {txt.chat_persona_connectors_missing({ persona, list: services.join(', ') })}{' '}
+        <button type="button" onClick={onConnect} className="font-semibold text-accent hover:underline">
+          {txt.chat_persona_connectors_connect()}
+        </button>
+      </p>
+    </div>
+  );
 }
 
 const MessageItem = memo(function MessageItem({
@@ -272,6 +294,13 @@ const MessageItem = memo(function MessageItem({
                   <ReactMarkdown components={MarkdownComponents} remarkPlugins={[remarkGfm]} urlTransform={markdownUrlTransform}>{msg.content}</ReactMarkdown>
                 </div>
               )}
+              {/* SQEM-649 — a long task goes on in a new invocation; say so, or a pause in the stream reads as a hang. */}
+              {msg.continuing && (
+                <div className="flex items-center gap-2 mt-2 text-xs text-slate-400 dark:text-slate-500">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>{txt.chat_still_working()}</span>
+                </div>
+              )}
               {msg.model && !msg.pending && <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2 font-mono">{msg.model}</p>}
             </div>
             {!msg.pending && <UsedPlaybookChips used={usedPlaybooks(msg.loadedTemplateIds, playbookTitles)} />}
@@ -339,6 +368,7 @@ const Chat = () => {
   const location  = useLocation();
   const navigate  = useNavigate();
   const openProviderKeys = () => navigate('/settings', { state: { initialTab: PROVIDER_KEYS_TAB } });
+  const openConnectorSettings = () => navigate('/settings', { state: { initialTab: 'connectors' } }); // SQEM-641
   const { sessionId: routeSessionId } = useParams<{ sessionId?: string }>();
 
   // ── Conversation state ───────────────────────────────────────────────────
@@ -373,10 +403,18 @@ const Chat = () => {
   const [dragActive, setDragActive]           = useState(false);
   const [sessionId, setSessionId]             = useState<string | null>(null);
   const [attachMenuOpen, setAttachMenuOpen]   = useState(false);
-  // SQEM-149 — the workspace's connectors. ⭐ SQEM-436 removed the per-session SELECTION: a connector
-  // is set up in order to be there, and confirming it again before every conversation was a step that
-  // bought nothing. What is left is the list and a status indicator.
+  // SQEM-149 — the workspace's connectors.
   const [connectors, setConnectors]           = useState<Connector[]>([]);
+  // SQEM-635 — the connectors switched on for THIS session, stored on its row; none by default.
+  // ⚠️ This reverses SQEM-436 ("a connector is set up in order to be there"), knowingly: sending every
+  // connector with every message let the model call them for tasks that did not need them, and
+  // for one customer a single connector round pushed a request past Claude's 1M tokens (2026-10-29).
+  // Decided 2026-11-03: off for everyone, switched on for the session — not per message like web search,
+  // because a follow-up question usually builds on the last connector result. sqemes' own tools
+  // (library, files) are not connectors and are always on.
+  const [sessionConnectorIds, setSessionConnectorIds] = useState<string[]>([]);
+  // SQEM-641 — services of a persona just chosen, waiting for the connector list to resolve them.
+  const [pendingPersonaServices, setPendingPersonaServices] = useState<PersonaConnector[] | null>(null);
   // SQEM-594 — web search for the NEXT message only: off by default, and off
   // again the moment a message is sent. Search costs time and money, so it is a choice per question.
   const [webNext, setWebNext]                 = useState(false);
@@ -500,6 +538,9 @@ const Chat = () => {
   const applyPersona = useCallback((persona: Persona) => {
     setActivePersona(persona);
     setActiveSystemInstruction(personaInstruction(persona, prompts));
+    // SQEM-641 — the persona's services are switched on below, once the connectors are loaded (a
+    // persona applied from a card or a handoff can arrive before them).
+    if (persona.connectors?.length) setPendingPersonaServices(persona.connectors);
     if (sessionId) void updateAppliedContext(sessionId, { personaId: persona.id }).catch(() => {});
   }, [prompts, sessionId]);
 
@@ -617,12 +658,14 @@ const Chat = () => {
           setActivePersona(persona);
           setActiveSystemInstruction(persona ? personaInstruction(persona, prompts) : '');
           setActiveSkills(skills.map((template, i) => ({ template, context: skillCtxs[i].text })));
+          setSessionConnectorIds(applied.connectorIds); // SQEM-635 — set unconditionally, like the rest
         } catch {
           // A failed restore must not cost the conversation. Clear rather than keep the previous
           // session's context — wrong context is worse than none, and this is the leak's direction.
           setActivePersona(null);
           setActiveSystemInstruction('');
           setActiveSkills([]);
+          setSessionConnectorIds([]); // SQEM-635 — none in use; SQEM-651: the model fetches what it needs
         }
       } catch {
         // SQEM-287 — a dead end otherwise: the conversation list is right there, and starting a
@@ -737,6 +780,7 @@ const Chat = () => {
     setActivePersona(null); // SQEM-389
     setActiveSystemInstruction('');
     setActiveSkills([]);
+    setSessionConnectorIds([]); // SQEM-651 — a new chat uses no connector yet; the model fetches what it needs
     setSessionId(null);
     sessionLoadedRef.current = null;
     navigate('/chat', { replace: true });
@@ -820,7 +864,34 @@ const Chat = () => {
   }, [attachMenuOpen]);
 
   // SQEM-149 — load the workspace's connectors.
-  useEffect(() => { fetchConnectors(workspace.id).then(setConnectors).catch(() => {}); }, [workspace.id]);
+  const [connectorsLoaded, setConnectorsLoaded] = useState(false);
+  useEffect(() => {
+    fetchConnectors(workspace.id).then(setConnectors).catch(() => {}).finally(() => setConnectorsLoaded(true));
+  }, [workspace.id]);
+
+  /**
+   * SQEM-641 — choosing a persona switches ON, for this chat, each person's own connection to the
+   * persona's services (a shared one otherwise). Added, never removing what the person switched on
+   * themselves; a restored session keeps its own choice (this runs only after `applyPersona`).
+   */
+  useEffect(() => {
+    if (!pendingPersonaServices || !connectorsLoaded) return;
+    const { ids } = resolvePersonaConnectors(pendingPersonaServices, connectors, currentUser.id);
+    setPendingPersonaServices(null);
+    if (!ids.length) return;
+    const next = [...new Set([...sessionConnectorIds, ...ids])];
+    setSessionConnectorIds(next);
+    if (sessionId) void updateAppliedContext(sessionId, { connectorIds: next }).catch(() => {});
+  }, [pendingPersonaServices, connectorsLoaded, connectors, currentUser.id, sessionId, sessionConnectorIds]);
+
+  // SQEM-641 — services of the active persona this person has not connected; said in the chat with a
+  // link, not in the plug menu (that list would only grow).
+  const missingPersonaServices = useMemo(
+    () => (activePersona?.connectors?.length && connectorsLoaded
+      ? resolvePersonaConnectors(activePersona.connectors, connectors, currentUser.id).missing
+      : []),
+    [activePersona, connectors, connectorsLoaded, currentUser.id],
+  );
 
   /**
    * SQEM-436 — whether the MODEL currently chosen can reach connectors.
@@ -838,10 +909,15 @@ const Chat = () => {
     const m = AVAILABLE_MODELS.find(x => x.id === selectedModel) ?? enabledModels.find(x => x.id === selectedModel);
     return !!m && !isImageModel(m.id);
   }, [selectedModel, enabledModels]);
-  const activeConnectorIds = useMemo(
-    () => (connectorsSupported ? connectors.map(c => c.id) : []),
-    [connectorsSupported, connectors],
+  // SQEM-651 — the connectors this chat already uses (fetched by the model, or by a persona) ∩ still
+  // there (a deleted connector, or a colleague's personal one in a shared session, drops out) ∩ a model
+  // that can use them. Every other connector is offered to the model by name and fetched on demand;
+  // there are no switches any more (they were SQEM-635's answer to sending every connector each time).
+  const inUseConnectorIds = useMemo(
+    () => connectors.filter(c => sessionConnectorIds.includes(c.id)).map(c => c.id),
+    [connectors, sessionConnectorIds],
   );
+  const activeConnectorIds = connectorsSupported ? inUseConnectorIds : [];
   // SQEM-594 — web search needs a text model (same rule as connectors) and a search key: sqemes' own
   // on Cloud, or the workspace's (Linkup or Brave). Self-host without one: the button says where to add it.
   const webKeyAvailable = !!workspace.webSearchHosted || !!workspace.apiKeys.search_linkup || !!workspace.apiKeys.search_brave;
@@ -1019,6 +1095,7 @@ const Chat = () => {
           // and then quietly disappear — the exact failure this ticket exists to remove.
           activeSkills.map(sk => sk.template.id),
           activePersona?.id, // SQEM-389 — same reason as the skills: applied before the row existed
+          sessionConnectorIds, // SQEM-635 — likewise
         );
         activeSessionId = newSession.id;
         sessionLoadedRef.current = activeSessionId; // prevent fetch from overwriting optimistic messages
@@ -1093,6 +1170,7 @@ const Chat = () => {
       let libraryChanges: LibraryChange[] = []; // SQEM-561
       let webSources: WebSources | null = null; // SQEM-594
       let generatedFiles: GeneratedFile[] = []; // SQEM-595
+      let carriedConnectorIds: string[] | null = null; // SQEM-651
       const resultPromise = waitForJobResult(jobId, controller.signal, (textSoFar) => {
         streamedTextRef.current = textSoFar;
         setMessages(prev => prev.map(m => (
@@ -1105,7 +1183,11 @@ const Chat = () => {
         libraryChanges = normalizeLibraryChanges(meta.libraryChanges);
         webSources = normalizeWebSources(meta.webSources);
         generatedFiles = normalizeGeneratedFiles(meta.generatedFiles);
-      }, clientHardCapMs({ selfHosted: IS_SELF_HOSTED })); // SQEM-582 — deltas may extend up to this
+        carriedConnectorIds = Array.isArray(meta.connectorIds) ? meta.connectorIds.filter((x): x is string => typeof x === 'string') : null;
+      }, clientHardCapMs({ selfHosted: IS_SELF_HOSTED }), // SQEM-582 — deltas may extend up to this
+      // SQEM-649 — after a hand-over the wait may run to the chain's end; the bubble says it is still working.
+      clientChainCapMs({ selfHosted: IS_SELF_HOSTED }),
+      () => setMessages(prev => prev.map(m => (m.id === assistantMsgId ? { ...m, continuing: true } : m))));
 
       const res = await fetch(functionCallUrl('chat-message'), {
         method: 'POST',
@@ -1128,7 +1210,14 @@ const Chat = () => {
       } else {
         // Text model — wait for Realtime broadcast
         rawResult = await resultPromise;
-        setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: inlineImagesToBlobUrls(rawResult), pending: false, loadedTemplateIds, libraryChanges, webSources, generatedFiles } : m));
+        setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: inlineImagesToBlobUrls(rawResult), pending: false, continuing: false, loadedTemplateIds, libraryChanges, webSources, generatedFiles } : m));
+        // SQEM-651 — a connector the model fetched stays for this chat, so the next message does not
+        // fetch it again. Stored on the session of THIS message, shown only if it is still the open one.
+        if (carriedConnectorIds?.length && activeSessionId) {
+          const next = [...new Set([...sessionConnectorIds, ...carriedConnectorIds])];
+          if (sessionLoadedRef.current === activeSessionId) setSessionConnectorIds(next);
+          void updateAppliedContext(activeSessionId, { connectorIds: next }).catch(() => {});
+        }
         // SQEM-561 — playbooks arrive through the store's realtime channel; personas and files do not,
         // so the lists the card and the pickers read from are fetched again when either changed.
         if (libraryChanges.some(c => c.kind === 'persona')) {
@@ -1150,9 +1239,9 @@ const Chat = () => {
         // SQEM-583 — stopped on purpose: keep what was written, say that it ends here, and store it.
         const content = stoppedContent(streamedTextRef.current);
         const { assistantMsgId } = started;
-        setMessages(prev => prev.map(m => (m.id === assistantMsgId ? { ...m, content, pending: false } : m)));
+        setMessages(prev => prev.map(m => (m.id === assistantMsgId ? { ...m, content, pending: false, continuing: false } : m)));
         if (activeSessionId) addChatMessage(activeSessionId, 'assistant', content, selectedModel, undefined, assistantMsgId).catch(() => {});
-      } else if (err.name !== 'AbortError') { setError(err.message); setErrorCode(err.code ?? null); }
+      } else if (err.name !== 'AbortError') { setError(describeContextOverflow(err) ?? err.message); setErrorCode(err.code ?? null); } // SQEM-634
     } finally {
       if (started && runningJobRef.current?.jobId === started.jobId) runningJobRef.current = null;
       setIsLoading(false);
@@ -1611,6 +1700,11 @@ const Chat = () => {
                     <Key className="w-4 h-4" /> {keyHint.actionLabel}
                   </Button>
                 )}
+                {missingPersonaServices.length > 0 && activePersona && (
+                  <div className="mt-6 w-full max-w-md text-left">
+                    <PersonaConnectorNotice persona={activePersona.title} services={missingPersonaServices.map(c => c.name)} onConnect={openConnectorSettings} />
+                  </div>
+                )}
               </div>
             ) : (
               <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
@@ -1635,6 +1729,9 @@ const Chat = () => {
                   />
                 ))}
 
+                {missingPersonaServices.length > 0 && activePersona && (
+                  <PersonaConnectorNotice persona={activePersona.title} services={missingPersonaServices.map(c => c.name)} onConnect={openConnectorSettings} />
+                )}
                 <div ref={messagesEndRef} />
               </div>
             )}
@@ -1719,7 +1816,11 @@ const Chat = () => {
                         <Paperclip className="w-4 h-4" />
                       </button>
                       {attachMenuOpen && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 mb-2 w-64 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-xl z-30 p-1.5 animate-scale-up">
+                        // SQEM-636 — two elements, like the connectors menu below: on one element the
+                        // `animate-scale-up` transform overrode `-translate-x-1/2` and the menu ran 37 px
+                        // off a 390 px screen (measured). Position outside, animate inside.
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 mb-2 w-64 z-30">
+                        <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-xl p-1.5 animate-scale-up">
                           <button
                             onClick={() => { setAttachMenuOpen(false); setWorkspacePickerOpen(true); }}
                             className="w-full text-left px-3 py-2 flex items-center gap-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
@@ -1743,6 +1844,7 @@ const Chat = () => {
                             <span className="text-xs text-slate-600 dark:text-slate-400">{txt.chat_save_uploads()}</span>
                           </label>
                         </div>
+                        </div>
                       )}
                     </div>
                     <button
@@ -1753,37 +1855,9 @@ const Chat = () => {
                     >
                       <FileText className="w-4 h-4" />
                     </button>
-                    {/* SQEM-436 — a STATUS, not a menu. The connectors are always sent; this says
-                        whether the chosen model can use them. Shown whenever the workspace has any.
-                        SQEM-584 — every text model can; only an image model shows "inactive". */}
-                    {connectors.length > 0 && (
-                      <div className="relative shrink-0 group">
-                        <div
-                          role="status"
-                          aria-label={connectorsSupported
-                            ? txt.chat_connectors_active()
-                            : txt.chat_connectors_inactive_label()}
-                          className={`p-3 rounded-control transition-all ${connectorsSupported
-                            ? 'text-success bg-success-soft'
-                            : 'text-danger bg-danger-soft'}`}
-                        >
-                          <Plug className="w-4 h-4" />
-                        </div>
-                        <div
-                          role="tooltip"
-                          className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[15rem] px-3 py-2 bg-surface-raised border border-line rounded-control shadow-xl z-30 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          {connectorsSupported ? (
-                            <p className="text-2xs font-bold text-success">{txt.chat_connectors_active()}</p>
-                          ) : (
-                            <>
-                              <p className="text-2xs font-bold text-danger">{txt.chat_connectors_inactive()}</p>
-                              <p className="text-2xs text-ink-muted mt-0.5">{txt.chat_connectors_image_models()}</p>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                    {/* SQEM-651 — no plug icon any more (2026-11-04): it switched nothing since the model
+                        fetches connectors itself, and what it showed is said elsewhere — the line under an answer
+                        names a connector the chat fetched, Settings → Connectors lists what is connected. */}
                   </div>
                   <div className="flex items-center gap-3 order-1 md:order-2 flex-1 min-w-0">
                     <div className="flex-1 relative">

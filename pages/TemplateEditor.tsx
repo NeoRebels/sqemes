@@ -89,6 +89,9 @@ const TemplateEditor = () => {
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const [mobileTab, setMobileTab] = useState<'editor' | 'settings' | 'test'>('editor');
+  // SQEM-633 — as in the persona editor: a save without a title leads into the field.
+  const titleRef = useRef<HTMLInputElement>(null);
+  const [titleMissing, setTitleMissing] = useState(false);
 
   const [draggedVarId, setDraggedVarId] = useState<string | null>(null);
   const [dragOverVarId, setDragOverVarId] = useState<string | null>(null);
@@ -239,6 +242,9 @@ const TemplateEditor = () => {
   const handleSave = async () => {
     if (!formData.title.trim()) {
       showToast(txt.ed_title_required(), 'error');
+      setTitleMissing(true);
+      setMobileTab('editor');
+      requestAnimationFrame(() => titleRef.current?.focus());
       return;
     }
     const saveData = formData;
@@ -801,7 +807,7 @@ const TemplateEditor = () => {
                 /* SQEM-292 — the "create your first group" link is only offered to admins: RLS
                    rejects the write from anyone else, and a button that fails is worse than its
                    absence. Editors get the reason instead. */
-                onCreateGroup={currentUser?.role === 'admin' ? () => navigate('/settings', { state: { initialTab: 'security' } }) : undefined}
+                onCreateGroup={currentUser?.role === 'admin' ? () => navigate('/settings', { state: { initialTab: 'team' } }) : undefined}
                 allowPrivate
                 /* SQEM-314 — offer "Restrict access" on a multi-seat plan even while nobody else has
                    joined yet; that absence is a matter of time, not a reason to withhold it. */
@@ -992,10 +998,13 @@ const TemplateEditor = () => {
               {formData.tag && <span className="text-2xs font-bold uppercase tracking-wider px-2 py-1 rounded-chip bg-surface-sunken text-ink-muted">{formData.tag}</span>}
             </div>
             <label htmlFor="template-editor-title" className="sr-only">{txt.ed_title_label()}</label>
+            {/* SQEM-633 — the same underline as the persona name: visible while empty or focused. */}
             <input id="template-editor-title"
-              className="w-full bg-transparent font-display text-2xl md:text-3xl font-semibold tracking-tight text-ink-strong outline-none placeholder:text-ink-subtle"
+              ref={titleRef}
+              aria-invalid={titleMissing || undefined}
+              className="w-full bg-transparent font-display text-2xl md:text-3xl font-semibold tracking-tight text-ink-strong outline-none placeholder:text-ink-subtle border-b-2 border-dashed border-transparent placeholder-shown:border-line-strong focus:border-line-strong aria-[invalid=true]:border-danger"
               value={formData.title}
-              onChange={e => { setFormData(prev => ({ ...prev, title: e.target.value })); setIsDirty(true); }}
+              onChange={e => { setFormData(prev => ({ ...prev, title: e.target.value })); setIsDirty(true); if (e.target.value.trim()) setTitleMissing(false); }}
               placeholder={txt.ed_untitled()}
               readOnly={!canEdit}
             />

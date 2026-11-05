@@ -27,3 +27,8 @@ export function tileText(text: string | undefined): string {
 export function appLogoForMcpUrl(_url: string, _className: string): ReactElement | null {
   return null;
 }
+
+/** SQEM-642 — likewise for a persona's connector service key. */
+export function appLogoForServiceKey(_key: string, _className: string): ReactElement | null {
+  return null;
+}

@@ -1,4 +1,5 @@
 import { m as txt } from './i18n'; // `m` is a local name in parse()
+import { CONTEXT_OVERFLOW } from '../supabase/functions/_shared/chatErrorKind.ts';
 // SQEM-310 — turning a provider's error into something a person can act on.
 //
 // The chain that produces these: `execute-step` throws `` `Gemini API error (503): ${body}` ``,
@@ -73,6 +74,11 @@ function parse(message: string): { provider: string; status: number; detail: str
   const m = message.match(/^(.*?)\s*API error \((\d{3})\):\s*([\s\S]*)$/);
   if (!m) return null;
   const [, rawProvider, rawStatus, body] = m;
+  return { ...split(rawProvider, body), status: Number(rawStatus) };
+}
+
+/** Provider name and the provider's own sentence, from the parts either error shape carries. */
+function split(rawProvider: string, body: string): { provider: string; detail: string } {
   const provider = rawProvider.trim() || txt.aierr_provider_fallback();
   // The body is usually JSON with the readable sentence nested somewhere. Reach for it, and fall
   // back to the raw body — a long line is still better than dropping what they told us.
@@ -82,7 +88,30 @@ function parse(message: string): { provider: string; status: number; detail: str
     const found = parsed?.error?.message ?? parsed?.message ?? parsed?.error?.[0]?.message;
     if (typeof found === 'string' && found.trim()) detail = found.trim();
   } catch { /* not JSON — keep the raw body */ }
-  return { provider, status: Number(rawStatus), detail };
+  return { provider, detail };
+}
+
+/**
+ * SQEM-634 — the request did not fit the model's context window.
+ *
+ * A customer, 29.10.: `Claude API error (400): … prompt is too long: 1012345 tokens > 1000000 maximum` and
+ * `OpenAI API error (stream): Your input exceeds the context window of this model`. ⚠️ **Not the chat
+ * history** — the client sends at most 480,000 characters of it (`pages/Chat.tsx`). The tokens pile up
+ * INSIDE one request, from connector results that Anthropic and OpenAI fetch themselves and that we
+ * cannot bound. So the next step names the connector switch (SQEM-635) first, and a new chat last.
+ *
+ * Matched on the provider's wording, not the status: the OpenAI stream error carries no status at all,
+ * and a 400 means a hundred other things. Only these exact phrases — a wrong match would send someone
+ * switching off connectors for an unrelated fault. The provider's sentence stays quoted either way.
+ */
+// SQEM-653 — the expression lives with the server's error kinds, so both sides match the same wording.
+
+export function describeContextOverflow(err: unknown): string | null {
+  const raw = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
+  if (!raw || !CONTEXT_OVERFLOW.test(raw)) return null;
+  const m = raw.match(/^(.*?)\s*API error \(([^)]*)\):\s*([\s\S]*)$/);
+  const { provider, detail } = m ? split(m[1], m[3]) : { provider: txt.aierr_provider_fallback(), detail: raw.trim() };
+  return `${txt.aierr_too_large({ provider })}${txt.aierr_quoted({ detail })} ${txt.aierr_too_large_next()}`;
 }
 
 /**

@@ -65,24 +65,8 @@ export function toResponsesInput(messages: ChatLikeMessage[], decodeText: TextDe
   });
 }
 
-/**
- * Remote MCP connectors, unchanged from SQEM-149.
- *
- * ⭐ These now sit in the **same** `tools` array as our own function tools. On chat completions the
- * two could not coexist — one field, two writers — which is why SQEM-373 withheld library tools
- * whenever a connector was active. On Responses that restriction simply has no cause any more:
- * OpenAI executes the `mcp` entries itself and hands the `function` ones back to us.
- */
-export function connectorResponsesTools(
-  connectors: { url: string; name: string; token: string | null; allowedTools: string[] | null }[],
-): any[] {
-  return connectors.map(c => {
-    const t: any = { type: 'mcp', server_label: c.name, server_url: c.url, require_approval: 'never' };
-    if (c.token) t.authorization = c.token;
-    if (c.allowedTools) t.allowed_tools = c.allowedTools;
-    return t;
-  });
-}
+// SQEM-652 — `connectorResponsesTools` (the `tools[type:mcp]` entries) is gone: connectors reach
+// OpenAI as ordinary functions now and run through sqemes, so their results are bounded.
 
 // ── Reading a response ──────────────────────────────────────────────────────
 

@@ -70,7 +70,9 @@ describe('mcp-server wiring', () => {
     expect(handedOut.length).toBeGreaterThanOrEqual(2);
     for (const u of handedOut) expect(u, u).toMatch(/onPublicHost\(/);
     const upload = MCP.slice(MCP.indexOf("toolName === 'create_upload_url'"), MCP.indexOf("toolName === 'finalize_upload'"));
-    expect(upload).toMatch(/uploadUrl:\s+onPublicHost\(signed\.signedUrl, Deno\.env\.get\('PUBLIC_API_URL'\) \?\? null\)/);
+    // SQEM-622 — computed once (it also feeds the sandbox hint), then handed out as `uploadUrl`.
+    expect(upload).toMatch(/const uploadUrl\s*=\s*onPublicHost\(signed\.signedUrl, Deno\.env\.get\('PUBLIC_API_URL'\) \?\? null\)/);
+    expect(upload).toMatch(/^\s+uploadUrl,$/m);
   });
 
   it('download_skill reads through the library (access rules), and get_template still carries no links', () => {

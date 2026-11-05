@@ -26,3 +26,11 @@ export function collectWorkspaceTags(
   }
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
+
+// SQEM-647 — what the bulk bar offers to SET: the workspace tag registry (`workspace.tags`, managed in
+// Settings → Tags and extended by the editors) plus every tag in use. The registry alone is not enough:
+// older tags can hang on entries without being in it. The filter keeps `collectWorkspaceTags` — a tag
+// nobody uses always filters to an empty list.
+export function withRegistry(inUse: string[], registry: string[] = []): string[] {
+  return Array.from(new Set([...inUse, ...registry])).sort((a, b) => a.localeCompare(b));
+}

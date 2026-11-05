@@ -34,17 +34,25 @@ export function waitForJobResult(
    * `loadedTemplateIds`, and since SQEM-561 `libraryChanges`). Unvalidated — the caller normalizes.
    * Other callers leave it out.
    */
-  onResultMeta?: (meta: { loadedTemplateIds?: unknown; libraryChanges?: unknown; webSources?: unknown; generatedFiles?: unknown }) => void,
+  onResultMeta?: (meta: { loadedTemplateIds?: unknown; libraryChanges?: unknown; webSources?: unknown; generatedFiles?: unknown; connectorIds?: unknown }) => void,
   /**
    * SQEM-582 — how far deltas may push the deadline (from the start). Defaults to `timeoutMs`, i.e.
    * deltas extend nothing — callers that do not stream keep the old behaviour exactly.
    */
   hardCapMs: number = timeoutMs,
+  /**
+   * SQEM-649 — the cap once the server said the answer goes on in a new invocation (`continued`).
+   * Defaults to `hardCapMs`: a caller that does not pass it keeps its old limit exactly.
+   */
+  chainCapMs: number = hardCapMs,
+  /** SQEM-649 — told on every `continued`, so the page can say the answer is still being worked on. */
+  onContinued?: () => void,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const channel = supabase.channel(`job:${jobId}`);
     const startedAt = Date.now();
     let deadline = startedAt + timeoutMs;
+    let cap = hardCapMs;
     let timeout: ReturnType<typeof setTimeout>;
     const arm = () => {
       clearTimeout(timeout);
@@ -62,18 +70,26 @@ export function waitForJobResult(
         // stalls still ends — a minute after its last delta at most — which is what the old rule
         // ("deltas never touch the timeout") protected: a wedged provider must not hold the UI open.
         if (typeof payload.delta === 'string') {
-          const next = nextJobDeadline(deadline, Date.now(), startedAt, hardCapMs);
+          const next = nextJobDeadline(deadline, Date.now(), startedAt, cap);
           if (next !== deadline) { deadline = next; arm(); }
           onDelta?.(payload.delta);
         }
       })
-      .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string; loadedTemplateIds?: unknown; libraryChanges?: unknown; webSources?: unknown; generatedFiles?: unknown } }) => {
+      // SQEM-649 — a new invocation took the answer over: it gets a full wait of its own, up to the chain cap.
+      .on('broadcast', { event: 'continued' }, () => {
+        cap = Math.max(cap, chainCapMs);
+        deadline = Math.min(Math.max(deadline, Date.now() + timeoutMs), startedAt + cap);
+        arm();
+        onContinued?.();
+      })
+      .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string; loadedTemplateIds?: unknown; libraryChanges?: unknown; webSources?: unknown; generatedFiles?: unknown; connectorIds?: unknown } }) => {
         clearTimeout(timeout);
         supabase.removeChannel(channel);
         if (payload.error) {
           reject(new Error(payload.error));
         } else {
-          onResultMeta?.({ loadedTemplateIds: payload.loadedTemplateIds, libraryChanges: payload.libraryChanges, webSources: payload.webSources, generatedFiles: payload.generatedFiles });
+          // SQEM-651 — `connectorIds`: the connectors the session carries on with (fetched by the model).
+          onResultMeta?.({ loadedTemplateIds: payload.loadedTemplateIds, libraryChanges: payload.libraryChanges, webSources: payload.webSources, generatedFiles: payload.generatedFiles, connectorIds: payload.connectorIds });
           resolve(payload.result ?? '');
         }
       })

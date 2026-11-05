@@ -40,9 +40,9 @@ describe('SQEM-446 — connector mark in the model list', () => {
     expect(block).not.toMatch(/text-red-/);
   });
 
-  it('the mark sits before the info icon and is the same symbol as the composer', () => {
+  it('the mark sits before the info icon (the composer has no connector icon since SQEM-651)', () => {
     expect(SELECT.indexOf('connectorProviders?.includes')).toBeLessThan(SELECT.indexOf('{m.specs && ('));
     expect(SELECT).toMatch(/import \{ ChevronDown, Info, Plug \} from 'lucide-react'/);
-    expect(CHAT).toMatch(/<Plug className="w-4 h-4" \/>/);
+    expect(CHAT).not.toMatch(/<Plug className="w-4 h-4" \/>/);
   });
 });

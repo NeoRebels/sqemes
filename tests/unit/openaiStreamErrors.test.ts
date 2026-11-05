@@ -53,7 +53,8 @@ describe('the round state, from a non-streamed body', () => {
 describe('wiring in chat-message', () => {
   const fn = readFileSync(resolve(__dirname, '../../supabase/functions/chat-message/index.ts'), 'utf8');
   it('the watcher reads the same chunks as the collector, and a problem is thrown before the answer is used', () => {
-    expect(fn).toMatch(/\(chunk\) => \{ collector\.onChunk\(chunk\); watcher\.onChunk\(chunk\); \}/);
+    // SQEM-652 — the same callback also counts the round's tokens for the log.
+    expect(fn).toMatch(/\(chunk\) => \{ collector\.onChunk\(chunk\); watcher\.onChunk\(chunk\); addUsage\(tools\?\.stats, responsesUsage\(chunk\)\); \}/);
     expect(fn).toMatch(/round = responsesBodyState\(data\);/);
     expect(fn.indexOf('const problem = responsesRoundProblem(round, text);')).toBeLessThan(fn.indexOf('    answer += text;\n\n    const toolCalls = activeTools ? readResponsesToolCalls(items)'));
     expect(fn).toMatch(/if \(problem\) \{[\s\S]{0,200}throw new Error\(problem\);/);

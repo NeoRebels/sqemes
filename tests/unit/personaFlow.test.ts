@@ -16,14 +16,24 @@ describe('SQEM-550 (d) — the persona as a flow', () => {
   it('each route: an "If" box with the condition, a connector, a "Load" box with the playbook', () => {
     expect(flow).toMatch(/htmlFor=\{`persona-route-condition-\$\{route\.templateId\}`\}[^>]*>\s*\{m\.ppv_if\(\)\}\s*<\/label>/);
     expect([en.ppv_if, en.pe_load]).toEqual(['If', 'Load']); // SQEM-605 — the words live in messages/
-    expect(flow).toMatch(/id=\{`persona-route-condition-\$\{route\.templateId\}`\}\s+value=\{route\.condition\}/);
+    expect(flow).toMatch(/<Textarea\s+id=\{`persona-route-condition-\$\{route\.templateId\}`\}\s+value=\{route\.condition\}/);
     expect(flow).toMatch(/<div aria-hidden className="ml-6 h-3 border-l-2 border-accent" \/>/);
     expect(flow).toMatch(/>\{m\.pe_load\(\)\}<\/span>/);
     expect(flow.indexOf('{m.ppv_if()}')).toBeLessThan(flow.indexOf('{m.pe_load()}'));
   });
 
+  // SQEM-617 — the condition is a text area that grows with its content, and nothing is draggable:
+  // pressing on a condition started a drag, and the order carries no weight. Move up / down stay.
+  it('SQEM-617 — the condition grows to fit, and the route card is not draggable', () => {
+    expect(flow).toMatch(/ref=\{growToFit\}/);
+    expect(flow).toMatch(/growToFit\(e\.target\)/);
+    // A hidden rail (below xl) measures 0 — the field waits until it is shown (found at 390 px).
+    expect(src).toMatch(/if \(el\.offsetParent !== null\) \{ fit\(\); return; \}/);
+    expect(src).toMatch(/new ResizeObserver\(/);
+    expect(src).not.toMatch(/draggable=|onDragStart=|onDrop=|<GripVertical/);
+  });
+
   it('⛔ ordering, removal, Write and the fallback note all survived', () => {
-    expect(flow).toMatch(/draggable=\{canEdit\}/);
     expect(flow).toMatch(/onMove=\{to => moveRoute\(i, to\)\}/);
     expect(flow).toMatch(/onClick=\{\(\) => removeRoute\(route\.templateId\)\}/);
     expect(flow).toMatch(/onClick=\{\(\) => handleGenerateCondition\(route\)\}/);
@@ -40,6 +50,6 @@ describe('SQEM-550 (d) — the persona as a flow', () => {
   it('the name heads the page in the display face (moved, not copied)', () => {
     expect(src.match(/id="persona-editor-name"/g)).toHaveLength(1);
     expect(src).toMatch(/<label htmlFor="persona-editor-name" className="sr-only">\{m\.pe_name_label\(\)\}<\/label>/);
-    expect(src).toMatch(/<input id="persona-editor-name"[\s\S]{0,300}font-display/);
+    expect(src).toMatch(/<input id="persona-editor-name"[\s\S]{0,700}font-display/);
   });
 });

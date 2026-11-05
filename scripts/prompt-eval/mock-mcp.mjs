@@ -19,6 +19,12 @@ function realDescription(name) {
   return out;
 }
 
+// SQEM-623 — MOCK_HINT=1 serves the improvement hint the way the real readers do (`afterUse` on a
+// template, `## After the task` closing a persona), read from the real source like the descriptions.
+const HINT = process.env.MOCK_HINT === '1'
+  ? readFileSync(new URL('../../supabase/functions/_shared/libraryPrompt.ts', import.meta.url), 'utf8').match(/IMPROVEMENT_HINT = '([^']*)'/)[1]
+  : null;
+
 const PLAYBOOKS = [
   { name: 'offer_letter', title: 'Angebot', kind: 'prompt', description: 'Ein Angebot für einen Kunden schreiben: Umfang, Lizenzen, Preis, Konditionen.' },
   { name: 'pricing_guidelines', title: 'Preisrichtlinien', kind: 'skill', description: 'Preisliste, Rabattregeln und wie weit wir in einer Preisverhandlung gehen.' },
@@ -52,7 +58,8 @@ function call(name, args) {
   if (name === 'get_persona') {
     const p = PERSONAS.find(x => x.name === args.name || x.name === args.id || x.title === args.name);
     if (!p) return { error: 'Persona not found' };
-    return `# ${p.title}\n\n${p.description}\n\n## Routes — load one only when its condition applies\n\n| When | Load |\n|---|---|\n` + p.routes.map(([w, t]) => `| ${w} | get_template(name: "${t}") |`).join('\n');
+    return `# ${p.title}\n\n${p.description}\n\n## Routes — load one only when its condition applies\n\n| When | Load |\n|---|---|\n` + p.routes.map(([w, t]) => `| ${w} | get_template(name: "${t}") |`).join('\n')
+      + (HINT ? `\n\n## After the task\n\n${HINT}` : '');
   }
   if (name === 'search_templates') {
     const q = words(args.query);
@@ -62,7 +69,11 @@ function call(name, args) {
   if (name === 'get_template') {
     const p = PLAYBOOKS.find(x => x.name === args.name || x.name === args.id);
     if (!p) return { error: 'Template not found' };
-    return { ...p, content: p.kind === 'skill' ? `Rules for ${p.title}: be concise; follow the house style.` : `Write the ${p.title.toLowerCase()} for {{subject}}. Keep it under 150 words.`, variables: p.kind === 'prompt' ? ['subject'] : [] };
+    // SQEM-623 — the rejection playbook states a rule (formal "Sie", no reason given) that case C2 contradicts.
+    const content = p.name === 'candidate_rejection'
+      ? 'Write the rejection for {{subject}}. Address the candidate formally ("Sie"). Do not state a reason for the rejection. Keep it under 150 words.'
+      : p.kind === 'skill' ? `Rules for ${p.title}: be concise; follow the house style.` : `Write the ${p.title.toLowerCase()} for {{subject}}. Keep it under 150 words.`;
+    return { ...p, content, variables: p.kind === 'prompt' ? ['subject'] : [], ...(HINT ? { afterUse: HINT } : {}) };
   }
   return { error: `Unknown tool ${name}` };
 }

@@ -19,8 +19,10 @@
  * object and then wrapped it in the very last line.
  */
 
+import { parsePersonaConnectors, type PersonaConnector } from './connectorService.ts';
 import { isTextContentMime } from './skillFile.ts';
 import { isResourcePath, matchSkillPath } from './skillPaths.ts';
+import { IMPROVEMENT_HINT } from './libraryPrompt.ts';
 
 /** SQEM-492 — a storage path belongs to a workspace only if it sits in that workspace's folder. */
 export const isPathInWorkspace = (path: string | null | undefined, workspaceId: string): boolean =>
@@ -209,6 +211,12 @@ export function renderContextBlocks(
 export function composePersona(
   persona: { title: string; description: string; content: string },
   routes: { name: string; title: string; kind: string; condition: string; description: string }[],
+  /**
+   * SQEM-639/641 — the connector services the role works with, by name. Over MCP a recommendation
+   * (sqemes cannot switch on a client's connectors and never hands out credentials); in Chat the same
+   * section, so the model says so when the person has not connected one of them.
+   */
+  connectors: string[] = [],
 ): string {
   const lines: string[] = [];
   lines.push('---');
@@ -252,6 +260,22 @@ export function composePersona(
     lines.push('_This persona currently has no routes available to you._');
   }
 
+  if (connectors.length) {
+    lines.push('');
+    lines.push('## Connectors this role works with');
+    lines.push('');
+    for (const name of connectors) lines.push(`- ${name.replace(/[\r\n]+/g, ' ')}`);
+    lines.push('');
+    lines.push('Use your own connector for each of these when the task needs its data. If you have none');
+    lines.push('for one, say so to the person instead of guessing what it would have returned.');
+  }
+
+  // SQEM-623 — after the routes, under its own heading, so it is not read as part of the role.
+  lines.push('');
+  lines.push('## After the task');
+  lines.push('');
+  lines.push(IMPROVEMENT_HINT);
+
   return lines.join('\n');
 }
 
@@ -294,6 +318,8 @@ export interface TemplateDetail {
   argumentCount: number;
   variables: { name: string; label: string; type: string }[];
   contextFiles: Array<Record<string, unknown>>;
+  /** SQEM-623 — `IMPROVEMENT_HINT`, last so it reads as a note after the playbook, not as part of it. */
+  afterUse: string;
 }
 
 export interface PersonaSummary {
@@ -304,7 +330,7 @@ export interface PersonaSummary {
   routeCount: number;
 }
 
-export interface PersonaRow { id: string; title: string; description: string; content: string }
+export interface PersonaRow { id: string; title: string; description: string; content: string; connectors?: unknown }
 
 /** SQEM-514 — a context file without its bytes: what a link is issued for. */
 export interface FileMeta {
@@ -347,9 +373,10 @@ export interface LibraryReader {
   getTemplate(args: { id?: string; name?: string; includeFiles?: string }): Promise<TemplateDetail>;
 
   listPersonas(): Promise<PersonaSummary[]>;
-  getPersona(args: { id?: string; name?: string }): Promise<{ text: string; routeCount: number }>;
+  /** SQEM-651 — `connectors`: the persona's services, so Chat can fetch them. MCP ignores the field. */
+  getPersona(args: { id?: string; name?: string }): Promise<{ text: string; routeCount: number; connectors: PersonaConnector[] }>;
   /** Render an already-fetched persona row. Used by `prompts/get`, which resolves the row itself. */
-  renderPersona(persona: PersonaRow): Promise<{ text: string; routeCount: number }>;
+  renderPersona(persona: PersonaRow): Promise<{ text: string; routeCount: number; connectors: PersonaConnector[] }>;
   routeVisibility(personaIds: string[]): Promise<Map<string, { total: number; visible: number }>>;
 
   /** Accepts a bare file id or a `sqemes://files/<id>` uri. */
@@ -554,7 +581,7 @@ export async function createLibraryReader(
   // was worth using: neither list_templates nor search_templates said anything about attached files.
   // The decision had to be made before the information existed. These two numbers close that gap.
   //
-  // Measured on production 2026-08-16 before choosing the query shape: 44 files in the workspace, 42
+  // Measured on 2026-08-16 before choosing the query shape: 44 files in the workspace, 42
   // of them referenced by some template, 78 templates of which 18 carry files. Fetching every file's
   // id+size for the workspace is therefore ~44 rows (~2 KB) and simpler than assembling an id union
   // that would select almost the same rows anyway. **If a workspace ever holds thousands of files
@@ -641,7 +668,12 @@ export async function createLibraryReader(
         description: r.prompts.description || '',
       }));
 
-    return { text: composePersona(persona, routes), routeCount: routes.length };
+    // SQEM-641 — the service names the persona itself carries. Over MCP a recommendation only: nothing
+    // about the client's tools changes, no connector row is read, no credential leaves. SQEM-651 — in
+    // Chat the runtime fetches them (`onPersonaLoaded`, `_shared/connectorPool.ts`).
+    const connectors = parsePersonaConnectors(persona.connectors);
+
+    return { text: composePersona(persona, routes, connectors.map(c => c.name)), routeCount: routes.length, connectors };
   };
 
   const reader: LibraryReader = {
@@ -792,6 +824,7 @@ export async function createLibraryReader(
         argumentCount: vars.length,
         variables:     vars.map((v: any) => ({ name: v.name, label: v.label, type: v.type })),
         contextFiles,
+        afterUse:      IMPROVEMENT_HINT,
       };
       return result;
     },
@@ -825,7 +858,7 @@ export async function createLibraryReader(
 
       const { data: personaRows } = await client
         .from('personas')
-        .select('id, title, description, content')
+        .select('id, title, description, content, connectors')
         .eq('workspace_id', workspaceId);
 
       const persona = personaId

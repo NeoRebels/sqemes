@@ -388,7 +388,7 @@ const Overview = () => {
               : m.ov_chat_managed({ count: enabledModels.length }))
             : m.ov_chat_none(),
           enabledModels.length > 0,
-          canManageConnections && <Link to="/settings" state={{ initialTab: 'api' }} className="text-sm font-semibold text-accent inline-flex items-center gap-1">{/* SQEM-424 — the same words as the wizard step it leads to. */}{apiKeysConfigured > 0 ? m.ov_provider_keys() : m.ov_add_provider_key()} <ArrowRight className="w-3.5 h-3.5" /></Link>,
+          canManageConnections && <Link to="/settings" state={{ initialTab: 'providers' }} className="text-sm font-semibold text-accent inline-flex items-center gap-1">{/* SQEM-424 — the same words as the wizard step it leads to. */}{apiKeysConfigured > 0 ? m.ov_provider_keys() : m.ov_add_provider_key()} <ArrowRight className="w-3.5 h-3.5" /></Link>,
           usageBlock('chat'),
         )}
       </section>
@@ -415,7 +415,7 @@ const Overview = () => {
                     </div>
                     <Link
                       to={a.to}
-                      state={a.kind === 'chat-without-model' ? { initialTab: 'api' } : undefined}
+                      state={a.kind === 'chat-without-model' ? { initialTab: 'providers' } : undefined}
                       className="text-sm font-semibold text-accent inline-flex items-center gap-1 shrink-0"
                     >
                       {a.actionLabel} <ArrowRight className="w-3.5 h-3.5" />

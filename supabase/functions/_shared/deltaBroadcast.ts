@@ -34,15 +34,21 @@ export interface DeltaBroadcasterOptions {
   intervalMs?: number;
   /** Injected clock, so tests do not wait in real time. */
   now?: () => number;
+  /**
+   * SQEM-649 — the text an earlier invocation already streamed for this answer. Each broadcast carries
+   * the whole text so far, so a continued answer must start from it — or the first delta of the new
+   * invocation would replace the reply with only its own part.
+   */
+  initial?: string;
 }
 
 export function createDeltaBroadcaster(
   send: (text: string) => Promise<void>,
-  { intervalMs = 100, now = () => Date.now() }: DeltaBroadcasterOptions = {},
+  { intervalMs = 100, now = () => Date.now(), initial = '' }: DeltaBroadcasterOptions = {},
 ): DeltaBroadcaster {
-  let assembled = '';
+  let assembled = initial;
   let lastSentAt = 0;
-  let lastSentLength = 0;
+  let lastSentLength = initial.length;
   /**
    * ⛔ Explicit, because the first increment must go out **immediately** — the whole perceived-speed
    * win is the gap between "sent" and "something appears". Without this flag it worked only by

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  toResponsesInput, connectorResponsesTools, responsesDelta,
+  toResponsesInput, responsesDelta,
   createResponsesItemCollector, readResponsesText, readResponsesToolCalls, responsesToolResults,
 } from '../../supabase/functions/_shared/openaiResponses';
 import { toResponsesTools, LIBRARY_TOOLS } from '../../supabase/functions/_shared/libraryTools';
@@ -92,22 +92,6 @@ describe('the tools array', () => {
     // have optional parameters by design (`get_template` takes either name or id). A default that
     // flipped to strict would reject the whole request and blame the schema.
     for (const t of toResponsesTools(LIBRARY_TOOLS) as any[]) expect(t.strict).toBe(false);
-  });
-
-  it('⭐ connectors and function tools coexist in ONE array', () => {
-    // The reason SQEM-373's exclusion could be lifted for OpenAI.
-    const combined = [
-      ...connectorResponsesTools([{ url: 'https://x', name: 'c_1', token: 't', allowedTools: ['a'] }]),
-      ...toResponsesTools(LIBRARY_TOOLS),
-    ] as any[];
-    expect(combined[0]).toMatchObject({ type: 'mcp', server_label: 'c_1', server_url: 'https://x', authorization: 't', allowed_tools: ['a'] });
-    expect(combined.filter(t => t.type === 'function')).toHaveLength(LIBRARY_TOOLS.length);
-  });
-
-  it('a connector without a token carries no authorization key', () => {
-    const [t] = connectorResponsesTools([{ url: 'https://x', name: 'c_1', token: null, allowedTools: null }]) as any[];
-    expect(t).not.toHaveProperty('authorization');
-    expect(t).not.toHaveProperty('allowed_tools');
   });
 });
 

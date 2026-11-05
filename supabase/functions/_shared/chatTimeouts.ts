@@ -54,7 +54,7 @@ export const EDGE_WALL_CLOCK_MS = {
  * described above; a wrong `false` silently withholds the connector fix — which is what happened for
  * one promotion.
  *
- * Cloud production: **paid plan** (owner, 2026-09-11). Self-host is handled separately — the
+ * Cloud production: **paid plan** (2026-09-11). Self-host is handled separately — the
  * `selfHosted` context keeps the default pair no matter what this says, because a self-hoster's plan
  * is theirs and unknown to us.
  */
@@ -70,7 +70,7 @@ export const EDGE_PLAN_IS_PAID = true;
  * 400 s wall clock — the same arithmetic connector turns have run on since SQEM-381.
  */
 export const PROVIDER_TIMEOUT_MS = {
-  /** Self-host (a possible 150 s wall clock), authoring, images. The original number. */
+  /** Self-host (Path B allows 400 s since SQEM-656; Path A may be 150 s), authoring, images. The original number. */
   default: 120_000,
   /** Every chat turn on a paid Cloud wall clock. */
   long: 300_000,
@@ -88,6 +88,22 @@ export const CLIENT_JOB_TIMEOUT_MS = {
  * after its last delta — which is the case the old "deltas never touch the timeout" rule guarded.
  */
 export const DELTA_GRACE_MS = 60_000;
+
+/**
+ * SQEM-649 — how long new tool rounds may still START for one answer, counted from the person's
+ * message, across every invocation it is handed to (`_shared/chatContinuation.ts`). Decided 2026-11-04:
+ * 10 minutes ("25 Minuten sind zu lang … 10 Minuten würden reichen"). After it the next round is the
+ * answer, with the time notice. ⚠️ That answer can take one provider call longer — usually seconds.
+ */
+export const CHAT_CHAIN_MS = 600_000;
+
+/**
+ * SQEM-649 — the client's cap once the server said the answer was handed on (`continued`): the chain,
+ * one provider call for the answer, and a margin. Before the first `continued` the old cap applies.
+ */
+export function clientChainCapMs(ctx: TimeoutContext): number {
+  return CHAT_CHAIN_MS + providerTimeoutMs(ctx) + 30_000;
+}
 
 /** The latest moment the client may still be waiting: just under the wall clock where it applies. */
 export function clientHardCapMs(ctx: TimeoutContext): number {
