@@ -18,6 +18,9 @@ import { chatErrorKind, errorStatus } from '../_shared/chatErrorKind.ts';
 import { readSSE, geminiDelta, openAiDelta, claudeDelta, contentText, stopReasonOf } from '../_shared/sseStream.ts';
 import { createDeltaBroadcaster } from '../_shared/deltaBroadcast.ts';
 import { createLibraryReader } from '../_shared/libraryQueries.ts';
+import { unzipEntries } from '../_shared/officeZip.ts';
+import { withAnalysisTool, normalizeAnalysisTables, normalizeAnalyses, analysisLogCounts, ANALYSIS_INSTRUCTION, type AnalysisRecord } from '../_shared/analysisTool.ts';
+import { requestBrowserAnalysis } from '../_shared/analysisRoundTrip.ts';
 import {
   createLibraryToolRuntime, advanceToolRound, restoreToolRuntime, MAX_TOOL_ROUNDS, countNativeConnectorCalls, toolCapNotice, toolsWereRefused, runToolCall, truncatedNotice, afterToolsRefused, toolsRefusedNotice, noAnswerText, type ToolRuntime,
   toOpenAiTools, toClaudeTools, toGeminiTools, toResponsesTools, chatActionDefinitions,
@@ -126,6 +129,7 @@ Deno.serve(async (req) => {
       ? { ...continuation.request, jobId: continuation.jobId, workspaceId: continuation.workspaceId }
       : body;
     const { workspaceId, modelId, systemInstruction, jobId, funded, connectorIds, timeZone, webSearch } = src;
+    const analysisTables = normalizeAnalysisTables(src.analysisTables); // SQEM-660 — metadata only, never rows
     locale = requestLocale(req, src.locale); // SQEM-599 — the language of the notices sqemes adds (SQEM-612: or the query)
     // SQEM-514 — a file part no provider can take never reaches a provider branch (_shared/messageParts.ts).
     // SQEM-649 — a continuation brings the provider's own message list in the state instead.
@@ -382,7 +386,7 @@ Deno.serve(async (req) => {
       // SQEM-649 — what a hand-over needs: the person's own JWT (header only, never in the state), the
       // request to carry on, and — on a continuation — where the last invocation stopped.
       authHeader,
-      request: { modelId, funded: !!funded, systemInstruction, timeZone, connectorIds, webSearch: webSearch === true, locale } satisfies ContinuationRequest,
+      request: { modelId, funded: !!funded, systemInstruction, timeZone, connectorIds, webSearch: webSearch === true, locale, ...(analysisTables.length ? { analysisTables } : {}) } satisfies ContinuationRequest,
       continuation,
     }));
     return new Response(JSON.stringify({ jobId }), {
@@ -659,6 +663,9 @@ async function runAndBroadcast({
   const webState: WebState = { allowanceExhausted: false };
   // SQEM-595 — files the model handed out with this answer (built in the browser, never here).
   const generatedFiles: GeneratedFile[] = [];
+  // SQEM-660 — the programs run_analysis ran for this answer (code and ok, never the data).
+  const analyses: AnalysisRecord[] = [];
+  const analysisTables = normalizeAnalysisTables(request.analysisTables);
   // SQEM-649 — what earlier invocations of this answer collected comes back first.
   const collected = continuation?.collected;
   if (collected) {
@@ -668,7 +675,10 @@ async function runAndBroadcast({
     webSources.pages.push(...(collected.webSources.pages as WebSources['pages']));
     webState.allowanceExhausted = collected.webAllowanceExhausted;
     generatedFiles.push(...(collected.generatedFiles as GeneratedFile[]));
+    analyses.push(...normalizeAnalyses(collected.analyses));
   }
+  // SQEM-660 step C — [chat-tools] counts only this invocation's runs; the carried ones were logged before.
+  const analysesCarried = analyses.length;
   // SQEM-649 — the 10 minutes count from the person's message, not from this invocation.
   const invocationStartedAt = Date.now();
   const chainStartedAt = continuation?.chainStartedAt ?? invocationStartedAt;
@@ -677,7 +687,7 @@ async function runAndBroadcast({
   let pool: ConnectorPool<ResolvedConnector> | null = null;
   const tools: ToolRuntime | null = workspaceId
     ? createLibraryToolRuntime(
-        () => createLibraryReader({ client: createAdminClient(), workspaceId, userId }),
+        () => createLibraryReader({ client: createAdminClient(), workspaceId, userId, unzip: unzipEntries }), // SQEM-658
         {
           maxRounds: MAX_TOOL_ROUNDS, // SQEM-650
           // SQEM-649 — this invocation's budget, but never past the chain's end.
@@ -726,7 +736,7 @@ async function runAndBroadcast({
   // the date line changes by the minute and the web line by the message. Until 654 both stood in FRONT,
   // so nothing after them could be reused from one message to the next. Same text, other position.
   const stableInstruction = tools ? withLibraryPrompt(systemInstruction) : systemInstruction;
-  const changingInstruction = [tools && web ? WEB_SEARCH_INSTRUCTION : null, timeLine].filter(Boolean).join('\n\n');
+  const changingInstruction = [tools && web ? WEB_SEARCH_INSTRUCTION : null, tools && analysisTables.length ? ANALYSIS_INSTRUCTION : null, timeLine].filter(Boolean).join('\n\n');
   const instruction = [stableInstruction, changingInstruction].filter(Boolean).join('\n\n') || undefined;
 
   // SQEM-381 — measured, so the next timeout decision rests on a distribution rather than on the
@@ -804,6 +814,8 @@ async function runAndBroadcast({
     }
     // SQEM-595 — create_file for every text model, always: it costs nothing until it is used.
     if (base) base = withFileTool(base, generatedFiles);
+    // SQEM-660 — run_analysis only with attached tables; the program runs in the person's browser.
+    if (base) base = withAnalysisTool(base, analysisTables, (code) => requestBrowserAnalysis(jobId, code, cancel.signal), analyses);
     let runtime = base;
     let unreachable: string[] = [];
     /**
@@ -879,7 +891,7 @@ async function runAndBroadcast({
         tools: tools ? { stats: { ...tools.stats }, callCounts: { ...(tools.callCounts ?? {}) } } : null,
         collected: {
           loadedTemplateIds, libraryChanges, webSources,
-          webAllowanceExhausted: webState.allowanceExhausted, generatedFiles,
+          webAllowanceExhausted: webState.allowanceExhausted, generatedFiles, analyses,
           unreachable: [...new Set([...unreachable, ...(pool?.failed ?? [])])],
           fetchedConnectors: pool?.fetchedNames ?? [],
         },
@@ -933,6 +945,8 @@ async function runAndBroadcast({
         // SQEM-648 — the time per message, so the 90 s budget can be judged against real rounds.
         // SQEM-649 — per invocation; `chainMs` is the whole answer across hand-overs.
         durationMs: Date.now() - startedAt, chainMs: Date.now() - chainStartedAt, gen,
+        // SQEM-660 step C — analyses run, failed, and never started (Python did not load): the monitor's counts.
+        ...(analyses.length > analysesCarried ? analysisLogCounts(analyses.slice(analysesCarried)) : {}),
       }));
     }
     // ⛔ The cap must be VISIBLE. A model cut off mid-investigation answers confidently from half the
@@ -974,6 +988,8 @@ async function runAndBroadcast({
       ...(webSources.queries.length || webSources.pages.length ? { webSources } : {}),
       // SQEM-595 — the file descriptions; an older client ignores the key.
       ...(generatedFiles.length ? { generatedFiles } : {}),
+      // SQEM-660 — what run_analysis ran, for the "Analysis run" line; an older client ignores it.
+      ...(analyses.length ? { analyses } : {}),
       // SQEM-651 — what the session carries on with; the browser stores it. An older client ignores it.
       ...(pool?.fetchedNames.length ? { connectorIds: pool.activeIds() } : {}),
     });

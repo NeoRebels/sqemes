@@ -281,9 +281,14 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Cg_PhoneInputs */
 /** @typedef {{ term: NonNullable<unknown> }} Cg_TermInputs */
 /** @typedef {{}} Chat_Ai_DisclosureInputs */
+/** @typedef {{}} Chat_Analysis_RunningInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Attach_FailedInputs */
 /** @typedef {{}} Chat_Attach_FileInputs */
+/** @typedef {{}} Chat_Attach_Legacy_OfficeInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Chat_Attach_Office_FailedInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Attach_Too_LargeInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Chat_Attach_TruncatedInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Chat_Attach_Truncated_TableInputs */
 /** @typedef {{}} Chat_Attachment_AltInputs */
 /** @typedef {{}} Chat_Back_To_StartInputs */
 /** @typedef {{}} Chat_CancelInputs */
@@ -326,6 +331,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Chat_Private_ExpiryInputs */
 /** @typedef {{}} Chat_RemoveInputs */
 /** @typedef {{}} Chat_RenameInputs */
+/** @typedef {{}} Chat_Running_ElsewhereInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Save_To_Workspace_FailedInputs */
 /** @typedef {{}} Chat_Save_UploadsInputs */
 /** @typedef {{}} Chat_SearchInputs */
@@ -377,6 +383,10 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Chat_Withdraw_FailedInputs */
 /** @typedef {{}} Chat_Withdraw_TitleInputs */
 /** @typedef {{}} Chat_WithdrawnInputs */
+/** @typedef {{}} Chatcard_Analysis_FailedInputs */
+/** @typedef {{}} Chatcard_Analysis_Not_KeptInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Chatcard_Analysis_RanInputs */
+/** @typedef {{}} Chatcard_Analysis_WhereInputs */
 /** @typedef {{ noun: NonNullable<unknown> }} Chatcard_Change_CreatedInputs */
 /** @typedef {{ noun: NonNullable<unknown> }} Chatcard_Change_DeletedInputs */
 /** @typedef {{ noun: NonNullable<unknown> }} Chatcard_Change_UpdatedInputs */
@@ -5914,6 +5924,20 @@ export const chat_ai_disclosure = /** @type {((inputs?: Chat_Ai_DisclosureInputs
 /**
 * | output |
 * | --- |
+* | "Computing in your browser …" |
+*
+* @param {Chat_Analysis_RunningInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_analysis_running = /** @type {((inputs?: Chat_Analysis_RunningInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Analysis_RunningInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_analysis_running(inputs)
+	return __en.chat_analysis_running(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Could not attach {name} — try again, or drag the file in directly." |
 *
 * @param {Chat_Attach_FailedInputs} inputs
@@ -5942,6 +5966,34 @@ export const chat_attach_file = /** @type {((inputs?: Chat_Attach_FileInputs, op
 /**
 * | output |
 * | --- |
+* | "Old Office formats (.doc, .xls, .ppt) cannot be read. Save the file as .docx, .xlsx or .pptx and attach it again." |
+*
+* @param {Chat_Attach_Legacy_OfficeInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_attach_legacy_office = /** @type {((inputs?: Chat_Attach_Legacy_OfficeInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Attach_Legacy_OfficeInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_attach_legacy_office(inputs)
+	return __en.chat_attach_legacy_office(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "\"{name}\" could not be read. It may be damaged or password-protected." |
+*
+* @param {Chat_Attach_Office_FailedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_attach_office_failed = /** @type {((inputs: Chat_Attach_Office_FailedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Attach_Office_FailedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_attach_office_failed(inputs)
+	return __en.chat_attach_office_failed(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "{name} is too large to attach" |
 *
 * @param {Chat_Attach_Too_LargeInputs} inputs
@@ -5952,6 +6004,34 @@ export const chat_attach_too_large = /** @type {((inputs: Chat_Attach_Too_LargeI
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.chat_attach_too_large(inputs)
 	return __en.chat_attach_too_large(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "\"{name}\" is long: only the first 300,000 characters were attached." |
+*
+* @param {Chat_Attach_TruncatedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_attach_truncated = /** @type {((inputs: Chat_Attach_TruncatedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Attach_TruncatedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_attach_truncated(inputs)
+	return __en.chat_attach_truncated(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "\"{name}\" is large: the AI reads an excerpt, calculations use the whole table." |
+*
+* @param {Chat_Attach_Truncated_TableInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_attach_truncated_table = /** @type {((inputs: Chat_Attach_Truncated_TableInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Attach_Truncated_TableInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_attach_truncated_table(inputs)
+	return __en.chat_attach_truncated_table(inputs)
 });
 /**
 * | output |
@@ -6541,6 +6621,20 @@ export const chat_rename = /** @type {((inputs?: Chat_RenameInputs, options?: { 
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.chat_rename(inputs)
 	return __en.chat_rename(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "An answer is still being written in another chat. You can send again once it is done." |
+*
+* @param {Chat_Running_ElsewhereInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_running_elsewhere = /** @type {((inputs?: Chat_Running_ElsewhereInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Running_ElsewhereInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_running_elsewhere(inputs)
+	return __en.chat_running_elsewhere(inputs)
 });
 /**
 * | output |
@@ -7255,6 +7349,62 @@ export const chat_withdrawn = /** @type {((inputs?: Chat_WithdrawnInputs, option
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.chat_withdrawn(inputs)
 	return __en.chat_withdrawn(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Analysis failed" |
+*
+* @param {Chatcard_Analysis_FailedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chatcard_analysis_failed = /** @type {((inputs?: Chatcard_Analysis_FailedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chatcard_Analysis_FailedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chatcard_analysis_failed(inputs)
+	return __en.chatcard_analysis_failed(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "The programs are not stored, only whether they worked." |
+*
+* @param {Chatcard_Analysis_Not_KeptInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chatcard_analysis_not_kept = /** @type {((inputs?: Chatcard_Analysis_Not_KeptInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chatcard_Analysis_Not_KeptInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chatcard_analysis_not_kept(inputs)
+	return __en.chatcard_analysis_not_kept(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Analysis run ({count})" |
+*
+* @param {Chatcard_Analysis_RanInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chatcard_analysis_ran = /** @type {((inputs: Chatcard_Analysis_RanInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chatcard_Analysis_RanInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chatcard_analysis_ran(inputs)
+	return __en.chatcard_analysis_ran(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Computed in your browser — the data did not leave it." |
+*
+* @param {Chatcard_Analysis_WhereInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chatcard_analysis_where = /** @type {((inputs?: Chatcard_Analysis_WhereInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chatcard_Analysis_WhereInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chatcard_analysis_where(inputs)
+	return __en.chatcard_analysis_where(inputs)
 });
 /**
 * | output |

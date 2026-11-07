@@ -68,6 +68,8 @@ export interface ContinuationRequest {
   connectorIds?: string[];
   webSearch?: boolean;
   locale?: string;
+  /** SQEM-660 — the attached tables' keys, row counts and columns (never their rows), for run_analysis. */
+  analysisTables?: unknown[];
 }
 
 export interface ContinuationState {
@@ -100,6 +102,8 @@ export interface ContinuationState {
     unreachable: string[];
     /** SQEM-651 — connectors the model fetched during the answer (display names), for the line under it. */
     fetchedConnectors?: string[];
+    /** SQEM-660 — the programs run_analysis ran so far, for the line under the answer. */
+    analyses?: unknown[];
   };
 }
 

@@ -15,14 +15,14 @@ const ROOT = resolve(__dirname, '../..');
 const code = (s: string) => s.replace(/(^|[^:])\/\/[^\n]*/g, '$1').replace(/\/\*[\s\S]*?\*\//g, '');
 const MCP = code((readFileSync(resolve(ROOT, 'supabase/functions/mcp-server/index.ts'), 'utf8') + '\n' + readFileSync(resolve(ROOT, 'supabase/functions/_shared/libraryActions.ts'), 'utf8') + '\n' + readFileSync(resolve(ROOT, 'supabase/functions/_shared/libraryToolDefs.ts'), 'utf8')));
 
-describe('deliveryOf — read vs use', () => {
-  it('text outside assets/ and scripts/ is read as text', () => {
+describe('deliveryOf — one rule since SQEM-658: readable → text, wherever it sits', () => {
+  it('text is read as text, in references/ as in scripts/ and assets/ (no folder rule any more)', () => {
     expect(deliveryOf('docx/references/ooxml.md', 'text/markdown')).toBe('text');
     expect(deliveryOf('docx/ooxml/schemas/wml.xsd', 'text/plain')).toBe('text');
+    expect(deliveryOf('docx/scripts/pack.py', 'text/x-python')).toBe('text');
+    expect(deliveryOf('canvas/assets/template.html', 'text/html')).toBe('text');
   });
-  it('scripts/, assets/ and every binary come back as a link', () => {
-    expect(deliveryOf('docx/scripts/pack.py', 'text/x-python')).toBe('link');
-    expect(deliveryOf('canvas/assets/template.html', 'text/html')).toBe('link');
+  it('what cannot be read comes back as a link', () => {
     expect(deliveryOf('canvas/canvas-fonts/Inter.ttf', OCTET_STREAM)).toBe('link');
     expect(deliveryOf('diagram.png', 'image/png')).toBe('link');
     expect(deliveryOf('brief.pdf', 'application/pdf')).toBe('link');
@@ -88,5 +88,28 @@ describe('mcp-server wiring', () => {
     const functions = compose.slice(compose.indexOf('\n  functions:'), compose.indexOf('\n  storage:'));
     expect(functions).toMatch(/PUBLIC_API_URL: \$\{SUPABASE_PUBLIC_URL\}/);
     expect(functions).toMatch(/SELF_HOSTED: "true"/);
+  });
+});
+
+describe('SQEM-658 — Office files follow the read-vs-use rule', () => {
+  it('as text wherever they sit; the original on request', () => {
+    expect(deliveryOf('angebot/references/Preise.xlsx', OCTET_STREAM)).toBe('text');
+    expect(deliveryOf('Pitch.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation')).toBe('text');
+    expect(deliveryOf('brief/assets/Briefkopf.docx', OCTET_STREAM)).toBe('text');
+    expect(deliveryOf('brief/assets/Briefkopf.docx', OCTET_STREAM, 'file')).toBe('link');
+    expect(deliveryOf('references/Preise.xlsx', OCTET_STREAM, 'file')).toBe('link');
+    expect(deliveryOf('alt.doc', OCTET_STREAM, 'text')).toBe('refuse');
+  });
+  it('the tool description says so', () => {
+    const defs = readFileSync(resolve(__dirname, '../../supabase/functions/_shared/libraryToolDefs.ts'), 'utf8');
+    expect(defs).toMatch(/Every file sqemes can read comes back as text, wherever it sits in the skill/);
+    expect(defs).toMatch(/Pass as: "file" for the original of any file/);
+  });
+  it('⛔ both edge functions pass the unzip in; only they import npm:jszip for it', () => {
+    const src = (p: string) => readFileSync(resolve(__dirname, '../..', p), 'utf8');
+    expect(src('supabase/functions/mcp-server/index.ts')).toMatch(/createLibraryReader\(\{[^}]*unzip: unzipEntries \}\)/);
+    expect(src('supabase/functions/chat-message/index.ts')).toMatch(/createLibraryReader\(\{[^}]*unzip: unzipEntries \}\)/);
+    expect(src('supabase/functions/_shared/libraryQueries.ts')).not.toMatch(/from ['"]npm:/);
+    expect(src('supabase/functions/_shared/officeText.ts')).not.toMatch(/^import /m);
   });
 });

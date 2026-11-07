@@ -128,6 +128,7 @@
   "chat_edit": "Edit",
   "chat_attachment_alt": "Attachment",
   "chat_thinking": "Thinking...",
+  "chat_analysis_running": "Computing in your browser …",
   "chat_still_working": "Still working on it: a longer task, up to 10 minutes.",
   "chat_time_just_now": "just now",
   "chat_time_minutes": "{count}m ago",
@@ -194,6 +195,7 @@
   "chat_model_fallback": "AI",
   "chat_upgrade_or_key": "Upgrade or add a key",
   "chat_someone_waiting": "Someone is waiting for a response…",
+  "chat_running_elsewhere": "An answer is still being written in another chat. You can send again once it is done.",
   "chat_attach_file": "Attach file",
   "chat_choose_workspace": "Choose from workspace",
   "chat_upload_device": "Upload from device",
@@ -2874,5 +2876,13 @@
   ],
   "bulk_edit_tag": "Edit tag",
   "bulk_remove_tag_all": "Remove tag",
-  "bulk_set_tag_group": "Set tag"
+  "bulk_set_tag_group": "Set tag",
+  "chat_attach_truncated": "\"{name}\" is long: only the first 300,000 characters were attached.",
+  "chat_attach_truncated_table": "\"{name}\" is large: the AI reads an excerpt, calculations use the whole table.",
+  "chat_attach_office_failed": "\"{name}\" could not be read. It may be damaged or password-protected.",
+  "chat_attach_legacy_office": "Old Office formats (.doc, .xls, .ppt) cannot be read. Save the file as .docx, .xlsx or .pptx and attach it again.",
+  "chatcard_analysis_ran": "Analysis run ({count})",
+  "chatcard_analysis_failed": "Analysis failed",
+  "chatcard_analysis_where": "Computed in your browser — the data did not leave it.",
+  "chatcard_analysis_not_kept": "The programs are not stored, only whether they worked."
 }

@@ -39,8 +39,10 @@ describe('classifySkillFile — real and format-true files', () => {
     expect(classifySkillFile('canvas-design/assets/fonts/Inter.ttf', ttf)).toEqual({ rowMime: OCTET_STREAM, storageMime: OCTET_STREAM, isText: false });
   });
 
-  it('a .docx (a zip) is octet-stream, not text and not an image', async () => {
-    expect(classifySkillFile('docx/template.docx', await docxBytes()).rowMime).toBe(OCTET_STREAM);
+  it('a .docx (a zip) is not text and not an image — SQEM-658: its Office type on the row, octet-stream in storage', async () => {
+    expect(classifySkillFile('docx/template.docx', await docxBytes())).toEqual({
+      rowMime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', storageMime: OCTET_STREAM, isText: false,
+    });
   });
 
   it('a PDF is a PDF — with the usual binary comment line AND written in plain ASCII', () => {

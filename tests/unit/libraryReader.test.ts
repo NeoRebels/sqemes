@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { IMPROVEMENT_HINT } from '../../supabase/functions/_shared/libraryPrompt';
 import {
-  createLibraryReader, LibraryNotFound, LibraryBadRequest,
+  createLibraryReader, LibraryNotFound, LibraryBadRequest, OFFICE_READ_MAX_BYTES,
   toSlug, buildPreview, renderContextBlocks, composePersona, hiddenFromCaller,
 } from '../../supabase/functions/_shared/libraryQueries';
 
@@ -129,7 +129,7 @@ function fakeClient(tables: Rows, rpcs: Record<string, any[]>, blobs: Record<str
 const WORKSPACE = 'ws-1';
 const USER = 'user-1';
 
-function build(overrides: { templates?: any[]; personas?: any[]; routes?: any[]; files?: any[]; accessibleTemplates?: string[]; accessiblePersonas?: string[]; ownFiles?: any[]; blobs?: Record<string, string>; failFirst?: Record<string, number> } = {}) {
+function build(overrides: { templates?: any[]; personas?: any[]; routes?: any[]; files?: any[]; accessibleTemplates?: string[]; accessiblePersonas?: string[]; ownFiles?: any[]; blobs?: Record<string, string>; failFirst?: Record<string, number>; unzip?: (bytes: ArrayBuffer) => Promise<(path: string) => Promise<string | null>>; texts?: { file_id: string; workspace_id: string; content: string }[] } = {}) {
   const templates = overrides.templates ?? [
     { id: 't-open', workspace_id: WORKSPACE, title: 'Open Brief', description: 'a brief', kind: 'prompt', content: 'body', variables: [], context_file_ids: ['f-open'] },
     { id: 't-shut', workspace_id: WORKSPACE, title: 'Shut Brief', description: 'a brief', kind: 'prompt', content: 'secret', variables: [], context_file_ids: ['f-shut'] },
@@ -141,6 +141,7 @@ function build(overrides: { templates?: any[]; personas?: any[]; routes?: any[];
         { id: 'p-open', workspace_id: WORKSPACE, title: 'Open Role', description: 'r', content: 'be helpful' },
       ],
       persona_templates: overrides.routes ?? [],
+      ...(overrides.texts ? { workspace_file_texts: overrides.texts } : {}),
       workspace_files: overrides.files ?? [
         { id: 'f-open', workspace_id: WORKSPACE, name: 'open.md', mime_type: 'text/markdown', size_bytes: 10, storage_path: 'ws-1/open.md', created_by: 'someone' },
         { id: 'f-shut', workspace_id: WORKSPACE, name: 'shut.md', mime_type: 'text/markdown', size_bytes: 20, storage_path: 'ws-1/shut.md', created_by: 'someone' },
@@ -154,7 +155,7 @@ function build(overrides: { templates?: any[]; personas?: any[]; routes?: any[];
     overrides.failFirst ?? {},
   );
   (overrides as any)._capture?.(client);
-  return createLibraryReader({ client, workspaceId: WORKSPACE, userId: USER });
+  return createLibraryReader({ client, workspaceId: WORKSPACE, userId: USER, unzip: overrides.unzip });
 }
 
 /** Like `build`, but also hands back the fake client, for assertions on what was queried. */
@@ -590,3 +591,57 @@ describe('SQEM-499 — progressive disclosure: read by path, assets are resource
   });
 });
 
+
+describe('SQEM-658 — an Office context file is read as text', () => {
+  const docxRow = (over: Record<string, unknown> = {}) => ({
+    id: 'f-doc', workspace_id: WORKSPACE, name: 'references/Preise.docx', mime_type: 'application/octet-stream',
+    size_bytes: 2048, storage_path: 'ws-1/Preise.docx', created_by: USER, ...over,
+  });
+  const entries: Record<string, string> = {
+    'word/document.xml': '<w:document><w:body><w:p><w:r><w:t>Preis: 99 &amp; mehr</w:t></w:r></w:p></w:body></w:document>',
+  };
+  const unzip = async () => async (p: string) => entries[p] ?? null;
+
+  it('returns the text, keeps the binary type, stores it and reads it from the database next time', async () => {
+    const { lib, client } = await buildWithClient({ files: [docxRow()], blobs: { 'ws-1/Preise.docx': '' }, unzip });
+    const first = await lib.readContextFile('f-doc');
+    expect(first.text).toBe("File: Preise.docx (Word document) — converted to text by sqemes (sqemes reader 2); this text is the file's content.\n\nPreis: 99 & mehr");
+    expect(first.base64).toBeNull();
+    expect(first.mimeType).toBe('application/octet-stream');
+    expect(client.seen).toContain('upsert:workspace_file_texts:f-doc');
+    const downloads = () => client.seen.filter((x: string) => x === 'download:ws-1/Preise.docx').length;
+    expect(downloads()).toBe(1);
+    expect((await lib.readContextFile('f-doc')).text).toBe(first.text);
+    expect(downloads()).toBe(1);
+  });
+
+  it('a stored text from an older reader (no marker) is read again, not served', async () => {
+    const { lib, client } = await buildWithClient({
+      files: [docxRow()], blobs: { 'ws-1/Preise.docx': '' }, unzip,
+      texts: [{ file_id: 'f-doc', workspace_id: WORKSPACE, content: 'File: Preise.docx (Word document) — old reader, wrong count' }],
+    });
+    const f = await lib.readContextFile('f-doc');
+    expect(f.text).toContain('(sqemes reader 2)');
+    expect(f.text).toContain('Preis: 99 & mehr');
+    expect(client.seen).toContain('download:ws-1/Preise.docx');
+  });
+
+  it('without an unzip (unit tests, older callers) it stays a binary, as before', async () => {
+    const lib = await build({ files: [docxRow()], blobs: { 'ws-1/Preise.docx': '' } });
+    const f = await lib.readContextFile('f-doc');
+    expect(f.text).toBeNull();
+  });
+
+  it('⛔ too large: refused before the download, with the way out', async () => {
+    const { lib, client } = await buildWithClient({ files: [docxRow({ size_bytes: OFFICE_READ_MAX_BYTES + 1 })], blobs: { 'ws-1/Preise.docx': '' }, unzip });
+    await expect(lib.readContextFile('f-doc')).rejects.toThrow(LibraryBadRequest);
+    await expect(lib.readContextFile('f-doc')).rejects.toThrow(/as: "file"/);
+    expect(client.seen).not.toContain('download:ws-1/Preise.docx');
+  });
+
+  it('⛔ not really a Word file: a clear error, not garbage', async () => {
+    const empty = async () => async () => null;
+    const lib = await build({ files: [docxRow()], blobs: { 'ws-1/Preise.docx': '' }, unzip: empty });
+    await expect(lib.readContextFile('f-doc')).rejects.toThrow(/could not be read as text: Not a valid Word document/);
+  });
+});

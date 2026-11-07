@@ -25,6 +25,7 @@ import {
 import { countUsage } from './usageCounts.ts';
 import { safeStorageFileName } from './storageKey.ts';
 import { classifySkillFile, extensionOf, sniffBinaryMime, TEXT_EXT_TO_MIME, STORAGE_TEXT_MIME, OCTET_STREAM, SKILL_STORAGE_MIMES } from './skillFile.ts';
+import { officeUploadNote } from './officeText.ts';
 import { readSkillMd, toSlug as skillSlug, withoutOwnFrontmatter, buildSkillMd } from './skillMd.ts';
 import { relativeSkillPaths, uploadedFileName } from './skillPaths.ts';
 import { isTextContentMime, deliveryOf } from './skillFile.ts';
@@ -580,8 +581,8 @@ export async function runLibraryTool(
   if (toolName === 'read_context_file') {
     // SQEM-499 — one file, on demand: by the uri from get_template, or by its path inside the
     // playbook (`references/x.md`), the way SKILL.md refers to it. Same reader as `resources/read`.
-    // SQEM-514 — delivered by PURPOSE: a file to read (text outside assets/ and scripts/) as text, a
-    // file to use (scripts/, assets/, every binary) as a download link; `as` asks for the other.
+    // SQEM-658 — one rule (deliveryOf): readable as text → text, wherever it sits; anything else → a
+    // download link; `as: "file"` gives the original of any file.
     try {
       const fileId = args.uri
         ? String(args.uri)
@@ -1055,6 +1056,7 @@ export async function runLibraryTool(
       id:       inserted.id,
       name:     inserted.name,
       mimeType: inserted.mime_type,
+      asText:   officeUploadNote(inserted.name, sizeBytes), // SQEM-658
     }, null, 2) }] });
   }
 
@@ -1198,6 +1200,7 @@ export async function runLibraryTool(
 
     return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
       id: inserted.id, name: inserted.name, mimeType: inserted.mime_type,
+      asText: officeUploadNote(inserted.name, sizeBytes), // SQEM-658
     }, null, 2) }] });
   }
 

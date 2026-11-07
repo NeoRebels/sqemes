@@ -279,9 +279,14 @@
 /** @typedef {{}} Cg_PhoneInputs */
 /** @typedef {{ term: NonNullable<unknown> }} Cg_TermInputs */
 /** @typedef {{}} Chat_Ai_DisclosureInputs */
+/** @typedef {{}} Chat_Analysis_RunningInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Attach_FailedInputs */
 /** @typedef {{}} Chat_Attach_FileInputs */
+/** @typedef {{}} Chat_Attach_Legacy_OfficeInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Chat_Attach_Office_FailedInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Attach_Too_LargeInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Chat_Attach_TruncatedInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Chat_Attach_Truncated_TableInputs */
 /** @typedef {{}} Chat_Attachment_AltInputs */
 /** @typedef {{}} Chat_Back_To_StartInputs */
 /** @typedef {{}} Chat_CancelInputs */
@@ -324,6 +329,7 @@
 /** @typedef {{}} Chat_Private_ExpiryInputs */
 /** @typedef {{}} Chat_RemoveInputs */
 /** @typedef {{}} Chat_RenameInputs */
+/** @typedef {{}} Chat_Running_ElsewhereInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Save_To_Workspace_FailedInputs */
 /** @typedef {{}} Chat_Save_UploadsInputs */
 /** @typedef {{}} Chat_SearchInputs */
@@ -375,6 +381,10 @@
 /** @typedef {{}} Chat_Withdraw_FailedInputs */
 /** @typedef {{}} Chat_Withdraw_TitleInputs */
 /** @typedef {{}} Chat_WithdrawnInputs */
+/** @typedef {{}} Chatcard_Analysis_FailedInputs */
+/** @typedef {{}} Chatcard_Analysis_Not_KeptInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Chatcard_Analysis_RanInputs */
+/** @typedef {{}} Chatcard_Analysis_WhereInputs */
 /** @typedef {{ noun: NonNullable<unknown> }} Chatcard_Change_CreatedInputs */
 /** @typedef {{ noun: NonNullable<unknown> }} Chatcard_Change_DeletedInputs */
 /** @typedef {{ noun: NonNullable<unknown> }} Chatcard_Change_UpdatedInputs */
@@ -3138,6 +3148,10 @@ export const chat_ai_disclosure = /** @type {(inputs: Chat_Ai_DisclosureInputs) 
 	return /** @type {LocalizedString} */ (`Antworten werden von einem KI-System erzeugt und können falsch sein.`)
 };
 
+export const chat_analysis_running = /** @type {(inputs: Chat_Analysis_RunningInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Rechnet in deinem Browser …`)
+};
+
 export const chat_attach_failed = /** @type {(inputs: Chat_Attach_FailedInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`${i?.name} konnte nicht angehängt werden – versuch es noch einmal oder zieh die Datei direkt hinein.`)
 };
@@ -3146,8 +3160,24 @@ export const chat_attach_file = /** @type {(inputs: Chat_Attach_FileInputs) => L
 	return /** @type {LocalizedString} */ (`Datei anhängen`)
 };
 
+export const chat_attach_legacy_office = /** @type {(inputs: Chat_Attach_Legacy_OfficeInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Alte Office-Formate (.doc, .xls, .ppt) können nicht gelesen werden. Speichere die Datei als .docx, .xlsx oder .pptx und häng sie erneut an.`)
+};
+
+export const chat_attach_office_failed = /** @type {(inputs: Chat_Attach_Office_FailedInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`„${i?.name}“ konnte nicht gelesen werden. Die Datei ist vielleicht beschädigt oder mit einem Passwort geschützt.`)
+};
+
 export const chat_attach_too_large = /** @type {(inputs: Chat_Attach_Too_LargeInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`${i?.name} ist zu groß zum Anhängen`)
+};
+
+export const chat_attach_truncated = /** @type {(inputs: Chat_Attach_TruncatedInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`„${i?.name}“ ist lang: Angehängt wurden nur die ersten 300.000 Zeichen.`)
+};
+
+export const chat_attach_truncated_table = /** @type {(inputs: Chat_Attach_Truncated_TableInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`„${i?.name}“ ist groß: Die KI liest einen Auszug, gerechnet wird mit der ganzen Tabelle.`)
 };
 
 export const chat_attachment_alt = /** @type {(inputs: Chat_Attachment_AltInputs) => LocalizedString} */ () => {
@@ -3319,6 +3349,10 @@ export const chat_remove = /** @type {(inputs: Chat_RemoveInputs) => LocalizedSt
 
 export const chat_rename = /** @type {(inputs: Chat_RenameInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Umbenennen`)
+};
+
+export const chat_running_elsewhere = /** @type {(inputs: Chat_Running_ElsewhereInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`In einem anderen Chat wird noch eine Antwort geschrieben. Senden geht wieder, sobald sie fertig ist.`)
 };
 
 export const chat_save_to_workspace_failed = /** @type {(inputs: Chat_Save_To_Workspace_FailedInputs) => LocalizedString} */ (i) => {
@@ -3523,6 +3557,22 @@ export const chat_withdraw_title = /** @type {(inputs: Chat_Withdraw_TitleInputs
 
 export const chat_withdrawn = /** @type {(inputs: Chat_WithdrawnInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Teilen zurückgenommen – der Chat bleibt bei der Person, die ihn erstellt hat`)
+};
+
+export const chatcard_analysis_failed = /** @type {(inputs: Chatcard_Analysis_FailedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Analyse fehlgeschlagen`)
+};
+
+export const chatcard_analysis_not_kept = /** @type {(inputs: Chatcard_Analysis_Not_KeptInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Die Programme werden nicht gespeichert, nur ob sie geklappt haben.`)
+};
+
+export const chatcard_analysis_ran = /** @type {(inputs: Chatcard_Analysis_RanInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Analyse ausgeführt (${i?.count})`)
+};
+
+export const chatcard_analysis_where = /** @type {(inputs: Chatcard_Analysis_WhereInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`In deinem Browser berechnet — die Daten haben ihn nicht verlassen.`)
 };
 
 export const chatcard_change_created = /** @type {(inputs: Chatcard_Change_CreatedInputs) => LocalizedString} */ (i) => {

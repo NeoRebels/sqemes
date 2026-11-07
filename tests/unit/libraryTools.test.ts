@@ -163,7 +163,7 @@ describe('SQEM-373 — the wiring in chat-message', () => {
     // runs under the person who owns the API key, so a workspace-shared one would let anybody act as
     // its owner — the failure class SQEM-346 closed.
     expect(CHAT_FN).toMatch(/userId: user\.id/);
-    expect(CHAT_FN).toMatch(/createLibraryReader\(\{ client: createAdminClient\(\), workspaceId, userId \}\)/);
+    expect(CHAT_FN).toMatch(/createLibraryReader\(\{ client: createAdminClient\(\), workspaceId, userId, unzip: unzipEntries \}\)/);
     for (const keyPath of ['mcp_api_keys', 'hashKey', 'api_key_hash', 'authChallenge']) {
       expect(CHAT_FN).not.toContain(keyPath);
     }

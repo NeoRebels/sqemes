@@ -408,6 +408,10 @@ verify_jwt = false
 [functions.delete-workspace-file]
 verify_jwt = false
 
+# SQEM-658 — stores the text of an Office file the browser read (auth and role checked in the function).
+[functions.store-file-text]
+verify_jwt = false
+
 # SQEM-517 — the extension reports a playbook insertion; counted per workspace and day, never per person.
 [functions.record-usage]
 verify_jwt = false

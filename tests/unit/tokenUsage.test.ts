@@ -43,7 +43,7 @@ describe('SQEM-654 — prompt caching in chat-message', () => {
   const fn = readFileSync('supabase/functions/chat-message/index.ts', 'utf8');
   it('stable first, changing last: the date and web lines follow the library rule and the session', () => {
     expect(fn).toMatch(/const stableInstruction = tools \? withLibraryPrompt\(systemInstruction\) : systemInstruction;/);
-    expect(fn).toMatch(/const changingInstruction = \[tools && web \? WEB_SEARCH_INSTRUCTION : null, timeLine\]\.filter\(Boolean\)\.join\('\\n\\n'\);/);
+    expect(fn).toMatch(/const changingInstruction = \[tools && web \? WEB_SEARCH_INSTRUCTION : null, tools && analysisTables\.length \? ANALYSIS_INSTRUCTION : null, timeLine\]\.filter\(Boolean\)\.join\('\\n\\n'\);/);
     expect(fn).toMatch(/const instruction = \[stableInstruction, changingInstruction\]\.filter\(Boolean\)\.join\('\\n\\n'\) \|\| undefined;/);
     // ⛔ the date line is no longer put in FRONT of the session instruction for text answers
     expect(fn).toMatch(/systemInstruction, \/\/ SQEM-654 — without the time line/);

@@ -76,7 +76,8 @@ describe('wiring', () => {
     // connector tools (SQEM-584), the web tools (SQEM-594, `,` — webState follows), the self-call (SQEM-649),
     // and SQEM-651's fetched connectors: their tool list and the pool wrapper (one since SQEM-652, which
     // routed Claude and OpenAI through sqemes too)
-    expect([...fn.matchAll(/cancel\.signal[,)]/g)].length).toBe(9);
+    // SQEM-660 — and the wait for the browser's analysis result (Stop ends that wait too).
+    expect([...fn.matchAll(/cancel\.signal[,)]/g)].length).toBe(10);
     expect([...fn.matchAll(/^\s+signal,$/gm)].length).toBe(4);   // the four fetch sites
   });
   it('a stopped job broadcasts nothing and always ends its watch', () => {
@@ -88,9 +89,11 @@ describe('wiring', () => {
   });
   it('Chat: Stop replaces Send while an answer runs, and New chat stops the job too', () => {
     const chat = read('pages/Chat.tsx');
-    expect(chat).toMatch(/isLoading \? \(\s*<button onClick=\{handleStop\} aria-label=\{txt\.chat_stop_label\(\)\}/);
+    // SQEM-657 — only in the chat whose answer runs (`generatingHere`), not wherever one runs.
+    expect(chat).toMatch(/generatingHere \? \(\s*<button onClick=\{handleStop\} aria-label=\{txt\.chat_stop_label\(\)\}/);
     expect(en.chat_stop_label).toBe('Stop generating'); // SQEM-604
-    expect(chat).toMatch(/const handleNewChat = \(\) => \{\s*\/\/[^\n]*\n\s*if \(runningJobRef\.current\) requestChatJobCancel/);
+    // SQEM-657 — the running job is read from lib/runningChat.ts, so this works after a page change too.
+    expect(chat).toMatch(/const handleNewChat = \(\) => \{\s*\/\/[^\n]*\n\s*const run = getRunningChat<ChatMsg>\(\)\.running;\s*if \(run\?\.jobId\) requestChatJobCancel/);
   });
   it('the migration lets clients insert only, and only their own row', () => {
     const sql = read('supabase/migrations/20261024200000_sqem583_chat_job_cancellations.sql');

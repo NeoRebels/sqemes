@@ -21,6 +21,7 @@
 
 import { parsePersonaConnectors, type PersonaConnector } from './connectorService.ts';
 import { isTextContentMime } from './skillFile.ts';
+import { extractOfficeText, officeKindOf, OfficeReadError, OFFICE_READER_MARKER, OFFICE_SERVER_READ_MAX_BYTES, type ReadEntry } from './officeText.ts';
 import { isResourcePath, matchSkillPath } from './skillPaths.ts';
 import { IMPROVEMENT_HINT } from './libraryPrompt.ts';
 
@@ -401,7 +402,17 @@ export interface LibraryReaderOptions {
   workspaceId: string;
   /** The **person** this reader answers for. There is no "no user" mode; see the module header. */
   userId: string;
+  /**
+   * SQEM-658 — unzips an Office file so `readContextFile` can return its text. Passed in by the two
+   * edge functions (`_shared/officeZip.ts`, which imports `npm:jszip`) rather than imported here,
+   * because the unit tests import this module and Node cannot resolve `npm:` specifiers. Without
+   * it an Office file stays a binary, as before.
+   */
+  unzip?: (bytes: ArrayBuffer) => Promise<ReadEntry>;
 }
+
+/** SQEM-658 — kept as a name for the tests; the value and its reason live in officeText.ts. */
+export const OFFICE_READ_MAX_BYTES = OFFICE_SERVER_READ_MAX_BYTES;
 
 /**
  * Resolves the caller's access once, then answers library reads against it.
@@ -412,7 +423,7 @@ export interface LibraryReaderOptions {
  * a slow query later. `mcp-server` already built all three per request before this module existed.
  */
 export async function createLibraryReader(
-  { client, workspaceId, userId }: LibraryReaderOptions,
+  { client, workspaceId, userId, unzip }: LibraryReaderOptions,
 ): Promise<LibraryReader> {
   // SQEM-500 — the three access sets in ONE database call. SQEM-481 ran four lookups concurrently;
   // under load that still meant four requests queueing for PostgREST's share of the connections, and
@@ -979,12 +990,28 @@ export async function createLibraryReader(
 
       const { data: file } = await client
         .from('workspace_files')
-        .select('id, name, mime_type, storage_path, workspace_file_texts(content)')
+        .select('id, name, mime_type, size_bytes, storage_path, workspace_file_texts(content)')
         .eq('workspace_id', workspaceId)
         .eq('id', fileId)
         .single();
 
       if (!file || !isPathInWorkspace(file.storage_path, workspaceId)) throw new LibraryNotFound(`Resource not found: ${ref}`);
+
+      // SQEM-658 — a Word, Excel or PowerPoint file is answered with its text. The row keeps its binary
+      // type (the link stays available with as: "file"); the extracted text is stored like a text
+      // file's (SQEM-500), so the CPU is spent once per file, not once per read. Size is checked
+      // before the download below, which it shares with every other file (one guarded call site).
+      const office = unzip ? officeKindOf(file.name) : null;
+      if (office) {
+        const stored = storedTextOf(file);
+        // Only a text from the current reader counts; an older one is read again and replaced.
+        if (stored != null && stored.includes(OFFICE_READER_MARKER)) return { uri, name: file.name, mimeType: file.mime_type, text: stored, base64: null };
+        if ((file.size_bytes ?? 0) > OFFICE_READ_MAX_BYTES) {
+          // SQEM-658 — a stored text (prepared in a browser) is served at any size up to the upload
+          // limit; only reading it HERE is limited, by the CPU an edge function has.
+          throw new LibraryBadRequest(`"${file.name}" is not prepared as text yet: it is too large to read on the server (over ${OFFICE_READ_MAX_BYTES / 1024 / 1024} MB), and its text is prepared the next time an admin or editor opens Files in the sqemes app. Tell the person so. Ask with as: "file" for a download link.`);
+        }
+      }
 
       // SQEM-500 — a text file read before is answered from the database, without storage.
       const stored = isTextContentMime(file.mime_type) ? storedTextOf(file) : null;
@@ -995,6 +1022,23 @@ export async function createLibraryReader(
         .download(file.storage_path);
 
       if (storageErr || !blob) throw new LibraryNotFound('File content not available');
+
+      if (office) {
+        let text: string;
+        try {
+          text = (await extractOfficeText(office, file.name, await unzip!(await blob.arrayBuffer()))).text;
+        } catch (e) {
+          const why = e instanceof OfficeReadError ? e.message : 'it may be damaged or password-protected.';
+          throw new LibraryBadRequest(`"${file.name}" could not be read as text: ${why} Ask with as: "file" for a download link.`);
+        }
+        try {
+          await client.from('workspace_file_texts')
+            .upsert([{ file_id: file.id, workspace_id: workspaceId, content: text }], { onConflict: 'file_id' } /* SQEM-658: overwrites a text from an older reader */);
+        } catch (e) {
+          console.error('[library] text write-back failed:', (e as Error)?.message);
+        }
+        return { uri, name: file.name, mimeType: file.mime_type, text, base64: null };
+      }
 
       if (isTextContentMime(file.mime_type)) {
         const text = await blob.text();

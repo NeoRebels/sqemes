@@ -34,3 +34,6 @@ deno.lock
 
 # SQEM-487 — prompt measurement output
 scripts/prompt-eval/results/
+
+# SQEM-660 — the Python runtime for Chat's analysis, fetched and checksum-verified at build (scripts/fetch-pyodide.mjs).
+public/pyodide/

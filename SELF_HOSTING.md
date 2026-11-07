@@ -254,7 +254,7 @@ docker compose --profile preview up --build   # builds + serves on :3000
 ```
 or directly:
 ```bash
-npm run build        # → dist/
+npm run build        # → dist/ (also fetches the ~21 MB Python runtime for Chat's analysis, checksum-verified — needs network to cdn.jsdelivr.net)
 # serve dist/ behind any static host (nginx, Caddy, Vercel, etc.), SPA-fallback to index.html
 ```
 
@@ -370,6 +370,34 @@ the server-side submission scan and the super-admin review surface. That split i
 and anti-abuse stay on the side that owns the shared namespace. If you run your own reverse proxy,
 route `/api/marketplace-submit` and `/api/marketplace-config` to the sidecar (see the routing table
 below) — without them, submit and the token field fail.
+
+---
+
+## Office files and data analysis in Chat
+
+**Word, Excel and PowerPoint files are read as text** (since v1.11.36): attached in sqemes Chat, or
+stored under Files and fetched by an MCP client with `read_context_file`. A file can be up to 15 MB.
+Large Office files are read in the browser, not on the server, because an edge function has only a
+few seconds of CPU: at upload in the app, or — for a large file uploaded over MCP — the next time an
+admin or editor opens Files. Until then `read_context_file` says the text is not ready yet.
+
+**Chat can calculate with attached tables** (since v1.11.36). For counts, sums, averages and filters
+the model writes a short Python program (pandas, numpy) that runs **in the person's browser**, on the
+full rows of the attached Excel or CSV file, and the answer says which rows it counted. The data never
+reaches the server or the AI provider for this; only the column names and row counts do. The program
+runs in an isolated frame (`/analysis-sandbox.html`) with no network access, and only whether each
+run worked is stored with the answer.
+
+What that means for an operator:
+- **The image is about 21 MB larger.** `npm run build` fetches the Python runtime (Pyodide) from
+  cdn.jsdelivr.net and checks every file against `scripts/pyodide-manifest.json`; your instance then
+  serves it itself under `/pyodide/`. A browser downloads it once: as soon as a table is attached,
+  or — on a device in data-saver mode — only when the first analysis runs.
+- **Behind your own reverse proxy**, serve `/analysis-sandbox.html` with the `Content-Security-Policy`
+  header from `selfhost/nginx.conf`, and `/pyodide/*.wasm` as `application/wasm`. The bundled nginx
+  does both. Without the header the frame is not isolated; without the type Python does not start.
+- The licence texts of Pyodide and the Python standard library are in `public/pyodide-licenses/` and
+  in `THIRD_PARTY_NOTICES.md`.
 
 ---
 
@@ -496,7 +524,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.11.35       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.11.36       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### ⛔ 3a. Before v1.11.9: count your workspace-wide MCP keys
@@ -700,7 +728,7 @@ If you would rather it did not, block `/#/library/` at your reverse proxy — bu
 reaches the server, so the block has to happen in the browser or not at all. Removing the route in a
 fork is the reliable way.
 
-*Last updated: 2026-11-04 (SQEM-656: version pin v1.11.35 — Chat answers keep working on long tasks, the AI fetches connectors when a question needs them, large connector results are shortened, personas can name the connector services they work with, prompt caching) · 2026-11-02 (SQEM-618: AI provider and web search keys moved to Settings → AI providers) · 2026-10-27 (SQEM-614: version pin v1.11.34 — sqemes in German: every person chooses English or German under My Profile, admins set a workspace default under Settings → General, and without a choice everything stays in English; messages from the server follow the same language; legal texts, e-mails, the browser extension and MCP stay in English. Before that, SQEM-598: version pin v1.11.33 — web search in Chat with your own Linkup or Brave key, files from Chat (Word, PDF, Excel, PowerPoint, Markdown, text) with a preview beside the chat, and a document style under Settings → Brand. Before that, SQEM-597: document style for files from Chat, also on self-host. Before that, SQEM-594: web search in Chat with a workspace's own Linkup or Brave key; "Settings → Integrations" corrected to API & MCP. Before that, SQEM-593: version pin v1.11.32 — fonts, logos and other binary files uploaded over MCP keep their folder in the file name, so a downloaded skill finds them again. Before that, SQEM-591: version pin v1.11.31 — connectors work with every text model, a Stop button that really stops an answer, no two-minute cut-off for models that think long, custom connectors show their logo, the playbook editor opens on Test. SQEM-589: one-click connector apps are part of sqemes Cloud — the Connectors section now describes custom connectors only. Before that, SQEM-580: version pin v1.11.30 — OpenRouter shows only the models you add and its image models work; a connector OpenAI cannot reach is left out instead of failing the answer, and errors inside an OpenAI stream are reported; the Start card shows your pinned chats; History deletes several chats at once; one default AI model for chats and writing; mobile polish. Before that, SQEM-566: version pin v1.11.29 — every MCP tool in sqemes Chat by role, with a card for what an answer changed; a History page with delete; bulk tag and access actions; the Files filter Media/Documents; a refreshed model list with image models routed again. Before that, SQEM-559: version pin v1.11.28 — a new design (new typefaces served from the image, Work | Manage navigation, an Overview page), playbook versions with restore, “Who can edit” with a workspace default, a Security tab, and the playbook card in Chat. Before that, SQEM-531: v1.11.27 — the file list checks access once per query, an MCP call carries at most 5 MB (larger files go through create_upload_url), a failed import removes what it created, and sqemes is described as the AI Management OS.)*
+*Last updated: 2026-11-07 (SQEM-658, SQEM-660: version pin v1.11.36 — Word, Excel and PowerPoint files are read as text in Chat and over MCP, files up to 15 MB, and Chat calculates with attached tables in the browser; the image carries the ~21 MB Python runtime) · 2026-11-04 (SQEM-656: version pin v1.11.35 — Chat answers keep working on long tasks, the AI fetches connectors when a question needs them, large connector results are shortened, personas can name the connector services they work with, prompt caching) · 2026-11-02 (SQEM-618: AI provider and web search keys moved to Settings → AI providers) · 2026-10-27 (SQEM-614: version pin v1.11.34 — sqemes in German: every person chooses English or German under My Profile, admins set a workspace default under Settings → General, and without a choice everything stays in English; messages from the server follow the same language; legal texts, e-mails, the browser extension and MCP stay in English. Before that, SQEM-598: version pin v1.11.33 — web search in Chat with your own Linkup or Brave key, files from Chat (Word, PDF, Excel, PowerPoint, Markdown, text) with a preview beside the chat, and a document style under Settings → Brand. Before that, SQEM-597: document style for files from Chat, also on self-host. Before that, SQEM-594: web search in Chat with a workspace's own Linkup or Brave key; "Settings → Integrations" corrected to API & MCP. Before that, SQEM-593: version pin v1.11.32 — fonts, logos and other binary files uploaded over MCP keep their folder in the file name, so a downloaded skill finds them again. Before that, SQEM-591: version pin v1.11.31 — connectors work with every text model, a Stop button that really stops an answer, no two-minute cut-off for models that think long, custom connectors show their logo, the playbook editor opens on Test. SQEM-589: one-click connector apps are part of sqemes Cloud — the Connectors section now describes custom connectors only. Before that, SQEM-580: version pin v1.11.30 — OpenRouter shows only the models you add and its image models work; a connector OpenAI cannot reach is left out instead of failing the answer, and errors inside an OpenAI stream are reported; the Start card shows your pinned chats; History deletes several chats at once; one default AI model for chats and writing; mobile polish. Before that, SQEM-566: version pin v1.11.29 — every MCP tool in sqemes Chat by role, with a card for what an answer changed; a History page with delete; bulk tag and access actions; the Files filter Media/Documents; a refreshed model list with image models routed again. Before that, SQEM-559: version pin v1.11.28 — a new design (new typefaces served from the image, Work | Manage navigation, an Overview page), playbook versions with restore, “Who can edit” with a workspace default, a Security tab, and the playbook card in Chat. Before that, SQEM-531: v1.11.27 — the file list checks access once per query, an MCP call carries at most 5 MB (larger files go through create_upload_url), a failed import removes what it created, and sqemes is described as the AI Management OS.)*
 `/playbooks` and every old link redirects. Nothing changes for an operator. Earlier the same day
 (SQEM-390) — the assistant template kind is gone: on upgrade the migration
 turns every assistant into a skill with the same text, and a role is a persona. Earlier: 2026-08-19

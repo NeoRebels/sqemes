@@ -191,7 +191,7 @@ export const LIBRARY_TOOL_DEFS = [
   {
     name: 'read_context_file',
     title: 'Read playbook file',
-    description: 'Read one context file of a template — after get_template has shown which files exist and what is in them. A file to read (text outside assets/ and scripts/) comes back as text; a file to use (scripts/, assets/, any binary) comes back as a download link valid 15 minutes — pass as: "text" or as: "file" for the other. Address it either by its "uri" from get_template\'s contextFiles, or by "template" (name slug or id) plus "path" — the path inside the skill exactly as SKILL.md writes it (e.g. references/animation.md). Read only the files the task actually needs.\n\nDocs: https://help.sqemes.com/en/articles/54-how-do-i-connect-sqemes-to-claude-desktop-or-another-mcp-client',
+    description: 'Read one context file of a template — after get_template has shown which files exist and what is in them. Every file sqemes can read comes back as text, wherever it sits in the skill: text files, and Word, Excel and PowerPoint files (.docx, .xlsx, .pptx) as Markdown with their text, tables, sheets and slides. Any other file (fonts, images, PDF, archives) comes back as a download link valid 15 minutes. Pass as: "file" for the original of any file as a link. Address it either by its "uri" from get_template\'s contextFiles, or by "template" (name slug or id) plus "path" — the path inside the skill exactly as SKILL.md writes it (e.g. references/animation.md). Read only the files the task actually needs.\n\nDocs: https://help.sqemes.com/en/articles/54-how-do-i-connect-sqemes-to-claude-desktop-or-another-mcp-client',
     inputSchema: {
       type: 'object',
       properties: {

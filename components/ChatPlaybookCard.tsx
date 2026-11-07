@@ -4,6 +4,7 @@ import KindBadge from './ui/KindBadge';
 import type { PlaybookRef, PromptKind } from '../types';
 import { changeLabel, type LibraryChange } from '../supabase/functions/_shared/libraryChanges.ts';
 import type { WebSources } from '../supabase/functions/_shared/webSearch.ts';
+import type { ShownAnalysis } from '../supabase/functions/_shared/analysisTool.ts';
 import { m } from '../lib/i18n';
 
 /**
@@ -162,3 +163,31 @@ export function WebSourcesCard({ sources }: { sources: WebSources | null | undef
     </div>
   );
 }
+
+/**
+ * SQEM-660 — under an answer that computed something: that it ran, in the person's browser, and the
+ * program to check it. Code only — the data never left the browser and is not shown here either.
+ * After a reload only whether each run worked is left (step C: count and success are
+ * stored, the program is not), and the card says so instead of showing an empty box.
+ */
+export function AnalysesCard({ analyses }: { analyses: ShownAnalysis[] | null | undefined }) {
+  if (!analyses?.length) return null;
+  const okCount = analyses.filter(a => a.ok).length;
+  const withCode = analyses.filter(a => a.code);
+  return (
+    <details className="mt-2 ml-1 w-full max-w-md rounded-card border border-line bg-surface-raised shadow-rest px-4 py-3 text-left">
+      <summary className="cursor-pointer text-xs font-medium text-ink-subtle">
+        {okCount ? m.chatcard_analysis_ran({ count: okCount }) : m.chatcard_analysis_failed()}
+      </summary>
+      <p className="mt-1.5 text-xs text-ink-subtle">{m.chatcard_analysis_where()}</p>
+      {!withCode.length && <p className="mt-1 text-xs text-ink-subtle">{m.chatcard_analysis_not_kept()}</p>}
+      {withCode.map((a, i) => (
+        <div key={i}>
+          <pre className={`mt-2 max-h-64 overflow-auto rounded-lg bg-surface-sunken p-2 text-2xs text-ink-muted whitespace-pre-wrap break-words ${a.ok ? '' : 'opacity-70'}`}>{a.code}</pre>
+          {!a.ok && a.error && <p className="mt-1 text-2xs text-ink-subtle break-words">{a.error}</p>}
+        </div>
+      ))}
+    </details>
+  );
+}
+

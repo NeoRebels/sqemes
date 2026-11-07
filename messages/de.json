@@ -128,6 +128,7 @@
   "chat_edit": "Bearbeiten",
   "chat_attachment_alt": "Anhang",
   "chat_thinking": "Denkt nach …",
+  "chat_analysis_running": "Rechnet in deinem Browser …",
   "chat_still_working": "Arbeitet noch: eine längere Aufgabe, bis zu 10 Minuten.",
   "chat_time_just_now": "gerade eben",
   "chat_time_minutes": "vor {count} Min.",
@@ -194,6 +195,7 @@
   "chat_model_fallback": "KI",
   "chat_upgrade_or_key": "Plan erweitern oder Schlüssel hinterlegen",
   "chat_someone_waiting": "Jemand wartet auf eine Antwort …",
+  "chat_running_elsewhere": "In einem anderen Chat wird noch eine Antwort geschrieben. Senden geht wieder, sobald sie fertig ist.",
   "chat_attach_file": "Datei anhängen",
   "chat_choose_workspace": "Aus dem Workspace wählen",
   "chat_upload_device": "Vom Gerät hochladen",
@@ -2874,5 +2876,13 @@
   ],
   "bulk_edit_tag": "Tag bearbeiten",
   "bulk_remove_tag_all": "Tag entfernen",
-  "bulk_set_tag_group": "Tag setzen"
+  "bulk_set_tag_group": "Tag setzen",
+  "chat_attach_truncated": "„{name}“ ist lang: Angehängt wurden nur die ersten 300.000 Zeichen.",
+  "chat_attach_truncated_table": "„{name}“ ist groß: Die KI liest einen Auszug, gerechnet wird mit der ganzen Tabelle.",
+  "chat_attach_office_failed": "„{name}“ konnte nicht gelesen werden. Die Datei ist vielleicht beschädigt oder mit einem Passwort geschützt.",
+  "chat_attach_legacy_office": "Alte Office-Formate (.doc, .xls, .ppt) können nicht gelesen werden. Speichere die Datei als .docx, .xlsx oder .pptx und häng sie erneut an.",
+  "chatcard_analysis_ran": "Analyse ausgeführt ({count})",
+  "chatcard_analysis_failed": "Analyse fehlgeschlagen",
+  "chatcard_analysis_where": "In deinem Browser berechnet — die Daten haben ihn nicht verlassen.",
+  "chatcard_analysis_not_kept": "Die Programme werden nicht gespeichert, nur ob sie geklappt haben."
 }

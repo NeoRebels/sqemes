@@ -1,6 +1,7 @@
 import type { LibraryChange } from './supabase/functions/_shared/libraryChanges.ts';
 import type { WebSources } from './supabase/functions/_shared/webSearch.ts';
 import type { GeneratedFile } from './supabase/functions/_shared/fileOutput.ts';
+import type { StoredAnalysis } from './supabase/functions/_shared/analysisTool.ts';
 import type { DocumentStyle } from './supabase/functions/_shared/documentStyle.ts';
 import type { Locale } from './lib/i18n';
 
@@ -311,6 +312,8 @@ export interface StoredChatMessage {
   webSources?: WebSources | null;
   /** SQEM-595 — assistant message: files handed out with it (descriptions; built on download). */
   generatedFiles?: GeneratedFile[];
+  /** SQEM-660 — assistant message: whether each analysis it ran worked (no program, no data). */
+  analyses?: StoredAnalysis[];
 }
 
 export interface Invitation {

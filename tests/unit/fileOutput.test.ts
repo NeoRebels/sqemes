@@ -208,7 +208,7 @@ describe('wiring', () => {
 
   it('Chat stores the files with the answer and opens the preview from the card', () => {
     const page = code(read('pages/Chat.tsx'));
-    expect(page).toMatch(/assistantMsgId, \{ loadedTemplateIds, libraryChanges, webSources, generatedFiles \}\)/);
+    expect(page).toMatch(/assistantMsgId, \{ loadedTemplateIds, libraryChanges, webSources, generatedFiles(, analyses: storedAnalyses\(analyses\))? \}\)/);
     expect(page).toMatch(/<GeneratedFilesCard files=\{msg\.generatedFiles\} onOpen=\{onOpenFile\} \/>/);
     expect(page).toMatch(/<FilePreviewPanel file=\{previewFile\}/);
   });

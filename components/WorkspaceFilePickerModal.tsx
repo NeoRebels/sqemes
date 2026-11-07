@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Search, X, Loader2, Image, FileText, FileSpreadsheet, File } from 'lucide-react';
 import Modal from './ui/Modal';
 import { SUPPORTED_MIME_TYPES, isImageType, fileTypeLabel } from '../lib/uploadTypes';
+import { officeKindOf } from '../supabase/functions/_shared/officeText';
 import type { WorkspaceFile } from '../types';
 import Checkbox from './ui/Checkbox';
 import { m } from '../lib/i18n';
@@ -35,7 +36,8 @@ export function WorkspaceFilePickerModal({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [attaching, setAttaching] = useState(false);
 
-  const attachable = files.filter(f => SUPPORTED_MIME_TYPES.has(f.mimeType));
+  // SQEM-658 — Word, Excel and PowerPoint too: the chat reads them as text (lib/officeAttachment.ts).
+  const attachable = files.filter(f => SUPPORTED_MIME_TYPES.has(f.mimeType) || officeKindOf(f.name) !== null);
   const filtered = attachable.filter(f => f.name.toLowerCase().includes(search.toLowerCase()));
 
   const toggle = (id: string) => setSelected(prev => {

@@ -1,11 +1,13 @@
 {
   "name": "sqemes",
   "private": true,
-  "version": "1.11.35",
+  "version": "1.11.36",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/fetch-pyodide.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/fetch-pyodide.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "local:up": "bash scripts/local-stack.sh up",

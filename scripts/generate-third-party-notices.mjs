@@ -112,6 +112,7 @@ function containerImages() {
 // ---------------------------------------------------------------------------------------------
 
 const deps = productionDependencies();
+const pyodideComponents = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts/pyodide-manifest.json'), 'utf8')).components ?? [];
 const images = containerImages();
 
 // Group by licence text rather than repeating it per package: the obligation is that the text and
@@ -150,6 +151,19 @@ const notices = [
   '',
   ...images.map(i => `- \`${i}\``),
   '',
+  // SQEM-660 — the Python runtime for Chat's analysis is not an npm package: the build fetches it
+  // (scripts/fetch-pyodide.mjs) from the pinned manifest, and the manifest names each component.
+  '## Bundled Python runtime (Chat data analysis)',
+  '',
+  'Fetched at build time into `/pyodide/` from the checksummed list in `scripts/pyodide-manifest.json`.',
+  'Each wheel carries its licence text in its `.dist-info` folder. Pyodide (MPL-2.0, unmodified, source at',
+  'the address given) and the CPython standard library (PSF-2.0) ship none in their files, so their texts',
+  'are reproduced under Licence texts below and served next to the app under `/pyodide-licenses/`.',
+  '',
+  '| Component | Version | Licence | Source |',
+  '|---|---|---|---|',
+  ...pyodideComponents.map(c => `| ${c.name} | ${c.version} | ${c.license} | ${c.source} |`),
+  '',
   '## npm dependencies',
   '',
   '| Package | Version | Licence |',
@@ -163,6 +177,13 @@ const notices = [
 ];
 
 let n = 0;
+// SQEM-660 — the two runtime parts whose files carry no licence text (the wheels do). The texts are
+// committed in public/pyodide-licenses/ (served with the app too) and named by the manifest.
+for (const c of pyodideComponents.filter(c => c.licenseFile)) {
+  n += 1;
+  const text = fs.readFileSync(path.join(ROOT, c.licenseFile), 'utf8').trim();
+  notices.push(`### ${n}. ${c.name}@${c.version} (Python runtime)`, '', '```', text, '```', '');
+}
 for (const { text, packages } of byText.values()) {
   n += 1;
   notices.push(`### ${n}. ${packages.map(p => `${p.name}@${p.version}`).join(', ')}`, '', '```', text, '```', '');
@@ -196,6 +217,7 @@ const sbom = {
       purl: `pkg:npm/${d.name.replace('@', '%40')}@${d.version}`,
       ...(d.licenseId !== 'UNKNOWN' ? { licenses: [{ license: { id: d.licenseId } }] } : {}),
     })),
+    ...pyodideComponents.map(c => ({ type: 'library', name: c.name, version: c.version, licenses: [{ expression: c.license }] })),
     ...images.map(i => {
       const [name, tag] = i.split(':');
       return { type: 'container', name, version: tag ?? 'latest', purl: `pkg:docker/${name}@${tag ?? 'latest'}` };

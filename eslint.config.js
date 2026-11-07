@@ -8,7 +8,7 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/', 'node_modules/', 'supabase/functions/'],
+    ignores: ['dist/', 'node_modules/', 'supabase/functions/', 'public/pyodide/'], // SQEM-660 — fetched third-party runtime
   },
   js.configs.recommended,
   {

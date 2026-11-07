@@ -3,7 +3,8 @@ import { IS_SELF_HOSTED, functionCallUrl } from '../env';
 import { m } from '../i18n';
 import { SUPPORTED_MIME_TYPES, MAX_FILE_SIZE_BYTES, inferTextMime } from '../uploadTypes';
 import { safeStorageFileName } from '../storageKey';
-import { classifySkillFile, isUtf8Text, STORAGE_TEXT_MIME } from '../../supabase/functions/_shared/skillFile.ts';
+import { classifySkillFile, isUtf8Text, STORAGE_TEXT_MIME, OCTET_STREAM } from '../../supabase/functions/_shared/skillFile.ts';
+import { officeKindOf } from '../../supabase/functions/_shared/officeText.ts';
 import type { WorkspaceFile } from '../../types';
 import type { Database } from '../database.types';
 
@@ -69,6 +70,16 @@ async function storeWorkspaceFile(
     labelMime = t.rowMime;
     storageMime = t.storageMime;
     uploadBody = new Blob([bytes], { type: storageMime });
+  } else if (officeKindOf(file.name)) {
+    // SQEM-658 — Word, Excel, PowerPoint: readable as text by Chat and MCP (read_context_file), so the
+    // Files page takes them. Same classification as every skill path (Office type on the row,
+    // octet-stream in storage); a .docx that is not a ZIP is refused rather than stored as a lie.
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const t = classifySkillFile(file.name, bytes);
+    if (t.storageMime !== OCTET_STREAM || t.rowMime === OCTET_STREAM) throw new Error(m.api_file_type({ type: file.name }));
+    labelMime = t.rowMime;
+    storageMime = t.storageMime;
+    uploadBody = new Blob([bytes], { type: storageMime });
   } else {
     // A directly-storable type (image / PDF / standard text), or any text/code file recognised by
     // extension. SQEM-514: an unknown extension is accepted too when its bytes ARE text. Text is
@@ -130,7 +141,57 @@ async function storeWorkspaceFile(
     throw error;
   }
 
+  // SQEM-658 — read an Office file HERE, while the browser holds it, and let the server store the
+  // text: the server's ~2 s of CPU cannot read a 15 MB workbook, the browser can. Not awaited and
+  // never fatal — the upload is done; a failure is caught up by the Files page (prepareOfficeTexts).
+  if (officeKindOf(file.name)) void storeOfficeText(fileId, file, file.name).catch(() => undefined);
+
   return rowToFile(data);
+}
+
+/** SQEM-658 — reads an Office file in the browser and hands its text to `store-file-text`. */
+export async function storeOfficeText(fileId: string, blob: Blob, name: string): Promise<boolean> {
+  const { readOfficeText } = await import('../officeAttachment');
+  const { text } = await readOfficeText(blob, name);
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return false;
+  const res = await fetch(functionCallUrl('store-file-text'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ fileId, text }),
+  });
+  return res.ok;
+}
+
+/**
+ * SQEM-658 — the Office files of a workspace that have no text from the current reader yet (an MCP
+ * upload, a file from before, a text from an older reader), prepared in the browser, a few per call
+ * and one after another so a visit to the Files page stays light. Admins and editors only (the
+ * function answers others with an empty list). Never throws.
+ */
+export async function prepareOfficeTexts(workspaceId: string, max = 5): Promise<number> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return 0;
+    const res = await fetch(functionCallUrl('store-file-text'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ pending: true, workspaceId }),
+    });
+    if (!res.ok) return 0;
+    const { files } = await res.json() as { files: { id: string; name: string; sizeBytes: number; storagePath: string }[] };
+    let done = 0;
+    for (const f of (files ?? []).filter(x => x.sizeBytes <= MAX_FILE_SIZE_BYTES).slice(0, max)) {
+      try {
+        const url = await getWorkspaceFileSignedUrl(f.storagePath);
+        const blob = await (await fetch(url)).blob();
+        if (await storeOfficeText(f.id, blob, f.name)) done++;
+      } catch { /* the next visit tries again */ }
+    }
+    return done;
+  } catch {
+    return 0;
+  }
 }
 
 export async function updateWorkspaceFile(

@@ -412,7 +412,8 @@ const MAX_RESULT_CHARS = 60_000;
 function bound(text: string): string {
   if (text.length <= MAX_RESULT_CHARS) return text;
   return text.slice(0, MAX_RESULT_CHARS)
-    + `\n\n[truncated — ${text.length - MAX_RESULT_CHARS} more characters were not included]`;
+    // SQEM-658 — what the cut means: an excerpt, not the file; a count or total over it is a guess.
+    + `\n\n[truncated by sqemes — ${text.length - MAX_RESULT_CHARS} more characters were not included. The source is complete; only this result is an excerpt. Do not count, sum or search across all of it from this part — say the answer covers only what is shown.]`;
 }
 
 /**

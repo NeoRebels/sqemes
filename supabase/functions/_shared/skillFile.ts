@@ -17,7 +17,7 @@
 //
 // Plain TypeScript with no Deno or browser API, so both sides import it (precedent: authoringPrompts.ts).
 
-import { isResourcePath } from './skillPaths.ts';
+import { officeKindOf, OFFICE_MIME } from './officeText.ts';
 
 /** Extension → the row type for a TEXT file. Label and reader hint only; the bytes are stored as text/plain. */
 export const TEXT_EXT_TO_MIME: Record<string, string> = {
@@ -53,6 +53,15 @@ export function isTextContentMime(mime: string): boolean {
     || mime === 'application/sql';
 }
 export const STORAGE_TEXT_MIME = 'text/plain';
+
+/**
+ * SQEM-658 — the ONE size limit for a workspace file: upload (app and MCP) and reading as text follow
+ * it ("if the upload size changes, reading must change with it"). The bucket
+ * enforces the same number (`storage.buckets.file_size_limit`, set in a migration);
+ * `tests/unit/officeAttachment.test.ts` fails when the two drift apart.
+ */
+export const MAX_FILE_SIZE_MB = 15;
+export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 /** Every content type an object in `workspace-files` can be stored with — must match the bucket allowlist. */
 export const SKILL_STORAGE_MIMES: readonly string[] = [
@@ -100,6 +109,10 @@ export function classifySkillFile(name: string, bytes: Uint8Array): SkillFileTyp
   // Signature first: a PDF written in plain ASCII is valid UTF-8 and would otherwise count as text.
   const sniffed = sniffBinaryMime(bytes);
   if (sniffed) return { rowMime: sniffed, storageMime: sniffed, isText: false };
+  // SQEM-658 — a Word/Excel/PowerPoint file (a ZIP with the matching extension) keeps its Office type
+  // on the row, so every upload path labels it alike; stored as octet-stream (the bucket allowlist).
+  const office = officeKindOf(name);
+  if (office && startsWith(bytes, [0x50, 0x4b, 0x03, 0x04])) return { rowMime: OFFICE_MIME[office], storageMime: OCTET_STREAM, isText: false };
   if (isUtf8Text(bytes)) {
     return { rowMime: TEXT_EXT_TO_MIME[extensionOf(name)] ?? STORAGE_TEXT_MIME, storageMime: STORAGE_TEXT_MIME, isText: true };
   }
@@ -107,16 +120,24 @@ export function classifySkillFile(name: string, bytes: Uint8Array): SkillFileTyp
 }
 
 /**
- * SQEM-514 — how MCP `read_context_file` hands a file out, by PURPOSE (Agent Skills: read vs use):
- * a file to read — text outside `assets/` and `scripts/` — as text; a file to use — `scripts/`,
- * `assets/`, every binary — as a download link. `as` asks for the other; text cannot be made of a
- * binary, which is refused rather than answered with garbage.
+ * How MCP `read_context_file` hands a file out — ONE rule since SQEM-658:
+ * what sqemes can read as text (a text file, a .docx/.xlsx/.pptx) comes back as text, wherever it
+ * sits; everything else (fonts, images, PDF, archives) as a download link. `as: "file"` gives the
+ * original of any file, `as: "text"` on something unreadable is refused rather than answered with
+ * garbage.
+ *
+ * ⚠️ SQEM-514 had split by FOLDER (Agent Skills: `references/` read, `scripts/`/`assets/` used, as a
+ * link). That was retired: sqemes' Files page has no such folders, so it was a rule users could
+ * neither see nor follow, and a link alone is useless where no sandbox can fetch it (sqemes Chat,
+ * ChatGPT in chat mode). A client that installs whole skills still gets the folder from
+ * `download_skill`; a link is never sent unasked because on Cloud every link counts against the
+ * workspace's daily download ceiling (SQEM-515).
  */
 export type Delivery = 'text' | 'link' | 'refuse';
 
 export function deliveryOf(name: string, mimeType: string, as?: unknown): Delivery {
-  const isText = isTextContentMime(mimeType);
-  if (as === 'text') return isText ? 'text' : 'refuse';
+  // SQEM-658 — a Word, Excel or PowerPoint file has text the server reads out of it; its row stays a binary.
+  const readable = isTextContentMime(mimeType) || officeKindOf(name) !== null;
   if (as === 'file') return 'link';
-  return isText && !isResourcePath(name) ? 'text' : 'link';
+  return readable ? 'text' : (as === 'text' ? 'refuse' : 'link');
 }

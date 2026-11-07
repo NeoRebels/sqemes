@@ -470,6 +470,7 @@ export type Database = {
           library_changes: Json | null;
           web_sources: Json | null;
           generated_files: Json | null;
+          analyses: Json | null;
         };
         Insert: {
           id?: string;
@@ -484,6 +485,7 @@ export type Database = {
           library_changes?: Json | null;
           web_sources?: Json | null;
           generated_files?: Json | null;
+          analyses?: Json | null;
         };
         Update: {
           id?: string;
@@ -498,6 +500,7 @@ export type Database = {
           library_changes?: Json | null;
           web_sources?: Json | null;
           generated_files?: Json | null;
+          analyses?: Json | null;
         };
         Relationships: [];
       };

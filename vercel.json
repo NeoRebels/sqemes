@@ -17,7 +17,6 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
@@ -25,12 +24,31 @@
       ]
     },
     {
-      "source": "/((?!oauth/authorize).*)",
+      "source": "/((?!analysis-sandbox\\.html).*)",
+      "headers": [
+        { "key": "X-Frame-Options", "value": "DENY" }
+      ]
+    },
+    {
+      "source": "/((?!oauth/authorize|analysis-sandbox\\.html).*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
           "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'self' https://messenger-app.gleap.io https://app.gleap.io https://challenges.cloudflare.com; form-action 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' https://outboundmedia.gleap.io https://app.gleap.io; font-src 'self' data: https://app.gleap.io; connect-src 'self' https://api.sqemes.com https://*.supabase.co wss://api.sqemes.com wss://*.supabase.co https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io https://api.gleap.io wss://ws.gleap.io wss://sockets.gleap.io"
         }
+      ]
+    },
+    {
+      "source": "/analysis-sandbox.html",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "default-src 'none'; script-src 'sha256-AXFmyh3t1ra4PPVuDT1SNaDpriVkDRt5H5ChhT1Bz3M=' blob: 'wasm-unsafe-eval'; worker-src blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" }
+      ]
+    },
+    {
+      "source": "/pyodide/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     }
   ]

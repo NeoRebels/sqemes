@@ -34,7 +34,7 @@ export function waitForJobResult(
    * `loadedTemplateIds`, and since SQEM-561 `libraryChanges`). Unvalidated — the caller normalizes.
    * Other callers leave it out.
    */
-  onResultMeta?: (meta: { loadedTemplateIds?: unknown; libraryChanges?: unknown; webSources?: unknown; generatedFiles?: unknown; connectorIds?: unknown }) => void,
+  onResultMeta?: (meta: { loadedTemplateIds?: unknown; libraryChanges?: unknown; webSources?: unknown; generatedFiles?: unknown; connectorIds?: unknown; analyses?: unknown }) => void,
   /**
    * SQEM-582 — how far deltas may push the deadline (from the start). Defaults to `timeoutMs`, i.e.
    * deltas extend nothing — callers that do not stream keep the old behaviour exactly.
@@ -47,6 +47,12 @@ export function waitForJobResult(
   chainCapMs: number = hardCapMs,
   /** SQEM-649 — told on every `continued`, so the page can say the answer is still being worked on. */
   onContinued?: () => void,
+  /**
+   * SQEM-660 — a program the model wants run on the attached tables. The caller runs it in the
+   * isolated frame and answers with `sendAnalysisResult`. While it runs the deadline moves on: a first
+   * start of Python can take two minutes, and the server waits for it.
+   */
+  onAnalysis?: (req: { callId: string; code: string }) => void,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const channel = supabase.channel(`job:${jobId}`);
@@ -82,14 +88,23 @@ export function waitForJobResult(
         arm();
         onContinued?.();
       })
-      .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string; loadedTemplateIds?: unknown; libraryChanges?: unknown; webSources?: unknown; generatedFiles?: unknown; connectorIds?: unknown } }) => {
+      // SQEM-660 — run_analysis: the program comes here, the result goes back on analysis:<jobId>.
+      .on('broadcast', { event: 'analysis' }, ({ payload }: { payload: { analysis?: { callId?: unknown; code?: unknown } } }) => {
+        const a = payload?.analysis;
+        if (!a || typeof a.callId !== 'string' || typeof a.code !== 'string') return;
+        cap = Math.max(cap, chainCapMs);
+        deadline = Math.min(Math.max(deadline, Date.now() + ANALYSIS_DEADLINE_MS), startedAt + cap);
+        arm();
+        onAnalysis?.({ callId: a.callId, code: a.code });
+      })
+      .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string; loadedTemplateIds?: unknown; libraryChanges?: unknown; webSources?: unknown; generatedFiles?: unknown; connectorIds?: unknown; analyses?: unknown } }) => {
         clearTimeout(timeout);
         supabase.removeChannel(channel);
         if (payload.error) {
           reject(new Error(payload.error));
         } else {
           // SQEM-651 — `connectorIds`: the connectors the session carries on with (fetched by the model).
-          onResultMeta?.({ loadedTemplateIds: payload.loadedTemplateIds, libraryChanges: payload.libraryChanges, webSources: payload.webSources, generatedFiles: payload.generatedFiles, connectorIds: payload.connectorIds });
+          onResultMeta?.({ loadedTemplateIds: payload.loadedTemplateIds, libraryChanges: payload.libraryChanges, webSources: payload.webSources, generatedFiles: payload.generatedFiles, connectorIds: payload.connectorIds, analyses: payload.analyses });
           resolve(payload.result ?? '');
         }
       })
@@ -101,4 +116,23 @@ export function waitForJobResult(
       reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
     });
   });
+}
+
+/** SQEM-660 — how far an `analysis` request moves the wait on: the server's own wait (170 s) plus margin. */
+export const ANALYSIS_DEADLINE_MS = 200_000;
+
+/**
+ * SQEM-660 — the result of one run_analysis program, back to the waiting chat-message invocation.
+ * Over REST (`httpSend`): the browser does not need to join a second channel to answer once.
+ * Never throws — a lost answer becomes the server's "the browser did not answer".
+ */
+export async function sendAnalysisResult(jobId: string, payload: { callId: string; ok: boolean; output: string; error?: string; truncated?: boolean; unstarted?: boolean }): Promise<void> {
+  const channel = supabase.channel(`analysis:${jobId}`);
+  try {
+    await channel.httpSend('analysis_result', payload);
+  } catch (e) {
+    console.warn('[analysis] result not delivered:', (e as Error)?.message ?? e);
+  } finally {
+    void supabase.removeChannel(channel);
+  }
 }

@@ -40,7 +40,7 @@ describe('SQEM-634 — a request too large for the model is said so, with the wa
   });
 
   it('the chat uses it, falling back to the raw message', () => {
-    expect(readFileSync('pages/Chat.tsx', 'utf8')).toMatch(/setError\(describeContextOverflow\(err\) \?\? err\.message\)/);
+    expect(readFileSync('pages/Chat.tsx', 'utf8')).toMatch(/failRunning\(run, describeContextOverflow\(err\) \?\? err\.message, err\.code \?\? null\)/); // SQEM-657 — via the module
   });
 
   it('both languages', () => {

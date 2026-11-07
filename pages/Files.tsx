@@ -16,7 +16,7 @@ import TagEditor from '../components/ui/TagEditor';
 import BulkActionBar from '../components/ui/BulkActionBar';
 import Modal from '../components/ui/Modal';
 import { useData, useWorkspace, useUI, usePrompts } from '../store';
-import { uploadWorkspaceFile, updateWorkspaceFile, getWorkspaceFileSignedUrl, getWorkspaceFileUsage } from '../lib/api/files';
+import { uploadWorkspaceFile, updateWorkspaceFile, getWorkspaceFileSignedUrl, getWorkspaceFileUsage, prepareOfficeTexts } from '../lib/api/files';
 import { planTagChange, tagChangeSummary, tagsOnSelection } from '../lib/fileTags';
 import { collectWorkspaceTags, withRegistry } from '../lib/workspaceTags';
 import { FILE_ACCEPT_STRING, isImageType, isMediaFile, fileTypeLabel, MAX_FILE_SIZE_MB } from '../lib/uploadTypes';
@@ -429,6 +429,14 @@ export default function Files() {
       .catch(() => { /* keep the visible-only count rather than showing nothing */ });
     return () => { cancelled = true; };
   }, [workspace.id, workspaceFiles.length, prompts]);
+
+  // SQEM-658 — Office files without a text from the current reader (an MCP upload, an older file) are
+  // prepared here in the browser, a few per visit; the server's CPU cannot read large ones. The
+  // function returns nothing to members, so no role check is needed here.
+  useEffect(() => {
+    if (!workspace.id) return;
+    void prepareOfficeTexts(workspace.id);
+  }, [workspace.id, workspaceFiles.length]);
 
   const usageCountOf = useCallback(
     (id: string) => totalUsageById.get(id) ?? templatesByFile.get(id)?.length ?? 0,

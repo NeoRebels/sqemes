@@ -20,14 +20,25 @@ export const ACCEPT_STRING = [
 ].join(',');
 
 // Files page (workspace context files) — adds the full text/code set, stored as text/plain.
+// SQEM-658 — the chat composer also takes Word, Excel and PowerPoint: read in the browser and sent as
+// text (lib/officeAttachment.ts). Kept apart from ACCEPT_STRING, which the prompt launch modal shares.
+export const CHAT_ACCEPT_STRING = [
+  ACCEPT_STRING,
+  '.docx', '.xlsx', '.pptx',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+].join(',');
+
 export const FILE_ACCEPT_STRING = [
   'image/png', 'image/jpeg', 'image/webp', 'image/gif',
   'application/pdf',
+  '.docx', '.xlsx', '.pptx', // SQEM-658 — read as text by Chat and MCP
   ...Object.keys(TEXT_EXT_TO_MIME).map(ext => `.${ext}`),
 ].join(',');
 
-export const MAX_FILE_SIZE_MB = 15;
-export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+// SQEM-658 — one limit for upload and reading, defined beside the file rules the server shares.
+export { MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES } from '../supabase/functions/_shared/skillFile';
 
 export const isImageType = (mimeType: string) => mimeType.startsWith('image/');
 

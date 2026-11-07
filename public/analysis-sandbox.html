@@ -1,0 +1,129 @@
+<!doctype html>
+<!--
+  SQEM-660 — the frame Chat's data analysis runs in. Loaded by lib/analysisSandbox.ts as
+  <iframe sandbox="allow-scripts">: an opaque origin, so it reaches neither the app, nor its
+  storage, nor the person's session.
+
+  ⛔ This frame has NO network at all (default-src 'none', no connect-src). The app fetches the
+  Python runtime itself, checks every file against its SHA-256, and hands the bytes in. Why: an
+  opaque-origin frame sends no cookies, so behind ANY login in front of the host (a hosting
+  provider's deployment protection, measured 2026-11-06; an auth proxy in front of a self-host) every request
+  of its own was redirected to the login and Python never started — silently.
+
+  ⚠️ The script is inline because a script FILE would be one of those requests. The policy allows it
+  by its hash, here and in the headers (vercel.json, selfhost/nginx.conf). Change one character of
+  the script and the hash changes: tests/unit/analysisSandbox.test.ts computes it and names the
+  three places to update.
+
+  Order of trust: the parent is the app and only ever talks to this frame; the program comes from a
+  model and is treated as hostile. It runs in a WORKER (an endless loop freezes neither the page nor
+  the parent's timeout, which removes the frame), with fetch, XHR, sockets and importScripts removed
+  once Python is loaded.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-AXFmyh3t1ra4PPVuDT1SNaDpriVkDRt5H5ChhT1Bz3M=' blob: 'wasm-unsafe-eval'; worker-src blob:; base-uri 'none'; form-action 'none'">
+<title>analysis</title>
+</head>
+<body>
+<script>
+(function () {
+  'use strict';
+  var workerSource = [
+    "const MAX_OUT = 20000;",
+    // A name no request can reach: every runtime file is answered from the bytes the app handed in.
+    "const BASE = 'https://runtime.invalid/';",
+    "let py = null;",
+    "let files = null;",
+    "const urls = [];",
+    "function typeOf(name) { return name.endsWith('.wasm') ? 'application/wasm' : name.endsWith('.json') ? 'application/json' : name.endsWith('.mjs') ? 'text/javascript' : 'application/octet-stream'; }",
+    "function fromFiles(input) {",
+    "  const url = String(input && input.url || input);",
+    "  const name = url.startsWith(BASE) ? url.slice(BASE.length).split(/[?#]/)[0] : '';",
+    "  if (files && files[name]) return Promise.resolve(new Response(files[name].slice(0), { status: 200, headers: { 'Content-Type': typeOf(name) } }));",
+    "  return Promise.reject(new TypeError('The analysis frame has no network (' + url.slice(0, 120) + ').'));",
+    "}",
+    "function moduleUrl(name) { const u = URL.createObjectURL(new Blob([files[name]], { type: 'text/javascript' })); urls.push(u); return u; }",
+    "async function boot(given) {",
+    "  files = given;",
+    "  self.fetch = fromFiles;",
+    "  const { loadPyodide } = await import(moduleUrl('pyodide.mjs'));",
+    "  const asm = await import(moduleUrl('pyodide.asm.mjs'));",
+    "  py = await loadPyodide({",
+    "    indexURL: BASE, packageBaseUrl: BASE, createPyodideModule: asm.default,",
+    "    lockFileContents: Promise.resolve(JSON.parse(new TextDecoder().decode(files['pyodide-lock.json']))),",
+    "  });",
+    "  await py.loadPackage(['numpy', 'pandas'], { messageCallback: () => {}, errorCallback: () => {} });",
+    "  await py.runPythonAsync('import pandas as pd\\nimport numpy as np\\nimport io');",
+    "  files = null;",
+    "  for (const u of urls) URL.revokeObjectURL(u);",
+    // From here on the program has no way out: no fetch, no XHR, no sockets, no further scripts.
+    "  for (const k of ['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'importScripts', 'Request', 'Worker', 'SharedWorker']) { try { self[k] = undefined; } catch (_) {} }",
+    "}",
+    "self.addEventListener('securitypolicyviolation', (e) => postMessage({ type: 'csp-violation', directive: e.violatedDirective, blocked: String(e.blockedURI || '') }));",
+    "let booted = null;",
+    "onmessage = async (ev) => {",
+    "  const msg = ev.data || {};",
+    "  if (msg.type === 'boot' && !booted) {",
+    "    booted = boot(msg.files || {});",
+    "    booted.then(() => postMessage({ type: 'ready' }), (e) => postMessage({ type: 'boot-failed', error: String(e && e.message || e) }));",
+    "    return;",
+    "  }",
+    "  if (msg.type !== 'run') return;",
+    "  try { await booted; } catch (_) {}",
+    "  if (!py) { postMessage({ type: 'result', id: msg.id, ok: false, error: 'Python could not be loaded.' }); return; }",
+    "  const out = [];",
+    "  py.setStdout({ batched: (s) => { out.push(s); } });",
+    "  py.setStderr({ batched: (s) => { out.push(s); } });",
+    "  try {",
+    "    const tables = py.toPy(Object.fromEntries((msg.tables || []).map(t => [t.key, t.csv])));",
+    "    py.globals.set('__csv', tables);",
+    // `df` is the only table, or the only one with rows (the same rule as dfTableKey in analysisTool.ts).
+    "    await py.runPythonAsync('tables = {k: (pd.read_csv(io.StringIO(v)) if v.strip() else pd.DataFrame()) for k, v in __csv.items()}\\ndel __csv\\n_t = [v for v in tables.values() if len(v)]\\ndf = next(iter(tables.values())) if len(tables) == 1 else (_t[0] if len(_t) == 1 else None)\\ndel _t');",
+    "    tables.destroy();",
+    "    const value = await py.runPythonAsync(String(msg.code || ''));",
+    "    let shown = '';",
+    "    if (value !== undefined && value !== null) {",
+    "      try { shown = (value.to_string ? value.to_string() : String(value)); } catch (_) { shown = String(value); }",
+    "      if (value.destroy) value.destroy();",
+    "    }",
+    "    let text = out.join('\\n') + (shown ? (out.length ? '\\n' : '') + shown : '');",
+    "    const cut = text.length > MAX_OUT;",
+    "    if (cut) text = text.slice(0, MAX_OUT);",
+    "    postMessage({ type: 'result', id: msg.id, ok: true, output: text, truncated: cut });",
+    "  } catch (e) {",
+    "    const err = String(e && e.message || e);",
+    "    postMessage({ type: 'result', id: msg.id, ok: false, error: err.slice(-4000), output: out.join('\\n').slice(0, 4000) });",
+    "  }",
+    "};",
+  ].join('\n');
+
+  // ⚠️ A CLASSIC worker, loading Pyodide with import(): a module worker from a blob URL dies silently in
+  // a sandboxed frame (measured in Chrome, 2026-11-06), while a classic one loads the module fine.
+  var worker = null;
+  // Only the frame's own message types reach the app; a program cannot speak for the frame otherwise.
+  var KNOWN = { ready: 1, 'boot-failed': 1, result: 1, 'csp-violation': 1 };
+  // A policy violation is reported, not swallowed: it is how a too-strict (or too-loose) frame shows.
+  document.addEventListener('securitypolicyviolation', function (ev) {
+    window.parent.postMessage({ type: 'csp-violation', directive: ev.violatedDirective, blocked: String(ev.blockedURI || '') }, '*');
+  });
+  window.addEventListener('message', function (ev) {
+    if (ev.source !== window.parent) return;
+    var d = ev.data || {};
+    if (d.type === 'boot' && !worker) {
+      worker = new Worker(URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' })));
+      worker.onmessage = function (e) { if (e.data && KNOWN[e.data.type]) window.parent.postMessage(e.data, '*'); };
+      worker.onerror = function (e) { window.parent.postMessage({ type: 'boot-failed', error: String(e.message || 'worker error') }, '*'); };
+      var files = d.files || {};
+      worker.postMessage({ type: 'boot', files: files }, Object.keys(files).map(function (k) { return files[k]; }));
+    } else if (d.type === 'run' && worker) {
+      worker.postMessage(d);
+    }
+  });
+  // The app waits for this before it hands the runtime in.
+  window.parent.postMessage({ type: 'hello' }, '*');
+})();
+</script>
+</body>
+</html>

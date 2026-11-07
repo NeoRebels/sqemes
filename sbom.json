@@ -3,11 +3,11 @@
   "specVersion": "1.5",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-11-05T07:46:32.098Z",
+    "timestamp": "2026-11-07T18:45:39.025Z",
     "component": {
       "type": "application",
       "name": "sqemes",
-      "version": "1.11.35"
+      "version": "1.11.36"
     }
   },
   "components": [
@@ -2653,6 +2653,76 @@
           "license": {
             "id": "MIT"
           }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pyodide",
+      "version": "314.0.7",
+      "licenses": [
+        {
+          "expression": "MPL-2.0"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "cpython-stdlib",
+      "version": "3.14.2",
+      "licenses": [
+        {
+          "expression": "PSF-2.0"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "numpy",
+      "version": "2.4.6",
+      "licenses": [
+        {
+          "expression": "BSD-3-Clause"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pandas",
+      "version": "3.0.2",
+      "licenses": [
+        {
+          "expression": "BSD-3-Clause"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "python-dateutil",
+      "version": "2.9.0.post0",
+      "licenses": [
+        {
+          "expression": "Apache-2.0 OR BSD-3-Clause"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pytz",
+      "version": "2026.1.post1",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "six",
+      "version": "1.17.0",
+      "licenses": [
+        {
+          "expression": "MIT"
         }
       ]
     },

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, memo, useSyncExternalStore } from 'react';
 import { describeContextOverflow } from '../lib/aiErrors';
 import { getLocale, m as txt } from '../lib/i18n'; // SQEM-599 — the language of server notices; SQEM-604 — `txt`, because `m` is a common callback name in this file
 import { useUI, useWorkspace, useData, useChatSessions, usePrompts } from '../store';
@@ -6,7 +6,7 @@ import { can } from '../lib/permissions';
 import { checkContentViolation } from '../lib/contentGuard';
 import { IS_SELF_HOSTED, functionCallUrl } from '../lib/env';
 import { supabase } from '../lib/supabase';
-import { waitForJobResult } from '../lib/realtimeJob';
+import { waitForJobResult, sendAnalysisResult } from '../lib/realtimeJob';
 import { clientJobTimeoutMs, clientHardCapMs, clientChainCapMs } from '../supabase/functions/_shared/chatTimeouts.ts';
 import { AVAILABLE_MODELS } from '../constants';
 import { buildEnabledModels, isFundedModel, isImageModel } from '../lib/enabledModels';
@@ -17,7 +17,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { fetchPersona, fetchPersonas } from '../lib/api/personas';
 import { clearChatHandoff, peekChatHandoff } from '../lib/chatHandoff';
 import { buildPendingRef, finalizeRef, messagePlaybookFields, normalizeLoadedIds, pendingFromSent, usedPlaybooks, type PendingPlaybookRef } from '../lib/playbookRef';
-import { ChatPlaybookCard, UsedPlaybookChips, LibraryChangesCard, WebSourcesCard } from '../components/ChatPlaybookCard';
+import { ChatPlaybookCard, UsedPlaybookChips, LibraryChangesCard, WebSourcesCard, AnalysesCard } from '../components/ChatPlaybookCard';
 import { normalizeWebSources, type WebSources } from '../supabase/functions/_shared/webSearch.ts';
 import { normalizeGeneratedFiles, type GeneratedFile } from '../supabase/functions/_shared/fileOutput.ts';
 import { GeneratedFilesCard, FilePreviewPanel } from '../components/ChatFileOutput';
@@ -33,7 +33,12 @@ import { enhancePrompt, enhanceInput } from '../supabase/functions/_shared/autho
 import { shouldSendOnEnter, hasCoarsePointer } from '../lib/chatKeys';
 import { noKeyHint, PROVIDER_KEYS_TAB } from '../lib/chatKeyHint';
 import { useLocation, useNavigate, useParams, Link } from 'react-router';
-import { SUPPORTED_MIME_TYPES, ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, isImageType, fileTypeLabel } from '../lib/uploadTypes';
+import { SUPPORTED_MIME_TYPES, CHAT_ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, isImageType, fileTypeLabel } from '../lib/uploadTypes';
+import { officeAttachment } from '../lib/officeAttachment';
+import { tablesFromFile, isTableFile, uniqueTables, analysisTableMeta, type AttachmentTable } from '../lib/analysisTables';
+import { runAnalysis, preloadAnalysis } from '../lib/analysisSandbox';
+import { normalizeAnalyses, storedAnalyses, type AnalysisRecord, type ShownAnalysis } from '../supabase/functions/_shared/analysisTool';
+import { officeKindOf, isLegacyOfficeName } from '../supabase/functions/_shared/officeText';
 import {
   createChatSession, addChatMessage, fetchChatMessages, deleteChatMessages,
   fetchSharedChatSessions,
@@ -43,6 +48,7 @@ import {
   requestChatJobCancel,
 } from '../lib/api/chatSessions';
 import { stoppedContent } from '../lib/chatStop';
+import { subscribeRunningChat, getRunningChat, startRunning, updateRunning, finishRunning, failRunning, endRunning, takeFinished, clearFailed, withRunningAnswer, type RunningAnswer } from '../lib/runningChat';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import { uploadWorkspaceFile, getWorkspaceFileSignedUrl } from '../lib/api/files';
@@ -149,13 +155,15 @@ function truncateMessagesToPayloadLimit(
   return trimmed;
 }
 
-interface ChatAttachment { id: string; file: File; dataUrl: string; mimeType: string; }
+// SQEM-658 — `label` names an Office attachment (DOCX…), which travels as text and would otherwise read TXT.
+// SQEM-660 — `tables`: what an .xlsx/.csv offers run_analysis, full and in memory only (never sent, never stored).
+interface ChatAttachment { id: string; file: File; dataUrl: string; mimeType: string; label?: string; tables?: AttachmentTable[]; }
 interface ChatMsg {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   pending?: boolean;
-  attachments?: Array<{ mimeType: string; dataUrl: string }>;
+  attachments?: Array<{ mimeType: string; dataUrl: string; label?: string; tables?: AttachmentTable[] }>;
   model?: string;
   userId?: string;
   userName?: string;
@@ -165,6 +173,8 @@ interface ChatMsg {
   libraryChanges?: LibraryChange[];   // SQEM-561 — answer: what the model changed in the library
   webSources?: WebSources | null;     // SQEM-594 — answer: what it searched for and read
   generatedFiles?: GeneratedFile[];   // SQEM-595 — answer: files it handed out (built on download)
+  analyses?: ShownAnalysis[];         // SQEM-660 — answer: what run_analysis ran (live with the program; after a reload only ok)
+  analysing?: boolean;                // SQEM-660 — answer: a program is running in this browser right now
   continuing?: boolean;               // SQEM-649 — answer: handed to a new invocation, still being worked on
 }
 
@@ -243,7 +253,7 @@ const MessageItem = memo(function MessageItem({
                       {msg.attachments.map((att, i) =>
                         isImageType(att.mimeType)
                           ? <img key={i} src={att.dataUrl} alt={txt.chat_attachment_alt()} className="max-w-[200px] max-h-[150px] rounded-lg object-cover border border-line" />
-                          : <span key={i} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 bg-surface-sunken text-xs font-medium text-ink-muted"><FileText className="w-4 h-4" />{fileTypeLabel(att.mimeType)}</span>
+                          : <span key={i} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 bg-surface-sunken text-xs font-medium text-ink-muted"><FileText className="w-4 h-4" />{att.label ?? fileTypeLabel(att.mimeType)}</span>
                       )}
                     </div>
                   )}
@@ -259,7 +269,7 @@ const MessageItem = memo(function MessageItem({
                     ) : (
                       <div key={i} className="flex items-center gap-1.5 bg-white/10 rounded-lg px-2.5 py-1.5">
                         <FileText className="w-4 h-4 text-white/70" />
-                        <span className="text-xs text-white/80 font-medium">{fileTypeLabel(att.mimeType)}</span>
+                        <span className="text-xs text-white/80 font-medium">{att.label ?? fileTypeLabel(att.mimeType)}</span>
                       </div>
                     )
                   )}
@@ -298,7 +308,7 @@ const MessageItem = memo(function MessageItem({
               {msg.continuing && (
                 <div className="flex items-center gap-2 mt-2 text-xs text-slate-400 dark:text-slate-500">
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>{txt.chat_still_working()}</span>
+                  <span>{msg.analysing ? txt.chat_analysis_running() : txt.chat_still_working()}</span>
                 </div>
               )}
               {msg.model && !msg.pending && <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2 font-mono">{msg.model}</p>}
@@ -307,6 +317,7 @@ const MessageItem = memo(function MessageItem({
             {!msg.pending && <LibraryChangesCard changes={msg.libraryChanges} currentTitle={libraryTitle} />}
             {!msg.pending && <GeneratedFilesCard files={msg.generatedFiles} onOpen={onOpenFile} />}
             {!msg.pending && <WebSourcesCard sources={msg.webSources} />}
+            {!msg.pending && <AnalysesCard analyses={msg.analyses} />}
             {!msg.pending && (
               <button onClick={() => onCopy(msg.id, msg.content)} className="mt-2 ml-1 inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
                 {isCopied ? <><Check className="w-3.5 h-3.5" /> {txt.chat_copied()}</> : <><Copy className="w-3.5 h-3.5" /> {txt.chat_copy()}</>}
@@ -389,9 +400,11 @@ const Chat = () => {
    * `composeSystemInstruction` depends on.
    */
   const [activeSkills, setActiveSkills] = useState<{ template: Prompt; context: string }[]>([]);
-  const [isLoading, setIsLoading]             = useState(false);
-  const [error, setError]                     = useState<string | null>(null);
-  const [errorCode, setErrorCode]             = useState<string | null>(null);
+  // SQEM-657 — the running answer, its end and its error live in lib/runningChat.ts, not here: the
+  // send handler outlives a chat switch and the page itself. `isLoading` = an answer runs somewhere
+  // (one at a time — the browser stores it); `generatingHere` (below) = it runs in THIS chat.
+  const runningChat = useSyncExternalStore(subscribeRunningChat, getRunningChat<ChatMsg>);
+  const isLoading = runningChat.running !== null;
   // SQEM-550 (a) — text handed over from the Start page's composer (lib/chatHandoff.ts). Read once;
   // the input starts with it, and it is sent automatically as soon as the chat is ready (below).
   const [handoff]                              = useState(() => peekChatHandoff());
@@ -402,6 +415,13 @@ const Chat = () => {
   const [isEnhancing, setIsEnhancing]         = useState(false);
   const [dragActive, setDragActive]           = useState(false);
   const [sessionId, setSessionId]             = useState<string | null>(null);
+  // SQEM-657 — what this chat shows: its messages plus, if the running answer is this chat's, its
+  // question and bubble, plus a finished answer not taken in yet (matched by id, never twice).
+  const shownMessages = useMemo(() => withRunningAnswer(messages, runningChat, sessionId), [messages, runningChat, sessionId]);
+  const generatingHere = runningChat.running !== null && runningChat.running.sessionId === sessionId;
+  const failedHere = runningChat.failed && runningChat.failed.sessionId === sessionId ? runningChat.failed : null;
+  const error = failedHere?.message ?? null;
+  const errorCode = failedHere?.code ?? null;
   const [attachMenuOpen, setAttachMenuOpen]   = useState(false);
   // SQEM-149 — the workspace's connectors.
   const [connectors, setConnectors]           = useState<Connector[]>([]);
@@ -474,10 +494,6 @@ const Chat = () => {
   const supersededIdsRef    = useRef<string[]>([]);
   const menuRef             = useRef<HTMLDivElement>(null);
   const renameInputRef      = useRef<HTMLInputElement>(null);
-  const abortControllerRef  = useRef<AbortController | null>(null);
-  // SQEM-583 — the answer running now (for Stop) and the text it has written so far (kept on Stop).
-  const runningJobRef = useRef<{ jobId: string; stopped: boolean } | null>(null);
-  const streamedTextRef = useRef('');
   const membersRef          = useRef(workspace.members);
   useEffect(() => { membersRef.current = workspace.members; }, [workspace.members]);
 
@@ -627,6 +643,7 @@ const Chat = () => {
           libraryChanges: m.libraryChanges, // SQEM-561
           webSources: m.webSources, // SQEM-594
           generatedFiles: m.generatedFiles, // SQEM-595
+          analyses: m.analyses, // SQEM-660 — count and success only
         })));
         setSessionId(routeSessionId);
         setMobileTab('chat');
@@ -720,10 +737,20 @@ const Chat = () => {
     }
   }, [chatSessions, sessionId, enabledModels, defaultModelId]);
 
+  // SQEM-657 — a finished answer of THIS chat becomes one of its messages (replacing a copy that came
+  // in through the live channel first), and leaves the module — so an edit that cuts it off later does
+  // not bring it back. Another chat's answer waits there until that chat is opened.
+  useEffect(() => {
+    const f = runningChat.finished;
+    if (!f || f.sessionId !== sessionId) return;
+    setMessages(prev => (prev.some(m => m.id === f.msg.id) ? prev.map(m => (m.id === f.msg.id ? f.msg : m)) : [...prev, f.msg]));
+    takeFinished(f.msg.id);
+  }, [runningChat.finished, sessionId]);
+
   useEffect(() => {
     const container = messagesScrollRef.current;
     if (!container) return;
-    const lastMsg = messages[messages.length - 1];
+    const lastMsg = shownMessages[shownMessages.length - 1];
     if (lastMsg?.role === 'assistant' && lastAssistantRef.current) {
       // Scroll so the start of the assistant reply is ~20px below the top of the container.
       const offset = lastAssistantRef.current.offsetTop - container.offsetTop - 20;
@@ -731,7 +758,7 @@ const Chat = () => {
     } else {
       container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [shownMessages]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -757,24 +784,24 @@ const Chat = () => {
 
   // SQEM-583 — Stop: the server is asked to abort (that is what ends the cost), then the client stops
   // waiting. What was written so far is kept by the send handler's AbortError branch.
+  // SQEM-657 — the job and its controller come from lib/runningChat.ts, so Stop works after a page
+  // change too, and the button is only offered in the chat whose answer runs (`generatingHere`).
   const handleStop = () => {
-    const job = runningJobRef.current;
-    if (!job || job.stopped) return;
-    job.stopped = true;
-    requestChatJobCancel(job.jobId).catch(() => { /* a finished job needs no stop */ });
-    abortControllerRef.current?.abort();
+    const run = getRunningChat<ChatMsg>().running;
+    if (!run?.jobId || run.stopped) return;
+    updateRunning(run, { stopped: true });
+    requestChatJobCancel(run.jobId).catch(() => { /* a finished job needs no stop */ });
+    run.controller.abort();
   };
 
   const handleNewChat = () => {
     // SQEM-583 — leaving a running answer stops it on the server too; before, it ran on unseen.
-    if (runningJobRef.current) requestChatJobCancel(runningJobRef.current.jobId).catch(() => {});
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = null;
-    setIsLoading(false);
+    const run = getRunningChat<ChatMsg>().running;
+    if (run?.jobId) requestChatJobCancel(run.jobId).catch(() => {});
+    if (run) { run.controller.abort(); endRunning(run); }
     setMessages([]);
     supersededIdsRef.current = []; // SQEM-115 — drop any unsent edit truncation
-    setError(null);
-    setErrorCode(null);
+    clearFailed();
     setInput('');
     setAttachments([]);
     setActivePersona(null); // SQEM-389
@@ -796,7 +823,37 @@ const Chat = () => {
     } catch { showToast(txt.chat_copy_failed(), 'error'); }
   }, [showToast]);
 
+  // SQEM-658 — read in the browser and attached as text (lib/officeAttachment.ts), so every model gets it.
+  // SQEM-660 — a table file also offers its full rows to run_analysis; Python starts loading now,
+  // while the question is typed (not on data-saver devices). A failure here only costs the analysis.
+  const tablesOf = async (blob: Blob, name: string, mimeType = ''): Promise<AttachmentTable[] | undefined> => {
+    if (!isTableFile(name, mimeType)) return undefined;
+    try {
+      const t = await tablesFromFile(blob, name);
+      if (t.length) preloadAnalysis();
+      return t.length ? t : undefined;
+    } catch { return undefined; }
+  };
+
+  const attachOffice = async (blob: Blob, name: string) => {
+    try {
+      const { dataUrl, label, truncated } = await officeAttachment(blob, name);
+      const tables = await tablesOf(blob, name);
+      setAttachments(prev => [...prev, { id: crypto.randomUUID(), file: new File([], name), dataUrl, mimeType: 'text/plain', label, tables }]);
+      // SQEM-660 — for a table the excerpt is only what the model reads; run_analysis computes on all of it.
+      if (truncated) showToast(tables ? txt.chat_attach_truncated_table({ name }) : txt.chat_attach_truncated({ name }), 'info');
+    } catch {
+      showToast(txt.chat_attach_office_failed({ name }), 'error');
+    }
+  };
+
   const processFile = (file: File) => {
+    if (officeKindOf(file.name)) {
+      if (file.size > MAX_FILE_SIZE_BYTES) { showToast(txt.chat_file_too_big({ size: MAX_FILE_SIZE_MB }), 'error'); return; }
+      void attachOffice(file, file.name);
+      return;
+    }
+    if (isLegacyOfficeName(file.name)) { showToast(txt.chat_attach_legacy_office(), 'error'); return; }
     if (!SUPPORTED_MIME_TYPES.has(file.type)) {
       showToast(txt.chat_unsupported_file(), 'error'); return;
     }
@@ -804,13 +861,16 @@ const Chat = () => {
       showToast(txt.chat_file_too_big({ size: MAX_FILE_SIZE_MB }), 'error'); return;
     }
     const reader = new FileReader();
-    reader.onloadend = () => setAttachments(prev => [...prev, { id: crypto.randomUUID(), file, dataUrl: reader.result as string, mimeType: file.type }]);
+    reader.onloadend = async () => {
+      const tables = await tablesOf(file, file.name, file.type); // SQEM-660 — a .csv
+      setAttachments(prev => [...prev, { id: crypto.randomUUID(), file, dataUrl: reader.result as string, mimeType: file.type, tables }]);
+    };
     reader.readAsDataURL(file);
   };
 
   // Persist an uploaded file to the workspace library (when "Save to workspace" is on).
   const saveFileToWorkspace = async (file: File) => {
-    if (!SUPPORTED_MIME_TYPES.has(file.type) || file.size > MAX_FILE_SIZE_BYTES) return;
+    if ((!SUPPORTED_MIME_TYPES.has(file.type) && !officeKindOf(file.name)) || file.size > MAX_FILE_SIZE_BYTES) return; // SQEM-658 — Office too
     try {
       const wf = await uploadWorkspaceFile(workspace.id, file);
       addWorkspaceFile(wf);
@@ -837,13 +897,15 @@ const Chat = () => {
         const url = await getWorkspaceFileSignedUrl(f.storagePath);
         const res = await fetch(url);
         const blob = await res.blob();
+        if (officeKindOf(f.name)) { await attachOffice(blob, f.name); continue; } // SQEM-658
         const dataUrl: string = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onloadend = () => resolve(reader.result as string);
           reader.onerror = reject;
           reader.readAsDataURL(blob);
         });
-        setAttachments(prev => [...prev, { id: crypto.randomUUID(), file: new File([], f.name, { type: f.mimeType }), dataUrl, mimeType: f.mimeType }]);
+        const tables = await tablesOf(blob, f.name, f.mimeType); // SQEM-660
+        setAttachments(prev => [...prev, { id: crypto.randomUUID(), file: new File([], f.name, { type: f.mimeType }), dataUrl, mimeType: f.mimeType, tables }]);
       } catch {
         showToast(txt.chat_attach_failed({ name: f.name }), 'error');
       }
@@ -936,7 +998,7 @@ const Chat = () => {
     setInput(msg.content);
     pendingPlaybookRef.current = pendingFromSent(msg.playbookRef, msg.content); // SQEM-551 — the card comes back with it
     if (msg.attachments?.length) {
-      setAttachments(msg.attachments.map(a => ({ id: crypto.randomUUID(), file: new File([], 'restored'), dataUrl: a.dataUrl, mimeType: a.mimeType })));
+      setAttachments(msg.attachments.map(a => ({ id: crypto.randomUUID(), file: new File([], 'restored'), dataUrl: a.dataUrl, mimeType: a.mimeType, label: a.label })));
     } else {
       setAttachments([]);
     }
@@ -947,9 +1009,9 @@ const Chat = () => {
   // `messages.map(...).lastIndexOf('assistant')` inside the render map).
   const handleAvatarError = useCallback(() => setAvatarLoadError(true), []);
   const lastAssistantIndex = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === 'assistant') return i;
+    for (let i = shownMessages.length - 1; i >= 0; i--) if (shownMessages[i].role === 'assistant') return i;
     return -1;
-  }, [messages]);
+  }, [shownMessages]);
 
   const handleEnhanceInput = async () => {
     const trimmed = input.trim();
@@ -1053,7 +1115,7 @@ const Chat = () => {
 
   const handleSend = async () => {
     const trimmed = input.trim();
-    if (!trimmed || isLoading || !selectedModel) return;
+    if (!trimmed || getRunningChat().running || !selectedModel) return; // SQEM-657 — read live: one answer at a time
 
     // SQEM-170 — Content Governance is a Cloud-only feature
     if (!IS_SELF_HOSTED) {
@@ -1061,11 +1123,9 @@ const Chat = () => {
       if (violation) { showToast(violation, 'error'); return; }
     }
 
-    abortControllerRef.current?.abort();
     const controller = new AbortController();
-    abortControllerRef.current = controller;
 
-    const currentAttachments = attachments.map(a => ({ mimeType: a.mimeType, dataUrl: a.dataUrl }));
+    const currentAttachments = attachments.map(a => ({ mimeType: a.mimeType, dataUrl: a.dataUrl, label: a.label, tables: a.tables }));
     const playbookRef = finalizeRef(pendingPlaybookRef.current, trimmed); // SQEM-551
     pendingPlaybookRef.current = null;
     const userMsg: ChatMsg = { id: crypto.randomUUID(), role: 'user', content: trimmed, attachments: currentAttachments.length > 0 ? currentAttachments : undefined, playbookRef };
@@ -1076,14 +1136,14 @@ const Chat = () => {
     // SQEM-594 — read once for this message, then switched off for the next one.
     const webThis = webNext && webAvailable;
     setWebNext(false);
-    setError(null);
-    setErrorCode(null);
-    setIsLoading(true);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
     const isNewSession = !sessionId;
     let activeSessionId: string | null = sessionId;
-    let started: { jobId: string; assistantMsgId: string } | null = null; // SQEM-583
+    // SQEM-657 — everything the page shows about this answer goes through `run` (lib/runningChat.ts):
+    // the bubble, Stop, the end, the error. This handler may finish after the person opened another
+    // chat or left the page; the module is what the page they are on now reads.
+    const run: RunningAnswer<ChatMsg> = startRunning({ sessionId, userMsg, model: '', controller });
 
     try {
       if (!activeSessionId) {
@@ -1098,6 +1158,7 @@ const Chat = () => {
           sessionConnectorIds, // SQEM-635 — likewise
         );
         activeSessionId = newSession.id;
+        updateRunning(run, { sessionId: activeSessionId }); // SQEM-657 — the answer now belongs to this chat
         sessionLoadedRef.current = activeSessionId; // prevent fetch from overwriting optimistic messages
         setSessionId(activeSessionId);
         addChatSession(newSession);
@@ -1107,7 +1168,7 @@ const Chat = () => {
       storeUpdateSession(activeSessionId, { isGenerating: true }).catch(() => {});
 
       const userContentForStorage = currentAttachments.length > 0
-        ? `${trimmed}\n${currentAttachments.map(a => `[Attachment: ${a.mimeType}]`).join('\n')}`.trim()
+        ? `${trimmed}\n${currentAttachments.map(a => `[Attachment: ${a.label ?? a.mimeType}]`).join('\n')}`.trim()
         : trimmed;
 
       // SQEM-115 — prune messages truncated by an edit before persisting the new exchange. Private
@@ -1138,9 +1199,6 @@ const Chat = () => {
       const modelInfo = AVAILABLE_MODELS.find(m => m.id === selectedModel) ?? enabledModels.find(m => m.id === selectedModel);
       const assistantMsgId = crypto.randomUUID();
       const jobId = crypto.randomUUID();
-      started = { jobId, assistantMsgId };
-      runningJobRef.current = { jobId, stopped: false };
-      streamedTextRef.current = '';
       // Funded (keyless) → send `funded` and omit modelId; the server picks the funded model.
       const funded = isFundedModel(selectedModel);
       // SQEM-370 — the zone is the only part of the time context the client knows; the server
@@ -1150,8 +1208,10 @@ const Chat = () => {
       const chatPayloadBase = { workspaceId: workspace.id, modelId: funded ? undefined : selectedModel, funded, systemInstruction: composeSystemInstruction(activeSystemInstruction || null, activeSkills.map(s => s.context)), timeZone };
       const messagesToSend = truncateMessagesToPayloadLimit(allMessages, chatPayloadBase);
 
-      // Show thinking bubble immediately — before the fetch even completes
-      setMessages(prev => [...prev, { id: assistantMsgId, role: 'assistant', content: '', pending: true, model: modelInfo?.name || selectedModel }]);
+      // Show thinking bubble immediately — before the fetch even completes. SQEM-657 — it is drawn from
+      // the module (`runningBubble`: thinking until the first text), so it survives a chat switch.
+      // SQEM-583 — from here Stop has a job to cancel.
+      updateRunning(run, { jobId, assistantMsgId, model: modelInfo?.name || selectedModel });
 
       // Subscribe to Realtime before sending the request
       //
@@ -1171,11 +1231,12 @@ const Chat = () => {
       let webSources: WebSources | null = null; // SQEM-594
       let generatedFiles: GeneratedFile[] = []; // SQEM-595
       let carriedConnectorIds: string[] | null = null; // SQEM-651
+      let analyses: AnalysisRecord[] = []; // SQEM-660
+      // SQEM-660 — every table attached in this chat so far, full rows in memory. Captured here, so an
+      // analysis still runs on the right data after a switch to another chat (SQEM-657).
+      const chatTables = uniqueTables([...messages, userMsg].flatMap(m => (m.attachments ?? []).map(a => a.tables ?? [])));
       const resultPromise = waitForJobResult(jobId, controller.signal, (textSoFar) => {
-        streamedTextRef.current = textSoFar;
-        setMessages(prev => prev.map(m => (
-          m.id === assistantMsgId ? { ...m, content: textSoFar, pending: false } : m
-        )));
+        updateRunning(run, { text: textSoFar });
       }, clientJobTimeoutMs({ selfHosted: IS_SELF_HOSTED }),
       // SQEM-551 — what the model loaded for this answer ("Used" chips).
       (meta) => {
@@ -1184,16 +1245,23 @@ const Chat = () => {
         webSources = normalizeWebSources(meta.webSources);
         generatedFiles = normalizeGeneratedFiles(meta.generatedFiles);
         carriedConnectorIds = Array.isArray(meta.connectorIds) ? meta.connectorIds.filter((x): x is string => typeof x === 'string') : null;
+        analyses = normalizeAnalyses(meta.analyses);
       }, clientHardCapMs({ selfHosted: IS_SELF_HOSTED }), // SQEM-582 — deltas may extend up to this
       // SQEM-649 — after a hand-over the wait may run to the chain's end; the bubble says it is still working.
       clientChainCapMs({ selfHosted: IS_SELF_HOSTED }),
-      () => setMessages(prev => prev.map(m => (m.id === assistantMsgId ? { ...m, continuing: true } : m))));
+      () => updateRunning(run, { continuing: true }),
+      // SQEM-660 — run the model's program on this chat's tables, in the isolated frame, and answer.
+      chatTables.length ? ({ callId, code }) => {
+        updateRunning(run, { continuing: true, analysing: true });
+        void runAnalysis(code, chatTables.map(t => ({ key: t.key, csv: t.csv })))
+          .then(r => { updateRunning(run, { analysing: false }); return sendAnalysisResult(jobId, { callId, ...r }); });
+      } : undefined);
 
       const res = await fetch(functionCallUrl('chat-message'), {
         method: 'POST',
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ ...chatPayloadBase, messages: messagesToSend, jobId, connectorIds: activeConnectorIds, ...(webThis ? { webSearch: true } : {}), locale: getLocale() }),
+        body: JSON.stringify({ ...chatPayloadBase, messages: messagesToSend, jobId, connectorIds: activeConnectorIds, ...(webThis ? { webSearch: true } : {}), ...(chatTables.length ? { analysisTables: analysisTableMeta(chatTables) } : {}), locale: getLocale() }),
       });
 
       if (!res.ok) throw await edgeError(res);
@@ -1206,11 +1274,11 @@ const Chat = () => {
       if (resData?.result !== undefined) {
         // Image generation models return { result } directly (fast path, no jobId)
         rawResult = resData.result || txt.chat_no_content();
-        setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: inlineImagesToBlobUrls(rawResult), pending: false } : m));
+        finishRunning(run, { id: assistantMsgId, role: 'assistant', content: inlineImagesToBlobUrls(rawResult), model: run.model });
       } else {
         // Text model — wait for Realtime broadcast
         rawResult = await resultPromise;
-        setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: inlineImagesToBlobUrls(rawResult), pending: false, continuing: false, loadedTemplateIds, libraryChanges, webSources, generatedFiles } : m));
+        finishRunning(run, { id: assistantMsgId, role: 'assistant', content: inlineImagesToBlobUrls(rawResult), model: run.model, loadedTemplateIds, libraryChanges, webSources, generatedFiles, ...(analyses.length ? { analyses } : {}) });
         // SQEM-651 — a connector the model fetched stays for this chat, so the next message does not
         // fetch it again. Stored on the session of THIS message, shown only if it is still the open one.
         if (carriedConnectorIds?.length && activeSessionId) {
@@ -1229,22 +1297,23 @@ const Chat = () => {
       }
 
       // Save original base64 content to DB (use same ID so realtime can deduplicate)
-      if (activeSessionId) addChatMessage(activeSessionId, 'assistant', rawResult, selectedModel, undefined, assistantMsgId, { loadedTemplateIds, libraryChanges, webSources, generatedFiles }).catch(() => {});
+      if (activeSessionId) addChatMessage(activeSessionId, 'assistant', rawResult, selectedModel, undefined, assistantMsgId, { loadedTemplateIds, libraryChanges, webSources, generatedFiles, analyses: storedAnalyses(analyses) }).catch(() => {});
 
       // First exchange of a new chat → upgrade the truncated title to an AI topic title.
       if (isNewSession && activeSessionId) generateChatTitle(trimmed, rawResult, activeSessionId);
     } catch (err: any) {
-      const job = runningJobRef.current;
-      if (err.name === 'AbortError' && started && job?.jobId === started.jobId && job.stopped) {
+      if (err.name === 'AbortError' && run.assistantMsgId && run.stopped) {
         // SQEM-583 — stopped on purpose: keep what was written, say that it ends here, and store it.
-        const content = stoppedContent(streamedTextRef.current);
-        const { assistantMsgId } = started;
-        setMessages(prev => prev.map(m => (m.id === assistantMsgId ? { ...m, content, pending: false, continuing: false } : m)));
+        const content = stoppedContent(run.text);
+        const assistantMsgId = run.assistantMsgId;
+        finishRunning(run, { id: assistantMsgId, role: 'assistant', content, model: run.model });
         if (activeSessionId) addChatMessage(activeSessionId, 'assistant', content, selectedModel, undefined, assistantMsgId).catch(() => {});
-      } else if (err.name !== 'AbortError') { setError(describeContextOverflow(err) ?? err.message); setErrorCode(err.code ?? null); } // SQEM-634
+      } else if (err.name !== 'AbortError') {
+        // SQEM-634 — readable overflow text; SQEM-657 — the error belongs to this answer's chat.
+        failRunning(run, describeContextOverflow(err) ?? err.message, err.code ?? null);
+      }
     } finally {
-      if (started && runningJobRef.current?.jobId === started.jobId) runningJobRef.current = null;
-      setIsLoading(false);
+      endRunning(run); // SQEM-657 — no-op when finished or failed above
       if (activeSessionId) storeUpdateSession(activeSessionId, { isGenerating: false }).catch(() => {});
     }
   };
@@ -1328,7 +1397,9 @@ const Chat = () => {
 
   const modelInfo = AVAILABLE_MODELS.find(m => m.id === selectedModel) ?? enabledModels.find(m => m.id === selectedModel);
   const activeSession = chatSessions.find(s => s.id === sessionId);
-  const otherIsGenerating = !!activeSession?.isGenerating && !isLoading;
+  // SQEM-657 — `!generatingHere`, not `!isLoading`: the flag on the row is set by OUR answer too, and
+  // after a page change that answer is still ours; for anyone else's it says someone is waiting.
+  const otherIsGenerating = !!activeSession?.isGenerating && !generatingHere;
 
   // ── Session list item ─────────────────────────────────────────────────────
 
@@ -1682,7 +1753,7 @@ const Chat = () => {
           {/* Messages area */}
           <div ref={messagesScrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain">
             <PullToRefreshIndicator {...pull} />
-            {messages.length === 0 ? (
+            {shownMessages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6">
                 <div className="w-14 h-14 rounded-card bg-accent-soft flex items-center justify-center mb-4">
                   <Sparkles className="w-7 h-7 text-accent" />
@@ -1708,7 +1779,7 @@ const Chat = () => {
               </div>
             ) : (
               <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-                {messages.map((msg, index) => (
+                {shownMessages.map((msg, index) => (
                   <MessageItem
                     key={msg.id}
                     msg={msg}
@@ -1719,7 +1790,7 @@ const Chat = () => {
                     userAvatar={userAvatar}
                     showUserAvatar={showUserAvatar}
                     onAvatarError={handleAvatarError}
-                    isLoading={isLoading}
+                    isLoading={generatingHere}
                     isCopied={copiedMessageId === msg.id}
                     onCopy={handleCopyMessage}
                     onEdit={handleEditMessage}
@@ -1766,10 +1837,26 @@ const Chat = () => {
 
           {/* Input area */}
           <div className="shrink-0">
+            {/* SQEM-657 — a card as wide as the composer like the other notices of redesign C; amber like
+                the upgrade banner, because someone else's answer is running here. */}
             {otherIsGenerating && (
-              <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-t border-amber-100 dark:border-amber-800 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                {txt.chat_someone_waiting()}
+              <div className="px-4 pt-2 shrink-0">
+                <div className="max-w-3xl mx-auto p-3 rounded-xl border border-amber-100 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+                  {txt.chat_someone_waiting()}
+                </div>
+              </div>
+            )}
+            {/* SQEM-657 — said, not only locked: a Send that does nothing without a reason looks broken.
+                Shaped like the other notices of redesign C (the error above, the upgrade banner): a card
+                as wide as the composer, not a full-width strip. Neutral, because it is neither an error
+                nor a warning. */}
+            {isLoading && !generatingHere && (
+              <div role="status" className="px-4 pt-2 shrink-0">
+                <div className="max-w-3xl mx-auto p-3 rounded-xl border border-line bg-surface-sunken text-sm text-ink-muted flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+                  {txt.chat_running_elsewhere()}
+                </div>
               </div>
             )}
             {/* SQEM-550 (e) — redesign C: the composer is a raised card on the page, not a bar. */}
@@ -1784,7 +1871,7 @@ const Chat = () => {
                         ) : (
                           <div className="w-16 h-16 rounded-lg bg-red-50 border border-red-200 flex flex-col items-center justify-center">
                             <FileText className="w-6 h-6 text-red-500" />
-                            <span className="text-2xs font-bold text-red-500 mt-0.5">{fileTypeLabel(att.mimeType)}</span>
+                            <span className="text-2xs font-bold text-red-500 mt-0.5">{att.label ?? fileTypeLabel(att.mimeType)}</span>
                           </div>
                         )}
                         <button onClick={() => removeAttachment(att.id)} className="hit-24 absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center reveal-on-hover transition-opacity shadow-sm">
@@ -1800,7 +1887,7 @@ const Chat = () => {
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 >
-                  <input ref={fileInputRef} type="file" accept={ACCEPT_STRING} multiple onChange={handleFileSelect} className="hidden" />
+                  <input ref={fileInputRef} type="file" accept={CHAT_ACCEPT_STRING} multiple onChange={handleFileSelect} className="hidden" />
                   {/* SQEM-401 — two rows on a phone, one on a desktop. Below `md` the input row comes first
                       (`order-1`) and these tools sit centred underneath; from `md` up the wrapper is the row it
                       always was, tools first. The two menus anchor to the button's centre on a phone — `left-0`
@@ -1897,13 +1984,15 @@ const Chat = () => {
                     >
                       {isEnhancing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                     </button>
-                    {/* SQEM-583 — while an answer runs, Send becomes Stop (as in ChatGPT and Claude). */}
-                    {isLoading ? (
+                    {/* SQEM-583 — while an answer runs, Send becomes Stop (as in ChatGPT and Claude).
+                        SQEM-657 — only in the chat whose answer runs: anywhere else Stop stopped THAT
+                        answer unseen. There Send stays, locked, and says why (one answer at a time). */}
+                    {generatingHere ? (
                       <button onClick={handleStop} aria-label={txt.chat_stop_label()} title={txt.chat_stop()} className="p-3 bg-ink-strong text-surface-raised rounded-control hover:opacity-90 transition-all shadow-sm dark:shadow-none shrink-0">
                         <Square className="w-4 h-4" fill="currentColor" />
                       </button>
                     ) : (
-                      <button onClick={handleSend} aria-label={txt.chat_send_label()} disabled={!input.trim() || enabledModels.length === 0} className="p-3 bg-accent-strong text-white rounded-control hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm hover:shadow-md dark:shadow-none dark:hover:shadow-none shrink-0">
+                      <button onClick={handleSend} aria-label={txt.chat_send_label()} disabled={isLoading || !input.trim() || enabledModels.length === 0} className="p-3 bg-accent-strong text-white rounded-control hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm hover:shadow-md dark:shadow-none dark:hover:shadow-none shrink-0">
                         <Send className="w-4 h-4" />
                       </button>
                     )}
