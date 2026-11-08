@@ -35,6 +35,15 @@ export interface AnalysisResult {
   truncated?: boolean;
   /** SQEM-660 step C — Python never started, so the program never ran (counted by the ops monitor). */
   unstarted?: boolean;
+  /** SQEM-662 — the .xlsx files the program wrote to /out/ (bytes, in this browser only). */
+  files?: AnalysisFile[];
+  /** SQEM-662 — what it wrote there and the frame did not hand out (not .xlsx, too large, too many). */
+  skipped?: string[];
+}
+
+export interface AnalysisFile {
+  name: string;
+  data: ArrayBuffer;
 }
 
 export const ANALYSIS_TIMEOUT_MS = 30_000;
@@ -135,11 +144,15 @@ export async function runAnalysis(code: string, tables: AnalysisTable[], timeout
     }, timeoutMs);
     const onMessage = (ev: MessageEvent) => {
       if (ev.source !== f.contentWindow) return;
-      const d = ev.data as { type?: string; id?: string; ok?: boolean; output?: string; error?: string; truncated?: boolean };
+      const d = ev.data as { type?: string; id?: string; ok?: boolean; output?: string; error?: string; truncated?: boolean; files?: unknown; skipped?: unknown };
       if (d?.type !== 'result' || d.id !== id) return;
       clearTimeout(timer);
       window.removeEventListener('message', onMessage);
-      resolve({ ok: !!d.ok, output: String(d.output ?? ''), error: d.error, truncated: !!d.truncated });
+      const files = Array.isArray(d.files)
+        ? d.files.filter((f): f is AnalysisFile => !!f && typeof f.name === 'string' && f.data instanceof ArrayBuffer)
+        : [];
+      const skipped = Array.isArray(d.skipped) ? d.skipped.filter((n): n is string => typeof n === 'string') : [];
+      resolve({ ok: !!d.ok, output: String(d.output ?? ''), error: d.error, truncated: !!d.truncated, ...(files.length ? { files } : {}), ...(skipped.length ? { skipped } : {}) });
     };
     window.addEventListener('message', onMessage);
     // '*' because the frame's origin is opaque ("null"); it is our own frame, found by reference.

@@ -8,7 +8,7 @@
  * ask for the rest. Servers run by others (Notion, Linear, Chatarmin …) page through their own tools.
  *
  * ⚠️ The model decides whether it needs another page; nothing here pages on its own. Every page is a
- * tool round, and a page is bounded so it fits the 20,000 characters our own MCP client keeps of a
+ * tool round, and a page is bounded so it fits the 60,000 characters our own MCP client keeps of a
  * result (`MCP_RESULT_MAX_CHARS`).
  *
  * Pure: no Deno, no fetch — so the unit tests can import it.

@@ -23,7 +23,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-AXFmyh3t1ra4PPVuDT1SNaDpriVkDRt5H5ChhT1Bz3M=' blob: 'wasm-unsafe-eval'; worker-src blob:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-zsrgo814dMeUzjAmyfRW42fpmqPriYZaFC89Mg87nZQ=' blob: 'wasm-unsafe-eval'; worker-src blob:; base-uri 'none'; form-action 'none'">
 <title>analysis</title>
 </head>
 <body>
@@ -32,6 +32,10 @@
   'use strict';
   var workerSource = [
     "const MAX_OUT = 20000;",
+    // SQEM-662 — files the program writes to /out/ for the person: Excel only, few and bounded.
+    "const OUT_DIR = '/out';",
+    "const MAX_FILES = 3;",
+    "const MAX_FILE_BYTES = 5 * 1024 * 1024;",
     // A name no request can reach: every runtime file is answered from the bytes the app handed in.
     "const BASE = 'https://runtime.invalid/';",
     "let py = null;",
@@ -55,6 +59,10 @@
     "    lockFileContents: Promise.resolve(JSON.parse(new TextDecoder().decode(files['pyodide-lock.json']))),",
     "  });",
     "  await py.loadPackage(['numpy', 'pandas'], { messageCallback: () => {}, errorCallback: () => {} });",
+    // SQEM-662 — wheels the app handed in that Pyodide does not know (openpyxl from PyPI), by their own name.
+    "  const known = new Set(Object.values(JSON.parse(new TextDecoder().decode(files['pyodide-lock.json'])).packages || {}).map(p => p.file_name));",
+    "  const extra = Object.keys(files).filter(n => n.endsWith('.whl') && !known.has(n)).sort();",
+    "  if (extra.length) await py.loadPackage(extra.map(n => BASE + n), { messageCallback: () => {}, errorCallback: () => {} });",
     "  await py.runPythonAsync('import pandas as pd\\nimport numpy as np\\nimport io');",
     "  files = null;",
     "  for (const u of urls) URL.revokeObjectURL(u);",
@@ -82,6 +90,7 @@
     // `df` is the only table, or the only one with rows (the same rule as dfTableKey in analysisTool.ts).
     "    await py.runPythonAsync('tables = {k: (pd.read_csv(io.StringIO(v)) if v.strip() else pd.DataFrame()) for k, v in __csv.items()}\\ndel __csv\\n_t = [v for v in tables.values() if len(v)]\\ndf = next(iter(tables.values())) if len(tables) == 1 else (_t[0] if len(_t) == 1 else None)\\ndel _t');",
     "    tables.destroy();",
+    "    await py.runPythonAsync('import os as __os, shutil as __sh\\n__sh.rmtree(\"/out\", ignore_errors=True)\\n__os.makedirs(\"/out\")\\ndel __os, __sh');",
     "    const value = await py.runPythonAsync(String(msg.code || ''));",
     "    let shown = '';",
     "    if (value !== undefined && value !== null) {",
@@ -91,7 +100,15 @@
     "    let text = out.join('\\n') + (shown ? (out.length ? '\\n' : '') + shown : '');",
     "    const cut = text.length > MAX_OUT;",
     "    if (cut) text = text.slice(0, MAX_OUT);",
-    "    postMessage({ type: 'result', id: msg.id, ok: true, output: text, truncated: cut });",
+    // SQEM-662 — what the program wrote to /out/: .xlsx only, at most MAX_FILES, each at most MAX_FILE_BYTES.
+    "    const files = []; const skipped = [];",
+    "    for (const name of py.FS.readdir(OUT_DIR).filter(n => n !== '.' && n !== '..').sort()) {",
+    "      if (!py.FS.isFile(py.FS.stat(OUT_DIR + '/' + name).mode)) { skipped.push(name); continue; }",
+    "      const data = py.FS.readFile(OUT_DIR + '/' + name);",
+    "      if (!/\\.xlsx$/i.test(name) || data.byteLength > MAX_FILE_BYTES || files.length >= MAX_FILES) { skipped.push(name); continue; }",
+    "      files.push({ name, data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) });",
+    "    }",
+    "    postMessage({ type: 'result', id: msg.id, ok: true, output: text, truncated: cut, files, skipped }, files.map(f => f.data));",
     "  } catch (e) {",
     "    const err = String(e && e.message || e);",
     "    postMessage({ type: 'result', id: msg.id, ok: false, error: err.slice(-4000), output: out.join('\\n').slice(0, 4000) });",

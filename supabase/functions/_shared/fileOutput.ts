@@ -28,6 +28,12 @@ export interface GeneratedFile {
   content: string;
   /** SQEM-597 — the look a skill asked for; over the workspace default. Validated, never raw. */
   style?: DocumentStyle;
+  /**
+   * SQEM-662 — BROWSER ONLY: the file an analysis program wrote (openpyxl, formulas kept). `content` is
+   * then only its preview, and the download hands out these bytes unchanged. Never sent, never stored —
+   * `normalizeGeneratedFiles` drops it, and such a file never joins the stored `generatedFiles`.
+   */
+  bytes?: ArrayBuffer;
 }
 
 export const MAX_FILE_CHARS = 200_000;

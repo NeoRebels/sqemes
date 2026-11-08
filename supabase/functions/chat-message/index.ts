@@ -19,7 +19,8 @@ import { readSSE, geminiDelta, openAiDelta, claudeDelta, contentText, stopReason
 import { createDeltaBroadcaster } from '../_shared/deltaBroadcast.ts';
 import { createLibraryReader } from '../_shared/libraryQueries.ts';
 import { unzipEntries } from '../_shared/officeZip.ts';
-import { withAnalysisTool, normalizeAnalysisTables, normalizeAnalyses, analysisLogCounts, ANALYSIS_INSTRUCTION, type AnalysisRecord } from '../_shared/analysisTool.ts';
+import { withAnalysisTool, normalizeAnalysisTables, normalizeAnalyses, analysisLogCounts, ANALYSIS_INSTRUCTION, CONNECTOR_ANALYSIS_INSTRUCTION, type AnalysisRecord } from '../_shared/analysisTool.ts';
+import { ConnectorTableStore } from '../_shared/connectorTables.ts';
 import { requestBrowserAnalysis } from '../_shared/analysisRoundTrip.ts';
 import {
   createLibraryToolRuntime, advanceToolRound, restoreToolRuntime, MAX_TOOL_ROUNDS, countNativeConnectorCalls, toolCapNotice, toolsWereRefused, runToolCall, truncatedNotice, afterToolsRefused, toolsRefusedNotice, noAnswerText, type ToolRuntime,
@@ -130,6 +131,8 @@ Deno.serve(async (req) => {
       : body;
     const { workspaceId, modelId, systemInstruction, jobId, funded, connectorIds, timeZone, webSearch } = src;
     const analysisTables = normalizeAnalysisTables(src.analysisTables); // SQEM-660 — metadata only, never rows
+    // SQEM-661 — the browser can take connector tables (an older bundle cannot: it would never answer).
+    const connectorAnalysis = src.connectorAnalysis === true;
     locale = requestLocale(req, src.locale); // SQEM-599 — the language of the notices sqemes adds (SQEM-612: or the query)
     // SQEM-514 — a file part no provider can take never reaches a provider branch (_shared/messageParts.ts).
     // SQEM-649 — a continuation brings the provider's own message list in the state instead.
@@ -386,7 +389,7 @@ Deno.serve(async (req) => {
       // SQEM-649 — what a hand-over needs: the person's own JWT (header only, never in the state), the
       // request to carry on, and — on a continuation — where the last invocation stopped.
       authHeader,
-      request: { modelId, funded: !!funded, systemInstruction, timeZone, connectorIds, webSearch: webSearch === true, locale, ...(analysisTables.length ? { analysisTables } : {}) } satisfies ContinuationRequest,
+      request: { modelId, funded: !!funded, systemInstruction, timeZone, connectorIds, webSearch: webSearch === true, locale, ...(analysisTables.length ? { analysisTables } : {}), ...(connectorAnalysis ? { connectorAnalysis: true } : {}) } satisfies ContinuationRequest,
       continuation,
     }));
     return new Response(JSON.stringify({ jobId }), {
@@ -677,8 +680,13 @@ async function runAndBroadcast({
     generatedFiles.push(...(collected.generatedFiles as GeneratedFile[]));
     analyses.push(...normalizeAnalyses(collected.analyses));
   }
-  // SQEM-660 step C — [chat-tools] counts only this invocation's runs; the carried ones were logged before.
-  const analysesCarried = analyses.length;
+  /**
+   * ⚠️ SQEM-661 — only the LAST invocation of an answer writes `[chat-tools]`: a hand-over returns before
+   * the log (measured 2026-11-07: three invocations, one line). Until then the line counted
+   * only this invocation's analyses ("the carried ones were logged before" — they never were), so a
+   * chain lost the counts of every invocation but the last. It counts the whole chain now.
+   */
+  const connectorTablesCarried = Number.isInteger(collected?.connectorTables) ? collected!.connectorTables! : 0;
   // SQEM-649 — the 10 minutes count from the person's message, not from this invocation.
   const invocationStartedAt = Date.now();
   const chainStartedAt = continuation?.chainStartedAt ?? invocationStartedAt;
@@ -735,8 +743,23 @@ async function runAndBroadcast({
   // byte-identical: the library rule and the session's persona and skills are the same on every message,
   // the date line changes by the minute and the web line by the message. Until 654 both stood in FRONT,
   // so nothing after them could be reused from one message to the next. Same text, other position.
+  /**
+   * SQEM-661 — connector results that are lists become tables for run_analysis, for this answer only.
+   * Only when the browser can take them (`connectorAnalysis`) and the model has connectors at all.
+   */
+  const connectorTables = tools && request.connectorAnalysis === true && ((connectors?.length ?? 0) > 0 || availableConnectors.length > 0)
+    ? new ConnectorTableStore((info, outcome) => {
+      // SQEM-661 — which result became which tables (keys, rows, column count; never a value), or why
+      // none. Edge log only: connector names are customer data and stay out of the monitor (SQEM-653).
+      console.log('[chat-tables]', JSON.stringify({
+        jobId, connector: info.connector, tool: info.tool, chars: info.chars,
+        ...('tables' in outcome
+          ? { tables: outcome.tables.map(t => ({ key: t.key, rows: t.rows, columns: t.columns.length })) }
+          : { none: outcome.reason }),
+      }));
+    }) : undefined;
   const stableInstruction = tools ? withLibraryPrompt(systemInstruction) : systemInstruction;
-  const changingInstruction = [tools && web ? WEB_SEARCH_INSTRUCTION : null, tools && analysisTables.length ? ANALYSIS_INSTRUCTION : null, timeLine].filter(Boolean).join('\n\n');
+  const changingInstruction = [tools && web ? WEB_SEARCH_INSTRUCTION : null, tools && analysisTables.length ? ANALYSIS_INSTRUCTION : null, connectorTables ? CONNECTOR_ANALYSIS_INSTRUCTION : null, timeLine].filter(Boolean).join('\n\n');
   const instruction = [stableInstruction, changingInstruction].filter(Boolean).join('\n\n') || undefined;
 
   // SQEM-381 — measured, so the next timeout decision rests on a distribution rather than on the
@@ -815,7 +838,7 @@ async function runAndBroadcast({
     // SQEM-595 — create_file for every text model, always: it costs nothing until it is used.
     if (base) base = withFileTool(base, generatedFiles);
     // SQEM-660 — run_analysis only with attached tables; the program runs in the person's browser.
-    if (base) base = withAnalysisTool(base, analysisTables, (code) => requestBrowserAnalysis(jobId, code, cancel.signal), analyses);
+    if (base) base = withAnalysisTool(base, analysisTables, (code, pending) => requestBrowserAnalysis(jobId, code, cancel.signal, pending), analyses, connectorTables);
     let runtime = base;
     let unreachable: string[] = [];
     /**
@@ -828,7 +851,7 @@ async function runAndBroadcast({
     if (base && connectors?.length) {
       const loaded = await loadConnectorTools(connectors.map(c => ({
         url: c.url, token: c.token, displayName: c.displayName, allowedTools: c.allowedTools,
-      })), { signal: cancel.signal });
+      })), { signal: cancel.signal, onResult: connectorTables?.hook() });
       runtime = withConnectorTools(base!, loaded, cancel.signal);
       unreachable = loaded.failed;
     }
@@ -851,7 +874,7 @@ async function runAndBroadcast({
         resolve: async (ids) => (await resolveConnectors(admin, workspaceId!, userId, ids)) ?? [],
         load: (cs, offset) => loadConnectorTools(cs.map(c => ({
           url: c.url, token: c.token, displayName: c.displayName, allowedTools: c.allowedTools,
-        })), { signal: cancel.signal, offset }),
+        })), { signal: cancel.signal, offset, onResult: connectorTables?.hook() }),
       }, { fetchedNames: continuation?.collected.fetchedConnectors ?? [] });
       runtime = runtime && withConnectorPool(runtime, pool, cancel.signal);
     }
@@ -892,6 +915,7 @@ async function runAndBroadcast({
         collected: {
           loadedTemplateIds, libraryChanges, webSources,
           webAllowanceExhausted: webState.allowanceExhausted, generatedFiles, analyses,
+          connectorTables: connectorTablesCarried + (connectorTables?.built ?? 0), // SQEM-661
           unreachable: [...new Set([...unreachable, ...(pool?.failed ?? [])])],
           fetchedConnectors: pool?.fetchedNames ?? [],
         },
@@ -946,7 +970,8 @@ async function runAndBroadcast({
         // SQEM-649 — per invocation; `chainMs` is the whole answer across hand-overs.
         durationMs: Date.now() - startedAt, chainMs: Date.now() - chainStartedAt, gen,
         // SQEM-660 step C — analyses run, failed, and never started (Python did not load): the monitor's counts.
-        ...(analyses.length > analysesCarried ? analysisLogCounts(analyses.slice(analysesCarried)) : {}),
+        ...(analyses.length ? analysisLogCounts(analyses) : {}), // the whole chain (SQEM-661)
+        ...(connectorTablesCarried + (connectorTables?.built ?? 0) ? { connectorTables: connectorTablesCarried + (connectorTables?.built ?? 0) } : {}), // SQEM-661
       }));
     }
     // ⛔ The cap must be VISIBLE. A model cut off mid-investigation answers confidently from half the

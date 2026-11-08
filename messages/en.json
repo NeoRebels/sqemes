@@ -2884,5 +2884,7 @@
   "chatcard_analysis_ran": "Analysis run ({count})",
   "chatcard_analysis_failed": "Analysis failed",
   "chatcard_analysis_where": "Computed in your browser — the data did not leave it.",
-  "chatcard_analysis_not_kept": "The programs are not stored, only whether they worked."
+  "chatcard_analysis_not_kept": "The programs are not stored, only whether they worked.",
+  "chatfile_from_analysis": "Made by the analysis program in your browser. Excel calculates its formulas when you open it.",
+  "chatcard_analysis_file_not_kept": "The Excel file from this analysis is not kept. Ask again to create it again."
 }

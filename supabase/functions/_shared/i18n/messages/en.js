@@ -382,6 +382,7 @@
 /** @typedef {{}} Chat_Withdraw_TitleInputs */
 /** @typedef {{}} Chat_WithdrawnInputs */
 /** @typedef {{}} Chatcard_Analysis_FailedInputs */
+/** @typedef {{}} Chatcard_Analysis_File_Not_KeptInputs */
 /** @typedef {{}} Chatcard_Analysis_Not_KeptInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Chatcard_Analysis_RanInputs */
 /** @typedef {{}} Chatcard_Analysis_WhereInputs */
@@ -406,6 +407,7 @@
 /** @typedef {{}} Chatfile_Create_FailedInputs */
 /** @typedef {{}} Chatfile_DownloadInputs */
 /** @typedef {{ font: NonNullable<unknown> }} Chatfile_Font_FallbackInputs */
+/** @typedef {{}} Chatfile_From_AnalysisInputs */
 /** @typedef {{}} Chatfile_LogoInputs */
 /** @typedef {{}} Chatfile_No_SlidesInputs */
 /** @typedef {{}} Chatfile_No_TableInputs */
@@ -3563,6 +3565,10 @@ export const chatcard_analysis_failed = /** @type {(inputs: Chatcard_Analysis_Fa
 	return /** @type {LocalizedString} */ (`Analysis failed`)
 };
 
+export const chatcard_analysis_file_not_kept = /** @type {(inputs: Chatcard_Analysis_File_Not_KeptInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`The Excel file from this analysis is not kept. Ask again to create it again.`)
+};
+
 export const chatcard_analysis_not_kept = /** @type {(inputs: Chatcard_Analysis_Not_KeptInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`The programs are not stored, only whether they worked.`)
 };
@@ -3657,6 +3663,10 @@ export const chatfile_download = /** @type {(inputs: Chatfile_DownloadInputs) =>
 
 export const chatfile_font_fallback = /** @type {(inputs: Chatfile_Font_FallbackInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`${i?.font} → Roboto in PDF`)
+};
+
+export const chatfile_from_analysis = /** @type {(inputs: Chatfile_From_AnalysisInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Made by the analysis program in your browser. Excel calculates its formulas when you open it.`)
 };
 
 export const chatfile_logo = /** @type {(inputs: Chatfile_LogoInputs) => LocalizedString} */ () => {

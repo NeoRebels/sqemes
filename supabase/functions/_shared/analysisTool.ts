@@ -13,6 +13,7 @@
  */
 
 import type { ToolRuntime, ToolDefinition } from './libraryTools.ts';
+import type { ConnectorTableStore, ConnectorTable } from './connectorTables.ts';
 
 export interface AnalysisTableMeta {
   key: string;
@@ -27,6 +28,28 @@ export interface AnalysisRunResult {
   truncated?: boolean;
   /** Python never started in the browser (or the browser never answered): the program did not run. */
   unstarted?: boolean;
+  /** SQEM-661 — connector tables that did not reach the browser whole; the program did not run. */
+  missingTables?: string[];
+  /** SQEM-662 — the files the program wrote to /out/ and the person got: name and size, never the bytes. */
+  files?: AnalysisFileMeta[];
+  /** SQEM-662 — what it wrote there that was not handed out (not .xlsx, too large, too many). */
+  skipped?: string[];
+}
+
+export interface AnalysisFileMeta {
+  name: string;
+  size: number;
+}
+
+/** SQEM-662 — as the frame hands them out (public/analysis-sandbox.html). */
+export const MAX_ANALYSIS_FILES = 3;
+export const MAX_ANALYSIS_FILE_BYTES = 5 * 1024 * 1024;
+
+export function normalizeFileMetas(v: unknown): AnalysisFileMeta[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((f: any) => f && typeof f.name === 'string' && Number.isFinite(f.size))
+    .slice(0, MAX_ANALYSIS_FILES)
+    .map((f: any) => ({ name: String(f.name).slice(0, 120), size: Math.max(0, Math.floor(f.size)) }));
 }
 
 /** What the answer shows under it ("Analysis run"), and what the next invocation carries on with. */
@@ -37,6 +60,10 @@ export interface AnalysisRecord {
   error?: string;
   /** For the `[chat-tools]` counts only; never shown, never stored. */
   unstarted?: boolean;
+  /** SQEM-661 — a connector table did not reach the browser whole. Counts only, like `unstarted`. */
+  incomplete?: boolean;
+  /** SQEM-662 — the files it handed the person (live view only; stored as a count). */
+  files?: AnalysisFileMeta[];
 }
 
 const MAX_ERROR_SHOWN = 300;
@@ -64,18 +91,25 @@ export function errorTail(err: string, max = MAX_ERROR_SHOWN): string {
  */
 export interface StoredAnalysis {
   ok: boolean;
+  /**
+   * SQEM-662 — how many files the run handed out. A count, not a name: the file itself is never stored
+   * (decided 2026-11-07: gone after a reload is fine), so the card can only say that a new question makes
+   * it again. Fits the column's CHECK (≤ 6 entries, ≤ 1 KB) without a migration.
+   */
+  fileCount?: number;
 }
 
-/** What the card shows: live with program and reason, after a reload only `ok`. */
-export type ShownAnalysis = StoredAnalysis & { code?: string; error?: string };
+/** What the card shows: live with program, reason and files, after a reload only `ok` and the count. */
+export type ShownAnalysis = StoredAnalysis & { code?: string; error?: string; files?: AnalysisFileMeta[] };
 
 export function storedAnalyses(records: AnalysisRecord[]): StoredAnalysis[] {
-  return records.slice(0, MAX_ANALYSES_PER_ANSWER).map(a => ({ ok: a.ok === true }));
+  return records.slice(0, MAX_ANALYSES_PER_ANSWER).map(a => ({ ok: a.ok === true, ...(a.files?.length ? { fileCount: a.files.length } : {}) }));
 }
 
 export function normalizeStoredAnalyses(v: unknown): StoredAnalysis[] {
   if (!Array.isArray(v)) return [];
-  return v.filter((a: any) => a && typeof a.ok === 'boolean').slice(0, MAX_ANALYSES_PER_ANSWER).map((a: any) => ({ ok: a.ok }));
+  return v.filter((a: any) => a && typeof a.ok === 'boolean').slice(0, MAX_ANALYSES_PER_ANSWER)
+    .map((a: any) => ({ ok: a.ok, ...(Number.isInteger(a.fileCount) && a.fileCount > 0 ? { fileCount: Math.min(a.fileCount, MAX_ANALYSIS_FILES) } : {}) }));
 }
 
 export const MAX_ANALYSES_PER_ANSWER = 6;
@@ -115,7 +149,39 @@ function describeTables(tables: AnalysisTableMeta[]): string {
   }).join('\n');
 }
 
-export function analysisToolDefinition(tables: AnalysisTableMeta[]): ToolDefinition {
+/**
+ * SQEM-661 — `connectors`: connector results that are lists become tables during the answer. They are
+ * named in the connector's own result, not here: this description is part of the cached start of every
+ * request (SQEM-654) and must not change while the answer runs.
+ */
+/**
+ * SQEM-662 — the one way a program hands the person a file: openpyxl into /out/. ⚠️ openpyxl writes a
+ * formula without its value (Excel computes it on opening), so the model also writes the numbers it
+ * computed where the person should read them — the preview beside the chat shows values only.
+ */
+export const EXCEL_FILE_LINE =
+  'To give the person an Excel file with exact numbers, formulas or several sheets, write it in the same program with openpyxl to /out/<name>.xlsx '
+  + `(at most ${MAX_ANALYSIS_FILES} files, ${MAX_ANALYSIS_FILE_BYTES / 1024 / 1024} MB each): it reaches the person as a download under the answer, and you get its name and size back. `
+  + 'Formulas are kept and computed by Excel when the file is opened, so also write the computed values where the person should read them. Prefer this over create_file whenever the numbers come from a program.';
+
+export function analysisToolDefinition(tables: AnalysisTableMeta[], { connectors = false }: { connectors?: boolean } = {}): ToolDefinition {
+  if (!tables.length && connectors) {
+    return {
+      name: 'run_analysis',
+      description:
+        'Run a Python program (pandas as pd, numpy as np) in the person’s browser on tables from connector results, and get back what it prints. '
+        + 'A connector result that is a list names the tables it became, e.g. tables["Service · tool #1"]; each is a pandas DataFrame in `tables`. '
+        + 'Use it for anything that needs counting, summing, filtering, grouping or comparing across rows — never estimate such numbers from the text of a result. '
+        + 'Values are as the connector sent them, so convert types as needed (pd.to_numeric, pd.to_datetime). '
+        + 'Print the result, or end the program with an expression. No network, no installs; 30 seconds per run. '
+        + EXCEL_FILE_LINE,
+      parameters: {
+        type: 'object',
+        properties: { code: { type: 'string', description: 'The Python program. Print what the answer needs; keep the output short (a number, a small table).' } },
+        required: ['code'],
+      },
+    };
+  }
   return {
     name: 'run_analysis',
     description:
@@ -124,8 +190,10 @@ export function analysisToolDefinition(tables: AnalysisTableMeta[]): ToolDefinit
       + 'Each table is a pandas DataFrame in `tables`. '
       + (dfTableKey(tables) ? `\`df\` is tables[${JSON.stringify(dfTableKey(tables))}]. ` : 'There is no `df`: pick the table from `tables` by its key. ')
       + 'Values were read from the file as text, so convert types as needed (pd.to_numeric, pd.to_datetime). '
-      + 'Print the result, or end the program with an expression. No network, no files, no installs; 30 seconds per run.\n\nTables:\n'
-      + describeTables(tables),
+      + 'Print the result, or end the program with an expression. No network, no installs; 30 seconds per run. '
+      + EXCEL_FILE_LINE + '\n\nTables:\n'
+      + describeTables(tables)
+      + (connectors ? '\n\nA connector result that is a list also becomes tables here; the result names them.' : ''),
     parameters: {
       type: 'object',
       properties: { code: { type: 'string', description: 'The Python program. Print what the answer needs; keep the output short (a number, a small table).' } },
@@ -142,11 +210,24 @@ export function analysisToolDefinition(tables: AnalysisTableMeta[]): ToolDefinit
 export const ANALYSIS_INSTRUCTION =
   'Attached tables can be analysed exactly with the run_analysis tool. Counts, sums, averages and filters over them come from a run_analysis result, not from the text excerpt of the file. '
   + 'Say in one short line that you computed it and which rows you counted: the columns and values you filtered on (for example: Counted: Category = Bikes, Group = Kids). '
-  + 'If the question can be read more than one way, say which reading you used. Then give the number.';
+  + 'If the question can be read more than one way, say which reading you used. Then give the number. '
+  + 'An Excel file of computed numbers is written by the program itself (openpyxl, see run_analysis), never retyped into create_file.';
+
+/** SQEM-661 — the same rule for connector results (in the changing part of the instruction, like the one above). */
+export const CONNECTOR_ANALYSIS_INSTRUCTION =
+  'A connector result that is a list is also available to run_analysis as tables, named at the end of that result. Counts, sums, totals, top lists and outliers over such a list come from a run_analysis result, never from the text of the result and never copied into a program by hand. '
+  + 'Fetch every page you need first, then compute. Say in one short line what you computed and over which rows, then give the numbers. '
+  + 'An Excel file of computed numbers is written by the program itself (openpyxl, see run_analysis), never retyped into create_file.';
 
 export function formatAnalysisResult(r: AnalysisRunResult): string {
   if (r.ok) {
-    return `Program output:\n${r.output || '(nothing printed)'}${r.truncated ? '\n[output cut at 20,000 characters]' : ''}`;
+    const files = r.files?.length
+      ? `\nFiles handed to the person under the answer: ${r.files.map(f => `${f.name} (${Math.max(1, Math.round(f.size / 1024))} KB)`).join(', ')}. Do not repeat their contents; say in one line what they hold.`
+      : '';
+    const skipped = r.skipped?.length
+      ? `\nNot handed out (only .xlsx, at most ${MAX_ANALYSIS_FILES} files of ${MAX_ANALYSIS_FILE_BYTES / 1024 / 1024} MB each): ${r.skipped.join(', ')}.`
+      : '';
+    return `Program output:\n${r.output || '(nothing printed)'}${r.truncated ? '\n[output cut at 20,000 characters]' : ''}${files}${skipped}`;
   }
   return `The program failed: ${r.error || 'unknown error'}${r.output ? `\nOutput before the failure:\n${r.output}` : ''}\n`
     + 'Fix the program and run it again (at most twice), or tell the person it could not be computed.';
@@ -160,13 +241,15 @@ export function formatAnalysisResult(r: AnalysisRunResult): string {
 export function withAnalysisTool(
   runtime: ToolRuntime,
   tables: AnalysisTableMeta[],
-  run: (code: string) => Promise<AnalysisRunResult>,
+  // SQEM-661 — `pending`: connector tables the browser does not hold yet; they travel ahead of the program.
+  run: (code: string, pending: ConnectorTable[]) => Promise<AnalysisRunResult>,
   records: AnalysisRecord[],
+  connectorTables?: ConnectorTableStore,
 ): ToolRuntime {
-  if (!tables.length) return runtime;
+  if (!tables.length && !connectorTables) return runtime;
   return {
     ...runtime,
-    definitions: [...runtime.definitions, analysisToolDefinition(tables)],
+    definitions: [...runtime.definitions, analysisToolDefinition(tables, { connectors: !!connectorTables })],
     stats: runtime.stats,
     async execute(name, args) {
       if (name !== 'run_analysis') return runtime.execute(name, args);
@@ -177,14 +260,22 @@ export function withAnalysisTool(
       if (records.length >= MAX_ANALYSES_PER_ANSWER) {
         return `The analysis limit for one answer (${MAX_ANALYSES_PER_ANSWER}) is reached. Answer with what you have.`;
       }
+      const pending = connectorTables?.pending() ?? [];
       let result: AnalysisRunResult;
       try {
-        result = await run(code);
+        result = await run(code, pending);
+        // SQEM-661 — what arrived whole is the browser's now; the rest goes again with the next program.
+        const missing = new Set(result.missingTables ?? []);
+        connectorTables?.markSent(pending.map(t => t.key).filter(k => !missing.has(k)));
+        if (missing.size) {
+          // Counted as incomplete, not as "Python did not start": the monitor names the transport, not the runtime.
+          result = { ok: false, output: '', missingTables: [...missing], error: `Connector data did not reach the browser whole (${[...missing].join(', ')}); the program did not run. Run the same program again.` };
+        }
       } catch (err: any) {
         // No answer from the browser at all counts as not started: the program cannot have run.
         result = { ok: false, output: '', error: err?.message ?? 'the browser did not answer', unstarted: true };
       }
-      records.push(result.ok ? { code, ok: true } : { code, ok: false, error: errorTail(String(result.error || 'unknown error')), ...(result.unstarted ? { unstarted: true } : {}) });
+      records.push(result.ok ? { code, ok: true, ...(result.files?.length ? { files: normalizeFileMetas(result.files) } : {}) } : { code, ok: false, error: errorTail(String(result.error || 'unknown error')), ...(result.unstarted ? { unstarted: true } : {}), ...(result.missingTables?.length ? { incomplete: true } : {}) });
       return formatAnalysisResult(result);
     },
   };
@@ -194,11 +285,13 @@ export function withAnalysisTool(
  * SQEM-660 step C — the counts `[chat-tools]` carries for the ops monitor (scripts/ops-monitor). Counts
  * only: no program, no reason.
  */
-export function analysisLogCounts(records: AnalysisRecord[]): { analyses: number; analysesFailed: number; analysesUnstarted: number } {
+export function analysisLogCounts(records: AnalysisRecord[]): { analyses: number; analysesFailed: number; analysesUnstarted: number; analysesIncomplete?: number } {
+  const incomplete = records.filter(r => r.incomplete).length; // SQEM-661 — only when it happened
   return {
     analyses: records.length,
     analysesFailed: records.filter(r => !r.ok).length,
     analysesUnstarted: records.filter(r => r.unstarted).length,
+    ...(incomplete ? { analysesIncomplete: incomplete } : {}),
   };
 }
 
@@ -207,6 +300,8 @@ export function normalizeAnalyses(v: unknown): AnalysisRecord[] {
   if (!Array.isArray(v)) return [];
   return v.filter((a: any) => a && typeof a.code === 'string').slice(0, MAX_ANALYSES_PER_ANSWER)
     .map((a: any) => (a.ok
-      ? { code: String(a.code).slice(0, MAX_CODE_CHARS), ok: true }
-      : { code: String(a.code).slice(0, MAX_CODE_CHARS), ok: false, ...(typeof a.error === 'string' && a.error ? { error: errorTail(a.error) } : {}) }));
+      ? { code: String(a.code).slice(0, MAX_CODE_CHARS), ok: true, ...(normalizeFileMetas(a.files).length ? { files: normalizeFileMetas(a.files) } : {}) }
+      : { code: String(a.code).slice(0, MAX_CODE_CHARS), ok: false, ...(typeof a.error === 'string' && a.error ? { error: errorTail(a.error) } : {}),
+        // SQEM-661 — the counts flags ride along a hand-over too: only the last invocation logs them.
+        ...(a.unstarted === true ? { unstarted: true } : {}), ...(a.incomplete === true ? { incomplete: true } : {}) }));
 }

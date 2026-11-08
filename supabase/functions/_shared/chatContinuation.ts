@@ -70,6 +70,8 @@ export interface ContinuationRequest {
   locale?: string;
   /** SQEM-660 — the attached tables' keys, row counts and columns (never their rows), for run_analysis. */
   analysisTables?: unknown[];
+  /** SQEM-661 — the browser takes connector tables for run_analysis. */
+  connectorAnalysis?: boolean;
 }
 
 export interface ContinuationState {
@@ -104,6 +106,8 @@ export interface ContinuationState {
     fetchedConnectors?: string[];
     /** SQEM-660 — the programs run_analysis ran so far, for the line under the answer. */
     analyses?: unknown[];
+    /** SQEM-661 — connector tables built in earlier invocations (a count, for `[chat-tools]`). */
+    connectorTables?: number;
   };
 }
 

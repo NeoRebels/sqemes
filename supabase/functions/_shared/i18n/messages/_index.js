@@ -384,6 +384,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Chat_Withdraw_TitleInputs */
 /** @typedef {{}} Chat_WithdrawnInputs */
 /** @typedef {{}} Chatcard_Analysis_FailedInputs */
+/** @typedef {{}} Chatcard_Analysis_File_Not_KeptInputs */
 /** @typedef {{}} Chatcard_Analysis_Not_KeptInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Chatcard_Analysis_RanInputs */
 /** @typedef {{}} Chatcard_Analysis_WhereInputs */
@@ -408,6 +409,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Chatfile_Create_FailedInputs */
 /** @typedef {{}} Chatfile_DownloadInputs */
 /** @typedef {{ font: NonNullable<unknown> }} Chatfile_Font_FallbackInputs */
+/** @typedef {{}} Chatfile_From_AnalysisInputs */
 /** @typedef {{}} Chatfile_LogoInputs */
 /** @typedef {{}} Chatfile_No_SlidesInputs */
 /** @typedef {{}} Chatfile_No_TableInputs */
@@ -7367,6 +7369,20 @@ export const chatcard_analysis_failed = /** @type {((inputs?: Chatcard_Analysis_
 /**
 * | output |
 * | --- |
+* | "The Excel file from this analysis is not kept. Ask again to create it again." |
+*
+* @param {Chatcard_Analysis_File_Not_KeptInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chatcard_analysis_file_not_kept = /** @type {((inputs?: Chatcard_Analysis_File_Not_KeptInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chatcard_Analysis_File_Not_KeptInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chatcard_analysis_file_not_kept(inputs)
+	return __en.chatcard_analysis_file_not_kept(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "The programs are not stored, only whether they worked." |
 *
 * @param {Chatcard_Analysis_Not_KeptInputs} inputs
@@ -7699,6 +7715,20 @@ export const chatfile_font_fallback = /** @type {((inputs: Chatfile_Font_Fallbac
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.chatfile_font_fallback(inputs)
 	return __en.chatfile_font_fallback(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Made by the analysis program in your browser. Excel calculates its formulas when you open it." |
+*
+* @param {Chatfile_From_AnalysisInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chatfile_from_analysis = /** @type {((inputs?: Chatfile_From_AnalysisInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chatfile_From_AnalysisInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chatfile_from_analysis(inputs)
+	return __en.chatfile_from_analysis(inputs)
 });
 /**
 * | output |

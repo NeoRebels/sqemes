@@ -9,6 +9,8 @@
 //   one against its SHA-256 — a changed file fails the build instead of shipping.
 // The checksums: core files from the npm package (integrity-checked by npm, identical on the CDN —
 // compared 2026-11-06), wheels from Pyodide's own pyodide-lock.json.
+// SQEM-662 — two wheels are not part of Pyodide (openpyxl and its et_xmlfile, pure Python, MIT): they
+// come from PyPI, named in `urls`, with the checksum PyPI publishes.
 //
 // Runs before `vite build` and `vite` (prebuild / predev). Files already present with the right
 // checksum are kept, so a rebuild downloads nothing.
@@ -29,7 +31,7 @@ let fetched = 0;
 for (const [name, expected] of Object.entries(manifest.files)) {
   const target = join(outDir, name);
   if (existsSync(target) && sha256(readFileSync(target)) === expected) continue;
-  const url = manifest.base + name;
+  const url = manifest.urls?.[name] ?? manifest.base + name;
   let buf = null;
   for (let attempt = 1; attempt <= 3 && !buf; attempt++) {
     try {

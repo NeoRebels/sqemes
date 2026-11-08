@@ -37,7 +37,10 @@ import { SUPPORTED_MIME_TYPES, CHAT_ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SI
 import { officeAttachment } from '../lib/officeAttachment';
 import { tablesFromFile, isTableFile, uniqueTables, analysisTableMeta, type AttachmentTable } from '../lib/analysisTables';
 import { runAnalysis, preloadAnalysis } from '../lib/analysisSandbox';
-import { normalizeAnalyses, storedAnalyses, type AnalysisRecord, type ShownAnalysis } from '../supabase/functions/_shared/analysisTool';
+import { normalizeAnalyses, storedAnalyses, dfTableKey, type AnalysisRecord, type ShownAnalysis } from '../supabase/functions/_shared/analysisTool';
+import { ConnectorTableParts, programWithDf } from '../lib/connectorTableParts';
+import { analysisFilesAsGenerated } from '../lib/analysisFiles';
+import type { AnalysisFile } from '../lib/analysisSandbox';
 import { officeKindOf, isLegacyOfficeName } from '../supabase/functions/_shared/officeText';
 import {
   createChatSession, addChatMessage, fetchChatMessages, deleteChatMessages,
@@ -173,6 +176,7 @@ interface ChatMsg {
   libraryChanges?: LibraryChange[];   // SQEM-561 — answer: what the model changed in the library
   webSources?: WebSources | null;     // SQEM-594 — answer: what it searched for and read
   generatedFiles?: GeneratedFile[];   // SQEM-595 — answer: files it handed out (built on download)
+  analysisFiles?: GeneratedFile[];    // SQEM-662 — answer: Excel files its programs wrote (bytes in this tab only, never stored)
   analyses?: ShownAnalysis[];         // SQEM-660 — answer: what run_analysis ran (live with the program; after a reload only ok)
   analysing?: boolean;                // SQEM-660 — answer: a program is running in this browser right now
   continuing?: boolean;               // SQEM-649 — answer: handed to a new invocation, still being worked on
@@ -316,6 +320,7 @@ const MessageItem = memo(function MessageItem({
             {!msg.pending && <UsedPlaybookChips used={usedPlaybooks(msg.loadedTemplateIds, playbookTitles)} />}
             {!msg.pending && <LibraryChangesCard changes={msg.libraryChanges} currentTitle={libraryTitle} />}
             {!msg.pending && <GeneratedFilesCard files={msg.generatedFiles} onOpen={onOpenFile} />}
+            {!msg.pending && <GeneratedFilesCard files={msg.analysisFiles} onOpen={onOpenFile} />}
             {!msg.pending && <WebSourcesCard sources={msg.webSources} />}
             {!msg.pending && <AnalysesCard analyses={msg.analyses} />}
             {!msg.pending && (
@@ -1235,6 +1240,11 @@ const Chat = () => {
       // SQEM-660 — every table attached in this chat so far, full rows in memory. Captured here, so an
       // analysis still runs on the right data after a switch to another chat (SQEM-657).
       const chatTables = uniqueTables([...messages, userMsg].flatMap(m => (m.attachments ?? []).map(a => a.tables ?? [])));
+      // SQEM-661 — connector results that are lists arrive here as tables, for this answer only.
+      const connectorParts = new ConnectorTableParts();
+      // SQEM-662 — the files this answer's programs wrote; the server only ever hears name and size.
+      const programFiles: AnalysisFile[] = [];
+      const dfKey = dfTableKey(analysisTableMeta(chatTables));
       const resultPromise = waitForJobResult(jobId, controller.signal, (textSoFar) => {
         updateRunning(run, { text: textSoFar });
       }, clientJobTimeoutMs({ selfHosted: IS_SELF_HOSTED }),
@@ -1251,17 +1261,28 @@ const Chat = () => {
       clientChainCapMs({ selfHosted: IS_SELF_HOSTED }),
       () => updateRunning(run, { continuing: true }),
       // SQEM-660 — run the model's program on this chat's tables, in the isolated frame, and answer.
-      chatTables.length ? ({ callId, code }) => {
+      // SQEM-661 — and on the connector tables of this answer; one that did not arrive whole is reported, not run on.
+      ({ callId, code, tables: expected }) => {
         updateRunning(run, { continuing: true, analysing: true });
-        void runAnalysis(code, chatTables.map(t => ({ key: t.key, csv: t.csv })))
-          .then(r => { updateRunning(run, { analysing: false }); return sendAnalysisResult(jobId, { callId, ...r }); });
-      } : undefined);
+        void (async () => {
+          const missing = expected?.length ? await connectorParts.whenComplete(expected) : [];
+          if (missing.length) return { ok: false, output: '', error: 'Connector data incomplete.', unstarted: true, missingTables: missing };
+          const fromConnectors = connectorParts.tables();
+          return runAnalysis(programWithDf(code, dfKey, fromConnectors.length > 0), [...chatTables.map(t => ({ key: t.key, csv: t.csv })), ...fromConnectors]);
+        })().then(r => {
+          updateRunning(run, { analysing: false });
+          const { files, ...rest } = r as typeof r & { files?: AnalysisFile[] };
+          if (files?.length) programFiles.push(...files);
+          return sendAnalysisResult(jobId, { callId, ...rest, ...(files?.length ? { files: files.map(f => ({ name: f.name, size: f.data.byteLength })) } : {}) });
+        });
+      },
+      (part) => { connectorParts.add(part); preloadAnalysis(); });
 
       const res = await fetch(functionCallUrl('chat-message'), {
         method: 'POST',
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ ...chatPayloadBase, messages: messagesToSend, jobId, connectorIds: activeConnectorIds, ...(webThis ? { webSearch: true } : {}), ...(chatTables.length ? { analysisTables: analysisTableMeta(chatTables) } : {}), locale: getLocale() }),
+        body: JSON.stringify({ ...chatPayloadBase, messages: messagesToSend, jobId, connectorIds: activeConnectorIds, ...(webThis ? { webSearch: true } : {}), ...(chatTables.length ? { analysisTables: analysisTableMeta(chatTables) } : {}), connectorAnalysis: true, locale: getLocale() }),
       });
 
       if (!res.ok) throw await edgeError(res);
@@ -1278,7 +1299,8 @@ const Chat = () => {
       } else {
         // Text model — wait for Realtime broadcast
         rawResult = await resultPromise;
-        finishRunning(run, { id: assistantMsgId, role: 'assistant', content: inlineImagesToBlobUrls(rawResult), model: run.model, loadedTemplateIds, libraryChanges, webSources, generatedFiles, ...(analyses.length ? { analyses } : {}) });
+        const analysisFiles = programFiles.length ? await analysisFilesAsGenerated(programFiles) : [];
+        finishRunning(run, { id: assistantMsgId, role: 'assistant', content: inlineImagesToBlobUrls(rawResult), model: run.model, loadedTemplateIds, libraryChanges, webSources, generatedFiles, ...(analyses.length ? { analyses } : {}), ...(analysisFiles.length ? { analysisFiles } : {}) });
         // SQEM-651 — a connector the model fetched stays for this chat, so the next message does not
         // fetch it again. Stored on the session of THIS message, shown only if it is still the open one.
         if (carriedConnectorIds?.length && activeSessionId) {

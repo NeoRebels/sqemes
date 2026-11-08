@@ -1,6 +1,10 @@
 {
   "version": "314.0.7",
   "base": "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/",
+  "urls": {
+    "et_xmlfile-2.0.0-py3-none-any.whl": "https://files.pythonhosted.org/packages/c1/8b/5fe2cc11fee489817272089c4203e679c63b570a5aaeb18d852ae3cbba6a/et_xmlfile-2.0.0-py3-none-any.whl",
+    "openpyxl-3.1.5-py2.py3-none-any.whl": "https://files.pythonhosted.org/packages/c0/da/977ded879c29cbd04de313843e76868e6e13408a94ed6b987245dc7c8506/openpyxl-3.1.5-py2.py3-none-any.whl"
+  },
   "files": {
     "pyodide.mjs": "6f1d60f7bf529beb300f0f47983c921d3982363640ba20af0e38efdddbc66109",
     "pyodide.asm.mjs": "f7cdc8ece80678ceb712f8e65ebe6d3a83203a180c399865f49612a051693635",
@@ -11,7 +15,9 @@
     "pandas-3.0.2-cp314-cp314-pyemscripten_2026_0_wasm32.whl": "45ff57772cc2f366a8582c7d3097cc4e6676342ecd5a3c08184a43462d5a02ae",
     "python_dateutil-2.9.0.post0-py2.py3-none-any.whl": "9b13365edf9c188f570baf9c540bbb3029ada2a2dacb9694b3659941693ee9e5",
     "pytz-2026.1.post1-py2.py3-none-any.whl": "b8249d6450146e0b61e6d710dc02ebb35a904796c4c2f97fe87d4ac5872db36a",
-    "six-1.17.0-py2.py3-none-any.whl": "228c50f73aa7addf2c2ccf2979c256802a59ab69cad8152b31b9443cc8140f42"
+    "six-1.17.0-py2.py3-none-any.whl": "228c50f73aa7addf2c2ccf2979c256802a59ab69cad8152b31b9443cc8140f42",
+    "et_xmlfile-2.0.0-py3-none-any.whl": "7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa",
+    "openpyxl-3.1.5-py2.py3-none-any.whl": "5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2"
   },
   "components": [
     {
@@ -66,6 +72,18 @@
       "version": "1.17.0",
       "license": "MIT",
       "source": "https://github.com/benjaminp/six"
+    },
+    {
+      "name": "openpyxl",
+      "version": "3.1.5",
+      "license": "MIT",
+      "source": "https://foss.heptapod.net/openpyxl/openpyxl"
+    },
+    {
+      "name": "et-xmlfile",
+      "version": "2.0.0",
+      "license": "MIT",
+      "source": "https://foss.heptapod.net/openpyxl/et_xmlfile"
     }
   ]
 }

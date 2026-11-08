@@ -24,7 +24,8 @@
  */
 // SQEM-649 — `continued`: the answer goes on in a new invocation; the browser moves its deadline.
 // SQEM-660 — `analysis`: a program for the browser to run (run_analysis); not terminal.
-export const JOB_EVENTS = ['delta', 'continued', 'analysis', 'result'] as const;
+// SQEM-661 — `analysis_table`: one part of a connector table, sent ahead of the program that needs it.
+export const JOB_EVENTS = ['delta', 'continued', 'analysis_table', 'analysis', 'result'] as const;
 
 export type JobEvent = typeof JOB_EVENTS[number];
 
@@ -38,6 +39,7 @@ export type JobEvent = typeof JOB_EVENTS[number];
 export function jobEventFor(payload: Record<string, unknown>): JobEvent {
   if ('delta' in payload) return 'delta';
   if ('continued' in payload) return 'continued'; // SQEM-649 — not terminal
+  if ('analysisTable' in payload) return 'analysis_table'; // SQEM-661 — not terminal
   if ('analysis' in payload) return 'analysis'; // SQEM-660 — not terminal
   return 'result';
 }

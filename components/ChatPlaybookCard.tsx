@@ -174,7 +174,11 @@ export function AnalysesCard({ analyses }: { analyses: ShownAnalysis[] | null | 
   if (!analyses?.length) return null;
   const okCount = analyses.filter(a => a.ok).length;
   const withCode = analyses.filter(a => a.code);
+  // SQEM-662 — after a reload the Excel file a program wrote is gone (never stored); say so, visibly.
+  const lostFiles = !withCode.length && analyses.some(a => (a.fileCount ?? 0) > 0);
   return (
+    <>
+    {lostFiles && <p className="mt-2 ml-1 max-w-md text-xs text-ink-subtle">{m.chatcard_analysis_file_not_kept()}</p>}
     <details className="mt-2 ml-1 w-full max-w-md rounded-card border border-line bg-surface-raised shadow-rest px-4 py-3 text-left">
       <summary className="cursor-pointer text-xs font-medium text-ink-subtle">
         {okCount ? m.chatcard_analysis_ran({ count: okCount }) : m.chatcard_analysis_failed()}
@@ -188,6 +192,7 @@ export function AnalysesCard({ analyses }: { analyses: ShownAnalysis[] | null | 
         </div>
       ))}
     </details>
+    </>
   );
 }
 

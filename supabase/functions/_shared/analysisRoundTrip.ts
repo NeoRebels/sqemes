@@ -8,16 +8,23 @@
  * ⚠️ The listener is subscribed BEFORE the program is sent, so a fast browser cannot answer into the
  * void; the wait covers a first start of Python in the browser (download, up to 120 s) plus the run.
  * If the chat is closed meanwhile nobody answers: the tool reports that, the answer goes on.
+ *
+ * SQEM-661 — connector tables travel the same way, AHEAD of the program that needs them: each one in
+ * parts (`analysis_table`), because a broadcast message has a size limit; the program then names what
+ * it expects (`tables`: key and number of parts). A broadcast is best-effort, so the browser answers
+ * with the keys that did not arrive whole (`missingTables`) instead of computing on part of the data,
+ * and those are sent again with the next program.
  */
 
 import { createAdminClient } from './supabase-admin.ts';
 import { broadcastJobResult } from './broadcast.ts';
-import type { AnalysisRunResult } from './analysisTool.ts';
+import { normalizeFileMetas, type AnalysisRunResult } from './analysisTool.ts';
+import { tableParts, type ConnectorTable } from './connectorTables.ts';
 
 /** Python's first start in the browser (≤ 120 s, lib/analysisSandbox.ts) + one run (30 s) + margin. */
 export const ANALYSIS_WAIT_MS = 170_000;
 
-export async function requestBrowserAnalysis(jobId: string, code: string, signal?: AbortSignal): Promise<AnalysisRunResult> {
+export async function requestBrowserAnalysis(jobId: string, code: string, signal?: AbortSignal, tables: ConnectorTable[] = []): Promise<AnalysisRunResult> {
   const callId = crypto.randomUUID();
   const client = createAdminClient();
   const channel = client.channel(`analysis:${jobId}`);
@@ -41,12 +48,26 @@ export async function requestBrowserAnalysis(jobId: string, code: string, signal
             error: payload.error ? String(payload.error).slice(0, 4000) : undefined,
             truncated: payload.truncated === true,
             unstarted: payload.unstarted === true,
+            ...(Array.isArray(payload.missingTables) ? { missingTables: payload.missingTables.filter((k): k is string => typeof k === 'string') } : {}),
+            // SQEM-662 — name and size of the files the person got; the bytes stay in the browser.
+            ...(normalizeFileMetas(payload.files).length ? { files: normalizeFileMetas(payload.files) } : {}),
+            ...(Array.isArray(payload.skipped) ? { skipped: payload.skipped.filter((k): k is string => typeof k === 'string').slice(0, 10).map(k => k.slice(0, 120)) } : {}),
           });
         })
         .subscribe((status: string) => {
           if (status === 'SUBSCRIBED' && !sent) {
             sent = true; // a reconnect fires SUBSCRIBED again; the program goes out once
-            broadcastJobResult(jobId, { analysis: { callId, code } }).catch((e) => {
+            const expect = tables.map(t => ({ key: t.key, parts: tableParts(t).length }));
+            (async () => {
+              // Parts in order, one message each; the program last, so it never waits on its data.
+              for (const t of tables) {
+                const parts = tableParts(t);
+                for (let i = 0; i < parts.length; i++) {
+                  await broadcastJobResult(jobId, { analysisTable: { key: t.key, part: i, parts: parts.length, csv: parts[i] } });
+                }
+              }
+              await broadcastJobResult(jobId, { analysis: { callId, code, ...(expect.length ? { tables: expect } : {}) } });
+            })().catch((e) => {
               clearTimeout(timer);
               reject(new Error(`The program could not be sent to the browser: ${(e as Error)?.message}`));
             });

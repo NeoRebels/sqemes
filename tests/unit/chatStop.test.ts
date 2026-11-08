@@ -77,7 +77,8 @@ describe('wiring', () => {
     // and SQEM-651's fetched connectors: their tool list and the pool wrapper (one since SQEM-652, which
     // routed Claude and OpenAI through sqemes too)
     // SQEM-660 — and the wait for the browser's analysis result (Stop ends that wait too).
-    expect([...fn.matchAll(/cancel\.signal[,)]/g)].length).toBe(10);
+    // SQEM-661 — the first connector list's `{ signal: cancel.signal }` gained `, onResult` and is counted now.
+    expect([...fn.matchAll(/cancel\.signal[,)]/g)].length).toBe(11);
     expect([...fn.matchAll(/^\s+signal,$/gm)].length).toBe(4);   // the four fetch sites
   });
   it('a stopped job broadcasts nothing and always ends its watch', () => {

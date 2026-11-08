@@ -468,6 +468,8 @@ async function xlsxBlob(md: string, style: DocumentStyle = {}): Promise<Blob> {
 
 /** Build the file. Throws with a readable message; the caller shows it. */
 export async function buildFile(file: GeneratedFile, opts: BuildOptions = {}): Promise<Blob> {
+  // SQEM-662 — a file from an analysis program is already built; its content is only the preview.
+  if (file.bytes) return new Blob([file.bytes], { type: MIME[file.format] });
   const title = file.name.replace(/\.[a-z]+$/, '');
   const style = opts.style ?? file.style ?? {};
   const logo = opts.logo ?? null;

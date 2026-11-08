@@ -107,7 +107,8 @@ describe('SQEM-660 — the runtime is fetched and checked at build time', () => 
     expect(read('.gitignore')).toMatch(/^public\/pyodide\/$/m);
   });
   it('the components are named in the third-party notices', () => {
-    expect(manifest.components.map((c: { name: string }) => c.name)).toEqual(['pyodide', 'cpython-stdlib', 'numpy', 'pandas', 'python-dateutil', 'pytz', 'six']);
+    // SQEM-662 — openpyxl and et_xmlfile from PyPI (not in Pyodide), for Excel files written by a program.
+    expect(manifest.components.map((c: { name: string }) => c.name)).toEqual(['pyodide', 'cpython-stdlib', 'numpy', 'pandas', 'python-dateutil', 'pytz', 'six', 'openpyxl', 'et-xmlfile']);
     expect(read('scripts/generate-third-party-notices.mjs')).toMatch(/## Bundled Python runtime \(Chat data analysis\)/);
   });
 });

@@ -172,8 +172,9 @@ describe('SQEM-660 — wiring', () => {
   const chat = readFileSync('pages/Chat.tsx', 'utf8');
   it('chat-message: metadata in, tool on the base runtime, carried through hand-overs, shown with the result', () => {
     expect(fn).toMatch(/const analysisTables = normalizeAnalysisTables\(src\.analysisTables\);/);
-    expect(fn).toMatch(/\.\.\.\(analysisTables\.length \? \{ analysisTables \} : \{\}\) \} satisfies ContinuationRequest/);
-    expect(fn).toMatch(/if \(base\) base = withAnalysisTool\(base, analysisTables, \(code\) => requestBrowserAnalysis\(jobId, code, cancel\.signal\), analyses\);/);
+    expect(fn).toMatch(/\.\.\.\(analysisTables\.length \? \{ analysisTables \} : \{\}\), \.\.\.\(connectorAnalysis \? \{ connectorAnalysis: true \} : \{\}\) \} satisfies ContinuationRequest/);
+    // SQEM-661 — the connector tables of this answer travel with the program (`pending`).
+    expect(fn).toMatch(/if \(base\) base = withAnalysisTool\(base, analysisTables, \(code, pending\) => requestBrowserAnalysis\(jobId, code, cancel\.signal, pending\), analyses, connectorTables\);/);
     expect(fn).toMatch(/generatedFiles, analyses,/);
     expect(fn).toMatch(/\.\.\.\(analyses\.length \? \{ analyses \} : \{\}\),/);
     expect(fn).toMatch(/tools && analysisTables\.length \? ANALYSIS_INSTRUCTION : null/);
@@ -185,13 +186,18 @@ describe('SQEM-660 — wiring', () => {
   });
   it('⛔ the round trip listens BEFORE it sends, once, and stores nothing', () => {
     const rt = readFileSync('supabase/functions/_shared/analysisRoundTrip.ts', 'utf8');
-    expect(rt).toMatch(/if \(status === 'SUBSCRIBED' && !sent\) \{\s*sent = true;[\s\S]*?broadcastJobResult\(jobId, \{ analysis: \{ callId, code \} \}\)/);
+    expect(rt).toMatch(/if \(status === 'SUBSCRIBED' && !sent\) \{\s*sent = true;[\s\S]*?broadcastJobResult\(jobId, \{ analysis: \{ callId, code, \.\.\.\(expect\.length \? \{ tables: expect \} : \{\}\) \} \}\)/);
     expect(rt).not.toMatch(/\.from\(/);
     expect(rt).toMatch(/if \(payload\?\.callId !== callId\) return;/);
   });
   it('Chat: only metadata goes to the server; the program runs on this chat\'s tables; the card shows what ran', () => {
     expect(chat).toMatch(/\.\.\.\(chatTables\.length \? \{ analysisTables: analysisTableMeta\(chatTables\) \} : \{\}\)/);
-    expect(chat).toMatch(/void runAnalysis\(code, chatTables\.map\(t => \(\{ key: t\.key, csv: t\.csv \}\)\)\)\s*\.then\(r => \{ updateRunning\(run, \{ analysing: false \}\); return sendAnalysisResult\(jobId, \{ callId, \.\.\.r \}\); \}\);/);
+    // SQEM-661 — attachments and this answer's connector tables; an incomplete one is reported, not run on.
+    expect(chat).toMatch(/if \(missing\.length\) return \{ ok: false, output: '', error: 'Connector data incomplete\.', unstarted: true, missingTables: missing \};/);
+    expect(chat).toMatch(/return runAnalysis\(programWithDf\(code, dfKey, fromConnectors\.length > 0\), \[\.\.\.chatTables\.map\(t => \(\{ key: t\.key, csv: t\.csv \}\)\), \.\.\.fromConnectors\]\);/);
+    // SQEM-662 — the bytes of a program's files stay here; the server hears name and size.
+    expect(chat).toMatch(/const \{ files, \.\.\.rest \} = r as typeof r & \{ files\?: AnalysisFile\[\] \};/);
+    expect(chat).toMatch(/return sendAnalysisResult\(jobId, \{ callId, \.\.\.rest, \.\.\.\(files\?\.length \? \{ files: files\.map\(f => \(\{ name: f\.name, size: f\.data\.byteLength \}\)\) \} : \{\}\) \}\);/);
     expect(chat).toMatch(/if \(t\.length\) preloadAnalysis\(\);/);
     expect(chat).toMatch(/<AnalysesCard analyses=\{msg\.analyses\} \/>/);
   });
@@ -202,7 +208,9 @@ describe('SQEM-660 — wiring', () => {
     expect(chat).toMatch(/updateRunning\(run, \{ analysing: false \}\)/);
     expect(readFileSync('lib/api/chatSessions.ts', 'utf8')).toMatch(/extra\?\.analyses\?\.length \? \{ analyses: extra\.analyses as unknown as Json \}/);
     expect(readFileSync('lib/playbookRef.ts', 'utf8')).toMatch(/analyses: normalizeStoredAnalyses\(row\.analyses\)/);
-    expect(fn).toMatch(/analysisLogCounts\(analyses\.slice\(analysesCarried\)\)/);
+    // SQEM-661 — only the last invocation logs, so the line counts the whole chain.
+    expect(fn).toMatch(/\.\.\.\(analyses\.length \? analysisLogCounts\(analyses\) : \{\}\), \/\/ the whole chain/);
+    expect(fn).not.toMatch(/analysesCarried/);
   });
   it('both languages', () => {
     for (const k of ['chatcard_analysis_ran', 'chatcard_analysis_where', 'chatcard_analysis_failed', 'chat_attach_truncated_table', 'chat_analysis_running', 'chatcard_analysis_not_kept'] as const) {

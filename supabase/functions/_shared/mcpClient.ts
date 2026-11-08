@@ -58,11 +58,18 @@ function withTimeout(signal: AbortSignal | undefined, ms: number): AbortSignal {
 }
 
 /** One connector's session: initialize once, then list and call; re-initialize once if it expired. */
+/**
+ * SQEM-661 — sees every successful tool result WHOLE, before the cut to `MCP_RESULT_MAX_CHARS`, and may
+ * answer with the text the model gets instead (a list result becomes tables for run_analysis). `null`
+ * keeps the bounded text.
+ */
+export type ConnectorResultHook = (info: { connector: string; tool: string }, fullText: string, boundedText: string) => string | null;
+
 export class McpSession {
   private session: string | null = null;
   private ready = false;
   private nextId = 1;
-  constructor(private c: McpConnectorInput, private fetchImpl: Fetch = fetch) {}
+  constructor(private c: McpConnectorInput, private fetchImpl: Fetch = fetch, private onResult?: ConnectorResultHook) {}
 
   private headers(): Record<string, string> {
     const h: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json, text/event-stream' };
@@ -117,12 +124,20 @@ export class McpSession {
 
   async callTool(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
     const result = await this.request('tools/call', { name, arguments: args }, withTimeout(signal, MCP_CALL_TIMEOUT_MS));
-    return toolResultText(result);
+    const full = toolResultFullText(result);
+    const bounded = boundResultText(full);
+    if (!this.onResult || result?.isError) return bounded;
+    return this.onResult({ connector: this.c.displayName, tool: name }, full, bounded) ?? bounded;
   }
 }
 
 /** A `tools/call` result as text for the model: text parts joined, other parts named, bounded. */
 export function toolResultText(result: any): string {
+  return boundResultText(toolResultFullText(result));
+}
+
+/** The same text, not yet bounded (SQEM-661: a list is turned into tables from the whole of it). */
+export function toolResultFullText(result: any): string {
   const parts: string[] = [];
   for (const p of Array.isArray(result?.content) ? result.content : []) {
     if (p?.type === 'text' && typeof p.text === 'string') parts.push(p.text);
@@ -130,12 +145,13 @@ export function toolResultText(result: any): string {
     else if (p?.type) parts.push(`[${p.type} omitted]`);
   }
   if (!parts.length && result?.structuredContent !== undefined) parts.push(JSON.stringify(result.structuredContent));
-  let text = parts.join('\n\n') || '(no content)';
-  if (result?.isError) text = `Tool error: ${text}`;
-  if (text.length > MCP_RESULT_MAX_CHARS) {
-    text = `${text.slice(0, MCP_RESULT_MAX_CHARS)}\n\n[Truncated: the tool returned ${text.length} characters, only the first ${MCP_RESULT_MAX_CHARS} are shown.]`;
-  }
-  return text;
+  const text = parts.join('\n\n') || '(no content)';
+  return result?.isError ? `Tool error: ${text}` : text;
+}
+
+export function boundResultText(text: string): string {
+  if (text.length <= MCP_RESULT_MAX_CHARS) return text;
+  return `${text.slice(0, MCP_RESULT_MAX_CHARS)}\n\n[Truncated: the tool returned ${text.length} characters, only the first ${MCP_RESULT_MAX_CHARS} are shown.]`;
 }
 
 /**
@@ -195,13 +211,14 @@ export interface LoadedConnectorTools {
 export async function loadConnectorTools(
   connectors: McpConnectorInput[],
   // SQEM-651 — `offset`: a connector fetched later in the answer numbers on after the ones already loaded.
-  { signal, fetchImpl, offset = 0 }: { signal?: AbortSignal; fetchImpl?: Fetch; offset?: number } = {},
+  // SQEM-661 — `onResult`: every result of these connectors passes it (list results become tables).
+  { signal, fetchImpl, offset = 0, onResult }: { signal?: AbortSignal; fetchImpl?: Fetch; offset?: number; onResult?: ConnectorResultHook } = {},
 ): Promise<LoadedConnectorTools> {
   const definitions: ToolDefinition[] = [];
   const routes = new Map<string, { session: McpSession; tool: string }>();
   const failed: string[] = [];
   const results = await Promise.allSettled(connectors.map(async (c) => {
-    const session = new McpSession(c, fetchImpl);
+    const session = new McpSession(c, fetchImpl, onResult);
     return { c, session, tools: await session.listTools(signal) };
   }));
   results.forEach((r, i) => {

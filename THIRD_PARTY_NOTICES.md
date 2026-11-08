@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Generated 2026-11-07 from the production dependency tree. **Do not edit by hand** — it is rebuilt
+Generated 2026-11-08 from the production dependency tree. **Do not edit by hand** — it is rebuilt
 by `scripts/build-public-export.sh` on every release, which is what keeps it from going stale.
 
 Sqemes itself is licensed under the Sustainable Use License from v1.11.0 (AGPL-3.0 for v1.10.0 to
@@ -46,6 +46,8 @@ are reproduced under Licence texts below and served next to the app under `/pyod
 | python-dateutil | 2.9.0.post0 | Apache-2.0 OR BSD-3-Clause | https://github.com/dateutil/dateutil |
 | pytz | 2026.1.post1 | MIT | https://github.com/stub42/pytz |
 | six | 1.17.0 | MIT | https://github.com/benjaminp/six |
+| openpyxl | 3.1.5 | MIT | https://foss.heptapod.net/openpyxl/openpyxl |
+| et-xmlfile | 2.0.0 | MIT | https://foss.heptapod.net/openpyxl/et_xmlfile |
 
 ## npm dependencies
 

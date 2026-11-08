@@ -58,7 +58,7 @@ describe('⛔ the contract — sender and client must use the same words', () =>
   it('the client listens for NOTHING the sender cannot emit', () => {
     // The other direction, and it is not symmetric noise: a listener for an event that is never sent
     // reads as working code and is dead. That is how a wrong name survives a review.
-    const listened = [...CLIENT.matchAll(/on\('broadcast',\s*\{\s*event:\s*'([a-z]+)'/g)].map(m => m[1]);
+    const listened = [...CLIENT.matchAll(/on\('broadcast',\s*\{\s*event:\s*'([a-z_]+)'/g)].map(m => m[1]);
     expect(listened.length).toBeGreaterThan(0);
     expect([...new Set(listened)].sort()).toEqual([...JOB_EVENTS].sort());
   });

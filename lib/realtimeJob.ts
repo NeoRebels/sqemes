@@ -52,7 +52,12 @@ export function waitForJobResult(
    * isolated frame and answers with `sendAnalysisResult`. While it runs the deadline moves on: a first
    * start of Python can take two minutes, and the server waits for it.
    */
-  onAnalysis?: (req: { callId: string; code: string }) => void,
+  onAnalysis?: (req: { callId: string; code: string; tables?: { key: string; parts: number }[] }) => void,
+  /**
+   * SQEM-661 — one part of a connector table, sent ahead of the program that needs it (`tables` on the
+   * request names what it expects). The caller collects them; a broadcast can be lost, so it checks.
+   */
+  onAnalysisTable?: (part: { key: string; part: number; parts: number; csv: string }) => void,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const channel = supabase.channel(`job:${jobId}`);
@@ -89,13 +94,21 @@ export function waitForJobResult(
         onContinued?.();
       })
       // SQEM-660 — run_analysis: the program comes here, the result goes back on analysis:<jobId>.
-      .on('broadcast', { event: 'analysis' }, ({ payload }: { payload: { analysis?: { callId?: unknown; code?: unknown } } }) => {
+      .on('broadcast', { event: 'analysis_table' }, ({ payload }: { payload: { analysisTable?: { key?: unknown; part?: unknown; parts?: unknown; csv?: unknown } } }) => {
+        const t = payload?.analysisTable;
+        if (!t || typeof t.key !== 'string' || typeof t.csv !== 'string' || !Number.isInteger(t.part) || !Number.isInteger(t.parts)) return;
+        onAnalysisTable?.({ key: t.key, part: t.part as number, parts: t.parts as number, csv: t.csv });
+      })
+      .on('broadcast', { event: 'analysis' }, ({ payload }: { payload: { analysis?: { callId?: unknown; code?: unknown; tables?: unknown } } }) => {
         const a = payload?.analysis;
         if (!a || typeof a.callId !== 'string' || typeof a.code !== 'string') return;
         cap = Math.max(cap, chainCapMs);
         deadline = Math.min(Math.max(deadline, Date.now() + ANALYSIS_DEADLINE_MS), startedAt + cap);
         arm();
-        onAnalysis?.({ callId: a.callId, code: a.code });
+        const tables = Array.isArray(a.tables)
+          ? a.tables.filter((x): x is { key: string; parts: number } => !!x && typeof x.key === 'string' && Number.isInteger(x.parts))
+          : undefined;
+        onAnalysis?.({ callId: a.callId, code: a.code, ...(tables?.length ? { tables } : {}) });
       })
       .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string; loadedTemplateIds?: unknown; libraryChanges?: unknown; webSources?: unknown; generatedFiles?: unknown; connectorIds?: unknown; analyses?: unknown } }) => {
         clearTimeout(timeout);
@@ -126,7 +139,7 @@ export const ANALYSIS_DEADLINE_MS = 200_000;
  * Over REST (`httpSend`): the browser does not need to join a second channel to answer once.
  * Never throws — a lost answer becomes the server's "the browser did not answer".
  */
-export async function sendAnalysisResult(jobId: string, payload: { callId: string; ok: boolean; output: string; error?: string; truncated?: boolean; unstarted?: boolean }): Promise<void> {
+export async function sendAnalysisResult(jobId: string, payload: { callId: string; ok: boolean; output: string; error?: string; truncated?: boolean; unstarted?: boolean; missingTables?: string[]; files?: { name: string; size: number }[]; skipped?: string[] }): Promise<void> {
   const channel = supabase.channel(`analysis:${jobId}`);
   try {
     await channel.httpSend('analysis_result', payload);

@@ -52,6 +52,8 @@ function useDownload(file: GeneratedFile | null, workspaceStyle: DocumentStyle |
 /** One line under the file name: which look applies, and what a format cannot do with it. */
 function StyleLine({ file, workspaceStyle }: { file: GeneratedFile; workspaceStyle: DocumentStyle | null | undefined }) {
   if (file.format === 'md' || file.format === 'txt') return null;
+  // SQEM-662 — the program decided the look of its own file; the document style does not apply.
+  if (file.bytes) return <p className="text-xs text-ink-subtle">{m.chatfile_from_analysis()}</p>;
   const s = effectiveStyle(file.style, workspaceStyle);
   if (!Object.keys(s).length) return null;
   const pdfFallback = file.format === 'pdf' && s.font && pdfFontFor(s) !== s.font;

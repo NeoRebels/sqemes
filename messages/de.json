@@ -2884,5 +2884,7 @@
   "chatcard_analysis_ran": "Analyse ausgeführt ({count})",
   "chatcard_analysis_failed": "Analyse fehlgeschlagen",
   "chatcard_analysis_where": "In deinem Browser berechnet — die Daten haben ihn nicht verlassen.",
-  "chatcard_analysis_not_kept": "Die Programme werden nicht gespeichert, nur ob sie geklappt haben."
+  "chatcard_analysis_not_kept": "Die Programme werden nicht gespeichert, nur ob sie geklappt haben.",
+  "chatfile_from_analysis": "Vom Analyse-Programm in deinem Browser erstellt. Excel rechnet die Formeln beim Öffnen.",
+  "chatcard_analysis_file_not_kept": "Die Excel-Datei aus dieser Analyse wird nicht gespeichert. Frag noch einmal, um sie neu zu erzeugen."
 }
