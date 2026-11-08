@@ -307,6 +307,11 @@ export interface TemplateSummary {
   argumentCount?: number;
   contextFileCount?: number;
   contextBytes?: number;
+  /** SQEM-663 — the template's one workspace tag, absent when it has none. */
+  tag?: string;
+  /** SQEM-663 — who created it (a name, never an e-mail address) and when it last changed. */
+  createdBy?: string;
+  updatedAt?: string;
 }
 
 export interface TemplateDetail {
@@ -369,8 +374,8 @@ export interface LibraryReader {
   canAccessPersona(id: string): boolean;
   canAccessFile(id: string): boolean;
 
-  listTemplates(args?: { kind?: string | null }): Promise<TemplateSummary[]>;
-  searchTemplates(args: { query: string; kind?: string | null }): Promise<TemplateSummary[]>;
+  listTemplates(args?: { kind?: string | null; tag?: string | null }): Promise<TemplateSummary[]>;
+  searchTemplates(args: { query: string; kind?: string | null; tag?: string | null }): Promise<TemplateSummary[]>;
   getTemplate(args: { id?: string; name?: string; includeFiles?: string }): Promise<TemplateDetail>;
 
   listPersonas(): Promise<PersonaSummary[]>;
@@ -687,6 +692,20 @@ export async function createLibraryReader(
     return { text: composePersona(persona, routes, connectors.map(c => c.name)), routeCount: routes.length, connectors };
   };
 
+  // SQEM-663 — member names for `createdBy`, loaded once per reader and only when a list is asked for.
+  let memberNames: Promise<Map<string, string>> | null = null;
+  const namesOfMembers = () => memberNames ??= (async () => {
+    const { data } = await client.from('workspace_members').select('user_id, profiles(name)').eq('workspace_id', workspaceId);
+    return new Map(((data ?? []) as any[]).map(m => [m.user_id as string, (m.profiles?.name || 'Member without a name') as string]));
+  })();
+  /** The SQEM-663 fields of one row: tag, owner's name, last change. */
+  const listFields = (t: any, names: Map<string, string>) => ({
+    ...(Array.isArray(t.tags) && t.tags[0] ? { tag: t.tags[0] as string } : {}),
+    ...(t.created_by ? { createdBy: names.get(t.created_by) ?? 'A former member' } : {}),
+    ...(t.updated_at ? { updatedAt: t.updated_at as string } : {}),
+  });
+  const tagMatches = (t: any, tag: string | null | undefined) => !tag || (Array.isArray(t.tags) && t.tags.includes(tag));
+
   const reader: LibraryReader = {
     canAccessTemplate,
     canAccessPersona,
@@ -695,10 +714,10 @@ export async function createLibraryReader(
     routeVisibility,
     renderPersona,
 
-    async listTemplates({ kind = null } = {}) {
+    async listTemplates({ kind = null, tag = null } = {}) {
       let query = client
         .from('prompts')
-        .select('id, title, description, kind, variables, context_file_ids')
+        .select('id, title, description, kind, variables, context_file_ids, tags, created_by, updated_at')
         .eq('workspace_id', workspaceId)
         .or('published.eq.true,kind.eq.skill') // SQEM-110/210 — vestigial guard
         .order('title');
@@ -706,10 +725,10 @@ export async function createLibraryReader(
       const { data: templates } = await query;
 
       const visible = (templates || [])
-        .filter((t: any) => canAccessTemplate(t.id)); // SQEM-142/210 — access-filtered
+        .filter((t: any) => canAccessTemplate(t.id) && tagMatches(t, tag)); // SQEM-142/210 — access-filtered; SQEM-663 — tag
       // SQEM-232 — stats computed AFTER the access filter, so a template the caller may not see
       // contributes nothing, not even its file count.
-      const stats = await contextFileStats(visible);
+      const [stats, names] = await Promise.all([contextFileStats(visible), namesOfMembers()]);
 
       return visible.map((t: any) => {
         const s = stats.get(t.id);
@@ -723,17 +742,18 @@ export async function createLibraryReader(
           // Omitted entirely when there are no files — a list of zeroes is noise the model has to
           // read past on every entry, and most templates carry nothing.
           ...(s ? { contextFileCount: s.count, contextBytes: s.bytes } : {}),
+          ...listFields(t, names),
         };
       });
     },
 
-    async searchTemplates({ query: rawQuery, kind = null }) {
+    async searchTemplates({ query: rawQuery, kind = null, tag = null }) {
       const needle = (rawQuery || '').toLowerCase();
       if (!needle) throw new LibraryBadRequest('Missing search query');
 
       let dbQuery = client
         .from('prompts')
-        .select('id, title, description, kind, context_file_ids')
+        .select('id, title, description, kind, context_file_ids, tags, created_by, updated_at')
         .eq('workspace_id', workspaceId)
         .or('published.eq.true,kind.eq.skill'); // SQEM-110/210 — vestigial guard
       if (kind) dbQuery = dbQuery.eq('kind', kind);
@@ -741,13 +761,13 @@ export async function createLibraryReader(
 
       const matched = (templates || [])
         .filter((t: any) =>
-          canAccessTemplate(t.id) && ( // SQEM-142/210 — access-filtered
+          canAccessTemplate(t.id) && tagMatches(t, tag) && ( // SQEM-142/210 — access-filtered; SQEM-663 — tag
             t.title.toLowerCase().includes(needle) ||
             (t.description || '').toLowerCase().includes(needle)
           )
         );
       // SQEM-232 — only for the matches, so a search that hits nothing costs no extra query.
-      const stats = await contextFileStats(matched);
+      const [stats, names] = await Promise.all([contextFileStats(matched), matched.length ? namesOfMembers() : Promise.resolve(new Map<string, string>())]);
 
       return matched.map((t: any) => {
         const s = stats.get(t.id);
@@ -758,6 +778,7 @@ export async function createLibraryReader(
           kind:        t.kind,
           description: t.description || '',
           ...(s ? { contextFileCount: s.count, contextBytes: s.bytes } : {}),
+          ...listFields(t, names),
         };
       });
     },

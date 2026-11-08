@@ -1,6 +1,6 @@
 import React from 'react';
-import { Lock } from 'lucide-react';
 import { ACCESS_BADGE_LABEL, ACCESS_BADGE_TITLE, type AccessBadgeMode } from '../../lib/accessBadge';
+import { ACCESS_ICON } from './RightsIcons';
 
 /**
  * SQEM-400 — the badge on a playbook or persona card that carries an access rule.
@@ -13,12 +13,13 @@ import { ACCESS_BADGE_LABEL, ACCESS_BADGE_TITLE, type AccessBadgeMode } from '..
  */
 export default function AccessBadge({ mode }: { mode?: AccessBadgeMode }) {
   if (!mode) return null;
+  const Icon = ACCESS_ICON[mode]; // SQEM-664 — the same glyph as the list row and the editor
   return (
     <span
       className="text-2xs font-bold px-2.5 py-1 bg-surface-sunken text-slate-500 dark:text-slate-300 rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0"
       title={ACCESS_BADGE_TITLE[mode]}
     >
-      <Lock className="w-3 h-3" /> {ACCESS_BADGE_LABEL[mode]}
+      <Icon className="w-3 h-3" /> {ACCESS_BADGE_LABEL[mode]}
     </span>
   );
 }

@@ -52,8 +52,9 @@ describe('which tools Chat offers, by role', () => {
     expect([...all].sort()).toEqual([...mcp].sort());
   });
 
-  it('a member still gets the extra reads (list_templates, list_files, download_skill)', () => {
-    expect(names('member').sort()).toEqual(['download_skill', 'list_files', 'list_templates']);
+  it('a member still gets the extra reads (list_templates, list_files, download_skill, list_members)', () => {
+    // SQEM-663 — list_members is a read: names and roles of the workspace, never e-mail addresses.
+    expect(names('member').sort()).toEqual(['download_skill', 'list_files', 'list_members', 'list_templates']);
   });
 });
 
@@ -189,7 +190,7 @@ describe('wiring', () => {
 
   it('chat-message runs the SHARED handlers as the chat user, with the role from the membership check', () => {
     expect(chat).toMatch(/role: \(membership as \{ role\?: string \}\)\.role \?\? null/);
-    expect(chat).toMatch(/definitions: chatActionDefinitions\(role\)/);
+    expect(chat).toMatch(/definitions: chatActionDefinitions\(role, \{ selfHosted: SELF_HOSTED \}\)/); // SQEM-663
     expect(chat).toMatch(/runLibraryTool\(\s*\{ adminClient: createAdminClient\(\), workspaceId, userId, role, lib, surface: 'chat' \}/);
   });
 

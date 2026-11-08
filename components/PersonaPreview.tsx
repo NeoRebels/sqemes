@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import { ArrowLeft, Copy, Edit, FolderDown, Play, Star, Trash2 } from 'lucide-react';
 import AccessBadge from './ui/AccessBadge';
+import { EditBadge } from './ui/RightsIcons';
 import OwnerLine from './OwnerLine';
 import type { OwnerMember } from '../lib/listFilters';
 import TagEditor from './ui/TagEditor';
@@ -29,12 +30,14 @@ import { m } from '../lib/i18n';
 const ACTION = 'inline-flex items-center gap-1.5 px-3 py-2 rounded-control text-sm font-medium text-ink-muted hover:text-ink-strong hover:bg-surface-sunken transition-colors';
 
 export default function PersonaPreview({
-  persona, canEdit, accessMode, workspaceTags, visiblePlaybookIds, members, connectors, currentUserId,
+  persona, canEdit, accessMode, editRestricted, workspaceTags, visiblePlaybookIds, members, connectors, currentUserId,
   onDuplicate, onExport, onDelete, onSetTag, onFavorite, onBack,
 }: {
   persona: Persona;
   canEdit: boolean;
   accessMode?: AccessBadgeMode;
+  /** SQEM-664 — the persona names its editors; spelled out beside the access badge. */
+  editRestricted?: boolean;
   workspaceTags: string[];
   /** Playbooks the viewer can open — only those become links. */
   visiblePlaybookIds: ReadonlySet<string>;
@@ -82,6 +85,7 @@ export default function PersonaPreview({
             />
             {/* SQEM-330 — the same badge, in the same words, as a restricted playbook. */}
             <AccessBadge mode={accessMode} />
+            <EditBadge restricted={editRestricted} />
           </div>
           <h2 id="persona-preview-title" className="font-display text-2xl md:text-3xl font-semibold tracking-tight text-ink-strong break-words">{persona.title}</h2>
           {persona.description && <p className="mt-1 text-ink-muted">{persona.description}</p>}

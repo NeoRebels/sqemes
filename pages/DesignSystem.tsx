@@ -14,6 +14,7 @@ import Switch from '../components/ui/Switch';
 import SegmentedTabs from '../components/ui/SegmentedTabs';
 import KindBadge from '../components/ui/KindBadge';
 import AccessBadge from '../components/ui/AccessBadge';
+import RightsIcons, { EditBadge } from '../components/ui/RightsIcons';
 import EmptyState from '../components/ui/EmptyState';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import CardSaveBar from '../components/ui/CardSaveBar';
@@ -278,6 +279,12 @@ export default function DesignSystem() {
           <KindBadge kind="skill" />
           <AccessBadge mode="restricted" />
           <AccessBadge mode="private" />
+          <EditBadge restricted />
+          {/* SQEM-664 — the list row's form: restricted, only me, editing restricted, and both. */}
+          <RightsIcons access="restricted" />
+          <RightsIcons access="private" />
+          <RightsIcons editRestricted />
+          <RightsIcons access="restricted" editRestricted />
         </Card>
 
         <Card className="p-6">

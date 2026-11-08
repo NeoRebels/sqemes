@@ -42,7 +42,22 @@ export const TOOL_CAPABILITY: Record<string, Capability> = {
   // let a `create`-only connection reshape a persona it may not otherwise touch.
   attach_template:   'update',
   detach_template:   'update',
+  // SQEM-663 — who may see and who may change a playbook or persona, set from the client. Both are
+  // `update` on the object (the app: changing access is an edit, SQEM-473 decision 3); `list_members`
+  // only reads who is in the workspace, so a model can name people.
+  list_members:      'read',
+  set_access:        'update',
+  set_editors:       'update',
 };
+
+/**
+ * SQEM-663 — tools a self-hosted installation does not offer. Access and "Who can edit" are both
+ * Cloud-only there (SQEM-170, SQEM-323: the editor shows "everyone in this workspace" instead of the
+ * control), so their tools are too: an MCP list should not promise what the app does not show.
+ * `list_members` only exists to find the ids those two take, so it goes with them.
+ * Applied at both advertisements (MCP `tools/list`, Chat) and at the handler.
+ */
+export const SELF_HOST_HIDDEN_TOOLS: readonly string[] = ['set_access', 'set_editors', 'list_members'];
 
 /**
  * The tool definitions as MCP advertises them (`tools/list`). Chat derives its own from these
@@ -53,7 +68,7 @@ export const LIBRARY_TOOL_DEFS = [
   {
     name: 'list_templates',
     title: 'List playbooks',
-    description: 'Browse every published template in the workspace (prompts and skills) with id, name, kind and description. Use this to see what reusable templates exist before composing something from scratch, or to find a template\'s id/name to pass to get_template. For a targeted lookup by keyword use search_templates instead. Optionally filter by kind.\n\nTemplates with attached context files also report "contextFileCount" and "contextBytes" (absent when there are none). Use them to decide HOW to load the template: when a template has several files or a large total, call get_template with include_files: "list" — you then get each file\'s name, size and a preview instead of its full text, and read only the ones you need via resources/read. For one small file, the default is fine.',
+    description: 'Browse every published template in the workspace (prompts and skills) with id, name, kind and description. Use this to see what reusable templates exist before composing something from scratch, or to find a template\'s id/name to pass to get_template. For a targeted lookup by keyword use search_templates instead. Optionally filter by kind.\n\nTemplates with attached context files also report "contextFileCount" and "contextBytes" (absent when there are none). Use them to decide HOW to load the template: when a template has several files or a large total, call get_template with include_files: "list" — you then get each file\'s name, size and a preview instead of its full text, and read only the ones you need via resources/read. For one small file, the default is fine.\n\nEach entry also carries its tag (when it has one), who created it (createdBy) and when it last changed (updatedAt).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -62,13 +77,14 @@ export const LIBRARY_TOOL_DEFS = [
           enum: ['prompt', 'skill', 'all'],
           description: 'Filter by template kind. Defaults to all.',
         },
+        tag: { type: 'string', description: 'Only templates carrying this workspace tag (e.g. "review").' },
       },
     },
   },
   {
     name: 'search_templates',
     title: 'Search playbooks',
-    description: 'Find a workspace template by keyword (matches title and description). Useful when the user wants to use, find or check one of their team\'s playbooks, or when the task is one their team keeps a playbook for — a matching prompt or skill can then be used instead of composing from scratch. Returns matching templates with their id and name — pass one to get_template to load its full content. Optionally filter by kind.\n\nMatches with attached context files also report "contextFileCount" and "contextBytes" (absent when there are none). Use them to decide HOW to load the template: when a template has several files or a large total, call get_template with include_files: "list" — you then get each file\'s name, size and a preview instead of its full text, and read only the ones you need via resources/read. For one small file, the default is fine.',
+    description: 'Find a workspace template by keyword (matches title and description). Useful when the user wants to use, find or check one of their team\'s playbooks, or when the task is one their team keeps a playbook for — a matching prompt or skill can then be used instead of composing from scratch. Returns matching templates with their id and name — pass one to get_template to load its full content. Optionally filter by kind.\n\nMatches with attached context files also report "contextFileCount" and "contextBytes" (absent when there are none). Use them to decide HOW to load the template: when a template has several files or a large total, call get_template with include_files: "list" — you then get each file\'s name, size and a preview instead of its full text, and read only the ones you need via resources/read. For one small file, the default is fine.\n\nEach entry also carries its tag (when it has one), who created it (createdBy) and when it last changed (updatedAt).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -78,6 +94,7 @@ export const LIBRARY_TOOL_DEFS = [
           enum: ['prompt', 'skill'],
           description: 'Optional kind filter',
         },
+        tag: { type: 'string', description: 'Only templates carrying this workspace tag.' },
       },
       required: ['query'],
     },
@@ -241,6 +258,7 @@ export const LIBRARY_TOOL_DEFS = [
           description: 'UUIDs of workspace files to attach as context (from list_files). Works for all kinds.',
           items: { type: 'string' },
         },
+        tag: { type: 'string', description: 'Optional workspace tag, e.g. "review". A template carries one tag; a tag the workspace does not have yet is added to its tag list.' },
       },
       required: ['kind', 'title', 'content'],
     },
@@ -266,6 +284,7 @@ export const LIBRARY_TOOL_DEFS = [
           description: 'Replace the attached context file list (array of file UUIDs from list_files).',
           items: { type: 'string' },
         },
+        tag: { type: 'string', description: 'Set the template\'s one workspace tag (replaces the current one); an empty string removes it.' },
       },
       required: ['id'],
     },
@@ -345,6 +364,44 @@ export const LIBRARY_TOOL_DEFS = [
         replaceWith: { type: 'string', description: 'Optional UUID of a replacement file. When the file is attached to other templates, swap it for this file in each of them (detach old, attach new) instead of just detaching, then delete the old file. Implies force.' },
       },
       required: ['fileId'],
+    },
+  },
+  {
+    name: 'list_members',
+    title: 'List workspace members',
+    description: 'List the people in this workspace (id, name, role, and whether it is you) and its groups (id, name). Use it to find the ids that set_access and set_editors take. Read only.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'set_access',
+    title: 'Set who can see',
+    description: 'Set who can SEE a template (playbook) or persona — the same choice as Access in the app.\n\nmode: "everyone" (everyone in the workspace), "only_me" (only its owner), or "restricted" (only the people and groups you name in user_ids / group_ids — find them with list_members). The owner always keeps sight.\n\nOnly on the person\'s explicit request, never on your own initiative: this decides what colleagues can find. Requires that you may edit it. Returns the new state in words; tell the person.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind:      { type: 'string', enum: ['template', 'persona'], description: 'What to change' },
+        id:        { type: 'string', description: 'UUID of the template or persona' },
+        mode:      { type: 'string', enum: ['everyone', 'only_me', 'restricted'] },
+        user_ids:  { type: 'array', items: { type: 'string' }, description: 'mode "restricted": people who may see it (ids from list_members)' },
+        group_ids: { type: 'array', items: { type: 'string' }, description: 'mode "restricted": groups who may see it (ids from list_members)' },
+      },
+      required: ['kind', 'id', 'mode'],
+    },
+  },
+  {
+    name: 'set_editors',
+    title: 'Set who can edit',
+    description: 'Set who can CHANGE a template (playbook) or persona — the same choice as "Who can edit" in the app, separate from who can see it.\n\nmode: "anyone" (anyone who may edit in this workspace) or "selected" (only the people and groups you name; its owner and the workspace admins keep their right regardless).\n\nOnly on the person\'s explicit request. Requires that you are a workspace admin, or an editor who owns it. Returns the new state in words; tell the person.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind:      { type: 'string', enum: ['template', 'persona'], description: 'What to change' },
+        id:        { type: 'string', description: 'UUID of the template or persona' },
+        mode:      { type: 'string', enum: ['anyone', 'selected'] },
+        user_ids:  { type: 'array', items: { type: 'string' }, description: 'mode "selected": people who may edit it (ids from list_members)' },
+        group_ids: { type: 'array', items: { type: 'string' }, description: 'mode "selected": groups who may edit it (ids from list_members)' },
+      },
+      required: ['kind', 'id', 'mode'],
     },
   },
 ];

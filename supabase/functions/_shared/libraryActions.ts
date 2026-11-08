@@ -37,11 +37,12 @@ import {
   resolveArchiveUrl,
   SKILL_ENTRY,
 } from './skillArchive.ts';
-import { TOOL_CAPABILITY } from './libraryToolDefs.ts';
+import { TOOL_CAPABILITY, SELF_HOST_HIDDEN_TOOLS } from './libraryToolDefs.ts';
+import { idList, accessPlan, editorsPlan, unknownIds, accessSentence, editorsSentence, normalizeTag, type AccessMode, type EditorsMode } from './accessTools.ts';
 
 // SQEM-561 — the definitions and the capability map are import-free (`./libraryToolDefs.ts`), so
 // tests and Chat's adapter can read them; re-exported so the server keeps one import.
-export { type Capability, TOOL_CAPABILITY, LIBRARY_TOOL_DEFS } from './libraryToolDefs.ts';
+export { type Capability, TOOL_CAPABILITY, LIBRARY_TOOL_DEFS, SELF_HOST_HIDDEN_TOOLS } from './libraryToolDefs.ts';
 
 // ---- The outcome both surfaces wrap ----
 
@@ -265,6 +266,8 @@ export async function runLibraryTool(
    */
   const requiredCap = TOOL_CAPABILITY[toolName];
   if (!requiredCap) return rpcError(id, -32601, `Unknown tool: '${toolName}'.`);
+  // SQEM-663 — not offered on self-host (both advertisements filter it); refused here as well.
+  if (SELF_HOSTED && SELF_HOST_HIDDEN_TOOLS.includes(toolName)) return rpcError(id, -32601, `Unknown tool: '${toolName}'.`);
   if (requiredCap !== 'read' && !mcpUserManagesContent) {
     return rpcError(id, -32602, writeRefusalMessage(`'${toolName}' (${requiredCap})`));
   }
@@ -286,6 +289,129 @@ export async function runLibraryTool(
   const refuseEdit = (id: unknown, what: 'playbook' | 'persona', title?: string | null) =>
     rpcError(id as never, -32602,
       `You may use this ${what}${title ? ` ("${title}")` : ''} but not change it: editing it is restricted to named people. Ask its owner or a workspace admin.`);
+
+  /**
+   * SQEM-663 — a tag the workspace does not list yet joins its list, as the app's editor does
+   * (`TemplateEditor`: a new tag is added to `workspaces.tags`). Only writers reach this (the role
+   * gate above). Non-fatal: the playbook carries the tag either way.
+   */
+  const ensureWorkspaceTag = async (tag: string): Promise<void> => {
+    const { data: ws } = await adminClient.from('workspaces').select('tags').eq('id', workspaceId).single();
+    const tags = ((ws as { tags?: string[] } | null)?.tags ?? []);
+    if (tags.includes(tag)) return;
+    const { error } = await adminClient.from('workspaces').update({ tags: [...tags, tag] }).eq('id', workspaceId);
+    if (error) console.error('[mcp] SQEM-663 tag not added to the workspace list:', error.message);
+  };
+
+  /** SQEM-663 — the workspace's people and groups, for naming principals and reading names back. */
+  const loadPrincipals = async () => {
+    const [{ data: mem }, { data: grp }] = await Promise.all([
+      // Names only, never e-mail addresses: the model needs to tell people apart, not to contact them.
+      adminClient.from('workspace_members').select('user_id, role, profiles(name)').eq('workspace_id', workspaceId),
+      adminClient.from('workspace_groups').select('id, name').eq('workspace_id', workspaceId),
+    ]);
+    const members = ((mem ?? []) as any[]).map(m => ({
+      id: m.user_id as string,
+      name: (m.profiles?.name || 'Member without a name') as string,
+      role: m.role as string,
+    }));
+    const groups = ((grp ?? []) as any[]).map(g => ({ id: g.id as string, name: g.name as string }));
+    return { members, groups };
+  };
+
+  if (toolName === 'list_members') {
+    const { members, groups } = await loadPrincipals();
+    return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
+      members: members.map(m => ({ ...m, ...(m.id === mcpUserId ? { you: true } : {}) })),
+      groups,
+    }, null, 2) }] });
+  }
+
+  /**
+   * SQEM-663 — the object `set_access` / `set_editors` act on, and the people they name. Visibility is
+   * checked by each handler itself (gate 1, inline), so the write-authorisation test sees it there.
+   */
+  const accessTarget = async (visible: boolean) => {
+    const kind: 'template' | 'persona' = args.kind === 'persona' ? 'persona' : 'template';
+    const objectId = typeof args.id === 'string' ? args.id : '';
+    const table = kind === 'template' ? 'prompts' : 'personas';
+    const { data: row } = await adminClient.from(table).select('id, title, created_by').eq('workspace_id', workspaceId).eq('id', objectId).maybeSingle();
+    if (!row || !visible) return null;
+    const who = { userIds: idList(args.user_ids), groupIds: idList(args.group_ids) };
+    const { members, groups } = await loadPrincipals();
+    return {
+      kind, objectId, what: kind === 'template' ? 'playbook' as const : 'persona' as const,
+      title: (row as { title: string }).title, ownerId: (row as { created_by: string | null }).created_by,
+      who, unknown: unknownIds(who, new Set(members.map(m => m.id)), new Set(groups.map(g => g.id))),
+      names: [
+        ...who.userIds.map(u => u === mcpUserId ? 'you' : (members.find(m => m.id === u)?.name ?? u)),
+        ...who.groupIds.map(g => `the group ${groups.find(x => x.id === g)?.name ?? g}`),
+      ],
+    };
+  };
+  const badTarget = () => args.kind !== 'template' && args.kind !== 'persona'
+    ? 'kind must be one of: template, persona' : typeof args.id !== 'string' || !args.id ? 'id is required' : null;
+
+  if (toolName === 'set_access') {
+    const bad = badTarget();
+    if (bad) return rpcError(id, -32602, bad);
+    // Gate 1 — visibility, same wording for absent and invisible (SQEM-291).
+    const t = await accessTarget(args.kind === 'persona' ? canAccessPersona(args.id) : canAccessTemplate(args.id));
+    if (!t) return rpcError(id, -32602, `${args.kind === 'persona' ? 'Persona' : 'Template'} not found: ${args.id}`);
+    if (t.unknown.length) return rpcError(id, -32602, `Not a member or group of this workspace: ${t.unknown.join(', ')}. Use list_members.`);
+    // SQEM-473 decision 3 — changing who may SEE it is an edit of it; the app's RLS asks the same.
+    if (!(await mayEdit(t.kind, t.objectId))) return refuseEdit(id, t.what, t.title);
+    const plan = accessPlan(args.mode, t.who, !!t.ownerId);
+    if (!plan.ok) return rpcError(id, -32602, plan.message);
+    const accessTable = t.kind === 'template' ? 'template_access' : 'persona_access';
+    const key = t.kind === 'template' ? 'template_id' : 'persona_id';
+    // Delete-then-insert, as the app does: a failure in between leaves it OPEN, never locked away.
+    const del = await adminClient.from(accessTable).delete().eq(key, t.objectId);
+    if (del.error) return rpcError(id, -32603, `Failed to change access: ${del.error.message}`);
+    if (plan.rows.length) {
+      const ins = await adminClient.from(accessTable).insert(plan.rows.map(r => ({ [key]: t.objectId, workspace_id: workspaceId, ...r, created_by: mcpUserId })));
+      if (ins.error) return rpcError(id, -32603, `Failed to change access (it is open to everyone now): ${ins.error.message}`);
+    }
+    let keepsSight = t.ownerId === mcpUserId || t.who.userIds.includes(mcpUserId) || args.mode === 'everyone';
+    if (!keepsSight && t.who.groupIds.length) {
+      const { data: gm } = await adminClient.from('workspace_group_members').select('group_id').eq('user_id', mcpUserId).in('group_id', t.who.groupIds);
+      keepsSight = (gm ?? []).length > 0;
+    }
+    return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
+      id: t.objectId, title: t.title, access: args.mode,
+      note: accessSentence(t.what, args.mode as AccessMode, t.names, { isOwner: t.ownerId === mcpUserId, keepsSight }),
+    }, null, 2) }] });
+  }
+
+  if (toolName === 'set_editors') {
+    const bad = badTarget();
+    if (bad) return rpcError(id, -32602, bad);
+    // Gate 1 — visibility, same wording for absent and invisible (SQEM-291).
+    const t = await accessTarget(args.kind === 'persona' ? canAccessPersona(args.id) : canAccessTemplate(args.id));
+    if (!t) return rpcError(id, -32602, `${args.kind === 'persona' ? 'Persona' : 'Template'} not found: ${args.id}`);
+    if (t.unknown.length) return rpcError(id, -32602, `Not a member or group of this workspace: ${t.unknown.join(', ')}. Use list_members.`);
+    // Gate 2 — an admin, or the owner while an editor (SQEM-473); asked of the database.
+    const fn = t.kind === 'template' ? 'template_editors_manage_allowed' : 'persona_editors_manage_allowed';
+    const { data: may, error: mayErr } = await adminClient.rpc(fn, t.kind === 'template' ? { p_template_id: t.objectId, p_user_id: mcpUserId } : { p_persona_id: t.objectId, p_user_id: mcpUserId });
+    if (mayErr) console.error(`[mcp] SQEM-663 ${fn} failed, refusing:`, mayErr.message);
+    if (mayErr || may !== true)
+      return rpcError(id, -32602, `You may not change who can edit this ${t.what} ("${t.title}"): that is up to its owner or a workspace admin.`);
+    const plan = editorsPlan(args.mode, t.who);
+    if (!plan.ok) return rpcError(id, -32602, plan.message);
+    const editorsTable = t.kind === 'template' ? 'template_editors' : 'persona_editors';
+    const key = t.kind === 'template' ? 'template_id' : 'persona_id';
+    // Delete-then-insert: a failure in between leaves it UNRESTRICTED, never locked (as the app).
+    const del = await adminClient.from(editorsTable).delete().eq(key, t.objectId);
+    if (del.error) return rpcError(id, -32603, `Failed to change who can edit: ${del.error.message}`);
+    if (plan.rows.length) {
+      const ins = await adminClient.from(editorsTable).insert(plan.rows.map(r => ({ [key]: t.objectId, workspace_id: workspaceId, ...r, created_by: mcpUserId })));
+      if (ins.error) return rpcError(id, -32603, `Failed to change who can edit (anyone who may edit can now): ${ins.error.message}`);
+    }
+    return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
+      id: t.objectId, title: t.title, editors: args.mode,
+      note: editorsSentence(t.what, args.mode as EditorsMode, t.names),
+    }, null, 2) }] });
+  }
 
   // SQEM-324 — the tool half of personas. The prompt half (prompts/list) is what a person picks
   // from a client menu; this is what answers "use the Sales persona from Sqemes" typed as a
@@ -555,11 +681,11 @@ export async function runLibraryTool(
   }
 
   if (toolName === 'list_templates') {
-    return libraryResult(id, () => lib.listTemplates({ kind: args.kind && args.kind !== 'all' ? args.kind : null }));
+    return libraryResult(id, () => lib.listTemplates({ kind: args.kind && args.kind !== 'all' ? args.kind : null, tag: typeof args.tag === 'string' ? args.tag : null }));
   }
 
   if (toolName === 'search_templates') {
-    return libraryResult(id, () => lib.searchTemplates({ query: args.query || '', kind: args.kind ?? null }));
+    return libraryResult(id, () => lib.searchTemplates({ query: args.query || '', kind: args.kind ?? null, tag: typeof args.tag === 'string' ? args.tag : null }));
   }
 
   if (toolName === 'get_template') {
@@ -672,6 +798,7 @@ export async function runLibraryTool(
 
   if (toolName === 'create_template') {
     const { kind, title, content, description, variables, file_ids } = args;
+    const tag = normalizeTag(args.tag); // SQEM-663
 
     // SQEM-390 — `assistant` is refused with a pointer, not silently mapped: a client that still
     // asks for one is running on an old idea of the product, and the honest answer names the new one.
@@ -715,6 +842,7 @@ export async function runLibraryTool(
         description:        description?.trim() || '',
         variables:          resolvedVars,
         context_file_ids:   Array.isArray(file_ids) ? file_ids : [],
+        ...(tag ? { tags: [tag] } : {}), // SQEM-663 — one tag, as in the app
         created_by:         mcpUserId,
         updated_by:         mcpUserId, // SQEM-477 — the author of version 1; auth.uid() is empty here
       })
@@ -723,6 +851,8 @@ export async function runLibraryTool(
 
     if (insertErr || !inserted)
       return rpcError(id, -32603, `Failed to create template: ${insertErr?.message ?? 'unknown error'}`);
+
+    if (tag) await ensureWorkspaceTag(tag);
 
     if (restrictByDefault) {
       // The principal-less row: a restriction exists and nobody is named by it (SQEM-210), which
@@ -743,6 +873,7 @@ export async function runLibraryTool(
       argumentCount: resolvedVars.length,
       variables:     resolvedVars.map((v: any) => v.name),
       fileCount:     Array.isArray(file_ids) ? file_ids.length : 0,
+      ...(tag ? { tag } : {}),
       // SQEM-240 — report it rather than leave the caller guessing. Who can see a template the
       // agent just created is exactly the kind of thing a person wants told, not discovered.
       visibility:    restrictByDefault ? 'only-you' : 'everyone-in-workspace',
@@ -751,6 +882,8 @@ export async function runLibraryTool(
 
   if (toolName === 'update_template') {
     const { id: templateId, title, content, description, variables, file_ids } = args;
+    // SQEM-663 — `tag`: one workspace tag; '' removes it. Not passed: unchanged.
+    const tag = args.tag === '' ? null : normalizeTag(args.tag);
     if (!templateId) return rpcError(id, -32602, 'id is required');
 
     const { data: existing } = await adminClient
@@ -775,6 +908,7 @@ export async function runLibraryTool(
     if (content            !== undefined) updates.content            = existing.kind === 'skill' ? withoutOwnFrontmatter(content) : content;
     if (description        !== undefined) updates.description        = description.trim();
     if (Array.isArray(file_ids))          updates.context_file_ids   = file_ids;
+    if (tag !== undefined)                updates.tags               = tag ? [tag] : [];
 
     // Variables: only for kind=prompt
     if (existing.kind === 'prompt') {
@@ -786,7 +920,7 @@ export async function runLibraryTool(
     }
 
     if (Object.keys(updates).length === 1)
-      return rpcError(id, -32602, 'No fields to update — provide at least one of: title, content, description, variables, file_ids');
+      return rpcError(id, -32602, 'No fields to update — provide at least one of: title, content, description, variables, file_ids, tag');
     // SQEM-477 — who the new version is by. Without it the version would carry the previous author.
     updates.updated_by = mcpUserId;
 
@@ -800,6 +934,7 @@ export async function runLibraryTool(
 
     if (updateErr || !updated)
       return rpcError(id, -32603, `Failed to update template: ${updateErr?.message ?? 'unknown error'}`);
+    if (tag) await ensureWorkspaceTag(tag);
 
     const updatedVars = updates.variables as any[] | undefined;
     return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
@@ -812,6 +947,7 @@ export async function runLibraryTool(
         variables:     updatedVars.map((v: any) => v.name),
       }),
       ...(Array.isArray(file_ids) && { fileCount: file_ids.length }),
+      ...(tag !== undefined && { tag: tag ?? '' }),
     }, null, 2) }] });
   }
 

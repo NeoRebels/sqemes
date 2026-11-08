@@ -44,7 +44,8 @@ describe('SQEM-523 — hints follow the gate', () => {
 
   it('the destructive ones by name, so a changed capability shows up here', () => {
     const destructive = Object.entries(CAPS).filter(([n, c]) => toolAnnotations(n, c, 'x').destructiveHint).map(([n]) => n).sort();
-    expect(destructive).toEqual(['attach_template', 'delete_file', 'delete_persona', 'delete_template', 'detach_template', 'update_persona', 'update_template']);
+    // SQEM-663 — set_access and set_editors change an existing object, like update_*.
+    expect(destructive).toEqual(['attach_template', 'delete_file', 'delete_persona', 'delete_template', 'detach_template', 'set_access', 'set_editors', 'update_persona', 'update_template']);
   });
 
   it('the two named exceptions: finalize_upload is idempotent, import_skill_from_url reaches outside', () => {

@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
   Save, Trash2, Plus, Sparkles, Loader2, X, AlertTriangle,
-  Settings, PenTool, ListTree, Search, Wand2, UserRound, Lock,
+  Settings, PenTool, ListTree, Search, Wand2, UserRound,
   Bot,
 } from 'lucide-react';
 import { useWorkspace, useUI, usePrompts } from '../store';
@@ -46,11 +46,18 @@ import {
   fetchRestrictedTemplateIdsAmong,
 } from '../lib/api/personaAccess';
 import { ACCESS_BADGE_LABEL, type AccessBadgeMode } from '../lib/accessBadge';
+import { ACCESS_ICON, EDIT_ICON } from '../components/ui/RightsIcons';
 import { Textarea } from '../components/ui/Input';
 import { m } from '../lib/i18n';
 
 /** SQEM-617 — condition fields that are waiting to be shown before they can be fitted (see `growToFit`). */
 const waitingToFit = new WeakSet<HTMLTextAreaElement>();
+
+/** SQEM-664 — the route chip's access glyph, the same one the playbook list row shows. */
+function RouteAccessIcon({ mode }: { mode: AccessBadgeMode }) {
+  const Icon = ACCESS_ICON[mode];
+  return <Icon className="w-3 h-3" />;
+}
 
 export default function PersonaEditor() {
   const { id } = useParams<{ id: string }>();
@@ -539,7 +546,7 @@ Rules:
       {/* SQEM-473 — may use, may not change: said once, with whom to ask. */}
       {id && roleCanEdit && !editRight && (
         <div className="flex items-start gap-2.5 border-b border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 px-4 md:px-6 py-2.5">
-          <Lock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <EDIT_ICON className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
           <p className="text-xs text-amber-800 dark:text-amber-200">
             <span className="font-semibold">{m.pe_readonly_1()}</span>{' '}
             {owner ? m.ed_readonly_2_named({ owner: owner.name || owner.email }) : m.ed_readonly_2()}
@@ -854,7 +861,7 @@ Rules:
                             ? m.pe_only_me_route()
                             : m.pe_restricted_route()}
                         >
-                          <Lock className="w-3 h-3" /> {ACCESS_BADGE_LABEL[restrictedRouteIds.get(route.templateId) ?? 'restricted']}
+                          <RouteAccessIcon mode={restrictedRouteIds.get(route.templateId) ?? 'restricted'} /> {ACCESS_BADGE_LABEL[restrictedRouteIds.get(route.templateId) ?? 'restricted']}
                         </span>
                       )}
                     </div>

@@ -80,3 +80,35 @@ describe('SQEM-620 — list filters wired in', () => {
     expect(Object.keys(en).filter(k => k.startsWith('flt_mine'))).toEqual([]);
   });
 });
+
+describe('SQEM-665 — keys by person on Settings → API & MCP', () => {
+  const members = [{ id: 'me', name: 'Ada', email: 'a@x' }, { id: 'b', name: 'Ben', email: 'b@x' }];
+  const L = { you: (n: string) => `${n} (you)`, workspaceWide: 'Workspace-wide', former: 'Former member' };
+  it('every person with a key, the viewer first, then workspace-wide', async () => {
+    const { keyPersonOptions, WORKSPACE_WIDE } = await import('../../lib/listFilters');
+    expect(keyPersonOptions([{ user_id: 'b' }, { user_id: 'me' }, { user_id: null }, { user_id: 'b' }], members, 'me', L)).toEqual([
+      { value: 'me', label: 'Ada (you)' }, { value: 'b', label: 'Ben' }, { value: WORKSPACE_WIDE, label: 'Workspace-wide' },
+    ]);
+  });
+  it('⛔ fewer than two entries → no filter; a key of someone who left is labelled, not dropped', async () => {
+    const { keyPersonOptions } = await import('../../lib/listFilters');
+    expect(keyPersonOptions([{ user_id: 'me' }, { user_id: 'me' }], members, 'me', L)).toEqual([]);
+    expect(keyPersonOptions([{ user_id: 'me' }, { user_id: 'gone' }], members, 'me', L).map(o => o.label)).toEqual(['Ada (you)', 'Former member']);
+  });
+  it('filters by person and by workspace-wide; counts per person', async () => {
+    const { matchesKeyPerson, keyCountByUser, WORKSPACE_WIDE } = await import('../../lib/listFilters');
+    expect(matchesKeyPerson('b', 'b')).toBe(true);
+    expect(matchesKeyPerson('me', 'b')).toBe(false);
+    expect(matchesKeyPerson(null, WORKSPACE_WIDE)).toBe(true);
+    expect(matchesKeyPerson('b', null)).toBe(true);
+    expect([...keyCountByUser([{ user_id: 'b' }, { user_id: 'b' }, { user_id: null }])]).toEqual([['b', 2]]);
+  });
+  it('the page: filter and link for admins only, the link opens API & MCP filtered', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('pages/Settings.tsx', 'utf8');
+    expect(src).toMatch(/\(\) => can\(currentUser, workspace, 'team:manage'\)\s+\? keyPersonOptions\(/);
+    expect(src).toMatch(/sqemesApiKeys\.filter\(k => matchesKeyPerson\(k\.user_id, activeKeyPerson\)\)\.map/);
+    expect(src).toMatch(/can\(currentUser, workspace, 'team:manage'\) && \(keyCounts\.get\(member\.id\) \?\? 0\) > 0 && \(/);
+    expect(src).toMatch(/onClick=\{\(\) => \{ setKeyPersonFilter\(member\.id\); requestTab\('api'\); \}\}/);
+  });
+});

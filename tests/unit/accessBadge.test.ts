@@ -75,10 +75,13 @@ describe('SQEM-400 — the fetchers select the principals, the sites render the 
   });
 
   it('the two card pages share one badge component; the route chip keeps its own weight but the same words', () => {
-    expect(code(read('pages/Templates.tsx'))).toMatch(/<AccessBadge mode=\{accessMode\} \/>/);
-    // SQEM-554 (b) — the persona list: the row and the preview both carry the same badge.
+    // SQEM-664 — the list rows show the access as an icon (`RightsIcons`, its tooltip is the same
+    // ACCESS_BADGE_TITLE); the previews keep the badge with the word.
+    expect(code(read('pages/Templates.tsx'))).toMatch(/<RightsIcons access=\{accessMode\} editRestricted=\{editRestricted\} \/>/);
+    expect(code(read('components/PlaybookPreview.tsx'))).toMatch(/<AccessBadge mode=\{accessMode\} \/>/);
+    // SQEM-554 (b) — the persona list: the row and the preview both carry the access.
     expect(code(read('pages/Personas.tsx'))).toMatch(/accessMode=\{restrictedIds\.get\(persona\.id\)\}/);
-    expect(code(read('pages/Personas.tsx'))).toMatch(/\{accessMode && <span className="relative z-10"><AccessBadge mode=\{accessMode\} \/><\/span>\}/);
+    expect(code(read('pages/Personas.tsx'))).toMatch(/<RightsIcons access=\{accessMode\} editRestricted=\{editRestricted\} \/>/);
     expect(code(read('components/PersonaPreview.tsx'))).toMatch(/<AccessBadge mode=\{accessMode\} \/>/);
     const chip = code(read('pages/PersonaEditor.tsx'));
     expect(chip).toMatch(/ACCESS_BADGE_LABEL\[restrictedRouteIds\.get\(route\.templateId\)/);

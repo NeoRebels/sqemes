@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useUI, useWorkspace, useData } from '../store';
 import DocumentStyleCard from '../components/DocumentStyleCard';
 import { can } from '../lib/permissions';
@@ -90,6 +90,8 @@ import {
   Globe,
   Cpu,
 } from 'lucide-react';
+import SelectFilter from '../components/ui/SelectFilter';
+import { keyPersonOptions, matchesKeyPerson, keyCountByUser } from '../lib/listFilters'; // SQEM-665
 import Select from '../components/ui/Select';
 
 // SQEM-539 — the Content Governance switches, saved together by their card's Save button.
@@ -275,6 +277,8 @@ const Settings = () => {
   type SqemesApiKey = { id: string; name: string; key_prefix: string; created_at: string; last_used_at: string | null; scopes: string[] | null; expires_at: string | null; connection_expires_at: string | null; is_oauth: boolean; user_id: string | null };
   const [sqemesApiKeys, setSqemesApiKeys] = useState<SqemesApiKey[]>([]);
   const [sqemesApiKeysLoaded, setSqemesApiKeysLoaded] = useState(false);
+  // SQEM-665 — admins see every key of the workspace; the person filter narrows the list to one.
+  const [keyPersonFilter, setKeyPersonFilter] = useState<string | null>(null);
   const [showGenerateKeyModal, setShowGenerateKeyModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   /**
@@ -757,12 +761,22 @@ const Settings = () => {
     }
   }, [location, activeTab]);
 
-  // Load public API keys when api tab is first opened
+  // Load public API keys when api tab is first opened — and, for an admin, with Team Members, whose rows
+  // link to each person's connections (SQEM-665).
   useEffect(() => {
-    if (activeTab === 'api' && !sqemesApiKeysLoaded) {
+    if ((activeTab === 'api' || (activeTab === 'team' && can(currentUser, workspace, 'team:manage'))) && !sqemesApiKeysLoaded) {
       loadSqemesApiKeys();
     }
   }, [activeTab]);
+  // SQEM-665 — the person filter (admins only: nobody else sees more than their own keys) and the counts.
+  const keyPeople = useMemo(
+    () => can(currentUser, workspace, 'team:manage')
+      ? keyPersonOptions(sqemesApiKeys, workspace.members ?? [], currentUser.id, { you: name => m.flt_owner_you({ name }), workspaceWide: m.sta_workspace_wide(), former: m.sta_filter_former() })
+      : [],
+    [sqemesApiKeys, workspace, currentUser],
+  );
+  const activeKeyPerson = keyPeople.some(o => o.value === keyPersonFilter) ? keyPersonFilter : null;
+  const keyCounts = useMemo(() => keyCountByUser(sqemesApiKeys), [sqemesApiKeys]);
 
   // Handlers
   // SQEM-090 — remove a saved provider key, then refresh key + funded status.
@@ -1520,6 +1534,16 @@ const Settings = () => {
                             <div>
                               <p className="font-bold text-ink-strong">{member.name}</p>
                               <p className="text-ink-muted">{member.email}</p>
+                              {/* SQEM-665 — this person's MCP keys and connections, one click away (admins). */}
+                              {can(currentUser, workspace, 'team:manage') && (keyCounts.get(member.id) ?? 0) > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setKeyPersonFilter(member.id); requestTab('api'); }}
+                                  className="mt-1 text-xs font-medium text-accent hover:underline underline-offset-2"
+                                >
+                                  {m.stt_mcp_connections({ count: keyCounts.get(member.id) ?? 0 })}
+                                </button>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -1896,7 +1920,12 @@ const Settings = () => {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {sqemesApiKeys.map(k => {
+                    {keyPeople.length > 0 && (
+                      <div className="flex">
+                        <SelectFilter icon={User} ariaLabel={m.sta_filter_person()} allLabel={m.sta_filter_person_all()} options={keyPeople} value={activeKeyPerson} onChange={setKeyPersonFilter} />
+                      </div>
+                    )}
+                    {sqemesApiKeys.filter(k => matchesKeyPerson(k.user_id, activeKeyPerson)).map(k => {
                       const scopes = k.scopes && k.scopes.length > 0 ? k.scopes : ['read', 'create', 'update', 'delete'];
                       const writeScopes = scopes.filter(s => s !== 'read');
                       // SQEM-226 — shared with the Dashboard's connection count so the two surfaces

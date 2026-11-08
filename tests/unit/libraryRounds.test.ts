@@ -148,10 +148,10 @@ describe('SQEM-648 — every MCP tool is classified', () => {
     const names = [...new Set([...defs.matchAll(/name: '([a-z_]+)'/g)].map(m => m[1]))].sort();
     const WORK = ['attach_template', 'create_persona', 'create_template', 'create_upload_url', 'delete_file',
       'delete_persona', 'delete_template', 'detach_template', 'finalize_upload', 'import_skill_from_url',
-      'update_persona', 'update_template', 'upload_file'];
+      'update_persona', 'update_template', 'upload_file', 'set_access', 'set_editors'];
     // A new tool fails this test until someone decides which side it is on.
     expect(names.filter(n => !isLibraryOnlyRound([n]) && !WORK.includes(n))).toEqual([]);
     expect(names.filter(n => isLibraryOnlyRound([n])).sort()).toEqual(
-      ['download_skill', 'get_persona', 'get_template', 'list_files', 'list_personas', 'list_templates', 'read_context_file', 'search_templates']);
+      ['download_skill', 'get_persona', 'get_template', 'list_files', 'list_members', 'list_personas', 'list_templates', 'read_context_file', 'search_templates']);
   });
 });

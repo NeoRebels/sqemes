@@ -70,3 +70,72 @@ export function usedTemplateIds(personas: ReadonlyArray<{ routes?: ReadonlyArray
   for (const p of personas) for (const r of p.routes ?? []) ids.add(r.templateId);
   return ids;
 }
+
+/** SQEM-664 — the connector filter's value for "no connector service named". */
+export const NO_CONNECTOR = '__none__';
+
+/**
+ * SQEM-664 — the Personas connector filter: every connector service some listed persona names (by its
+ * key, labelled with its name), then "No connector". ⛔ No persona names a service → no options and
+ * no filter: a choice about something nobody uses is noise.
+ */
+export function connectorOptions(
+  personas: ReadonlyArray<{ connectors?: ReadonlyArray<{ key: string; name: string }> | null }>,
+  noneLabel: string,
+): { value: string; label: string }[] {
+  const byKey = new Map<string, string>();
+  let anyWithout = false;
+  for (const p of personas) {
+    const cs = p.connectors ?? [];
+    if (!cs.length) anyWithout = true;
+    for (const c of cs) if (!byKey.has(c.key)) byKey.set(c.key, c.name);
+  }
+  if (!byKey.size) return [];
+  const opts = [...byKey].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+  return anyWithout ? [...opts, { value: NO_CONNECTOR, label: noneLabel }] : opts;
+}
+
+export function matchesConnector(connectors: ReadonlyArray<{ key: string }> | null | undefined, filter: string | null): boolean {
+  if (!filter) return true;
+  const cs = connectors ?? [];
+  return filter === NO_CONNECTOR ? cs.length === 0 : cs.some(c => c.key === filter);
+}
+
+/** SQEM-665 — the person filter's value for keys without a person (workspace-wide, admin-made). */
+export const WORKSPACE_WIDE = '__workspace__';
+
+/**
+ * SQEM-665 — the person filter on Settings → API & MCP (admins see every key of the workspace): each
+ * member with at least one key or OAuth connection, the viewer first as "Name (you)", then one entry for
+ * workspace-wide keys. ⛔ Fewer than two entries → no options and no filter (the SQEM-620 rule).
+ * Expired connections count: the list shows them too.
+ */
+export function keyPersonOptions(
+  keys: ReadonlyArray<{ user_id: string | null }>,
+  members: ReadonlyArray<OwnerMember>,
+  meId: string | null | undefined,
+  labels: { you: (name: string) => string; workspaceWide: string; former: string },
+): { value: string; label: string }[] {
+  const byId = new Map(members.map(mb => [mb.id, mb]));
+  const people = new Set<string>();
+  let wide = false;
+  for (const k of keys) { if (k.user_id) people.add(k.user_id); else wide = true; }
+  if (people.size + (wide ? 1 : 0) < 2) return [];
+  const nameOf = (id: string) => { const mb = byId.get(id); return mb ? (mb.name || mb.email) : labels.former; };
+  const opts = [...people]
+    .sort((a, b) => (a === meId ? -1 : b === meId ? 1 : nameOf(a).localeCompare(nameOf(b))))
+    .map(id => ({ value: id, label: id === meId ? labels.you(nameOf(id)) : nameOf(id) }));
+  return wide ? [...opts, { value: WORKSPACE_WIDE, label: labels.workspaceWide }] : opts;
+}
+
+export function matchesKeyPerson(userId: string | null, filter: string | null): boolean {
+  if (!filter) return true;
+  return filter === WORKSPACE_WIDE ? !userId : userId === filter;
+}
+
+/** SQEM-665 — how many keys and connections each person has, for the link under Team Members. */
+export function keyCountByUser(keys: ReadonlyArray<{ user_id: string | null }>): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const k of keys) if (k.user_id) out.set(k.user_id, (out.get(k.user_id) ?? 0) + 1);
+  return out;
+}

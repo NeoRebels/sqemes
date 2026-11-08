@@ -603,6 +603,8 @@
 /** @typedef {{}} Ed_Who_Can_EditInputs */
 /** @typedef {{}} Ed_Who_Can_Edit_HintInputs */
 /** @typedef {{}} Ed_Who_Can_Edit_ReadonlyInputs */
+/** @typedef {{}} Edit_Badge_RestrictedInputs */
+/** @typedef {{}} Edit_Badge_Restricted_TitleInputs */
 /** @typedef {{}} Exp_ChatsInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Exp_FileInputs */
 /** @typedef {{}} Exp_FilesInputs */
@@ -664,6 +666,9 @@
 /** @typedef {{}} Filepick_NoneInputs */
 /** @typedef {{}} Filepick_SearchInputs */
 /** @typedef {{}} Filepick_TitleInputs */
+/** @typedef {{}} Flt_Connector_AllInputs */
+/** @typedef {{}} Flt_Connector_LabelInputs */
+/** @typedef {{}} Flt_Connector_NoneInputs */
 /** @typedef {{}} Flt_Owner_AllInputs */
 /** @typedef {{}} Flt_Owner_GoneInputs */
 /** @typedef {{}} Flt_Owner_LabelInputs */
@@ -1446,6 +1451,9 @@
 /** @typedef {{}} Sta_Edit_ConnectionInputs */
 /** @typedef {{}} Sta_ExpiredInputs */
 /** @typedef {{ date: NonNullable<unknown> }} Sta_ExpiresInputs */
+/** @typedef {{}} Sta_Filter_FormerInputs */
+/** @typedef {{}} Sta_Filter_PersonInputs */
+/** @typedef {{}} Sta_Filter_Person_AllInputs */
 /** @typedef {{}} Sta_GenerateInputs */
 /** @typedef {{}} Sta_Get_KeyInputs */
 /** @typedef {{ days: NonNullable<unknown>, limit: NonNullable<unknown> }} Sta_IdleInputs */
@@ -1683,6 +1691,7 @@
 /** @typedef {{}} Stt_Link_CopiedInputs */
 /** @typedef {{}} Stt_Link_Copy_FailedInputs */
 /** @typedef {{}} Stt_Make_MemberInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Stt_Mcp_ConnectionsInputs */
 /** @typedef {{ limit: NonNullable<unknown> }} Stt_Of_SeatsInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Stt_PendingInputs */
 /** @typedef {{}} Stt_ReleaseInputs */
@@ -4482,6 +4491,14 @@ export const ed_who_can_edit_readonly = /** @type {(inputs: Ed_Who_Can_Edit_Read
 	return /** @type {LocalizedString} */ (`Nur der Eigentümer oder ein Admin des Workspace kann ändern, wer dieses Playbook bearbeiten darf.`)
 };
 
+export const edit_badge_restricted = /** @type {(inputs: Edit_Badge_RestrictedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Ausgewählte Personen`)
+};
+
+export const edit_badge_restricted_title = /** @type {(inputs: Edit_Badge_Restricted_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Bearbeiten eingeschränkt: nur die ausgewählten Personen, der Eigentümer und Admins können es ändern`)
+};
+
 export const exp_chats = /** @type {(inputs: Exp_ChatsInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Chats werden gesammelt …`)
 };
@@ -4748,6 +4765,18 @@ export const filepick_search = /** @type {(inputs: Filepick_SearchInputs) => Loc
 
 export const filepick_title = /** @type {(inputs: Filepick_TitleInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Workspace-Dateien anhängen`)
+};
+
+export const flt_connector_all = /** @type {(inputs: Flt_Connector_AllInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Alle Connectors`)
+};
+
+export const flt_connector_label = /** @type {(inputs: Flt_Connector_LabelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Connector`)
+};
+
+export const flt_connector_none = /** @type {(inputs: Flt_Connector_NoneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Kein Connector`)
 };
 
 export const flt_owner_all = /** @type {(inputs: Flt_Owner_AllInputs) => LocalizedString} */ () => {
@@ -7938,6 +7967,18 @@ export const sta_expires = /** @type {(inputs: Sta_ExpiresInputs) => LocalizedSt
 	return /** @type {LocalizedString} */ (`Läuft ab am ${i?.date}`)
 };
 
+export const sta_filter_former = /** @type {(inputs: Sta_Filter_FormerInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Ehemaliges Mitglied`)
+};
+
+export const sta_filter_person = /** @type {(inputs: Sta_Filter_PersonInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Person`)
+};
+
+export const sta_filter_person_all = /** @type {(inputs: Sta_Filter_Person_AllInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Alle Personen`)
+};
+
 export const sta_generate = /** @type {(inputs: Sta_GenerateInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Schlüssel erzeugen`)
 };
@@ -8896,6 +8937,10 @@ export const stt_link_copy_failed = /** @type {(inputs: Stt_Link_Copy_FailedInpu
 
 export const stt_make_member = /** @type {(inputs: Stt_Make_MemberInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Zum Mitglied machen`)
+};
+
+export const stt_mcp_connections = /** @type {(inputs: Stt_Mcp_ConnectionsInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`MCP-Verbindungen (${i?.count})`)
 };
 
 export const stt_of_seats = /** @type {(inputs: Stt_Of_SeatsInputs) => LocalizedString} */ (i) => {

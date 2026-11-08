@@ -17,7 +17,7 @@ import {
   LibraryBadRequest,
   LibraryNotFound,
 } from './libraryQueries.ts';
-import { LIBRARY_TOOL_DEFS, TOOL_CAPABILITY } from './libraryToolDefs.ts';
+import { LIBRARY_TOOL_DEFS, TOOL_CAPABILITY, SELF_HOST_HIDDEN_TOOLS } from './libraryToolDefs.ts';
 import { describeChange, type LibraryChange } from './libraryChanges.ts';
 import { m, type Locale } from './locale.ts';
 import type { PersonaConnector } from './connectorService.ts';
@@ -61,6 +61,7 @@ export const LIBRARY_TOOLS: ToolDefinition[] = [
       properties: {
         query: { type: 'string', description: 'Keyword to match against template titles and descriptions.' },
         kind: { type: 'string', enum: ['prompt', 'skill'], description: 'Optional filter by template kind.' },
+        tag: { type: 'string', description: 'Optional: only templates carrying this workspace tag.' },
       },
       required: ['query'],
     },
@@ -163,10 +164,11 @@ function forChat(schema: Record<string, unknown>): ToolDefinition['parameters'] 
 }
 
 /** The tools Chat adds to its own five, for a person holding `role`. */
-export function chatActionDefinitions(role: string | null): ToolDefinition[] {
+export function chatActionDefinitions(role: string | null, { selfHosted = false }: { selfHosted?: boolean } = {}): ToolDefinition[] {
   const managesContent = role === 'admin' || role === 'editor';
   return LIBRARY_TOOL_DEFS
     .filter(d => !CHAT_OWN_TOOLS.has(d.name) && !CHAT_EXCLUDED_TOOLS.includes(d.name))
+    .filter(d => !(selfHosted && SELF_HOST_HIDDEN_TOOLS.includes(d.name))) // SQEM-663
     .filter(d => TOOL_CAPABILITY[d.name] === 'read' || managesContent)
     .map(d => ({ name: d.name, description: d.description, parameters: forChat(d.inputSchema as Record<string, unknown>) }));
 }
@@ -316,6 +318,7 @@ export const LIBRARY_LOOKUP_TOOLS: ReadonlySet<string> = new Set([
   // missed these three; seven days of `[chat-tools]` showed `list_templates` and `list_files` in
   // capped persona chains. A new read-only MCP tool belongs here too — the test lists them all.
   'list_templates', 'list_files', 'download_skill',
+  'list_members', // SQEM-663
 ]);
 
 /**
@@ -606,6 +609,7 @@ export function createLibraryToolRuntime(
             return bound(JSON.stringify(await lib.searchTemplates({
               query: String(args.query ?? ''),
               kind: typeof args.kind === 'string' ? args.kind : null,
+              tag: typeof args.tag === 'string' ? args.tag : null, // SQEM-663
             })));
 
           case 'get_template':

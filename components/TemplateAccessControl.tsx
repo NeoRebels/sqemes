@@ -22,7 +22,8 @@
 // That is why the group tab comes first — it is the option that keeps working.
 import { useMemo, useState } from 'react';
 import type { UserRole, User } from '../types';
-import { Users, Lock, Search, UserRound, AlertTriangle } from 'lucide-react';
+import { Users, Search, AlertTriangle } from 'lucide-react';
+import { ACCESS_ICON, EDIT_ICON } from './ui/RightsIcons';
 import Checkbox from './ui/Checkbox';
 import { m as txt } from '../lib/i18n'; // SQEM-605 — `m` is a member in a callback here
 
@@ -342,7 +343,8 @@ export function TemplateAccessControl({
             title={privateDisabledReason}
             className={`${optionClass(value.mode === 'private')} ${privateDisabledReason ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            <UserRound className="w-4 h-4 shrink-0" />
+            {/* SQEM-664 — the glyph the list row and the preview show for this state */}
+            <ACCESS_ICON.private className="w-4 h-4 shrink-0" />
             <span>
               <span className="font-semibold">{txt.ta_only_me()}</span>
               {/* SQEM-212 — this used to read "admins & editors aside", which was the truth about
@@ -358,7 +360,7 @@ export function TemplateAccessControl({
         )}
         {canRestrict && (
           <button type="button" onClick={() => setMode('restricted')} className={optionClass(value.mode === 'restricted')}>
-            <Lock className="w-4 h-4 shrink-0" />
+            {isEdit ? <EDIT_ICON className="w-4 h-4 shrink-0" /> : <ACCESS_ICON.restricted className="w-4 h-4 shrink-0" />}
             <span>
               <span className="font-semibold">{isEdit ? txt.ta_only_selected() : members ? txt.ta_restrict() : txt.ta_restricted_default()}</span>
               <span className="block text-xs text-ink-subtle">

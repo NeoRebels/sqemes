@@ -11,7 +11,8 @@ import { categoryLabel, kindHelp } from '../lib/labels';
 import { buildEnabledModels } from '../lib/enabledModels';
 import { runAuthoringAI, authoringModelId } from '../lib/authoringAI';
 import { enhancePrompt, enhanceInput, describePrompt } from '../supabase/functions/_shared/authoringPrompts.ts';
-import { Save, Plus, Trash2, Settings, Edit, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Wand2, FlaskConical, History, UserRound, Users, Lock } from 'lucide-react';
+import { Save, Plus, Trash2, Settings, Edit, Copy, PenTool, Eye, EyeOff, GripVertical, Sparkles, Loader2, AlertTriangle, Wand2, FlaskConical, History, UserRound, Users } from 'lucide-react';
+import { EDIT_ICON } from '../components/ui/RightsIcons'; // SQEM-664 — one glyph for "editing restricted"
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import FieldTooltip from '../components/FieldTooltip';
@@ -597,7 +598,7 @@ const TemplateEditor = () => {
           whom to ask: a read-only editor without a reason reads as a bug. */}
       {!isLibrary && id && roleCanEdit && !editRight && (
         <div className="flex items-start gap-2.5 border-b border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 px-4 md:px-6 py-2.5">
-          <Lock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <EDIT_ICON className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
           <p className="text-xs text-amber-800 dark:text-amber-200">
             <span className="font-semibold">{txt.ed_readonly_1()}</span>{' '}
             {owner ? txt.ed_readonly_2_named({ owner: owner.name || owner.email }) : txt.ed_readonly_2()}

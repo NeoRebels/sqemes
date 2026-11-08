@@ -8,8 +8,11 @@ import { unzipEntries } from '../_shared/officeZip.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
 import { toolAnnotations } from '../_shared/toolAnnotations.ts';
 import {
-  type Capability, TOOL_CAPABILITY, LIBRARY_TOOL_DEFS, runLibraryTool, libraryError, writeRefusalMessage,
+  type Capability, TOOL_CAPABILITY, LIBRARY_TOOL_DEFS, SELF_HOST_HIDDEN_TOOLS, runLibraryTool, libraryError, writeRefusalMessage,
 } from '../_shared/libraryActions.ts';
+
+// SQEM-663 — a self-hosted installation does not offer tools its app hides.
+const SELF_HOSTED_INSTALL = Deno.env.get('SELF_HOSTED') === 'true';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -730,6 +733,8 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
      */
     const visibleTools = tools.filter((t) => {
       const cap = TOOL_CAPABILITY[t.name];
+      // SQEM-663 — a self-hosted installation does not offer what its app hides ("who can edit").
+      if (SELF_HOSTED_INSTALL && SELF_HOST_HIDDEN_TOOLS.includes(t.name)) return false;
       return scopes.includes(cap) && (cap === 'read' || mayWrite);
     });
     // SQEM-523 — title and hints derived from the capability that gates the tool (_shared/toolAnnotations.ts).

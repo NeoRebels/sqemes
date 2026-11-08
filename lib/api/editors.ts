@@ -49,6 +49,17 @@ export async function setEditors(kind: EditorKind, id: string, workspaceId: stri
   if (ins.error) throw ins.error;
 }
 
+/**
+ * SQEM-664 — which playbooks / personas of the workspace name their editors (one query per list, not
+ * per row), for the "editing restricted" icon. RLS lets every member read the lists (the editor shows
+ * who may edit). A read error yields an empty set: the icon is information, not a gate.
+ */
+export async function fetchEditRestrictedIds(kind: EditorKind, workspaceId: string): Promise<Set<string>> {
+  const { data, error } = await client.from(TABLE[kind]).select(KEY[kind]).eq('workspace_id', workspaceId);
+  if (error) return new Set();
+  return new Set(((data || []) as Record<string, string>[]).map(r => r[KEY[kind]]));
+}
+
 /** What the database says this person may do with it: change it, and set its editor list. */
 export async function fetchEditRights(kind: EditorKind, id: string): Promise<{ canEdit: boolean; canManage: boolean }> {
   const [edit, manage] = await Promise.all([

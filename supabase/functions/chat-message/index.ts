@@ -706,7 +706,7 @@ async function runAndBroadcast({
            * ⛔ Still the chat user's own id — never a key (SQEM-346).
            */
           actions: {
-            definitions: chatActionDefinitions(role),
+            definitions: chatActionDefinitions(role, { selfHosted: SELF_HOSTED }), // SQEM-663
             run: (name, args, lib) => runLibraryTool(
               { adminClient: createAdminClient(), workspaceId, userId, role, lib, surface: 'chat' }, name, args),
           },

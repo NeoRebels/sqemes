@@ -8,7 +8,7 @@
 // If personas ever reach the Dashboard, this is the moment to reconsider — not before.
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Plus, Loader2, Sparkles, Upload, Star, Bot, User } from 'lucide-react';
+import { Plus, Loader2, Sparkles, Upload, Star, Bot, User, Plug } from 'lucide-react';
 import { useWorkspace, useUI, usePrompts, useData } from '../store';
 import { can } from '../lib/permissions';
 import { fetchPersonas, duplicatePersona, deletePersona, setPersonaFavorite, updatePersona } from '../lib/api/personas';
@@ -17,7 +17,8 @@ import TagFilter from '../components/ui/TagFilter';
 import { fetchRestrictedPersonaIds } from '../lib/api/personaAccess';
 import { fetchCanEditMany } from '../lib/api/editors';
 import { applyToEditable, bulkSummary } from '../lib/bulkApply';
-import AccessBadge from '../components/ui/AccessBadge';
+import RightsIcons from '../components/ui/RightsIcons';
+import { fetchEditRestrictedIds } from '../lib/api/editors';
 import type { AccessBadgeMode } from '../lib/accessBadge';
 import { buildBundle, downloadBlob, readBundle, importBundle } from '../lib/templateBundle';
 import type { BundleManifest } from '../lib/bundleFormat';
@@ -26,7 +27,7 @@ import PersonaPreview from '../components/PersonaPreview';
 import EmptyState from '../components/ui/EmptyState';
 import SearchInput from '../components/ui/SearchInput';
 import SelectFilter from '../components/ui/SelectFilter';
-import { matchesOwner, ownerOptions } from '../lib/listFilters';
+import { matchesOwner, ownerOptions, connectorOptions, matchesConnector } from '../lib/listFilters';
 import PageHeader from '../components/ui/PageHeader';
 import Checkbox from '../components/ui/Checkbox';
 import BulkActionBar from '../components/ui/BulkActionBar';
@@ -52,6 +53,7 @@ const PersonaRow = memo(function PersonaRow({
   persona,
   canEdit,
   accessMode,
+  editRestricted,
   active,
   selected,
   onSelect,
@@ -61,6 +63,7 @@ const PersonaRow = memo(function PersonaRow({
   persona: Persona;
   canEdit: boolean;
   accessMode?: AccessBadgeMode;
+  editRestricted?: boolean; // SQEM-664 — names its editors
   active: boolean;
   selected: boolean;
   onSelect: (id: string) => void;
@@ -93,7 +96,7 @@ const PersonaRow = memo(function PersonaRow({
           {n === 0 ? m.ps_loads_nothing() : m.count_playbook({ count: n })}{persona.tags[0] ? ` · ${persona.tags[0]}` : ''}
         </span>
       </button>
-      {accessMode && <span className="relative z-10"><AccessBadge mode={accessMode} /></span>}
+      <RightsIcons access={accessMode} editRestricted={editRestricted} />
       <button
         type="button"
         onClick={() => onFavorite(persona)}
@@ -191,19 +194,31 @@ export default function Personas() {
     [personas, workspace?.members, currentUser?.id],
   );
   const activeOwner = owners.length > 0 ? ownerFilter : null;
+  // SQEM-664 — the connector filter: every service a listed persona names, plus "No connector".
+  const [connectorFilter, setConnectorFilter] = useState<string | null>(null);
+  const connectorChoices = useMemo(() => connectorOptions(personas ?? [], m.flt_connector_none()), [personas]);
+  const activeConnector = connectorChoices.some(o => o.value === connectorFilter) ? connectorFilter : null;
+  // SQEM-664 — which personas name their editors, for the edit icon. Cloud only (self-host hides it).
+  const [editRestrictedIds, setEditRestrictedIds] = useState<Set<string>>(new Set());
+  const loadEditRestricted = useCallback(() => {
+    if (!workspace?.id || IS_SELF_HOSTED) return;
+    void fetchEditRestrictedIds('persona', workspace.id).then(setEditRestrictedIds);
+  }, [workspace?.id]);
+  useEffect(loadEditRestricted, [loadEditRestricted, personas?.length]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (personas ?? []).filter(p => {
       if (showFavoritesOnly && !p.isFavorite) return false;
       if (!matchesOwner(p.createdBy, activeOwner, memberIds)) return false;
+      if (!matchesConnector(p.connectors, activeConnector)) return false;
       if (selectedTag && !p.tags.includes(selectedTag)) return false;
       if (!q) return true;
       return p.title.toLowerCase().includes(q) ||
         p.description.toLowerCase().includes(q) ||
         p.routes.some(r => (r.templateTitle || '').toLowerCase().includes(q));
     });
-  }, [personas, search, showFavoritesOnly, activeOwner, memberIds, selectedTag]);
+  }, [personas, search, showFavoritesOnly, activeOwner, memberIds, selectedTag, activeConnector]);
 
   // SQEM-393 — optimistic, then the row; on failure the state goes back and the toast says so.
   // The same shape as `toggleFavorite` in `store/prompts.tsx`, kept here because personas are not
@@ -436,6 +451,9 @@ export default function Personas() {
           {owners.length > 0 && (
             <SelectFilter icon={User} ariaLabel={m.flt_owner_label()} allLabel={m.flt_owner_all()} options={owners} value={activeOwner} onChange={setOwnerFilter} />
           )}
+          {connectorChoices.length > 0 && (
+            <SelectFilter icon={Plug} ariaLabel={m.flt_connector_label()} allLabel={m.flt_connector_all()} options={connectorChoices} value={activeConnector} onChange={setConnectorFilter} />
+          )}
           {allTags.length > 0 && (
             <TagFilter tags={allTags} value={selectedTag} onChange={setSelectedTag} />
           )}
@@ -482,6 +500,7 @@ export default function Personas() {
         onClose={() => setBulkEditorsOpen(false)}
         kind="persona"
         items={(personas ?? []).filter(p => selectedIds.has(p.id)).map(p => ({ id: p.id, createdBy: p.createdBy || null }))}
+        onDone={loadEditRestricted}
       />
 
       {personas === null && (
@@ -540,6 +559,7 @@ export default function Personas() {
                 persona={persona}
                 canEdit={canEdit}
                 accessMode={restrictedIds.get(persona.id)}
+                editRestricted={editRestrictedIds.has(persona.id)}
                 active={selectedPersona?.id === persona.id}
                 selected={selectedIds.has(persona.id)}
                 onSelect={selectPersona}
@@ -557,6 +577,7 @@ export default function Personas() {
                 currentUserId={currentUser.id}
                 canEdit={canEdit}
                 accessMode={restrictedIds.get(selectedPersona.id)}
+                editRestricted={editRestrictedIds.has(selectedPersona.id)}
                 workspaceTags={workspace.tags}
                 visiblePlaybookIds={visiblePlaybookIds}
                 onDuplicate={p => void handleDuplicate(p)}

@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { ArrowLeft, Copy, Edit, FolderDown, Play, Star, Store, Trash2 } from 'lucide-react';
 import KindBadge from './ui/KindBadge';
 import AccessBadge from './ui/AccessBadge';
+import { EditBadge } from './ui/RightsIcons';
 import OwnerLine from './OwnerLine';
 import type { OwnerMember } from '../lib/listFilters';
 import TagEditor from './ui/TagEditor';
@@ -31,12 +32,14 @@ export function blanksIn(content: string): string[] {
 const ACTION = 'inline-flex items-center gap-1.5 px-3 py-2 rounded-control text-sm font-medium text-ink-muted hover:text-ink-strong hover:bg-surface-sunken transition-colors';
 
 export default function PlaybookPreview({
-  prompt, canEdit, accessMode, workspaceTags, loadedBy, showPublish, members,
+  prompt, canEdit, accessMode, editRestricted, workspaceTags, loadedBy, showPublish, members,
   onUse, onDuplicate, onExport, onPublish, onDelete, onSetTag, onFavorite, onBack,
 }: {
   prompt: Prompt;
   canEdit: boolean;
   accessMode?: AccessBadgeMode;
+  /** SQEM-664 — the playbook names its editors; spelled out beside the access badge. */
+  editRestricted?: boolean;
   workspaceTags: string[];
   loadedBy: LoadedBy[];
   showPublish: boolean;
@@ -76,6 +79,7 @@ export default function PlaybookPreview({
               onRemove={() => onSetTag(prompt, null)}
             />
             {accessMode && <AccessBadge mode={accessMode} />}
+            <EditBadge restricted={editRestricted} />
           </div>
           <h2 id="playbook-preview-title" className="font-display text-2xl md:text-3xl font-semibold tracking-tight text-ink-strong break-words">{prompt.title}</h2>
           {prompt.description && <p className="mt-1 text-ink-muted">{prompt.description}</p>}

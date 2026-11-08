@@ -605,6 +605,8 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Ed_Who_Can_EditInputs */
 /** @typedef {{}} Ed_Who_Can_Edit_HintInputs */
 /** @typedef {{}} Ed_Who_Can_Edit_ReadonlyInputs */
+/** @typedef {{}} Edit_Badge_RestrictedInputs */
+/** @typedef {{}} Edit_Badge_Restricted_TitleInputs */
 /** @typedef {{}} Exp_ChatsInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Exp_FileInputs */
 /** @typedef {{}} Exp_FilesInputs */
@@ -666,6 +668,9 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Filepick_NoneInputs */
 /** @typedef {{}} Filepick_SearchInputs */
 /** @typedef {{}} Filepick_TitleInputs */
+/** @typedef {{}} Flt_Connector_AllInputs */
+/** @typedef {{}} Flt_Connector_LabelInputs */
+/** @typedef {{}} Flt_Connector_NoneInputs */
 /** @typedef {{}} Flt_Owner_AllInputs */
 /** @typedef {{}} Flt_Owner_GoneInputs */
 /** @typedef {{}} Flt_Owner_LabelInputs */
@@ -1448,6 +1453,9 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Sta_Edit_ConnectionInputs */
 /** @typedef {{}} Sta_ExpiredInputs */
 /** @typedef {{ date: NonNullable<unknown> }} Sta_ExpiresInputs */
+/** @typedef {{}} Sta_Filter_FormerInputs */
+/** @typedef {{}} Sta_Filter_PersonInputs */
+/** @typedef {{}} Sta_Filter_Person_AllInputs */
 /** @typedef {{}} Sta_GenerateInputs */
 /** @typedef {{}} Sta_Get_KeyInputs */
 /** @typedef {{ days: NonNullable<unknown>, limit: NonNullable<unknown> }} Sta_IdleInputs */
@@ -1685,6 +1693,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Stt_Link_CopiedInputs */
 /** @typedef {{}} Stt_Link_Copy_FailedInputs */
 /** @typedef {{}} Stt_Make_MemberInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Stt_Mcp_ConnectionsInputs */
 /** @typedef {{ limit: NonNullable<unknown> }} Stt_Of_SeatsInputs */
 /** @typedef {{ count: NonNullable<unknown> }} Stt_PendingInputs */
 /** @typedef {{}} Stt_ReleaseInputs */
@@ -10474,6 +10483,34 @@ export const ed_who_can_edit_readonly = /** @type {((inputs?: Ed_Who_Can_Edit_Re
 /**
 * | output |
 * | --- |
+* | "Selected people" |
+*
+* @param {Edit_Badge_RestrictedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const edit_badge_restricted = /** @type {((inputs?: Edit_Badge_RestrictedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Edit_Badge_RestrictedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.edit_badge_restricted(inputs)
+	return __en.edit_badge_restricted(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Editing restricted: only the selected people, its owner and admins can change it" |
+*
+* @param {Edit_Badge_Restricted_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const edit_badge_restricted_title = /** @type {((inputs?: Edit_Badge_Restricted_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Edit_Badge_Restricted_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.edit_badge_restricted_title(inputs)
+	return __en.edit_badge_restricted_title(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Collecting chats…" |
 *
 * @param {Exp_ChatsInputs} inputs
@@ -11332,6 +11369,48 @@ export const filepick_title = /** @type {((inputs?: Filepick_TitleInputs, option
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.filepick_title(inputs)
 	return __en.filepick_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "All connectors" |
+*
+* @param {Flt_Connector_AllInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const flt_connector_all = /** @type {((inputs?: Flt_Connector_AllInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Flt_Connector_AllInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.flt_connector_all(inputs)
+	return __en.flt_connector_all(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Connector" |
+*
+* @param {Flt_Connector_LabelInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const flt_connector_label = /** @type {((inputs?: Flt_Connector_LabelInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Flt_Connector_LabelInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.flt_connector_label(inputs)
+	return __en.flt_connector_label(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "No connector" |
+*
+* @param {Flt_Connector_NoneInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const flt_connector_none = /** @type {((inputs?: Flt_Connector_NoneInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Flt_Connector_NoneInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.flt_connector_none(inputs)
+	return __en.flt_connector_none(inputs)
 });
 /**
 * | output |
@@ -22303,6 +22382,48 @@ export const sta_expires = /** @type {((inputs: Sta_ExpiresInputs, options?: { l
 /**
 * | output |
 * | --- |
+* | "Former member" |
+*
+* @param {Sta_Filter_FormerInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const sta_filter_former = /** @type {((inputs?: Sta_Filter_FormerInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Sta_Filter_FormerInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.sta_filter_former(inputs)
+	return __en.sta_filter_former(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Person" |
+*
+* @param {Sta_Filter_PersonInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const sta_filter_person = /** @type {((inputs?: Sta_Filter_PersonInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Sta_Filter_PersonInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.sta_filter_person(inputs)
+	return __en.sta_filter_person(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "All people" |
+*
+* @param {Sta_Filter_Person_AllInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const sta_filter_person_all = /** @type {((inputs?: Sta_Filter_Person_AllInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Sta_Filter_Person_AllInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.sta_filter_person_all(inputs)
+	return __en.sta_filter_person_all(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Generate Key" |
 *
 * @param {Sta_GenerateInputs} inputs
@@ -25621,6 +25742,20 @@ export const stt_make_member = /** @type {((inputs?: Stt_Make_MemberInputs, opti
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.stt_make_member(inputs)
 	return __en.stt_make_member(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "MCP connections ({count})" |
+*
+* @param {Stt_Mcp_ConnectionsInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stt_mcp_connections = /** @type {((inputs: Stt_Mcp_ConnectionsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stt_Mcp_ConnectionsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stt_mcp_connections(inputs)
+	return __en.stt_mcp_connections(inputs)
 });
 /**
 * | output |

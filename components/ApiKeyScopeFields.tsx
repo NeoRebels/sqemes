@@ -115,7 +115,7 @@ const CAPS: { key: 'create' | 'update' | 'delete'; label: () => string; hint: st
   {
     key: 'update',
     label: m.ks_update,
-    hint: 'update_template, update_persona, attach_template, detach_template',
+    hint: 'update_template, update_persona, attach_template, detach_template, set_access, set_editors',
   },
   {
     key: 'delete',

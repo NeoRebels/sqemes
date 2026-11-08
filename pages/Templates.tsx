@@ -7,7 +7,8 @@ import { m } from '../lib/i18n';
 import { fetchRestrictedTemplateIds } from '../lib/api/templateAccess';
 import { bulkSummary } from '../lib/bulkApply';
 import { isMultiSeat } from '../lib/templateAccessScope';
-import AccessBadge from '../components/ui/AccessBadge';
+import RightsIcons from '../components/ui/RightsIcons';
+import { fetchEditRestrictedIds } from '../lib/api/editors';
 import type { AccessBadgeMode } from '../lib/accessBadge';
 import { exportTemplatesToZip, downloadBlob, readBundle, importBundle, type BundleManifest } from '../lib/templateBundle';
 import { importErrorMessage, readSkillZip, toSlug, type SkillBundle } from '../lib/skillBundle';
@@ -60,6 +61,7 @@ const PlaybookRow = memo(function PlaybookRow({
   prompt,
   canEdit,
   accessMode,
+  editRestricted,
   active,
   selected,
   onSelect,
@@ -69,6 +71,7 @@ const PlaybookRow = memo(function PlaybookRow({
   prompt: Prompt;
   canEdit: boolean;
   accessMode?: AccessBadgeMode; // SQEM-400 — undefined = open to everyone (no badge)
+  editRestricted?: boolean; // SQEM-664 — names its editors
   active: boolean;
   selected: boolean;
   onSelect: (id: string) => void;
@@ -99,7 +102,7 @@ const PlaybookRow = memo(function PlaybookRow({
         <span className="block text-sm font-semibold text-ink-strong truncate">{prompt.title}</span>
         <span className="block text-xs text-ink-muted truncate capitalize">{prompt.kind}{prompt.tag ? ` · ${prompt.tag}` : ''}</span>
       </button>
-      {accessMode && <span className="relative z-10"><AccessBadge mode={accessMode} /></span>}
+      <RightsIcons access={accessMode} editRestricted={editRestricted} />
       <button
         type="button"
         onClick={() => onFavorite(prompt)}
@@ -174,6 +177,14 @@ const Templates = () => {
     if (!workspace?.id || IS_SELF_HOSTED) return; // SQEM-170 — template access is Cloud-only
     fetchRestrictedTemplateIds(workspace.id).then(setRestrictedIds).catch(() => {});
   }, [workspace?.id, prompts.length]);
+  // SQEM-664 — which playbooks name their editors, for the edit icon. One query per list. Cloud only:
+  // self-host hides "who can edit".
+  const [editRestrictedIds, setEditRestrictedIds] = useState<Set<string>>(new Set());
+  const loadEditRestricted = useCallback(() => {
+    if (!workspace?.id || IS_SELF_HOSTED) return;
+    void fetchEditRestrictedIds('template', workspace.id).then(setEditRestrictedIds);
+  }, [workspace?.id]);
+  useEffect(loadEditRestricted, [loadEditRestricted, prompts.length]);
 
   // SQEM-181 — on self-host, publishing is possible only if a publisher token is configured (server-side).
   useEffect(() => {
@@ -611,6 +622,7 @@ const Templates = () => {
                 prompt={prompt}
                 canEdit={canEdit}
                 accessMode={restrictedIds.get(prompt.id)}
+                editRestricted={editRestrictedIds.has(prompt.id)}
                 active={selectedPrompt?.id === prompt.id}
                 selected={selectedIds.has(prompt.id)}
                 onSelect={selectPlaybook}
@@ -626,6 +638,7 @@ const Templates = () => {
                 members={workspace?.members ?? []}
                 canEdit={canEdit}
                 accessMode={restrictedIds.get(selectedPrompt.id)}
+                editRestricted={editRestrictedIds.has(selectedPrompt.id)}
                 workspaceTags={workspace.tags}
                 loadedBy={loadedByMap.get(selectedPrompt.id) || []}
                 showPublish={true}
@@ -686,6 +699,7 @@ const Templates = () => {
         onClose={() => setBulkEditorsOpen(false)}
         kind="template"
         items={selectedPrompts.map(p => ({ id: p.id, createdBy: p.createdBy || null }))}
+        onDone={loadEditRestricted}
       />
 
       {/* SQEM-564 — access for several playbooks at once; since SQEM-646 the dialog the Personas page shares. */}
