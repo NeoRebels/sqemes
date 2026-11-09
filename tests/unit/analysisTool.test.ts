@@ -172,7 +172,7 @@ describe('SQEM-660 — wiring', () => {
   const chat = readFileSync('pages/Chat.tsx', 'utf8');
   it('chat-message: metadata in, tool on the base runtime, carried through hand-overs, shown with the result', () => {
     expect(fn).toMatch(/const analysisTables = normalizeAnalysisTables\(src\.analysisTables\);/);
-    expect(fn).toMatch(/\.\.\.\(analysisTables\.length \? \{ analysisTables \} : \{\}\), \.\.\.\(connectorAnalysis \? \{ connectorAnalysis: true \} : \{\}\) \} satisfies ContinuationRequest/);
+    expect(fn).toMatch(/\.\.\.\(analysisTables\.length \? \{ analysisTables \} : \{\}\), \.\.\.\(connectorAnalysis \? \{ connectorAnalysis: true \} : \{\}\), \.\.\.\(images \? \{ images, officePictures \} : \{\}\) \} satisfies ContinuationRequest/);
     // SQEM-661 — the connector tables of this answer travel with the program (`pending`).
     expect(fn).toMatch(/if \(base\) base = withAnalysisTool\(base, analysisTables, \(code, pending\) => requestBrowserAnalysis\(jobId, code, cancel\.signal, pending\), analyses, connectorTables\);/);
     expect(fn).toMatch(/generatedFiles, analyses,/);

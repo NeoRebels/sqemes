@@ -72,6 +72,9 @@ export interface ContinuationRequest {
   analysisTables?: unknown[];
   /** SQEM-661 — the browser takes connector tables for run_analysis. */
   connectorAnalysis?: boolean;
+  /** SQEM-668 — pictures in the person's message, and how many of them came out of an Office file (for the log). */
+  images?: number;
+  officePictures?: number;
 }
 
 export interface ContinuationState {

@@ -19,8 +19,12 @@
 // the stored numbers behind charts (all three formats), SmartArt text, and a marker where a picture
 // sits. Only what the file STORES is read; nothing is recalculated.
 //
-// Deliberately not: .doc/.xls/.ppt (binary formats), the pictures themselves (SQEM-668), recalculating
-// formulas, text boxes and footnotes beyond what sits inside a body paragraph.
+// SQEM-668 — each picture is numbered (`[Image 3: name]`) and listed with its path inside the file, so
+// a caller can hand the picture itself to a model next to the text (chat attachment, MCP). The reader
+// still returns paths only: the bytes are read by the caller, which knows its limits.
+//
+// Deliberately not: .doc/.xls/.ppt (binary formats), recalculating formulas, text boxes and footnotes
+// beyond what sits inside a body paragraph, pictures inside a Word table, converting EMF/WMF/GIF/TIFF.
 
 export type OfficeKind = 'docx' | 'xlsx' | 'pptx';
 
@@ -29,7 +33,7 @@ export type OfficeKind = 'docx' | 'xlsx' | 'pptx';
  * one without the current marker is re-read. ⛔ Without it, v1's wrong row count stayed in the
  * database after the fix.
  */
-export const OFFICE_READER_MARKER = '(sqemes reader 3)';
+export const OFFICE_READER_MARKER = '(sqemes reader 4)';
 
 /**
  * The largest Office file the SERVER reads live, when no stored text exists (an MCP upload). Above it
@@ -78,7 +82,13 @@ export class OfficeReadError extends Error {}
 /** Reads one entry of the unzipped file as text, or null when the entry does not exist. */
 export type ReadEntry = (path: string) => Promise<string | null>;
 
-export interface OfficeText { text: string; truncated: boolean }
+/**
+ * SQEM-668 — one picture in the file, in reading order: `n` is the number in its `[Image n]` marker,
+ * `path` the entry inside the ZIP, `mime` null when the format is one no model takes as a picture.
+ */
+export interface OfficePicture { n: number; path: string; label: string; mime: string | null }
+
+export interface OfficeText { text: string; truncated: boolean; pictures: OfficePicture[] }
 
 /**
  * ⛔ Says what the cut MEANS, not only that it happened. The first wording ("the file is longer")
@@ -91,15 +101,16 @@ export const TRUNCATION_NOTE = `\n\n[Truncated after ${MAX_OFFICE_TEXT_CHARS.toL
   + 'and offer what is possible: an answer for the part shown, or a narrower question.]';
 
 export async function extractOfficeText(kind: OfficeKind, name: string, read: ReadEntry): Promise<OfficeText> {
-  const body = kind === 'docx' ? await docxText(read)
-    : kind === 'xlsx' ? await xlsxText(read)
-    : await pptxText(read);
+  const pictures: OfficePicture[] = [];
+  const body = kind === 'docx' ? await docxText(read, pictures)
+    : kind === 'xlsx' ? await xlsxText(read, pictures)
+    : await pptxText(read, pictures);
   // ⛔ "This text is the file": with only "File: x" a model asked for the attachment it
   // was reading. It sees text, not a file, unless the text says so.
   const head = `File: ${String(name).split('/').pop()} (${KIND_LABEL[kind]}) — converted to text by sqemes ${OFFICE_READER_MARKER}; this text is the file's content.\n\n`;
   const full = head + (body.trim() || '(no text in this file)');
-  if (full.length <= MAX_OFFICE_TEXT_CHARS) return { text: full, truncated: false };
-  return { text: full.slice(0, MAX_OFFICE_TEXT_CHARS) + TRUNCATION_NOTE, truncated: true };
+  if (full.length <= MAX_OFFICE_TEXT_CHARS) return { text: full, truncated: false, pictures };
+  return { text: full.slice(0, MAX_OFFICE_TEXT_CHARS) + TRUNCATION_NOTE, truncated: true, pictures };
 }
 
 // ── XML helpers ─────────────────────────────────────────────────────────────
@@ -223,7 +234,7 @@ async function required(read: ReadEntry, path: string, kind: OfficeKind): Promis
 
 // ── Word ────────────────────────────────────────────────────────────────────
 
-async function docxText(read: ReadEntry): Promise<string> {
+async function docxText(read: ReadEntry, pictures: OfficePicture[]): Promise<string> {
   const doc = await required(read, 'word/document.xml', 'docx');
   const headingLevel = headingStyles(await read('word/styles.xml'));
   const bodyStart = doc.indexOf('<w:body');
@@ -243,7 +254,7 @@ async function docxText(read: ReadEntry): Promise<string> {
     let extra: string[] = [];
     if (p.xml.indexOf('<w:drawing') >= 0) {
       rels ??= await relsOf(read, 'word/document.xml');
-      extra = await graphicsOf(elements(p.xml, 'w:drawing'), rels, read, 'wp:docPr');
+      extra = await graphicsOf(elements(p.xml, 'w:drawing'), rels, read, 'wp:docPr', pictures);
     }
     const all = [md, ...extra].filter(Boolean).join('\n\n');
     if (all) found.push({ at: p.at, md: all });
@@ -311,7 +322,7 @@ function markdownTable(rows: string[][]): string {
 /** Built-in number formats that are dates or times (ECMA-376, 18.8.30). */
 const DATE_FORMAT_IDS = new Set([14, 15, 16, 17, 18, 19, 20, 21, 22, 27, 30, 36, 45, 46, 47, 50, 57]);
 
-async function xlsxText(read: ReadEntry): Promise<string> {
+async function xlsxText(read: ReadEntry, pictures: OfficePicture[]): Promise<string> {
   const workbook = await required(read, 'xl/workbook.xml', 'xlsx');
   const rels = await relsOf(read, 'xl/workbook.xml');
   const date1904 = /<workbookPr\s[^>]*date1904="(1|true)"/.test(workbook);
@@ -331,7 +342,7 @@ async function xlsxText(read: ReadEntry): Promise<string> {
     if (!xml) continue;
     const { lines, total } = sheetRows(xml, shared, dateStyles, date1904, budget, true);
     // SQEM-659 — the sheet's charts and pictures live in its drawing part, after its rows.
-    const graphics = await sheetGraphics(read, target!);
+    const graphics = await sheetGraphics(read, target!, pictures);
     // The row count up front, so a model reading a cut excerpt still knows the real size.
     out.push(`## Sheet: ${name} (${total.toLocaleString('en-US')} rows)\n\n${lines.length ? '```csv\n' + lines.join('\n') + '\n```' : '(empty)'}`
       + (graphics.length ? `\n\n${graphics.join('\n\n')}` : ''));
@@ -527,14 +538,14 @@ function columnName(index: number): string {
 }
 
 /** SQEM-659 — the charts and pictures of one sheet, through sheet → drawing → chart relationships. */
-async function sheetGraphics(read: ReadEntry, sheetPath: string): Promise<string[]> {
+async function sheetGraphics(read: ReadEntry, sheetPath: string, pictures: OfficePicture[]): Promise<string[]> {
   const out: string[] = [];
   for (const r of (await relsOf(read, sheetPath)).values()) {
     if (!r.type.endsWith('/drawing')) continue;
     const drawing = await read(r.target);
     if (!drawing) continue;
     const anchors = [...elements(drawing, 'xdr:twoCellAnchor'), ...elements(drawing, 'xdr:oneCellAnchor'), ...elements(drawing, 'xdr:absoluteAnchor')];
-    out.push(...await graphicsOf(anchors, await relsOf(read, r.target), read, 'xdr:cNvPr'));
+    out.push(...await graphicsOf(anchors, await relsOf(read, r.target), read, 'xdr:cNvPr', pictures));
   }
   return out;
 }
@@ -545,7 +556,7 @@ function csvLine(cells: string[]): string {
 
 // ── PowerPoint ──────────────────────────────────────────────────────────────
 
-async function pptxText(read: ReadEntry): Promise<string> {
+async function pptxText(read: ReadEntry, pictures: OfficePicture[]): Promise<string> {
   const pres = await required(read, 'ppt/presentation.xml', 'pptx');
   const rels = await relsOf(read, 'ppt/presentation.xml');
   const out: string[] = [];
@@ -560,7 +571,7 @@ async function pptxText(read: ReadEntry): Promise<string> {
     let notes: string[] = [];
     const slideRels = await relsOf(read, target);
     // SQEM-659 — charts, SmartArt and pictures of the slide, in the order they sit on it.
-    const graphics = await graphicsOf([...elements(xml, 'p:graphicFrame'), ...elements(xml, 'p:pic')], slideRels, read, 'p:cNvPr');
+    const graphics = await graphicsOf([...elements(xml, 'p:graphicFrame'), ...elements(xml, 'p:pic')], slideRels, read, 'p:cNvPr', pictures);
     for (const r of slideRels.values()) {
       if (!r.type.endsWith('/notesSlide')) continue;
       const nx = await read(r.target);
@@ -587,7 +598,7 @@ export const MAX_CHART_ROWS = 200;
  * anchors): a chart as its stored data, SmartArt as a list, a picture as a marker. `namePr` is the tag
  * that carries a picture's name and description in that format.
  */
-async function graphicsOf(containers: string[], rels: Map<string, { target: string; type: string }>, read: ReadEntry, namePr: string): Promise<string[]> {
+async function graphicsOf(containers: string[], rels: Map<string, { target: string; type: string }>, read: ReadEntry, namePr: string, pictures: OfficePicture[]): Promise<string[]> {
   const out: string[] = [];
   for (const c of containers) {
     const chartId = c.match(/<c:chart\s[^>]*?r:id="([^"]+)"/)?.[1];
@@ -604,10 +615,92 @@ async function graphicsOf(containers: string[], rels: Map<string, { target: stri
     } else if (c.indexOf('<pic:pic') >= 0 || c.indexOf('<p:pic') === 0 || c.indexOf('<xdr:pic') >= 0) {
       const pr = c.match(new RegExp(`<${namePr.replace(':', '\\:')}\\s[^>]*>`))?.[0] ?? '';
       const label = (attrOf(pr, 'descr') || attrOf(pr, 'name') || '').trim();
-      out.push(`[Image${label ? `: ${label}` : ''}]`);
+      // SQEM-668 — the picture's file inside the ZIP, through the part's relationships; numbered in
+      // reading order so the caller can hand it over as "Image n". A linked (not embedded) picture
+      // has no r:embed and stays a marker without a number.
+      const embed = c.match(/<a:blip\s[^>]*?r:embed="([^"]+)"/)?.[1];
+      const path = embed ? rels.get(embed)?.target : undefined;
+      if (path) {
+        const n = pictures.length + 1;
+        const mime = pictureMimeOf(path);
+        pictures.push({ n, path, label, mime });
+        out.push(`[Image ${n}${label ? `: ${label}` : ''}${mime ? '' : ` (${extOf(path)}, not readable as a picture)`}]`);
+      } else {
+        out.push(`[Image${label ? `: ${label}` : ''}]`);
+      }
     }
   }
   return out;
+}
+
+function extOf(path: string): string {
+  const dot = path.lastIndexOf('.');
+  return dot >= 0 ? path.slice(dot + 1).toLowerCase() : '';
+}
+
+/**
+ * SQEM-668 — the formats handed to a model as a picture. PNG, JPEG and WebP are the ones Claude,
+ * OpenAI and Gemini all take; GIF is left out because Gemini does not, EMF/WMF/TIFF because none do.
+ */
+const PICTURE_MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' };
+export function pictureMimeOf(path: string): string | null {
+  return PICTURE_MIME[extOf(path)] ?? null;
+}
+
+/**
+ * SQEM-668 — how many pictures of one file go along, and how large. 4 MB each stays within what the
+ * providers that take pictures were tested with; 8 MB together keeps
+ * a request well under `chat-message`'s 20 MB body limit once base64 adds its third.
+ */
+export const MAX_OFFICE_PICTURES = 10;
+export const MAX_OFFICE_PICTURE_BYTES = 4 * 1024 * 1024;
+export const MAX_OFFICE_PICTURES_TOTAL_BYTES = 8 * 1024 * 1024;
+
+export type ReadPicture = (path: string) => Promise<string | null>;
+export interface PictureBatch {
+  sent: { n: number; mime: string; base64: string }[];
+  notShown: { n: number; reason: 'format' | 'size' | 'count' | 'missing' }[];
+}
+
+/** The pictures to hand over, in order, within the limits; `readBase64` returns an entry as base64. */
+export async function pickOfficePictures(pictures: OfficePicture[], readBase64: ReadPicture): Promise<PictureBatch> {
+  const batch: PictureBatch = { sent: [], notShown: [] };
+  let total = 0;
+  for (const p of pictures) {
+    if (!p.mime) { batch.notShown.push({ n: p.n, reason: 'format' }); continue; }
+    if (batch.sent.length >= MAX_OFFICE_PICTURES) { batch.notShown.push({ n: p.n, reason: 'count' }); continue; }
+    const base64 = await readBase64(p.path);
+    if (!base64) { batch.notShown.push({ n: p.n, reason: 'missing' }); continue; }
+    const bytes = Math.floor(base64.length * 3 / 4);
+    if (bytes > MAX_OFFICE_PICTURE_BYTES || total + bytes > MAX_OFFICE_PICTURES_TOTAL_BYTES) { batch.notShown.push({ n: p.n, reason: 'size' }); continue; }
+    total += bytes;
+    batch.sent.push({ n: p.n, mime: p.mime, base64 });
+  }
+  return batch;
+}
+
+const NOT_SHOWN_WHY: Record<PictureBatch['notShown'][number]['reason'], string> = {
+  format: 'in a format no model reads as a picture',
+  size: `over ${MAX_OFFICE_PICTURE_BYTES / 1024 / 1024} MB, or past ${MAX_OFFICE_PICTURES_TOTAL_BYTES / 1024 / 1024} MB together`,
+  count: `past the first ${MAX_OFFICE_PICTURES}`,
+  missing: 'missing from the file',
+};
+
+/**
+ * One line for the model: which pictures follow as images, and why the others do not.
+ * SQEM-671 — `follow: false` leaves out the "follow as images" sentence: a chat attachment's text is
+ * written before anyone knows whether the chosen model gets the pictures, and saying they follow when
+ * they then do not made Mistral describe a picture it never saw. Chat says it at send time instead.
+ */
+export function officePicturesNote(batch: PictureBatch, { follow = true }: { follow?: boolean } = {}): string {
+  if ((!batch.sent.length || !follow) && !batch.notShown.length) return '';
+  const parts: string[] = [];
+  if (batch.sent.length && follow) parts.push(`The pictures marked ${batch.sent.map(p => `[Image ${p.n}]`).join(', ')} follow as images, in that order.`);
+  for (const reason of ['format', 'size', 'count', 'missing'] as const) {
+    const ns = batch.notShown.filter(x => x.reason === reason).map(x => x.n);
+    if (ns.length) parts.push(`Not shown (${NOT_SHOWN_WHY[reason]}): ${ns.map(n => `Image ${n}`).join(', ')}.`);
+  }
+  return `[sqemes: ${parts.join(' ')}]`;
 }
 
 const CHART_KIND: Record<string, string> = {

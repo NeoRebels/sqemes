@@ -21,7 +21,7 @@
 
 import { parsePersonaConnectors, type PersonaConnector } from './connectorService.ts';
 import { isTextContentMime } from './skillFile.ts';
-import { extractOfficeText, officeKindOf, OfficeReadError, OFFICE_READER_MARKER, OFFICE_SERVER_READ_MAX_BYTES, type ReadEntry } from './officeText.ts';
+import { extractOfficeText, officeKindOf, OfficeReadError, OFFICE_READER_MARKER, OFFICE_SERVER_READ_MAX_BYTES, pickOfficePictures, type PictureBatch, type ReadEntry, type ReadPicture } from './officeText.ts';
 import { isResourcePath, matchSkillPath } from './skillPaths.ts';
 import { IMPROVEMENT_HINT } from './libraryPrompt.ts';
 
@@ -388,6 +388,12 @@ export interface LibraryReader {
   /** Accepts a bare file id or a `sqemes://files/<id>` uri. */
   readContextFile(ref: string): Promise<FileContent>;
   /**
+   * SQEM-668 — the pictures of an Office context file within the reader's limits, or null when there
+   * are none to give (not Office, no `[Image n]` in its text, over the server read limit, or no
+   * picture unzip passed in). Same access check as `readContextFile`.
+   */
+  readOfficePictures(ref: string, text: string): Promise<PictureBatch | null>;
+  /**
    * SQEM-499 — a file of ONE playbook by its path inside the skill (`references/x.md`), the way a
    * SKILL.md refers to it. Resolved among that playbook's files only; same access rules as the uri.
    */
@@ -414,6 +420,11 @@ export interface LibraryReaderOptions {
    * it an Office file stays a binary, as before.
    */
   unzip?: (bytes: ArrayBuffer) => Promise<ReadEntry>;
+  /**
+   * SQEM-668 — unzips with a second reader for pictures. Passed by `mcp-server` only: sqemes Chat
+   * keeps a context file as text (its tool results are text for every provider).
+   */
+  unzipPictures?: (bytes: ArrayBuffer) => Promise<{ read: ReadEntry; readBase64: ReadPicture }>;
 }
 
 /** SQEM-658 — kept as a name for the tests; the value and its reason live in officeText.ts. */
@@ -428,7 +439,7 @@ export const OFFICE_READ_MAX_BYTES = OFFICE_SERVER_READ_MAX_BYTES;
  * a slow query later. `mcp-server` already built all three per request before this module existed.
  */
 export async function createLibraryReader(
-  { client, workspaceId, userId, unzip }: LibraryReaderOptions,
+  { client, workspaceId, userId, unzip, unzipPictures }: LibraryReaderOptions,
 ): Promise<LibraryReader> {
   // SQEM-500 — the three access sets in ONE database call. SQEM-481 ran four lookups concurrently;
   // under load that still meant four requests queueing for PostgREST's share of the connections, and
@@ -1084,6 +1095,32 @@ export async function createLibraryReader(
         uri, name: file.name, mimeType: file.mime_type,
         text: null, base64: toBase64(await blob.arrayBuffer()),
       };
+    },
+
+    async readOfficePictures(ref: string, text: string) {
+      const fileId = String(ref || '').replace(/^sqemes:\/\/files\//, '');
+      if (!unzipPictures || !fileId || !accessibleFileIds.has(fileId)) return null;
+      // Most Office files carry no picture; their text says so, and nothing is downloaded for them.
+      if (!/\[Image \d+/.test(text)) return null;
+      const { data: file } = await client
+        .from('workspace_files')
+        .select('id, name, size_bytes, storage_path')
+        .eq('workspace_id', workspaceId)
+        .eq('id', fileId)
+        .single();
+      if (!file || !isPathInWorkspace(file.storage_path, workspaceId)) return null;
+      const office = officeKindOf(file.name);
+      // The same CPU limit as reading the text here: a larger file keeps its text and no pictures.
+      if (!office || (file.size_bytes ?? 0) > OFFICE_READ_MAX_BYTES) return null;
+      const { data: blob, error } = await client.storage.from('workspace-files').download(file.storage_path);
+      if (error || !blob) return null;
+      try {
+        const zip = await unzipPictures(await blob.arrayBuffer());
+        const { pictures } = await extractOfficeText(office, file.name, zip.read);
+        return pictures.length ? await pickOfficePictures(pictures, zip.readBase64) : null;
+      } catch {
+        return null; // the text was already answered; a picture that cannot be read is not an error
+      }
     },
   };
   return reader;

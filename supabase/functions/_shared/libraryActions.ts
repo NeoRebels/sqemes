@@ -25,7 +25,7 @@ import {
 import { countUsage } from './usageCounts.ts';
 import { safeStorageFileName } from './storageKey.ts';
 import { classifySkillFile, extensionOf, sniffBinaryMime, TEXT_EXT_TO_MIME, STORAGE_TEXT_MIME, OCTET_STREAM, SKILL_STORAGE_MIMES } from './skillFile.ts';
-import { officeUploadNote } from './officeText.ts';
+import { officeKindOf, officePicturesNote, officeUploadNote } from './officeText.ts';
 import { readSkillMd, toSlug as skillSlug, withoutOwnFrontmatter, buildSkillMd } from './skillMd.ts';
 import { relativeSkillPaths, uploadedFileName } from './skillPaths.ts';
 import { isTextContentMime, deliveryOf } from './skillFile.ts';
@@ -823,7 +823,14 @@ export async function runLibraryTool(
       }
       if (delivery === 'text') {
         const file = await lib.readContextFile(meta.id);
-        return rpcResult(id, { content: [{ type: 'text', text: file.text ?? '' }] });
+        // SQEM-668 — an Office file's pictures follow its text as images, within the reader's limits.
+        const pictures = file.text && officeKindOf(meta.name) ? await lib.readOfficePictures(meta.id, file.text) : null;
+        if (!pictures) return rpcResult(id, { content: [{ type: 'text', text: file.text ?? '' }] });
+        const note = officePicturesNote(pictures);
+        return rpcResult(id, { content: [
+          { type: 'text', text: note ? `${file.text}\n\n${note}` : file.text },
+          ...pictures.sent.map(p => ({ type: 'image', data: p.base64, mimeType: p.mime })),
+        ] });
       }
       const url = (await issueDownloadLinks(adminClient, workspaceId, [meta.storagePath])).get(meta.storagePath);
       if (!url) return rpcError(id, -32603, 'Could not create a download link for this file');

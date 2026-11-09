@@ -155,7 +155,7 @@ function build(overrides: { templates?: any[]; personas?: any[]; routes?: any[];
     overrides.failFirst ?? {},
   );
   (overrides as any)._capture?.(client);
-  return createLibraryReader({ client, workspaceId: WORKSPACE, userId: USER, unzip: overrides.unzip });
+  return createLibraryReader({ client, workspaceId: WORKSPACE, userId: USER, unzip: overrides.unzip, unzipPictures: (overrides as any).unzipPictures });
 }
 
 /** Like `build`, but also hands back the fake client, for assertions on what was queried. */
@@ -605,7 +605,7 @@ describe('SQEM-658 — an Office context file is read as text', () => {
   it('returns the text, keeps the binary type, stores it and reads it from the database next time', async () => {
     const { lib, client } = await buildWithClient({ files: [docxRow()], blobs: { 'ws-1/Preise.docx': '' }, unzip });
     const first = await lib.readContextFile('f-doc');
-    expect(first.text).toBe("File: Preise.docx (Word document) — converted to text by sqemes (sqemes reader 3); this text is the file's content.\n\nPreis: 99 & mehr");
+    expect(first.text).toBe("File: Preise.docx (Word document) — converted to text by sqemes (sqemes reader 4); this text is the file's content.\n\nPreis: 99 & mehr");
     expect(first.base64).toBeNull();
     expect(first.mimeType).toBe('application/octet-stream');
     expect(client.seen).toContain('upsert:workspace_file_texts:f-doc');
@@ -621,7 +621,7 @@ describe('SQEM-658 — an Office context file is read as text', () => {
       texts: [{ file_id: 'f-doc', workspace_id: WORKSPACE, content: 'File: Preise.docx (Word document) — old reader, wrong count' }],
     });
     const f = await lib.readContextFile('f-doc');
-    expect(f.text).toContain('(sqemes reader 3)');
+    expect(f.text).toContain('(sqemes reader 4)');
     expect(f.text).toContain('Preis: 99 & mehr');
     expect(client.seen).toContain('download:ws-1/Preise.docx');
   });
@@ -630,6 +630,39 @@ describe('SQEM-658 — an Office context file is read as text', () => {
     const lib = await build({ files: [docxRow()], blobs: { 'ws-1/Preise.docx': '' } });
     const f = await lib.readContextFile('f-doc');
     expect(f.text).toBeNull();
+  });
+
+  // SQEM-668 — the pictures of an Office context file, for MCP: same access, same size limit.
+  const withPicture: Record<string, string> = {
+    'word/document.xml': '<w:document><w:body><w:p><w:r><w:t>Logo:</w:t></w:r><w:r><w:drawing><wp:inline><wp:docPr id="1" name="Bild" descr="Firmenlogo"/>'
+      + '<a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="rId5"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p></w:body></w:document>',
+    'word/_rels/document.xml.rels': '<Relationships><Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/></Relationships>',
+  };
+  const unzipPictures = async () => ({
+    read: async (p: string) => withPicture[p] ?? null,
+    readBase64: async (p: string) => (p === 'word/media/image1.png' ? 'iVBORw0KGgo=' : null),
+  });
+
+  it('SQEM-668 — pictures: the text\'s [Image n] come back as base64, within the limits', async () => {
+    const { lib, client } = await buildWithClient({ files: [docxRow()], blobs: { 'ws-1/Preise.docx': '' }, unzip: async () => async (p: string) => withPicture[p] ?? null, unzipPictures } as any);
+    const f = await lib.readContextFile('f-doc');
+    expect(f.text).toContain('[Image 1: Firmenlogo]');
+    const batch = await lib.readOfficePictures('f-doc', f.text!);
+    expect(batch).toEqual({ sent: [{ n: 1, mime: 'image/png', base64: 'iVBORw0KGgo=' }], notShown: [] });
+    expect(client.seen.filter((x: string) => x === 'download:ws-1/Preise.docx').length).toBe(2);
+  });
+
+  it('SQEM-668 — no picture in the text, too large, no picture unzip, or no access: null, and nothing downloaded', async () => {
+    const plain = await buildWithClient({ files: [docxRow()], blobs: { 'ws-1/Preise.docx': '' }, unzipPictures } as any);
+    expect(await plain.lib.readOfficePictures('f-doc', 'File: Preise.docx … Preis: 99')).toBeNull();
+    expect(plain.client.seen).not.toContain('download:ws-1/Preise.docx');
+    const big = await buildWithClient({ files: [docxRow({ size_bytes: OFFICE_READ_MAX_BYTES + 1 })], blobs: { 'ws-1/Preise.docx': '' }, unzipPictures } as any);
+    expect(await big.lib.readOfficePictures('f-doc', '[Image 1: x]')).toBeNull();
+    expect(big.client.seen).not.toContain('download:ws-1/Preise.docx');
+    const none = await build({ files: [docxRow()], blobs: { 'ws-1/Preise.docx': '' } });
+    expect(await none.readOfficePictures('f-doc', '[Image 1: x]')).toBeNull();
+    const shut = await build({ files: [docxRow()], blobs: { 'ws-1/Preise.docx': '' }, unzipPictures } as any);
+    expect(await shut.readOfficePictures('f-elsewhere', '[Image 1: x]')).toBeNull();
   });
 
   it('⛔ too large: refused before the download, with the way out', async () => {

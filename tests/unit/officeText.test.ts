@@ -35,7 +35,7 @@ describe('SQEM-658 — Word', () => {
   it('headings, runs, a table and the order of the body', async () => {
     const { text, truncated } = await read('docx', 'references/Angebot.docx', await wordFile());
     expect(truncated).toBe(false);
-    expect(text.startsWith("File: Angebot.docx (Word document) — converted to text by sqemes (sqemes reader 3); this text is the file's content.\n\n")).toBe(true);
+    expect(text.startsWith("File: Angebot.docx (Word document) — converted to text by sqemes (sqemes reader 4); this text is the file's content.\n\n")).toBe(true);
     expect(text).toContain('# Angebot für Muster GmbH');
     expect(text).toContain('## Leistungen');
     expect(text).toContain('Preis & Laufzeit: 12 Monate');
@@ -218,7 +218,7 @@ describe('SQEM-659 — formulas next to their stored value', () => {
 
   it('the value with its formula, shared formulas resolved per cell, a formula without a stored value', async () => {
     const { text } = await read('xlsx', 'Kalkulation.xlsx', await workbook());
-    expect(text).toContain('(sqemes reader 3)');
+    expect(text).toContain('(sqemes reader 4)');
     expect(text).toContain('2,10,20 (=A2*B2)');
     expect(text).toContain('3,5,15 (=A3*B3)');
     expect(text).toContain(',,35 (=SUM(C2:C3)),=NOW()');
@@ -286,7 +286,7 @@ describe('SQEM-659 — PowerPoint: a real chart and a picture on a slide', () =>
     expect(text).toContain('| Category | Leads |');
     expect(text).toContain('| Jan | 12 |');
     expect(text).toContain('| Feb | 30 |');
-    expect(text).toContain('[Image: Logo]');
+    expect(text).toContain('[Image 1: Logo]');
   });
 });
 

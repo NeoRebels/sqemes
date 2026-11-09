@@ -34,7 +34,7 @@ import { shouldSendOnEnter, hasCoarsePointer } from '../lib/chatKeys';
 import { noKeyHint, PROVIDER_KEYS_TAB } from '../lib/chatKeyHint';
 import { useLocation, useNavigate, useParams, Link } from 'react-router';
 import { SUPPORTED_MIME_TYPES, CHAT_ACCEPT_STRING, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, isImageType, fileTypeLabel } from '../lib/uploadTypes';
-import { officeAttachment } from '../lib/officeAttachment';
+import { officeAttachment, OFFICE_PICTURE_PROVIDERS, OFFICE_PICTURES_FOLLOW, OFFICE_PICTURES_LEFT_OUT } from '../lib/officeAttachment';
 import { tablesFromFile, isTableFile, uniqueTables, analysisTableMeta, type AttachmentTable } from '../lib/analysisTables';
 import { runAnalysis, preloadAnalysis } from '../lib/analysisSandbox';
 import { normalizeAnalyses, storedAnalyses, dfTableKey, type AnalysisRecord, type ShownAnalysis } from '../supabase/functions/_shared/analysisTool';
@@ -160,13 +160,19 @@ function truncateMessagesToPayloadLimit(
 
 // SQEM-658 — `label` names an Office attachment (DOCX…), which travels as text and would otherwise read TXT.
 // SQEM-660 — `tables`: what an .xlsx/.csv offers run_analysis, full and in memory only (never sent, never stored).
-interface ChatAttachment { id: string; file: File; dataUrl: string; mimeType: string; label?: string; tables?: AttachmentTable[]; }
+interface ChatAttachment {
+  id: string; file: File; dataUrl: string; mimeType: string; label?: string; tables?: AttachmentTable[];
+  /** SQEM-668 — a picture taken out of an attached Word, Excel or PowerPoint file. */
+  officePicture?: boolean;
+  /** SQEM-671 — on an Office file's text: how many of its pictures were attached with it. */
+  officePictures?: number;
+}
 interface ChatMsg {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   pending?: boolean;
-  attachments?: Array<{ mimeType: string; dataUrl: string; label?: string; tables?: AttachmentTable[] }>;
+  attachments?: Array<{ mimeType: string; dataUrl: string; label?: string; tables?: AttachmentTable[]; officePicture?: boolean; officePictures?: number }>;
   model?: string;
   userId?: string;
   userName?: string;
@@ -842,9 +848,12 @@ const Chat = () => {
 
   const attachOffice = async (blob: Blob, name: string) => {
     try {
-      const { dataUrl, label, truncated } = await officeAttachment(blob, name);
+      const { dataUrl, label, truncated, pictures } = await officeAttachment(blob, name);
       const tables = await tablesOf(blob, name);
-      setAttachments(prev => [...prev, { id: crypto.randomUUID(), file: new File([], name), dataUrl, mimeType: 'text/plain', label, tables }]);
+      // SQEM-668 — the file's pictures as image attachments of their own, after the text, so the person
+      // sees what goes along and can remove one; the text says which [Image n] each one is.
+      setAttachments(prev => [...prev, { id: crypto.randomUUID(), file: new File([], name), dataUrl, mimeType: 'text/plain', label, tables, ...(pictures.length ? { officePictures: pictures.length } : {}) },
+        ...pictures.map(p => ({ id: crypto.randomUUID(), file: new File([], name), dataUrl: p.dataUrl, mimeType: p.mimeType, label: `${label} · Image ${p.n}`, officePicture: true }))]);
       // SQEM-660 — for a table the excerpt is only what the model reads; run_analysis computes on all of it.
       if (truncated) showToast(tables ? txt.chat_attach_truncated_table({ name }) : txt.chat_attach_truncated({ name }), 'info');
     } catch {
@@ -1003,7 +1012,7 @@ const Chat = () => {
     setInput(msg.content);
     pendingPlaybookRef.current = pendingFromSent(msg.playbookRef, msg.content); // SQEM-551 — the card comes back with it
     if (msg.attachments?.length) {
-      setAttachments(msg.attachments.map(a => ({ id: crypto.randomUUID(), file: new File([], 'restored'), dataUrl: a.dataUrl, mimeType: a.mimeType, label: a.label })));
+      setAttachments(msg.attachments.map(a => ({ id: crypto.randomUUID(), file: new File([], 'restored'), dataUrl: a.dataUrl, mimeType: a.mimeType, label: a.label, ...(a.officePicture ? { officePicture: true } : {}), ...(a.officePictures ? { officePictures: a.officePictures } : {}) }))); // SQEM-668/671 — the gate and the picture sentence need both fields after an edit too
     } else {
       setAttachments([]);
     }
@@ -1130,7 +1139,9 @@ const Chat = () => {
 
     const controller = new AbortController();
 
-    const currentAttachments = attachments.map(a => ({ mimeType: a.mimeType, dataUrl: a.dataUrl, label: a.label, tables: a.tables }));
+    // SQEM-668 — `officePicture` must survive this copy: the provider gate and the log read it from the message.
+    // SQEM-671 — and `officePictures`: the sentence about missing pictures is decided from it.
+    const currentAttachments = attachments.map(a => ({ mimeType: a.mimeType, dataUrl: a.dataUrl, label: a.label, tables: a.tables, ...(a.officePicture ? { officePicture: true } : {}), ...(a.officePictures ? { officePictures: a.officePictures } : {}) }));
     const playbookRef = finalizeRef(pendingPlaybookRef.current, trimmed); // SQEM-551
     pendingPlaybookRef.current = null;
     const userMsg: ChatMsg = { id: crypto.randomUUID(), role: 'user', content: trimmed, attachments: currentAttachments.length > 0 ? currentAttachments : undefined, playbookRef };
@@ -1189,9 +1200,25 @@ const Chat = () => {
       // Persist the user message with its local id (SQEM-115) so local == DB ids for pruning.
       addChatMessage(activeSessionId, 'user', userContentForStorage, undefined, currentUser.id, userMsg.id, { playbookRef }).catch(() => {});
 
+      // SQEM-668 — pictures from an Office file go only to the providers measured to take them; the
+      // others get the text and a sentence saying the pictures were left out. SQEM-671 — funded runs on
+      // mistral-small-latest, measured with the other Mistral model, so it takes them too.
+      const pictureProvider = isFundedModel(selectedModel) ? 'mistral'
+        : (AVAILABLE_MODELS.find(m => m.id === selectedModel) ?? enabledModels.find(m => m.id === selectedModel))?.provider;
+      const takesOfficePictures = !!pictureProvider && OFFICE_PICTURE_PROVIDERS.has(pictureProvider);
+      let officePicturesSent = 0;
       const allMessages = [...messages, userMsg].map(m => {
         if (m.attachments?.length) {
-          const content: any[] = m.attachments.map(a => ({ inlineData: { mimeType: a.mimeType, data: a.dataUrl.split(',')[1] } }));
+          const kept = takesOfficePictures ? m.attachments : m.attachments.filter(a => !a.officePicture);
+          const content: any[] = kept.map(a => ({ inlineData: { mimeType: a.mimeType, data: a.dataUrl.split(',')[1] } }));
+          if (m === userMsg) officePicturesSent = kept.filter(a => a.officePicture).length;
+          // SQEM-671 — exactly one sentence about them, so the model is never told both that they follow and that they do not.
+          // Missing is measured against what the file brought, so pictures the person removed count too: without a
+          // sentence a model named colours for an [Image 1] it never got.
+          const expected = m.attachments.reduce((n, a) => n + (a.officePictures ?? 0), 0);
+          const sent = kept.filter(a => a.officePicture).length;
+          if (expected > 0 && sent < expected) content.push({ text: OFFICE_PICTURES_LEFT_OUT });
+          else if (sent > 0) content.push({ text: OFFICE_PICTURES_FOLLOW });
           if (m.content) content.push({ text: m.content });
           return { role: m.role, content };
         }
@@ -1282,7 +1309,7 @@ const Chat = () => {
         method: 'POST',
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ ...chatPayloadBase, messages: messagesToSend, jobId, connectorIds: activeConnectorIds, ...(webThis ? { webSearch: true } : {}), ...(chatTables.length ? { analysisTables: analysisTableMeta(chatTables) } : {}), connectorAnalysis: true, locale: getLocale() }),
+        body: JSON.stringify({ ...chatPayloadBase, messages: messagesToSend, jobId, connectorIds: activeConnectorIds, ...(webThis ? { webSearch: true } : {}), ...(chatTables.length ? { analysisTables: analysisTableMeta(chatTables) } : {}), connectorAnalysis: true, locale: getLocale(), ...(officePicturesSent ? { officePictures: officePicturesSent } : {}) }),
       });
 
       if (!res.ok) throw await edgeError(res);

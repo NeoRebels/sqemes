@@ -4,7 +4,7 @@ import { MCP_MAX_BODY_BYTES, declaredLength, readJsonCapped, tooLargeMessage } f
 import {
   createLibraryReader, hiddenFromCaller, toSlug, renderContextBlocks,
 } from '../_shared/libraryQueries.ts';
-import { unzipEntries } from '../_shared/officeZip.ts';
+import { unzipEntries, unzipWithPictures } from '../_shared/officeZip.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
 import { toolAnnotations } from '../_shared/toolAnnotations.ts';
 import {
@@ -333,7 +333,7 @@ async function handle(req: Request, mark: (name: string) => void, call: CallNote
    * ⚠️ The `.catch` on the copies marks a rejection as handled when a gate returns early; awaiting the
    * originals below still throws, exactly as the inline awaits did.
    */
-  const libP = createLibraryReader({ client: adminClient, workspaceId, userId: mcpUserId, unzip: unzipEntries }); // SQEM-658
+  const libP = createLibraryReader({ client: adminClient, workspaceId, userId: mcpUserId, unzip: unzipEntries, unzipPictures: unzipWithPictures }); // SQEM-658, SQEM-668
   const memberP = Promise.resolve(adminClient
     .from('workspace_members')
     .select('role')

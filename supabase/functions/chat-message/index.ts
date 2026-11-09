@@ -137,6 +137,12 @@ Deno.serve(async (req) => {
     // SQEM-514 — a file part no provider can take never reaches a provider branch (_shared/messageParts.ts).
     // SQEM-649 — a continuation brings the provider's own message list in the state instead.
     const messages = continuation ? [] : Array.isArray(body.messages) ? dropUnsendableInMessages(body.messages) : body.messages;
+    // SQEM-668 — pictures in the person's newest message, for the [chat-images] log: what they cost
+    // shows in no other line (a BYOK answer without a tool call logs no tokens at all).
+    const lastContent = Array.isArray(messages) ? messages[messages.length - 1]?.content : null;
+    const images = continuation ? (src.images ?? 0)
+      : Array.isArray(lastContent) ? lastContent.filter((p: any) => String(p?.inlineData?.mimeType ?? '').startsWith('image/')).length : 0;
+    const officePictures = Math.min(images, Math.max(0, Number(src.officePictures) || 0));
 
     // SQEM-370 — the model is told what day it is, composed HERE and not by the client: built at the
     // instant of the request, it cannot go stale in a session left open overnight. The client only
@@ -389,7 +395,7 @@ Deno.serve(async (req) => {
       // SQEM-649 — what a hand-over needs: the person's own JWT (header only, never in the state), the
       // request to carry on, and — on a continuation — where the last invocation stopped.
       authHeader,
-      request: { modelId, funded: !!funded, systemInstruction, timeZone, connectorIds, webSearch: webSearch === true, locale, ...(analysisTables.length ? { analysisTables } : {}), ...(connectorAnalysis ? { connectorAnalysis: true } : {}) } satisfies ContinuationRequest,
+      request: { modelId, funded: !!funded, systemInstruction, timeZone, connectorIds, webSearch: webSearch === true, locale, ...(analysisTables.length ? { analysisTables } : {}), ...(connectorAnalysis ? { connectorAnalysis: true } : {}), ...(images ? { images, officePictures } : {}) } satisfies ContinuationRequest,
       continuation,
     }));
     return new Response(JSON.stringify({ jobId }), {
@@ -974,6 +980,14 @@ async function runAndBroadcast({
         ...(connectorTablesCarried + (connectorTables?.built ?? 0) ? { connectorTables: connectorTablesCarried + (connectorTables?.built ?? 0) } : {}), // SQEM-661
       }));
     }
+    // SQEM-668 — every answer to a message with pictures, with its tokens: the cost of a picture is
+    // measured here, and the ops monitor counts how often such an answer fails ([chat-error] images).
+    if (request.images) {
+      console.log('[chat-images]', JSON.stringify({
+        jobId, provider, model: modelId, funded, images: request.images, officePictures: request.officePictures ?? 0,
+        inputTokens: tools?.stats.inputTokens ?? null, cachedInputTokens: tools?.stats.cachedInputTokens ?? null, outputTokens: tools?.stats.outputTokens ?? null,
+      }));
+    }
     // ⛔ The cap must be VISIBLE. A model cut off mid-investigation answers confidently from half the
     // material, and nothing in the reply would say so.
     if (tools?.stats.cappedAt) result += toolCapNotice(tools.stats.cappedAt, tools.stats.cappedBy ?? 'rounds', locale);
@@ -1027,7 +1041,7 @@ async function runAndBroadcast({
     // SQEM-653 — counted by the ops monitor. The kind and the status only, ⛔ never the message: a
     // provider may quote the request back in it.
     const message = String(err?.message ?? '');
-    console.error('[chat-error]', JSON.stringify({ jobId, provider, model: modelId, funded, kind: chatErrorKind(message), status: errorStatus(message) }));
+    console.error('[chat-error]', JSON.stringify({ jobId, provider, model: modelId, funded, kind: chatErrorKind(message), status: errorStatus(message), ...(request.images ? { images: request.images, officePictures: request.officePictures ?? 0 } : {}) }));
     // No flush here on purpose: a partial answer followed by an error reads as if the fragment were
     // the reply. The client drops what it has when an error arrives.
     await broadcastJobResult(jobId, { error: err?.message ?? 'Unknown error' });

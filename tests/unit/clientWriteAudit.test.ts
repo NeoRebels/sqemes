@@ -54,11 +54,13 @@ describe('SQEM-492 — workspace_files', () => {
     // takes whatever its callers pass — so the guard count must still match the call sites.
     const direct  = lq.match(/\.download\([a-z]+\.storage_path\)/g) ?? [];
     const helper  = lq.match(/downloadText\(client, [a-z]+\.storage_path/g) ?? [];
-    expect(direct.length + helper.length).toBe(2);
+    // SQEM-668 — a third: readOfficePictures downloads the Office file for its pictures (MCP).
+    expect(direct.length + helper.length).toBe(3);
     expect((lq.match(/\.download\(/g) ?? []).length).toBe(direct.length + 1); // + the helper's own
     // One guard per download call site, plus — SQEM-514 — one in each reader that hands a path to the
     // MCP server for SIGNING a link (contextFileMeta, skillFolder): a link is a download by other means.
-    expect((lq.match(/isPathInWorkspace\(/g) ?? []).length).toBe(4);
+    expect((lq.match(/isPathInWorkspace\(/g) ?? []).length).toBe(5);
+    expect(fnBody(lq, 'async readOfficePictures')).toMatch(/isPathInWorkspace\(file\.storage_path, workspaceId\)/);
     expect(fnBody(lq, 'async contextFileMeta')).toMatch(/isPathInWorkspace\(file\.storage_path, workspaceId\)/);
     expect(fnBody(lq, 'async skillFolder')).toMatch(/isPathInWorkspace\(r\.storage_path, workspaceId\)/);
     const mcp = code((read('supabase/functions/mcp-server/index.ts') + '\n' + read('supabase/functions/_shared/libraryActions.ts') + '\n' + read('supabase/functions/_shared/libraryToolDefs.ts')));

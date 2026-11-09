@@ -107,9 +107,18 @@ describe('SQEM-658 — Office files follow the read-vs-use rule', () => {
   });
   it('⛔ both edge functions pass the unzip in; only they import npm:jszip for it', () => {
     const src = (p: string) => readFileSync(resolve(__dirname, '../..', p), 'utf8');
-    expect(src('supabase/functions/mcp-server/index.ts')).toMatch(/createLibraryReader\(\{[^}]*unzip: unzipEntries \}\)/);
+    expect(src('supabase/functions/mcp-server/index.ts')).toMatch(/createLibraryReader\(\{[^}]*unzip: unzipEntries, unzipPictures: unzipWithPictures \}\)/);
     expect(src('supabase/functions/chat-message/index.ts')).toMatch(/createLibraryReader\(\{[^}]*unzip: unzipEntries \}\)/);
     expect(src('supabase/functions/_shared/libraryQueries.ts')).not.toMatch(/from ['"]npm:/);
     expect(src('supabase/functions/_shared/officeText.ts')).not.toMatch(/^import /m);
+  });
+  it('SQEM-668 — over MCP an Office file\'s pictures follow its text as image blocks; Chat keeps it text', () => {
+    const h = MCP.slice(MCP.indexOf("toolName === 'read_context_file'"), MCP.indexOf("toolName === 'download_skill'"));
+    const text = h.slice(h.indexOf("delivery === 'text'"), h.indexOf('issueDownloadLinks('));
+    expect(text).toMatch(/await lib\.readOfficePictures\(meta\.id, file\.text\)/);
+    expect(text).toMatch(/officePicturesNote\(pictures\)/);
+    expect(text).toMatch(/pictures\.sent\.map\(p => \(\{ type: 'image', data: p\.base64, mimeType: p\.mime \}\)\)/);
+    const chat = readFileSync(resolve(__dirname, '../../supabase/functions/chat-message/index.ts'), 'utf8');
+    expect(chat).not.toMatch(/unzipPictures/);
   });
 });
