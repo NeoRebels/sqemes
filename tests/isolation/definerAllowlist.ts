@@ -68,6 +68,30 @@ export const DEFINER_ALLOWLIST: Record<string, DefinerEntry> = {
     why: 'app (member removal dialog); refuses unless the caller is admin of that workspace',
     probe: { sql: `select * from public.count_restricted_content_for_member('${A}', '${USERS.a1}')`, expect: 'error' },
   },
+  decide_review: {
+    why: 'app: a moderator or admin releases or rejects a submission (SQEM-666); checks is_workspace_moderator for auth.uid() in the object\'s workspace',
+    probe: { sql: `select public.decide_review('template', '${A_OPEN}', true)`, expect: 'error' },
+  },
+  am_i_moderator: {
+    why: 'RLS helper (pending_changes_select, SQEM-667); answers only for auth.uid()',
+    probe: { sql: `select count(*) from (select 1 where public.am_i_moderator('${A}')) x`, expect: 'zero' },
+  },
+  review_queue: {
+    why: 'app: the review list of a workspace for its moderators and admins (SQEM-669); is_workspace_moderator for auth.uid()',
+    probe: { sql: `select public.review_queue('${A}')`, expect: 'error' },
+  },
+  pending_change_released_state: {
+    why: 'app: the released state a waiting change is compared with, for moderators of its workspace only (SQEM-669)',
+    probe: { sql: `select public.pending_change_released_state((select id from public.pending_changes where object_id = '${A_OPEN}' limit 1))`, expect: 'error' },
+  },
+  submit_change: {
+    why: 'app: propose a change to a shared playbook or persona (SQEM-667); submit_change_for_user checks the edit right of auth.uid()',
+    probe: { sql: `select public.submit_change('template', '${A_OPEN}', '{"title":"x"}'::jsonb, null)`, expect: 'error' },
+  },
+  decide_change: {
+    why: 'app: a moderator or admin releases or rejects a proposed change (SQEM-667); checks is_workspace_moderator for auth.uid()',
+    probe: { sql: `select public.decide_change((select id from public.pending_changes where object_id = '${A_OPEN}' limit 1), true)`, expect: 'error' },
+  },
   create_workspace: {
     why: 'app: create a workspace for yourself; takes no tenant id',
   },

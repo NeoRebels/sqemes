@@ -18,6 +18,12 @@ import { fetchRestrictedPersonaIds } from '../lib/api/personaAccess';
 import { fetchCanEditMany } from '../lib/api/editors';
 import { applyToEditable, bulkSummary } from '../lib/bulkApply';
 import RightsIcons from '../components/ui/RightsIcons';
+import ReviewBanner, { ReviewBadge } from '../components/ReviewBanner';
+import { useModeration } from '../hooks/useModeration';
+import { fetchReviewStates, fetchWorkspacePendingChanges } from '../lib/api/moderation';
+import { ChangeBadge } from '../components/ChangeReview';
+import ModerationQueue from '../components/ModerationQueue';
+import { reviewBadgeOf, type ReviewInfo, type ReviewState } from '../lib/moderation';
 import { fetchEditRestrictedIds } from '../lib/api/editors';
 import type { AccessBadgeMode } from '../lib/accessBadge';
 import { buildBundle, downloadBlob, readBundle, importBundle } from '../lib/templateBundle';
@@ -54,6 +60,8 @@ const PersonaRow = memo(function PersonaRow({
   canEdit,
   accessMode,
   editRestricted,
+  review,
+  changed,
   active,
   selected,
   onSelect,
@@ -64,6 +72,8 @@ const PersonaRow = memo(function PersonaRow({
   canEdit: boolean;
   accessMode?: AccessBadgeMode;
   editRestricted?: boolean; // SQEM-664 — names its editors
+  review?: ReviewState | null; // SQEM-666
+  changed?: boolean; // SQEM-667
   active: boolean;
   selected: boolean;
   onSelect: (id: string) => void;
@@ -96,6 +106,8 @@ const PersonaRow = memo(function PersonaRow({
           {n === 0 ? m.ps_loads_nothing() : m.count_playbook({ count: n })}{persona.tags[0] ? ` · ${persona.tags[0]}` : ''}
         </span>
       </button>
+      <ReviewBadge state={review ?? null} />
+      <ChangeBadge show={!review && !!changed} />
       <RightsIcons access={accessMode} editRestricted={editRestricted} />
       <button
         type="button"
@@ -205,6 +217,22 @@ export default function Personas() {
     void fetchEditRestrictedIds('persona', workspace.id).then(setEditRestrictedIds);
   }, [workspace?.id]);
   useEffect(loadEditRestricted, [loadEditRestricted, personas?.length]);
+  // SQEM-666 — the review states of this list (one query), for the row badges.
+  const moderation = useModeration(workspace, currentUser);
+  const [reviewStates, setReviewStates] = useState<Map<string, ReviewInfo>>(new Map());
+  const loadReviewStates = useCallback(() => {
+    if (!workspace?.id || IS_SELF_HOSTED) return;
+    void fetchReviewStates('persona', workspace.id).then(setReviewStates);
+  }, [workspace?.id]);
+  useEffect(loadReviewStates, [loadReviewStates, personas?.length]);
+  // SQEM-669 — bumped after a decision in the review list, so states and badges are read again.
+  const [reviewTick, setReviewTick] = useState(0);
+  // SQEM-667 — objects with a waiting change the viewer may see (their own; every one as a moderator).
+  const [changedIds, setChangedIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!workspace?.id || IS_SELF_HOSTED) return;
+    void fetchWorkspacePendingChanges(workspace.id).then(cs => setChangedIds(new Set(cs.filter(c => c.kind === 'persona' && (c.state === 'pending' || c.author === currentUser?.id)).map(c => c.objectId))));
+  }, [workspace?.id, personas?.length, currentUser?.id, reviewTick]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -412,6 +440,10 @@ export default function Personas() {
         subtitle={m.ps_subtitle()}
         actions={canEdit && (
           <>
+            {/* SQEM-669 — the review list, for moderators and admins when something waits. */}
+            {!IS_SELF_HOSTED && workspace && currentUser && (
+              <ModerationQueue workspace={workspace} user={currentUser} onChanged={() => { loadReviewStates(); setReviewTick(t => t + 1); }} />
+            )}
             {/* SQEM-325 — Cloud-only, like the Template Wizard. ⚠️ Not for want of model access:
                 `runAuthoringAI` works on self-host over BYOK, and the enhance buttons in the editor
                 use it there. The wizard is Cloud's guided surface, which is a product decision
@@ -560,6 +592,8 @@ export default function Personas() {
                 canEdit={canEdit}
                 accessMode={restrictedIds.get(persona.id)}
                 editRestricted={editRestrictedIds.has(persona.id)}
+                review={reviewBadgeOf(reviewStates.get(persona.id), persona.createdBy === currentUser?.id, moderation.moderator)}
+                changed={changedIds.has(persona.id)}
                 active={selectedPersona?.id === persona.id}
                 selected={selectedIds.has(persona.id)}
                 onSelect={selectPersona}
@@ -570,6 +604,13 @@ export default function Personas() {
           </ul>
           {selectedPersona && (
             <div className={`lg:sticky lg:top-4 ${showPreviewOnMobile ? '' : 'hidden lg:block'}`}>
+              {reviewStates.get(selectedPersona.id) && (
+                <div className="mb-3 rounded-card border border-line overflow-hidden [&>div]:border-b-0">
+                  <ReviewBanner kind="persona" id={selectedPersona.id} review={reviewStates.get(selectedPersona.id)}
+                    isOwner={selectedPersona.createdBy === currentUser?.id} moderator={moderation.moderator}
+                    onChanged={next => setReviewStates(prev => { const n = new Map(prev); if (next) n.set(selectedPersona.id, next); else n.delete(selectedPersona.id); return n; })} />
+                </div>
+              )}
               <PersonaPreview
                 persona={selectedPersona}
                 members={workspace?.members ?? []}

@@ -32,6 +32,7 @@ import { Input } from '../components/ui/Input';
 import Switch from '../components/ui/Switch';
 import AccessGroupsCard from '../components/AccessGroupsCard';
 import AuthoringModelCard from '../components/AuthoringModelCard';
+import ModerationCard from '../components/ModerationCard';
 import { isMultiSeat } from '../lib/templateAccessScope';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -515,16 +516,20 @@ const Settings = () => {
   const [editDraft, setEditDraft] = useState<boolean | null>(null);
   const [governanceDraft, setGovernanceDraft] = useState<Partial<Record<GovernanceKey, boolean>>>({});
   const [authoringDirty, setAuthoringDirty] = useState(false);
+  const [moderationDirty, setModerationDirty] = useState(false); // SQEM-666
+  const [moderationResetKey, setModerationResetKey] = useState(0);
   const [authoringResetKey, setAuthoringResetKey] = useState(0);
   const [savingCard, setSavingCard] = useState<'access' | 'edit' | 'governance' | null>(null);
   const [pendingTab, setPendingTab] = useState<TabId | null>(null);
-  const hasUnsaved = accessDraft !== null || editDraft !== null || Object.keys(governanceDraft).length > 0 || authoringDirty;
+  const hasUnsaved = accessDraft !== null || editDraft !== null || Object.keys(governanceDraft).length > 0 || authoringDirty || moderationDirty;
   const discardDrafts = () => {
     setAccessDraft(null);
     setEditDraft(null);
     setGovernanceDraft({});
     setAuthoringDirty(false);
     setAuthoringResetKey(k => k + 1); // remounts AuthoringModelCard, which drops its own draft
+    setModerationDirty(false);
+    setModerationResetKey(k => k + 1);
   };
   /** A tab change the person asked for. Deep-link effects call `setActiveTab` directly. */
   const requestTab = (id: TabId) => {
@@ -1338,6 +1343,17 @@ const Settings = () => {
                     onSave={() => editDraft !== null && saveCard('edit', { defaultEditRestricted: editDraft }, () => setEditDraft(null))}
                   />
                 </Card>
+              )}
+
+              {/* SQEM-666 — Moderation: same conditions as the two cards above (hosted, several seats,
+                  admins). The database enforces it; this card is where it is chosen. */}
+              {!IS_SELF_HOSTED && isMultiSeat(workspace) && can(currentUser, workspace, 'team:manage') && (
+                <ModerationCard
+                  key={moderationResetKey}
+                  workspace={workspace}
+                  onSave={updateWorkspace}
+                  onDirtyChange={setModerationDirty}
+                />
               )}
 
               {/* SQEM-619 — the access groups were here (SQEM-304); they sit on the Team tab now, under

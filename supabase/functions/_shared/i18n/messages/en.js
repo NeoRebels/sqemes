@@ -422,6 +422,32 @@
 /** @typedef {{ term: NonNullable<unknown> }} Chatsearch_NoneInputs */
 /** @typedef {{}} Chatsearch_PlaceholderInputs */
 /** @typedef {{}} Chatsearch_UntitledInputs */
+/** @typedef {{}} Chg_BadgeInputs */
+/** @typedef {{}} Chg_ConflictInputs */
+/** @typedef {{}} Chg_DiscardInputs */
+/** @typedef {{}} Chg_Field_AccessInputs */
+/** @typedef {{}} Chg_Field_ConnectorsInputs */
+/** @typedef {{}} Chg_Field_ContentInputs */
+/** @typedef {{}} Chg_Field_DescriptionInputs */
+/** @typedef {{}} Chg_Field_FilesInputs */
+/** @typedef {{}} Chg_Field_KindInputs */
+/** @typedef {{}} Chg_Field_ModelInputs */
+/** @typedef {{}} Chg_Field_RoutesInputs */
+/** @typedef {{}} Chg_Field_TagInputs */
+/** @typedef {{}} Chg_Field_TitleInputs */
+/** @typedef {{}} Chg_Field_VariablesInputs */
+/** @typedef {{}} Chg_Mine_PendingInputs */
+/** @typedef {{}} Chg_Mine_RejectedInputs */
+/** @typedef {{ reason: NonNullable<unknown> }} Chg_Mine_Rejected_ReasonInputs */
+/** @typedef {{}} Chg_Modal_HintInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Chg_Modal_TitleInputs */
+/** @typedef {{}} Chg_No_FieldsInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Chg_Others_PendingInputs */
+/** @typedef {{}} Chg_Release_AnywayInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Chg_Review_ByInputs */
+/** @typedef {{}} Chg_Save_SubmitInputs */
+/** @typedef {{}} Chg_Submit_FailedInputs */
+/** @typedef {{}} Chg_SubmittedInputs */
 /** @typedef {{}} Confirm_ConfirmInputs */
 /** @typedef {{}} Confirm_Type_AfterInputs */
 /** @typedef {{}} Confirm_Type_BeforeInputs */
@@ -914,6 +940,36 @@
 /** @typedef {{}} Mk_TitleInputs */
 /** @typedef {{}} Mk_Try_Other_SearchInputs */
 /** @typedef {{}} Mk_Vote_FailedInputs */
+/** @typedef {{ names: NonNullable<unknown> }} Mod_Admins_AlwaysInputs */
+/** @typedef {{}} Mod_Admins_Always_NoneInputs */
+/** @typedef {{}} Mod_Badge_DraftInputs */
+/** @typedef {{}} Mod_Badge_PendingInputs */
+/** @typedef {{}} Mod_Badge_RejectedInputs */
+/** @typedef {{}} Mod_Banner_DraftInputs */
+/** @typedef {{}} Mod_Banner_Draft_PrivateInputs */
+/** @typedef {{}} Mod_Banner_PendingInputs */
+/** @typedef {{}} Mod_Banner_Pending_ModeratorInputs */
+/** @typedef {{}} Mod_Banner_RejectedInputs */
+/** @typedef {{ reason: NonNullable<unknown> }} Mod_Banner_Rejected_ReasonInputs */
+/** @typedef {{}} Mod_CancelInputs */
+/** @typedef {{}} Mod_Changes_DescInputs */
+/** @typedef {{}} Mod_Changes_LabelInputs */
+/** @typedef {{}} Mod_Changes_Needs_NewInputs */
+/** @typedef {{}} Mod_DescInputs */
+/** @typedef {{}} Mod_Members_NeverInputs */
+/** @typedef {{}} Mod_ModeratorsInputs */
+/** @typedef {{}} Mod_New_DescInputs */
+/** @typedef {{}} Mod_New_LabelInputs */
+/** @typedef {{}} Mod_No_EditorsInputs */
+/** @typedef {{}} Mod_RejectInputs */
+/** @typedef {{}} Mod_Reject_ConfirmInputs */
+/** @typedef {{}} Mod_Reject_ReasonInputs */
+/** @typedef {{}} Mod_ReleaseInputs */
+/** @typedef {{}} Mod_Save_SubmitInputs */
+/** @typedef {{}} Mod_Submit_FailedInputs */
+/** @typedef {{}} Mod_SubmittedInputs */
+/** @typedef {{}} Mod_TitleInputs */
+/** @typedef {{}} Mod_WithdrawInputs */
 /** @typedef {{}} Model_CostInputs */
 /** @typedef {{}} Model_NoneInputs */
 /** @typedef {{}} Model_SpeedInputs */
@@ -923,6 +979,19 @@
 /** @typedef {{ label: NonNullable<unknown> }} Move_Down_LabelInputs */
 /** @typedef {{}} Move_UpInputs */
 /** @typedef {{ label: NonNullable<unknown> }} Move_Up_LabelInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Mq_Change_ByInputs */
+/** @typedef {{}} Mq_CompareInputs */
+/** @typedef {{}} Mq_Compare_FailedInputs */
+/** @typedef {{}} Mq_EmptyInputs */
+/** @typedef {{}} Mq_MoreInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Mq_New_ByInputs */
+/** @typedef {{}} Mq_No_AccessInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Mq_OpenInputs */
+/** @typedef {{}} Mq_Open_ItemInputs */
+/** @typedef {{}} Mq_Tab_AllInputs */
+/** @typedef {{}} Mq_Tab_ChangesInputs */
+/** @typedef {{}} Mq_Tab_NewInputs */
+/** @typedef {{}} Mq_TitleInputs */
 /** @typedef {{}} Nav_ChatInputs */
 /** @typedef {{}} Nav_FilesInputs */
 /** @typedef {{}} Nav_HistoryInputs */
@@ -3734,6 +3803,113 @@ export const chatsearch_untitled = /** @type {(inputs: Chatsearch_UntitledInputs
 	return /** @type {LocalizedString} */ (`Untitled chat`)
 };
 
+export const chg_badge = /** @type {(inputs: Chg_BadgeInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Change in review`)
+};
+
+export const chg_conflict = /** @type {(inputs: Chg_ConflictInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`It was changed after this was submitted. Releasing now overwrites those changes with this proposal.`)
+};
+
+export const chg_discard = /** @type {(inputs: Chg_DiscardInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Discard`)
+};
+
+export const chg_field_access = /** @type {(inputs: Chg_Field_AccessInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Who can see it`)
+};
+
+export const chg_field_connectors = /** @type {(inputs: Chg_Field_ConnectorsInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Connectors`)
+};
+
+export const chg_field_content = /** @type {(inputs: Chg_Field_ContentInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Content`)
+};
+
+export const chg_field_description = /** @type {(inputs: Chg_Field_DescriptionInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Description`)
+};
+
+export const chg_field_files = /** @type {(inputs: Chg_Field_FilesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Files`)
+};
+
+export const chg_field_kind = /** @type {(inputs: Chg_Field_KindInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Kind`)
+};
+
+export const chg_field_model = /** @type {(inputs: Chg_Field_ModelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Model`)
+};
+
+export const chg_field_routes = /** @type {(inputs: Chg_Field_RoutesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Playbooks`)
+};
+
+export const chg_field_tag = /** @type {(inputs: Chg_Field_TagInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Tag`)
+};
+
+export const chg_field_title = /** @type {(inputs: Chg_Field_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Name`)
+};
+
+export const chg_field_variables = /** @type {(inputs: Chg_Field_VariablesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Variables`)
+};
+
+export const chg_mine_pending = /** @type {(inputs: Chg_Mine_PendingInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Your change waits for review. The team keeps using the released version until a moderator releases it. You can keep editing and save again.`)
+};
+
+export const chg_mine_rejected = /** @type {(inputs: Chg_Mine_RejectedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Your change was not released. Edit it and save to submit it again, or discard it.`)
+};
+
+export const chg_mine_rejected_reason = /** @type {(inputs: Chg_Mine_Rejected_ReasonInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Your change was not released: ${i?.reason}. Edit it and save to submit it again, or discard it.`)
+};
+
+export const chg_modal_hint = /** @type {(inputs: Chg_Modal_HintInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Red is the released version, green the proposed one. Released, the change is written as a new version credited to its author.`)
+};
+
+export const chg_modal_title = /** @type {(inputs: Chg_Modal_TitleInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Change by ${i?.name}`)
+};
+
+export const chg_no_fields = /** @type {(inputs: Chg_No_FieldsInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`This change no longer differs from the released version.`)
+};
+
+export const chg_others_pending = /** @type {(inputs: Chg_Others_PendingInputs) => LocalizedString} */ (i) => {
+	const countPlural = registry.plural("en", i?.count, {}, true);
+	if (countPlural === "one") return /** @type {LocalizedString} */ (`${i?.count} change waits for your review.`);
+	if (countPlural === "other") return /** @type {LocalizedString} */ (`${i?.count} changes wait for your review.`);
+	return /** @type {LocalizedString} */ ("chg_others_pending");
+};
+
+export const chg_release_anyway = /** @type {(inputs: Chg_Release_AnywayInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Release anyway`)
+};
+
+export const chg_review_by = /** @type {(inputs: Chg_Review_ByInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Review change by ${i?.name}`)
+};
+
+export const chg_save_submit = /** @type {(inputs: Chg_Save_SubmitInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Submit change for review`)
+};
+
+export const chg_submit_failed = /** @type {(inputs: Chg_Submit_FailedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`The change could not be submitted.`)
+};
+
+export const chg_submitted = /** @type {(inputs: Chg_SubmittedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Change submitted for review`)
+};
+
 export const confirm_confirm = /** @type {(inputs: Confirm_ConfirmInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Confirm`)
 };
@@ -5771,6 +5947,126 @@ export const mk_vote_failed = /** @type {(inputs: Mk_Vote_FailedInputs) => Local
 	return /** @type {LocalizedString} */ (`Vote failed`)
 };
 
+export const mod_admins_always = /** @type {(inputs: Mod_Admins_AlwaysInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Admins always moderate: ${i?.names}. Add editors who should review too.`)
+};
+
+export const mod_admins_always_none = /** @type {(inputs: Mod_Admins_Always_NoneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Admins always moderate. Add editors who should review too.`)
+};
+
+export const mod_badge_draft = /** @type {(inputs: Mod_Badge_DraftInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Not shared`)
+};
+
+export const mod_badge_pending = /** @type {(inputs: Mod_Badge_PendingInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`In review`)
+};
+
+export const mod_badge_rejected = /** @type {(inputs: Mod_Badge_RejectedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Not released`)
+};
+
+export const mod_banner_draft = /** @type {(inputs: Mod_Banner_DraftInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Only you can see this until it is released. Choose who should see it and save to submit it for review.`)
+};
+
+export const mod_banner_draft_private = /** @type {(inputs: Mod_Banner_Draft_PrivateInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Only you can see this. To share it, choose who should see it and save: it is then submitted for review.`)
+};
+
+export const mod_banner_pending = /** @type {(inputs: Mod_Banner_PendingInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Waiting for review. Until a moderator releases it, only you, the moderators and the admins can see it.`)
+};
+
+export const mod_banner_pending_moderator = /** @type {(inputs: Mod_Banner_Pending_ModeratorInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Waiting for your review. Released, it is shared with the people its owner chose.`)
+};
+
+export const mod_banner_rejected = /** @type {(inputs: Mod_Banner_RejectedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Not released. Change it and save to submit it again.`)
+};
+
+export const mod_banner_rejected_reason = /** @type {(inputs: Mod_Banner_Rejected_ReasonInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Not released: ${i?.reason}. Change it and save to submit it again.`)
+};
+
+export const mod_cancel = /** @type {(inputs: Mod_CancelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Cancel`)
+};
+
+export const mod_changes_desc = /** @type {(inputs: Mod_Changes_DescInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`A change from an editor to something the team uses waits until a moderator releases it. Until then the team keeps the released version. Files a shared playbook uses can then only be replaced or deleted by moderators and admins.`)
+};
+
+export const mod_changes_label = /** @type {(inputs: Mod_Changes_LabelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Review changes to shared playbooks and personas`)
+};
+
+export const mod_changes_needs_new = /** @type {(inputs: Mod_Changes_Needs_NewInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Works together with reviewing new ones: otherwise a new playbook would be the way round a review. Switch that on first.`)
+};
+
+export const mod_desc = /** @type {(inputs: Mod_DescInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Check what editors create before the whole team sees it. Admins and the moderators you choose decide.`)
+};
+
+export const mod_members_never = /** @type {(inputs: Mod_Members_NeverInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Members cannot moderate. Someone who becomes a member is removed from this list.`)
+};
+
+export const mod_moderators = /** @type {(inputs: Mod_ModeratorsInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Moderators`)
+};
+
+export const mod_new_desc = /** @type {(inputs: Mod_New_DescInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`A new playbook or persona from an editor stays with its owner until a moderator releases it. What is shared already stays shared.`)
+};
+
+export const mod_new_label = /** @type {(inputs: Mod_New_LabelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Review new playbooks and personas before they are shared`)
+};
+
+export const mod_no_editors = /** @type {(inputs: Mod_No_EditorsInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`There are no editors in this workspace yet.`)
+};
+
+export const mod_reject = /** @type {(inputs: Mod_RejectInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Reject`)
+};
+
+export const mod_reject_confirm = /** @type {(inputs: Mod_Reject_ConfirmInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Reject`)
+};
+
+export const mod_reject_reason = /** @type {(inputs: Mod_Reject_ReasonInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Reason for the owner (optional)`)
+};
+
+export const mod_release = /** @type {(inputs: Mod_ReleaseInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Release`)
+};
+
+export const mod_save_submit = /** @type {(inputs: Mod_Save_SubmitInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Save and submit for review`)
+};
+
+export const mod_submit_failed = /** @type {(inputs: Mod_Submit_FailedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Saved, but it could not be submitted for review. Save again to try once more.`)
+};
+
+export const mod_submitted = /** @type {(inputs: Mod_SubmittedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Saved and submitted for review`)
+};
+
+export const mod_title = /** @type {(inputs: Mod_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Moderation`)
+};
+
+export const mod_withdraw = /** @type {(inputs: Mod_WithdrawInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Withdraw`)
+};
+
 export const model_cost = /** @type {(inputs: Model_CostInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Cost`)
 };
@@ -5805,6 +6101,61 @@ export const move_up = /** @type {(inputs: Move_UpInputs) => LocalizedString} */
 
 export const move_up_label = /** @type {(inputs: Move_Up_LabelInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`Move ${i?.label} up`)
+};
+
+export const mq_change_by = /** @type {(inputs: Mq_Change_ByInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Change, by ${i?.name}`)
+};
+
+export const mq_compare = /** @type {(inputs: Mq_CompareInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Compare`)
+};
+
+export const mq_compare_failed = /** @type {(inputs: Mq_Compare_FailedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`The change could not be loaded. It may have been decided already.`)
+};
+
+export const mq_empty = /** @type {(inputs: Mq_EmptyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Nothing waits here.`)
+};
+
+export const mq_more = /** @type {(inputs: Mq_MoreInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Load more`)
+};
+
+export const mq_new_by = /** @type {(inputs: Mq_New_ByInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`New, by ${i?.name}`)
+};
+
+export const mq_no_access = /** @type {(inputs: Mq_No_AccessInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`You are not among the people who can see it. You can still compare and decide the change.`)
+};
+
+export const mq_open = /** @type {(inputs: Mq_OpenInputs) => LocalizedString} */ (i) => {
+	const countPlural = registry.plural("en", i?.count, {}, true);
+	if (countPlural === "one") return /** @type {LocalizedString} */ (`Review (${i?.count})`);
+	if (countPlural === "other") return /** @type {LocalizedString} */ (`Review (${i?.count})`);
+	return /** @type {LocalizedString} */ ("mq_open");
+};
+
+export const mq_open_item = /** @type {(inputs: Mq_Open_ItemInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Open`)
+};
+
+export const mq_tab_all = /** @type {(inputs: Mq_Tab_AllInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`All`)
+};
+
+export const mq_tab_changes = /** @type {(inputs: Mq_Tab_ChangesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Changes`)
+};
+
+export const mq_tab_new = /** @type {(inputs: Mq_Tab_NewInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`New`)
+};
+
+export const mq_title = /** @type {(inputs: Mq_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Waiting for review`)
 };
 
 export const nav_chat = /** @type {(inputs: Nav_ChatInputs) => LocalizedString} */ () => {

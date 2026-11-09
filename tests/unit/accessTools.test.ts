@@ -70,11 +70,22 @@ describe('tags — one per playbook, as in the app', () => {
     expect(normalizeTag('   ')).toBeNull();
     expect(normalizeTag('x'.repeat(99))).toHaveLength(MAX_TAG_LENGTH);
   });
+  it('⛔ the playbook tag is the column `prompts.tag` — `tags` was dropped and selecting it emptied list and search', () => {
+    // Every select on `prompts` in the reader and the actions: no `tags` column.
+    for (const src of [QUERIES, ACTIONS]) {
+      const selects = [...src.matchAll(/from\('prompts'\)\s*\.select\('([^']*)'\)/g)].map(m => m[1]);
+      for (const sel of selects) expect(sel.split(',').map(c => c.trim()), sel).not.toContain('tags');
+    }
+    expect(QUERIES).toMatch(/const tagMatches = \(t: any, tag: string \| null \| undefined\) => !tag \|\| t\.tag === tag;/);
+    // A failed query is an error, not an empty library.
+    expect(QUERIES).toMatch(/if \(listErr\) throw new Error/);
+    expect(QUERIES).toMatch(/if \(searchErr\) throw new Error/);
+  });
   it('create/update take `tag`, list/search return it and filter by it; a new tag joins the workspace list', () => {
     const props = (n: string) => Object.keys((LIBRARY_TOOL_DEFS.find(d => d.name === n)!.inputSchema as { properties: object }).properties);
     for (const n of ['create_template', 'update_template', 'list_templates', 'search_templates']) expect(props(n)).toContain('tag');
-    expect(ACTIONS).toMatch(/\.\.\.\(tag \? \{ tags: \[tag\] \} : \{\}\), \/\/ SQEM-663/);
-    expect(ACTIONS).toMatch(/if \(tag !== undefined\)\s+updates\.tags\s+= tag \? \[tag\] : \[\];/);
+    expect(ACTIONS).toMatch(/\.\.\.\(tag \? \{ tag \} : \{\}\), \/\/ SQEM-663/);
+    expect(ACTIONS).toMatch(/if \(tag !== undefined\)\s+updates\.tag\s+= tag \|\| null;/);
     expect(ACTIONS).toMatch(/if \(tag\) await ensureWorkspaceTag\(tag\);/);
     expect(QUERIES).toMatch(/canAccessTemplate\(t\.id\) && tagMatches\(t, tag\)/);
     expect(QUERIES).toMatch(/\.\.\.listFields\(t, names\),/);

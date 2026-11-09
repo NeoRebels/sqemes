@@ -15,8 +15,12 @@
 // scanned with indexOf and small regexes. That is deliberate and enough for the three formats' main
 // parts; it is not a general XML parser and must not become one.
 //
-// Deliberately not: .doc/.xls/.ppt (binary formats), pictures and charts, formulas (the stored
-// value is what counts), text boxes and footnotes beyond what sits inside a body paragraph.
+// SQEM-659 — also what a model could not see before: Excel formulas next to their stored value,
+// the stored numbers behind charts (all three formats), SmartArt text, and a marker where a picture
+// sits. Only what the file STORES is read; nothing is recalculated.
+//
+// Deliberately not: .doc/.xls/.ppt (binary formats), the pictures themselves (SQEM-668), recalculating
+// formulas, text boxes and footnotes beyond what sits inside a body paragraph.
 
 export type OfficeKind = 'docx' | 'xlsx' | 'pptx';
 
@@ -25,7 +29,7 @@ export type OfficeKind = 'docx' | 'xlsx' | 'pptx';
  * one without the current marker is re-read. ⛔ Without it, v1's wrong row count stayed in the
  * database after the fix.
  */
-export const OFFICE_READER_MARKER = '(sqemes reader 2)';
+export const OFFICE_READER_MARKER = '(sqemes reader 3)';
 
 /**
  * The largest Office file the SERVER reads live, when no stored text exists (an MCP upload). Above it
@@ -230,10 +234,19 @@ async function docxText(read: ReadEntry): Promise<string> {
   const tables = elementsAt(body, 'w:tbl');
   const inTable = (at: number) => tables.some(t => at > t.at && at < t.at + t.xml.length);
   const found: { at: number; md: string }[] = tables.map(t => ({ at: t.at, md: docxTable(t.xml) }));
+  // SQEM-659 — charts, SmartArt and pictures sit inside a paragraph's <w:drawing>; their parts are
+  // found through the document's relationships, read only when a paragraph has one.
+  let rels: Map<string, { target: string; type: string }> | null = null;
   for (const p of elementsAt(body, 'w:p')) {
     if (inTable(p.at)) continue;
     const md = docxParagraph(p.xml, headingLevel);
-    if (md) found.push({ at: p.at, md });
+    let extra: string[] = [];
+    if (p.xml.indexOf('<w:drawing') >= 0) {
+      rels ??= await relsOf(read, 'word/document.xml');
+      extra = await graphicsOf(elements(p.xml, 'w:drawing'), rels, read, 'wp:docPr');
+    }
+    const all = [md, ...extra].filter(Boolean).join('\n\n');
+    if (all) found.push({ at: p.at, md: all });
   }
   found.sort((a, b) => a.at - b.at);
   return found.map(f => f.md).join('\n\n');
@@ -316,9 +329,12 @@ async function xlsxText(read: ReadEntry): Promise<string> {
     const target = rid ? rels.get(rid)?.target : null;
     const xml = target ? await read(target) : null;
     if (!xml) continue;
-    const { lines, total } = sheetRows(xml, shared, dateStyles, date1904, budget);
+    const { lines, total } = sheetRows(xml, shared, dateStyles, date1904, budget, true);
+    // SQEM-659 — the sheet's charts and pictures live in its drawing part, after its rows.
+    const graphics = await sheetGraphics(read, target!);
     // The row count up front, so a model reading a cut excerpt still knows the real size.
-    out.push(`## Sheet: ${name} (${total.toLocaleString('en-US')} rows)\n\n${lines.length ? '```csv\n' + lines.join('\n') + '\n```' : '(empty)'}`);
+    out.push(`## Sheet: ${name} (${total.toLocaleString('en-US')} rows)\n\n${lines.length ? '```csv\n' + lines.join('\n') + '\n```' : '(empty)'}`
+      + (graphics.length ? `\n\n${graphics.join('\n\n')}` : ''));
   }
   return out.join('\n\n');
 }
@@ -386,7 +402,8 @@ export async function workbookTables(read: ReadEntry): Promise<{ sheet: string; 
     const target = rid ? rels.get(rid)?.target : null;
     const xml = target ? await read(target) : null;
     if (!xml) continue;
-    const { lines, total } = sheetRows(xml, shared, dateStyles, date1904, { left: Number.POSITIVE_INFINITY });
+    // ⛔ SQEM-659 — values only: pandas must count numbers, never "1250 (=SUM(B2:B9))".
+    const { lines, total } = sheetRows(xml, shared, dateStyles, date1904, { left: Number.POSITIVE_INFINITY }, false);
     if (!lines.length) continue;
     out.push({ sheet: name, csv: lines.join('\n'), rows: Math.max(0, total - 1), columns: parseCsvHeader(lines[0]) });
   }
@@ -415,14 +432,17 @@ export function parseCsvHeader(line: string): string[] {
 const ROW_RE = /<row(?:\s[^>]*)?(?:\/>|>([\s\S]*?)<\/row>)/g;
 const CELL_RE = /<c(\s[^>]*?)?(?:\/>|>([\s\S]*?)<\/c>)/g;
 const V_RE = /<v>([\s\S]*?)<\/v>/;
+const F_RE = /<f(\s[^>]*)?(?:\/>|>([\s\S]*?)<\/f>)/;
 
 /**
  * CSV lines while `budget.left` lasts, and the count of every non-empty row. One pass with
  * precompiled expressions — rows never nest, so a regex is safe here where Word needs depth counting.
  */
-function sheetRows(xml: string, shared: string[], dateStyles: Set<number>, date1904: boolean, budget: { left: number }): { lines: string[]; total: number } {
+function sheetRows(xml: string, shared: string[], dateStyles: Set<number>, date1904: boolean, budget: { left: number }, formulas: boolean): { lines: string[]; total: number } {
   const lines: string[] = [];
   let total = 0;
+  // SQEM-659 — a shared formula is written once, on its first cell; the others only name its index.
+  const masters = new Map<string, { f: string; row: number; col: number }>();
   ROW_RE.lastIndex = 0;
   let row: RegExpExecArray | null;
   while ((row = ROW_RE.exec(xml))) {
@@ -440,6 +460,7 @@ function sheetRows(xml: string, shared: string[], dateStyles: Set<number>, date1
       const body = c[2] ?? '';
       const ref = attrOf(attrs, 'r');
       const col = ref ? columnIndex(ref) : next;
+      const rowNum = ref ? Number(ref.replace(/^[A-Z]+/i, '')) : 0;
       next = col + 1;
       const t = attrOf(attrs, 't');
       const st = Number(attrOf(attrs, 's') ?? -1);
@@ -454,6 +475,10 @@ function sheetRows(xml: string, shared: string[], dateStyles: Set<number>, date1
         const n = Number(v);
         value = dateStyles.has(st) && Number.isFinite(n) ? excelSerialToIso(n, date1904) : v;
       }
+      if (formulas && body && body.indexOf('<f') >= 0) {
+        const f = formulaOf(body, rowNum, col, masters);
+        if (f) value = value !== '' ? `${value} (=${f})` : `=${f}`;
+      }
       cells[col] = value;
     }
     const filled = Array.from({ length: cells.length }, (_, i) => cells[i] ?? '');
@@ -464,6 +489,54 @@ function sheetRows(xml: string, shared: string[], dateStyles: Set<number>, date1
     budget.left -= line.length + 1;
   }
   return { lines, total };
+}
+
+/** SQEM-659 — the formula of one cell, a shared one resolved for this cell's position. */
+function formulaOf(body: string, row: number, col: number, masters: Map<string, { f: string; row: number; col: number }>): string | null {
+  const m = F_RE.exec(body);
+  if (!m) return null;
+  const attrs = m[1] ?? '';
+  const text = m[2] ? decodeXml(m[2]).trim() : '';
+  const si = attrOf(attrs, 'si');
+  if (attrOf(attrs, 't') === 'shared' && si != null) {
+    if (text) { masters.set(si, { f: text, row, col }); return text; }
+    const master = masters.get(si);
+    return master ? shiftFormula(master.f, row - master.row, col - master.col) : null;
+  }
+  return text || null;
+}
+
+/**
+ * A formula moved by `dr` rows and `dc` columns, as Excel fills a shared formula: relative references
+ * move, `$`-fixed parts stay, text in quotes and function names are left alone.
+ */
+export function shiftFormula(f: string, dr: number, dc: number): string {
+  if (!dr && !dc) return f;
+  return f.split(/("(?:[^"]|"")*")/).map((part, i) => i % 2 ? part : part.replace(
+    /(?<![A-Za-z0-9_.$])(\$?)([A-Z]{1,3})(\$?)(\d+)(?![A-Za-z0-9_(])/g,
+    (_, c$: string, c: string, r$: string, r: string) =>
+      `${c$}${c$ ? c : columnName(columnIndex(c) + dc)}${r$}${r$ ? r : Number(r) + dr}`,
+  )).join('');
+}
+
+function columnName(index: number): string {
+  let n = index + 1;
+  let s = '';
+  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+
+/** SQEM-659 — the charts and pictures of one sheet, through sheet → drawing → chart relationships. */
+async function sheetGraphics(read: ReadEntry, sheetPath: string): Promise<string[]> {
+  const out: string[] = [];
+  for (const r of (await relsOf(read, sheetPath)).values()) {
+    if (!r.type.endsWith('/drawing')) continue;
+    const drawing = await read(r.target);
+    if (!drawing) continue;
+    const anchors = [...elements(drawing, 'xdr:twoCellAnchor'), ...elements(drawing, 'xdr:oneCellAnchor'), ...elements(drawing, 'xdr:absoluteAnchor')];
+    out.push(...await graphicsOf(anchors, await relsOf(read, r.target), read, 'xdr:cNvPr'));
+  }
+  return out;
 }
 
 function csvLine(cells: string[]): string {
@@ -486,17 +559,112 @@ async function pptxText(read: ReadEntry): Promise<string> {
     const lines = drawingParagraphs(xml);
     let notes: string[] = [];
     const slideRels = await relsOf(read, target);
+    // SQEM-659 — charts, SmartArt and pictures of the slide, in the order they sit on it.
+    const graphics = await graphicsOf([...elements(xml, 'p:graphicFrame'), ...elements(xml, 'p:pic')], slideRels, read, 'p:cNvPr');
     for (const r of slideRels.values()) {
       if (!r.type.endsWith('/notesSlide')) continue;
       const nx = await read(r.target);
       // Only the notes body — the notes page also carries the slide image and the slide number.
       if (nx) notes = elements(nx, 'p:sp').filter(sp => /<p:ph\s[^>]*type="body"/.test(sp)).flatMap(drawingParagraphs);
     }
-    out.push(`## Slide ${n}\n\n${lines.join('\n') || '(no text)'}${notes.length ? `\n\nNotes:\n${notes.join('\n')}` : ''}`);
+    const body = lines.join('\n') || (graphics.length ? '' : '(no text)');
+    out.push(`## Slide ${n}\n\n${[body, ...graphics].filter(Boolean).join('\n\n')}${notes.length ? `\n\nNotes:\n${notes.join('\n')}` : ''}`);
   }
   return out.join('\n\n');
 }
 
 function drawingParagraphs(xml: string): string[] {
   return elements(xml, 'a:p').map(p => texts(p, 'a:t').join('').trim()).filter(Boolean);
+}
+
+// ── Charts, SmartArt and pictures (SQEM-659) ───────────────────────────────
+
+/** Chart rows shown per chart; a chart over a whole sheet would otherwise repeat the sheet. */
+export const MAX_CHART_ROWS = 200;
+
+/**
+ * Markdown for the graphics inside `containers` (Word drawings, slide frames and pictures, sheet
+ * anchors): a chart as its stored data, SmartArt as a list, a picture as a marker. `namePr` is the tag
+ * that carries a picture's name and description in that format.
+ */
+async function graphicsOf(containers: string[], rels: Map<string, { target: string; type: string }>, read: ReadEntry, namePr: string): Promise<string[]> {
+  const out: string[] = [];
+  for (const c of containers) {
+    const chartId = c.match(/<c:chart\s[^>]*?r:id="([^"]+)"/)?.[1];
+    const smartId = c.match(/<dgm:relIds\s[^>]*?r:dm="([^"]+)"/)?.[1];
+    if (chartId) {
+      const target = rels.get(chartId)?.target;
+      const xml = target ? await read(target) : null;
+      if (xml) out.push(chartText(xml));
+    } else if (smartId) {
+      const target = rels.get(smartId)?.target;
+      const xml = target ? await read(target) : null;
+      const items = xml ? smartArtItems(xml) : [];
+      if (items.length) out.push(`SmartArt:\n${items.map(t => `- ${t}`).join('\n')}`);
+    } else if (c.indexOf('<pic:pic') >= 0 || c.indexOf('<p:pic') === 0 || c.indexOf('<xdr:pic') >= 0) {
+      const pr = c.match(new RegExp(`<${namePr.replace(':', '\\:')}\\s[^>]*>`))?.[0] ?? '';
+      const label = (attrOf(pr, 'descr') || attrOf(pr, 'name') || '').trim();
+      out.push(`[Image${label ? `: ${label}` : ''}]`);
+    }
+  }
+  return out;
+}
+
+const CHART_KIND: Record<string, string> = {
+  bar: 'bar chart', bar3D: 'bar chart', line: 'line chart', line3D: 'line chart', pie: 'pie chart', pie3D: 'pie chart',
+  doughnut: 'doughnut chart', area: 'area chart', area3D: 'area chart', scatter: 'scatter chart', radar: 'radar chart',
+  bubble: 'bubble chart', ofPie: 'pie chart', stock: 'stock chart', surface: 'surface chart', surface3D: 'surface chart',
+};
+
+/** The cached points of a category or value reference, by index; and the cell range it points at. */
+function cachedPoints(ref: string | undefined): { points: Map<number, string>; formula: string | null } {
+  const points = new Map<number, string>();
+  if (!ref) return { points, formula: null };
+  for (const pt of elements(ref, 'c:pt')) {
+    const idx = Number(attrOf(pt.slice(0, pt.indexOf('>') + 1), 'idx'));
+    const v = texts(pt, 'c:v')[0];
+    if (Number.isFinite(idx) && v != null) points.set(idx, v);
+  }
+  return { points, formula: texts(ref, 'c:f')[0] ?? null };
+}
+
+/** One chart part as Markdown: kind, title, axis titles, and its stored data as a table. */
+export function chartText(xml: string): string {
+  const chart = elements(xml, 'c:chart')[0] ?? xml;
+  const plot = elements(chart, 'c:plotArea')[0] ?? '';
+  const outside = plot ? chart.replace(plot, '') : chart;
+  const titleOf = (x: string | undefined) => (x ? (texts(x, 'a:t').join('') || texts(x, 'c:v')[0] || '') : '').trim();
+  const title = titleOf(elements(outside, 'c:title')[0]);
+  const kindTag = plot.match(/<c:(\w+)Chart[\s>]/)?.[1] ?? '';
+  const kind = CHART_KIND[kindTag] ?? 'chart';
+  const axes = ['c:catAx', 'c:dateAx', 'c:valAx', 'c:serAx']
+    .flatMap(t => elements(plot, t)).map(ax => titleOf(elements(ax, 'c:title')[0])).filter(Boolean);
+  const series = elements(plot, 'c:ser').map((ser, i) => {
+    const tx = elements(ser, 'c:tx')[0];
+    const name = (tx ? (texts(tx, 'c:v')[0] ?? texts(tx, 'a:t').join('')) : '').trim() || `Series ${i + 1}`;
+    return {
+      name,
+      cat: cachedPoints(elements(ser, 'c:cat')[0] ?? elements(ser, 'c:xVal')[0]),
+      val: cachedPoints(elements(ser, 'c:val')[0] ?? elements(ser, 'c:yVal')[0]),
+    };
+  });
+  const head = `Chart${title ? `: ${title}` : ''} (${kind}${axes.length ? `; axes: ${axes.join(' / ')}` : ''})`;
+  if (!series.length) return head;
+  const withData = series.filter(s => s.val.points.size);
+  const refs = series.filter(s => !s.val.points.size).map(s => `- ${s.name}: no stored values${s.val.formula ? `, from ${s.val.formula}` : ''}`);
+  if (!withData.length) return `${head}\n${refs.join('\n')}`;
+  const n = Math.max(...withData.map(s => Math.max(...s.val.points.keys()) + 1));
+  const cats = withData.find(s => s.cat.points.size)?.cat.points;
+  const rows: string[][] = [['Category', ...withData.map(s => s.name)]];
+  for (let i = 0; i < Math.min(n, MAX_CHART_ROWS); i++) rows.push([cats?.get(i) ?? String(i + 1), ...withData.map(s => s.val.points.get(i) ?? '')]);
+  const more = n > MAX_CHART_ROWS ? `\n(${(n - MAX_CHART_ROWS).toLocaleString('en-US')} more points not shown)` : '';
+  return `${head}\n\n${markdownTable(rows)}${more}${refs.length ? `\n${refs.join('\n')}` : ''}`;
+}
+
+/** The text of a SmartArt graphic's points, from its data part; connector points carry no text. */
+export function smartArtItems(xml: string): string[] {
+  return elements(xml, 'dgm:pt').filter(pt => {
+    const type = attrOf(pt.slice(0, pt.indexOf('>') + 1), 'type');
+    return !type || type === 'node';
+  }).map(pt => texts(pt, 'a:t').join('').trim()).filter(Boolean);
 }

@@ -2895,5 +2895,102 @@
   "chatcard_analysis_where": "Computed in your browser — the data did not leave it.",
   "chatcard_analysis_not_kept": "The programs are not stored, only whether they worked.",
   "chatfile_from_analysis": "Made by the analysis program in your browser. Excel calculates its formulas when you open it.",
-  "chatcard_analysis_file_not_kept": "The Excel file from this analysis is not kept. Ask again to create it again."
+  "chatcard_analysis_file_not_kept": "The Excel file from this analysis is not kept. Ask again to create it again.",
+  "mod_title": "Moderation",
+  "mod_desc": "Check what editors create before the whole team sees it. Admins and the moderators you choose decide.",
+  "mod_new_label": "Review new playbooks and personas before they are shared",
+  "mod_new_desc": "A new playbook or persona from an editor stays with its owner until a moderator releases it. What is shared already stays shared.",
+  "mod_moderators": "Moderators",
+  "mod_admins_always": "Admins always moderate: {names}. Add editors who should review too.",
+  "mod_admins_always_none": "Admins always moderate. Add editors who should review too.",
+  "mod_no_editors": "There are no editors in this workspace yet.",
+  "mod_members_never": "Members cannot moderate. Someone who becomes a member is removed from this list.",
+  "mod_save_submit": "Save and submit for review",
+  "mod_submit_failed": "Saved, but it could not be submitted for review. Save again to try once more.",
+  "mod_submitted": "Saved and submitted for review",
+  "mod_banner_draft": "Only you can see this until it is released. Choose who should see it and save to submit it for review.",
+  "mod_banner_draft_private": "Only you can see this. To share it, choose who should see it and save: it is then submitted for review.",
+  "mod_banner_pending": "Waiting for review. Until a moderator releases it, only you, the moderators and the admins can see it.",
+  "mod_banner_pending_moderator": "Waiting for your review. Released, it is shared with the people its owner chose.",
+  "mod_banner_rejected": "Not released. Change it and save to submit it again.",
+  "mod_banner_rejected_reason": "Not released: {reason}. Change it and save to submit it again.",
+  "mod_withdraw": "Withdraw",
+  "mod_release": "Release",
+  "mod_reject": "Reject",
+  "mod_reject_reason": "Reason for the owner (optional)",
+  "mod_reject_confirm": "Reject",
+  "mod_cancel": "Cancel",
+  "mod_badge_draft": "Not shared",
+  "mod_badge_pending": "In review",
+  "mod_badge_rejected": "Not released",
+  "mod_changes_label": "Review changes to shared playbooks and personas",
+  "mod_changes_desc": "A change from an editor to something the team uses waits until a moderator releases it. Until then the team keeps the released version. Files a shared playbook uses can then only be replaced or deleted by moderators and admins.",
+  "mod_changes_needs_new": "Works together with reviewing new ones: otherwise a new playbook would be the way round a review. Switch that on first.",
+  "chg_field_title": "Name",
+  "chg_field_description": "Description",
+  "chg_field_content": "Content",
+  "chg_field_tag": "Tag",
+  "chg_field_kind": "Kind",
+  "chg_field_model": "Model",
+  "chg_field_variables": "Variables",
+  "chg_field_files": "Files",
+  "chg_field_connectors": "Connectors",
+  "chg_field_routes": "Playbooks",
+  "chg_field_access": "Who can see it",
+  "chg_mine_pending": "Your change waits for review. The team keeps using the released version until a moderator releases it. You can keep editing and save again.",
+  "chg_mine_rejected": "Your change was not released. Edit it and save to submit it again, or discard it.",
+  "chg_mine_rejected_reason": "Your change was not released: {reason}. Edit it and save to submit it again, or discard it.",
+  "chg_discard": "Discard",
+  "chg_others_pending": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} change waits for your review.",
+        "countPlural=other": "{count} changes wait for your review."
+      }
+    }
+  ],
+  "chg_review_by": "Review change by {name}",
+  "chg_modal_title": "Change by {name}",
+  "chg_modal_hint": "Red is the released version, green the proposed one. Released, the change is written as a new version credited to its author.",
+  "chg_no_fields": "This change no longer differs from the released version.",
+  "chg_conflict": "It was changed after this was submitted. Releasing now overwrites those changes with this proposal.",
+  "chg_release_anyway": "Release anyway",
+  "chg_save_submit": "Submit change for review",
+  "chg_submitted": "Change submitted for review",
+  "chg_submit_failed": "The change could not be submitted.",
+  "chg_badge": "Change in review",
+  "mq_open": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Review ({count})",
+        "countPlural=other": "Review ({count})"
+      }
+    }
+  ],
+  "mq_title": "Waiting for review",
+  "mq_tab_all": "All",
+  "mq_tab_new": "New",
+  "mq_tab_changes": "Changes",
+  "mq_empty": "Nothing waits here.",
+  "mq_new_by": "New, by {name}",
+  "mq_change_by": "Change, by {name}",
+  "mq_no_access": "You are not among the people who can see it. You can still compare and decide the change.",
+  "mq_open_item": "Open",
+  "mq_compare": "Compare",
+  "mq_more": "Load more",
+  "mq_compare_failed": "The change could not be loaded. It may have been decided already."
 }

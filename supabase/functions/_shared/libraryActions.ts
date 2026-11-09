@@ -44,6 +44,12 @@ import { idList, accessPlan, editorsPlan, unknownIds, accessSentence, editorsSen
 // tests and Chat's adapter can read them; re-exported so the server keeps one import.
 export { type Capability, TOOL_CAPABILITY, LIBRARY_TOOL_DEFS, SELF_HOST_HIDDEN_TOOLS } from './libraryToolDefs.ts';
 
+/** SQEM-667 — said when a change over MCP or in Chat was submitted instead of written. No apostrophes (SQEM-526). */
+export const CHANGE_NOTE = 'Moderation is on in this workspace: the change is submitted for review and takes effect when a moderator releases it. Until then the team keeps using the released version. Tell the person so.';
+
+/** SQEM-666 — said when something created over MCP or in Chat starts in review. No apostrophes (SQEM-526). */
+export const MODERATION_NOTE = 'Moderation is on in this workspace: only you can see it until you submit it for review in the sqemes app (choose who should see it and save) and a moderator releases it. Tell the person so.';
+
 // ---- The outcome both surfaces wrap ----
 
 /** What a tool call produced: MCP's `result` (`{ content: [...] }`), or a JSON-RPC-coded refusal. */
@@ -303,6 +309,62 @@ export async function runLibraryTool(
     if (error) console.error('[mcp] SQEM-663 tag not added to the workspace list:', error.message);
   };
 
+  /**
+   * SQEM-666 — whether a row just created starts in review (moderation on, the creator no moderator).
+   * Asked separately, not in the insert's select: the functions can go live before the migration that
+   * adds the column, and a missing column there would fail the create itself. An error reads as "no".
+   */
+  const startsInReview = async (table: 'prompts' | 'personas', rowId: string): Promise<boolean> => {
+    const { data, error } = await adminClient.from(table).select('review_state').eq('id', rowId).maybeSingle();
+    return !error && (data as { review_state?: string | null } | null)?.review_state === 'draft';
+  };
+
+  /**
+   * SQEM-667 — whether this write goes to review instead: the switch is on, the caller does not moderate,
+   * the object is released, and it is shared — or the write changes its access. The service role skips
+   * the database locks, so this is the lock here. An error (before the migration) reads as "no".
+   */
+  const goesToReview = async (kind: 'template' | 'persona', objectId: string, accessChange = false): Promise<boolean> => {
+    const { data: need, error } = await adminClient.rpc('changes_need_review', { p_workspace_id: workspaceId, p_user_id: mcpUserId });
+    if (error || !need) return false;
+    const { data: row } = await adminClient.from(kind === 'template' ? 'prompts' : 'personas').select('review_state').eq('id', objectId).maybeSingle();
+    if (!row || (row as { review_state?: string | null }).review_state) return false; // not released: the SQEM-666 path
+    if (accessChange) return true;
+    const { data: shared } = await adminClient.rpc('is_shared_object', { p_kind: kind, p_id: objectId });
+    return !!shared;
+  };
+
+  /** SQEM-667 — this caller's waiting change for an object, if any (merged into, never replaced blindly). */
+  const myPendingPayload = async (kind: 'template' | 'persona', objectId: string): Promise<Record<string, unknown> | null> => {
+    const { data } = await adminClient.from('pending_changes').select('payload')
+      .eq('kind', kind).eq('object_id', objectId).eq('author', mcpUserId).maybeSingle();
+    return ((data as { payload?: Record<string, unknown> } | null)?.payload) ?? null;
+  };
+
+  /** SQEM-667 — submit (or extend) this caller's change; null on success, else the message. */
+  const proposeChange = async (kind: 'template' | 'persona', objectId: string, patch: Record<string, unknown>): Promise<string | null> => {
+    const [mine, { data: row }] = await Promise.all([
+      myPendingPayload(kind, objectId),
+      adminClient.from(kind === 'template' ? 'prompts' : 'personas').select('updated_at').eq('id', objectId).maybeSingle(),
+    ]);
+    const { error } = await adminClient.rpc('submit_change_for_user', {
+      p_kind: kind, p_id: objectId, p_payload: { ...(mine ?? {}), ...patch },
+      p_base: (row as { updated_at?: string } | null)?.updated_at ?? null, p_user: mcpUserId,
+    });
+    return error ? error.message : null;
+  };
+
+  /** SQEM-667 — a persona's routes as a proposal sees them: this caller's waiting ones, else the released. */
+  const proposedRoutes = async (personaId: string): Promise<{ template_id: string; condition: string }[]> => {
+    const mine = await myPendingPayload('persona', personaId);
+    if (mine && Array.isArray(mine.routes)) return mine.routes as { template_id: string; condition: string }[];
+    const { data } = await adminClient.from('persona_templates').select('template_id, condition').eq('persona_id', personaId).order('sort_order');
+    return ((data ?? []) as { template_id: string; condition: string }[]).map(r => ({ template_id: r.template_id, condition: r.condition ?? '' }));
+  };
+
+  const submittedResult = (rpcId: unknown, objectId: string, fields: string[]) =>
+    rpcResult(rpcId, { content: [{ type: 'text', text: JSON.stringify({ id: objectId, submittedForReview: true, fields, note: CHANGE_NOTE }, null, 2) }] });
+
   /** SQEM-663 — the workspace's people and groups, for naming principals and reading names back. */
   const loadPrincipals = async () => {
     const [{ data: mem }, { data: grp }] = await Promise.all([
@@ -363,6 +425,12 @@ export async function runLibraryTool(
     if (!(await mayEdit(t.kind, t.objectId))) return refuseEdit(id, t.what, t.title);
     const plan = accessPlan(args.mode, t.who, !!t.ownerId);
     if (!plan.ok) return rpcError(id, -32602, plan.message);
+    // SQEM-667 — who may see something released is a change that waits for review.
+    if (await goesToReview(t.kind, t.objectId, true)) {
+      const err = await proposeChange(t.kind, t.objectId, { access: plan.rows });
+      if (err) return rpcError(id, -32603, `Failed to submit the change for review: ${err}`);
+      return submittedResult(id, t.objectId, ['access']);
+    }
     const accessTable = t.kind === 'template' ? 'template_access' : 'persona_access';
     const key = t.kind === 'template' ? 'template_id' : 'persona_id';
     // Delete-then-insert, as the app does: a failure in between leaves it OPEN, never locked away.
@@ -512,10 +580,13 @@ export async function runLibraryTool(
     // missing without the source; written out in
     // `pm/DOCUMENTATION.md` in the source repository.
     // `create_template` has never stamped it here, for the same reason.
+    const inReview = await startsInReview('personas', inserted.id); // SQEM-666
     return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
       id:    inserted.id,
       title: inserted.title,
-      note:  'Created, and visible to the whole workspace. It has no routes yet — attach templates to it in the app.',
+      note:  inReview
+        ? `Created. ${MODERATION_NOTE} It has no routes yet — attach templates to it in the app.`
+        : 'Created, and visible to the whole workspace. It has no routes yet — attach templates to it in the app.',
     }, null, 2) }] });
   }
 
@@ -531,6 +602,14 @@ export async function runLibraryTool(
     if (description !== undefined) updates.description = String(description).trim();
     if (content     !== undefined) updates.content     = content;
     if (Array.isArray(tags))       updates.tags        = tags;
+
+    // SQEM-667 — a change to a shared persona waits for review instead of being written.
+    if (await goesToReview('persona', personaId)) {
+      const { updated_at: _at, ...patch } = updates;
+      const err = await proposeChange('persona', personaId, patch);
+      if (err) return rpcError(id, -32603, `Failed to submit the change for review: ${err}`);
+      return submittedResult(id, personaId, Object.keys(patch));
+    }
 
     const { error: updateErr } = await adminClient
       .from('personas')
@@ -601,6 +680,16 @@ export async function runLibraryTool(
     if (!tpl || !canAccessTemplate(template_id))
       return rpcError(id, -32602, `Template not found: ${template_id}`);
 
+    // SQEM-667 — on a shared persona the new route is part of a change that waits for review.
+    if (await goesToReview('persona', persona_id)) {
+      const routes = (await proposedRoutes(persona_id)).filter(r => r.template_id !== template_id);
+      const at = typeof sort_order === 'number' ? Math.max(0, Math.min(sort_order, routes.length)) : routes.length;
+      routes.splice(at, 0, { template_id, condition: condition.trim() });
+      const err = await proposeChange('persona', persona_id, { routes });
+      if (err) return rpcError(id, -32603, `Failed to submit the change for review: ${err}`);
+      return submittedResult(id, persona_id, ['routes']);
+    }
+
     let order = typeof sort_order === 'number' ? sort_order : null;
     if (order === null) {
       const { data: last } = await adminClient
@@ -662,6 +751,16 @@ export async function runLibraryTool(
     // visibility would strand its owner with a route they cannot remove the moment somebody
     // restricts the template behind it. Same trap as reusing `hiddenFromCaller` for writes: the
     // person who has to clean it up is the one the rule would lock out.
+    // SQEM-667 — on a shared persona removing a route is part of a change that waits for review.
+    if (await goesToReview('persona', persona_id)) {
+      const before = await proposedRoutes(persona_id);
+      const routes = before.filter(r => r.template_id !== template_id);
+      if (routes.length === before.length) return rpcError(id, -32602, `That template is not attached to this persona: ${template_id}`);
+      const err = await proposeChange('persona', persona_id, { routes });
+      if (err) return rpcError(id, -32603, `Failed to submit the change for review: ${err}`);
+      return submittedResult(id, persona_id, ['routes']);
+    }
+
     const { data: removed, error: detachErr } = await adminClient
       .from('persona_templates')
       .delete()
@@ -842,7 +941,7 @@ export async function runLibraryTool(
         description:        description?.trim() || '',
         variables:          resolvedVars,
         context_file_ids:   Array.isArray(file_ids) ? file_ids : [],
-        ...(tag ? { tags: [tag] } : {}), // SQEM-663 — one tag, as in the app
+        ...(tag ? { tag } : {}), // SQEM-663 — one tag, as in the app (`prompts.tag`; `tags` no longer exists)
         created_by:         mcpUserId,
         updated_by:         mcpUserId, // SQEM-477 — the author of version 1; auth.uid() is empty here
       })
@@ -865,6 +964,7 @@ export async function runLibraryTool(
       if (accessErr) console.error('[mcp] SQEM-240 default access not applied', inserted.id, accessErr.message);
     }
 
+    const inReview = await startsInReview('prompts', inserted.id); // SQEM-666
     return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
       id:            inserted.id,
       name:          toSlug(inserted.title),
@@ -876,7 +976,9 @@ export async function runLibraryTool(
       ...(tag ? { tag } : {}),
       // SQEM-240 — report it rather than leave the caller guessing. Who can see a template the
       // agent just created is exactly the kind of thing a person wants told, not discovered.
-      visibility:    restrictByDefault ? 'only-you' : 'everyone-in-workspace',
+      // SQEM-666 — under moderation it is the owner's alone until released, whatever the access says.
+      visibility:    inReview ? 'only-you-until-released' : restrictByDefault ? 'only-you' : 'everyone-in-workspace',
+      ...(inReview ? { note: MODERATION_NOTE } : {}),
     }, null, 2) }] });
   }
 
@@ -908,7 +1010,7 @@ export async function runLibraryTool(
     if (content            !== undefined) updates.content            = existing.kind === 'skill' ? withoutOwnFrontmatter(content) : content;
     if (description        !== undefined) updates.description        = description.trim();
     if (Array.isArray(file_ids))          updates.context_file_ids   = file_ids;
-    if (tag !== undefined)                updates.tags               = tag ? [tag] : [];
+    if (tag !== undefined)                updates.tag                = tag || null; // `prompts.tag`, text
 
     // Variables: only for kind=prompt
     if (existing.kind === 'prompt') {
@@ -923,6 +1025,15 @@ export async function runLibraryTool(
       return rpcError(id, -32602, 'No fields to update — provide at least one of: title, content, description, variables, file_ids, tag');
     // SQEM-477 — who the new version is by. Without it the version would carry the previous author.
     updates.updated_by = mcpUserId;
+
+    // SQEM-667 — a change to a shared playbook waits for review instead of being written.
+    if (await goesToReview('template', templateId)) {
+      const { updated_at: _at, updated_by: _by, ...patch } = updates;
+      const err = await proposeChange('template', templateId, patch);
+      if (err) return rpcError(id, -32603, `Failed to submit the change for review: ${err}`);
+      if (tag) await ensureWorkspaceTag(tag);
+      return submittedResult(id, templateId, Object.keys(patch));
+    }
 
     const { data: updated, error: updateErr } = await adminClient
       .from('prompts')
@@ -1391,6 +1502,13 @@ export async function runLibraryTool(
     // makes the file protectable, the title is what leaks.
     const nameable = referencedBy.filter((t: any) => canAccessTemplate(t.id));
     const restricted = referencedBy.length - nameable.length;
+
+    // SQEM-667 — "possibility 2": a file a shared playbook uses is replaced or deleted by moderators only.
+    for (const t of referencedBy as { id: string }[]) {
+      if (await goesToReview('template', t.id)) {
+        return rpcError(id, -32602, 'A shared playbook uses this file, so only a moderator or an admin can replace or delete it in this workspace. Upload a new file with upload_file and change the playbook with update_template (file_ids): that change is submitted for review.');
+      }
+    }
 
     // 4. Blocked: still attached elsewhere and no explicit force/replaceWith.
     //    Return the referencing templates so the assistant can confirm with the

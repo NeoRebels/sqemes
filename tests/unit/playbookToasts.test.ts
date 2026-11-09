@@ -34,7 +34,8 @@ describe('SQEM-606 — the store reports, the pages do not', () => {
     expect(store).toMatch(/return true;\s*\} catch \(err: any\) \{\s*showToast\(err\.message \|\| m\.pb_update_failed\(\), 'error'\);\s*return false;/);
     const save = editor.slice(editor.indexOf('let savedId = id;'));
     expect(save).toMatch(/^let savedId = id;\s*if \(id\) \{\s*if \(!\(await updatePrompt\(saveData\)\)\) return;\s*\} else \{\s*const created = await addPrompt\(saveData\);\s*if \(!created\) return;/);
-    expect(save.indexOf('return;')).toBeLessThan(save.indexOf("showToast(txt.ed_saved(), 'success')"));
+    // SQEM-666 — the toast says "submitted" when the save also submitted it.
+    expect(save.indexOf('return;')).toBeLessThan(save.indexOf("showToast(submitted ? txt.mod_submitted() : txt.ed_saved(), 'success')"));
     expect(save.indexOf('return;')).toBeLessThan(save.indexOf('setIsDirty(false)'));
   });
 

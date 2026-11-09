@@ -21,6 +21,7 @@ import { isTrialing, trialDaysLeft } from '../lib/subscription';
 import { IS_SELF_HOSTED, functionCallUrl } from '../lib/env';
 import { canManage } from '../lib/navMode';
 import { needsAttention } from '../lib/needsAttention';
+import ModerationQueue from '../components/ModerationQueue';
 import { fetchPersonas } from '../lib/api/personas';
 import type { Persona } from '../types';
 import { fetchUsageSummary, fetchWebSearchUsage } from '../lib/api/usage';
@@ -241,6 +242,9 @@ const Overview = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* SQEM-669 — the review list, the same entry as on Playbooks and Personas,
+              instead of a "Waiting for review" block. Renders nothing unless something waits. */}
+          {!IS_SELF_HOSTED && <ModerationQueue workspace={workspace} user={currentUser} />}
           {isAdmin && (
             <Link to="/settings" state={{ initialTab: 'team' }} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-control border border-line-strong bg-surface-raised text-sm font-semibold text-ink-strong hover:bg-surface-sunken transition-colors">
               <UserPlus className="w-4 h-4" /> {m.ov_invite()}

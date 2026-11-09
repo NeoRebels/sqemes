@@ -40,6 +40,11 @@ import {
 } from '../components/TemplateAccessControl';
 import { accessAppliesTo, isMultiSeat } from '../lib/templateAccessScope';
 import { fetchGroups } from '../lib/api/groups';
+import { useModeration } from '../hooks/useModeration';
+import { fetchReviewState, submitForReview, fetchPendingChanges, submitChange } from '../lib/api/moderation';
+import { submitsOnSave, changeNeedsReview, changedFields, accessRowsOf, type ReviewInfo, type PendingChange, type ChangePayload } from '../lib/moderation';
+import { ChangeBanner } from '../components/ChangeReview';
+import ReviewBanner from '../components/ReviewBanner';
 import { fetchEditors, setEditors, fetchEditRights } from '../lib/api/editors';
 import {
   fetchPersonaAccess, setPersonaAccess, accessValueToPersonaAccess, personaAccessToValue,
@@ -106,6 +111,64 @@ export default function PersonaEditor() {
   );
   const [groups, setGroups] = useState<{ id: string; name: string; memberIds: string[] }[]>([]);
   const [ownerId, setOwnerId] = useState<string | null>(null);
+  // SQEM-666 — moderation, as in the playbook editor: the state, and whether saving also submits.
+  const moderation = useModeration(workspace, currentUser);
+  const [review, setReview] = useState<ReviewInfo | null>(null);
+  const reviewNow: ReviewInfo | null = review ?? (!id && moderation.enabled && !moderation.moderator ? { state: 'draft', note: null } : null);
+  const isOwnerHere = !id || ownerId === currentUser?.id;
+  // SQEM-667 — the released state as loaded, the waiting changes, and whether this save is a proposal.
+  type PersonaSnapshot = { title: string; description: string; content: string; tags: string[]; connectors: PersonaConnector[]; routes: PersonaRoute[]; access: TemplateAccessValue; updatedAt: string | null };
+  const releasedRef = useRef<PersonaSnapshot | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [releasedTick, setReleasedTick] = useState(0);
+  const [changes, setChanges] = useState<PendingChange[]>([]);
+  const payloadOf = (x: Omit<PersonaSnapshot, 'updatedAt'>): ChangePayload => ({
+    title: x.title, description: x.description, content: x.content, tags: x.tags, connectors: x.connectors,
+    routes: x.routes.map(r => ({ template_id: r.templateId, condition: r.condition ?? '' })),
+    access: accessRowsOf(x.access.mode, x.access.mode === 'restricted' ? x.access.userIds.filter(u => u !== ownerId) : [], x.access.groupIds ?? []),
+  });
+  const releasedPayload = releasedRef.current ? payloadOf(releasedRef.current) : null;
+  const proposed = releasedPayload ? changedFields(releasedPayload as Record<string, unknown>,
+    payloadOf({ title: title.trim(), description: description.trim(), content, tags: tag ? [tag] : [], connectors: personaConnectors, routes, access }) as Record<string, unknown>) as ChangePayload : {};
+  const changeGoesToReview = !!id && !!releasedPayload && changeNeedsReview({
+    changesOn: moderation.changes, moderator: moderation.moderator, released: !reviewNow,
+    shared: releasedRef.current?.access.mode !== 'private', accessChanged: 'access' in proposed,
+  });
+  void releasedTick;
+  const submitsNow = submitsOnSave(reviewNow ?? undefined, isOwnerHere, access.mode);
+  const loadChanges = useCallback(() => {
+    if (IS_SELF_HOSTED || !id) { setChanges([]); return; }
+    void fetchPendingChanges('persona', id).then(setChanges);
+  }, [id]);
+  useEffect(loadChanges, [loadChanges]);
+  const appliedMineRef = useRef<string | null>(null);
+  useEffect(() => {
+    const mine = changes.find(c => c.author === currentUser?.id);
+    if (!mine || !releasedRef.current || appliedMineRef.current === mine.id) return;
+    appliedMineRef.current = mine.id;
+    const p = mine.payload;
+    if (p.title !== undefined) setTitle(p.title);
+    if (p.description !== undefined) setDescription(p.description);
+    if (p.content !== undefined) setContent(p.content);
+    if (p.tags !== undefined) setTag(p.tags[0] ?? null);
+    if (p.connectors !== undefined) setPersonaConnectors(p.connectors as PersonaConnector[]);
+    if (p.routes !== undefined) {
+      const known = new Map((releasedRef.current.routes).map(r => [r.templateId, r]));
+      setRoutes(p.routes.map((r, i) => ({ ...(known.get(r.template_id) ?? { templateId: r.template_id }), templateId: r.template_id, condition: r.condition, sortOrder: i })));
+    }
+    if (p.access) {
+      const rows = p.access;
+      setAccess(rows.length === 0 ? { mode: 'everyone', userIds: [], groupIds: [] }
+        : rows.length === 1 && !rows[0].user_id && !rows[0].group_id ? { mode: 'private', userIds: [], groupIds: [] }
+        : { mode: 'restricted', userIds: rows.flatMap(r => r.user_id ? [r.user_id] : []), groupIds: rows.flatMap(r => r.group_id ? [r.group_id] : []) });
+    }
+  }, [changes, releasedTick, currentUser?.id]);
+  useEffect(() => {
+    if (IS_SELF_HOSTED || !id) { setReview(null); return; }
+    let alive = true;
+    void fetchReviewState('persona', id).then(r => { if (alive) setReview(r); });
+    return () => { alive = false; };
+  }, [id]);
   const [restrictedRouteIds, setRestrictedRouteIds] = useState<Map<string, AccessBadgeMode>>(new Map()); // SQEM-400 — the word per route
   const [mobileTab, setMobileTab] = useState<'details' | 'role' | 'routes'>('role');
   // SQEM-633 — a save without a name leads INTO the field, not only to a toast about it.
@@ -137,12 +200,18 @@ export default function PersonaEditor() {
         setRoutes(persona.routes);
         setPersonaConnectors(persona.connectors);
         setOwnerId(persona.createdBy || null);
+        releasedRef.current = { title: persona.title, description: persona.description, content: persona.content, tags: persona.tags,
+          connectors: persona.connectors, routes: persona.routes, access: { mode: 'everyone', userIds: [], groupIds: [] }, updatedAt: persona.updatedAt }; // SQEM-667
+        setReleasedTick(t => t + 1);
         // SQEM-326 — read the rules before the control renders, so it never shows "everyone" for a
         // persona that is restricted. Failure is deliberately loud here: silently showing the wrong
         // access is the failure this whole area keeps recording.
         if (!IS_SELF_HOSTED) {
           try {
-            setAccess(personaAccessToValue(await fetchPersonaAccess(persona.id)));
+            const loadedAccess = personaAccessToValue(await fetchPersonaAccess(persona.id));
+            setAccess(loadedAccess);
+            if (releasedRef.current) releasedRef.current.access = loadedAccess; // SQEM-667
+            setReleasedTick(t => t + 1);
           } catch (err: any) {
             showToast(err?.message || m.pe_access_read_failed(), 'error');
           }
@@ -162,7 +231,7 @@ export default function PersonaEditor() {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, reloadKey]); // SQEM-667 — reloadKey: a released change is read back
 
   // SQEM-326 — the groups the access control offers. Silent on failure by design: the People tab
   // still works, and a toast about groups while somebody is writing a persona is noise.
@@ -446,13 +515,34 @@ Rules:
       requestAnimationFrame(() => nameRef.current?.focus());
       return;
     }
+    // SQEM-667 — a change to something shared goes to review; the team keeps the released version.
+    if (id && changeGoesToReview) {
+      if (Object.keys(proposed).length === 0) { setIsDirty(false); showToast(m.pe_saved(), 'success'); return; }
+      setSaving(true);
+      try {
+        await submitChange('persona', id, proposed, releasedRef.current?.updatedAt ?? null);
+        appliedMineRef.current = null;
+        loadChanges();
+        setIsDirty(false);
+        setConnectorsChanged(false);
+        showToast(m.chg_submitted(), 'success');
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : m.chg_submit_failed(), 'error');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
     setSaving(true);
+    let savedId: string | undefined = id;
     try {
       if (id) {
         await updatePersona(id, { title: title.trim(), description: description.trim(), content, tags: tag ? [tag] : [], ...(connectorsChanged ? { connectors: personaConnectors } : {}) });
         await setPersonaRoutes(id, routes);
+        // SQEM-667 — an unchanged access is not rewritten under moderation of changes (the database refuses it).
+        const accessUntouched = moderation.changes && !moderation.moderator && !!releasedPayload && !('access' in proposed) && !reviewNow;
         if (!IS_SELF_HOSTED) {
-          await setPersonaAccess(id, workspace.id, accessValueToPersonaAccess(access, ownerId));
+          if (!accessUntouched) await setPersonaAccess(id, workspace.id, accessValueToPersonaAccess(access, ownerId));
           await saveEditors(id, ownerId);
         }
       } else {
@@ -476,11 +566,19 @@ Rules:
           }
         }
         if (!IS_SELF_HOSTED) await saveEditors(created.id, currentUser.id || null);
-        navigate(`/personas/${created.id}/edit`, { replace: true });
+        savedId = created.id;
       }
+      // SQEM-666 — the owner chose more than "only me" for something not yet released: submit it.
+      let submitted = false;
+      if (savedId && submitsNow) {
+        try { await submitForReview('persona', savedId); submitted = true; }
+        catch { showToast(m.mod_submit_failed(), 'error'); }
+      }
+      if (savedId && !IS_SELF_HOSTED) void fetchReviewState('persona', savedId).then(setReview);
+      if (!id && savedId) navigate(`/personas/${savedId}/edit`, { replace: true });
       setIsDirty(false);
       setConnectorsChanged(false);
-      showToast(m.pe_saved(), 'success');
+      showToast(submitted ? m.mod_submitted() : m.pe_saved(), 'success');
     } catch (err: any) {
       showToast(err?.message || m.pe_save_failed(), 'error');
     } finally {
@@ -537,11 +635,25 @@ Rules:
             <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {/* SQEM-539 — the same verbs as the playbook editor. */}
-              {id ? m.ed_save_changes() : m.pe_create()}
+              {changeGoesToReview ? m.chg_save_submit() : submitsNow ? m.mod_save_submit() : id ? m.ed_save_changes() : m.pe_create()}
             </Button>
           )}
         </div>
       </header>
+
+      {/* SQEM-667 — a waiting change: the author's own, or the ones a moderator decides. */}
+      {id && releasedPayload && (
+        <ChangeBanner changes={changes} myId={currentUser?.id ?? ''} moderator={moderation.moderator}
+          nameOf={uid => workspace?.members.find(mb => mb.id === uid)?.name || m.flt_owner_gone()}
+          released={releasedPayload}
+          onChanged={() => { appliedMineRef.current = null; loadChanges(); setReloadKey(k => k + 1); }} />
+      )}
+
+      {/* SQEM-666 — where this persona stands in review; a moderator decides here too. */}
+      {id && (
+        <ReviewBanner kind="persona" id={id} review={review} isOwner={isOwnerHere} moderator={moderation.moderator}
+          onChanged={setReview} privateAccess={access.mode === 'private'} />
+      )}
 
       {/* SQEM-473 — may use, may not change: said once, with whom to ask. */}
       {id && roleCanEdit && !editRight && (

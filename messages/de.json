@@ -2895,5 +2895,102 @@
   "chatcard_analysis_where": "In deinem Browser berechnet — die Daten haben ihn nicht verlassen.",
   "chatcard_analysis_not_kept": "Die Programme werden nicht gespeichert, nur ob sie geklappt haben.",
   "chatfile_from_analysis": "Vom Analyse-Programm in deinem Browser erstellt. Excel rechnet die Formeln beim Öffnen.",
-  "chatcard_analysis_file_not_kept": "Die Excel-Datei aus dieser Analyse wird nicht gespeichert. Frag noch einmal, um sie neu zu erzeugen."
+  "chatcard_analysis_file_not_kept": "Die Excel-Datei aus dieser Analyse wird nicht gespeichert. Frag noch einmal, um sie neu zu erzeugen.",
+  "mod_title": "Moderation",
+  "mod_desc": "Prüfe, was Editoren anlegen, bevor das ganze Team es sieht. Es entscheiden die Admins und die Moderatoren, die du wählst.",
+  "mod_new_label": "Neue Playbooks und Personas vor dem Teilen prüfen",
+  "mod_new_desc": "Ein neues Playbook oder eine neue Persona eines Editors bleibt bei seinem Eigentümer, bis ein Moderator es freigibt. Was schon geteilt ist, bleibt geteilt.",
+  "mod_moderators": "Moderatoren",
+  "mod_admins_always": "Admins moderieren immer: {names}. Füge Editoren hinzu, die auch prüfen sollen.",
+  "mod_admins_always_none": "Admins moderieren immer. Füge Editoren hinzu, die auch prüfen sollen.",
+  "mod_no_editors": "In diesem Workspace gibt es noch keine Editoren.",
+  "mod_members_never": "Member können nicht moderieren. Wer zum Member wird, fällt aus dieser Liste heraus.",
+  "mod_save_submit": "Speichern und zur Prüfung einreichen",
+  "mod_submit_failed": "Gespeichert, aber nicht zur Prüfung eingereicht. Speichere noch einmal, um es erneut zu versuchen.",
+  "mod_submitted": "Gespeichert und zur Prüfung eingereicht",
+  "mod_banner_draft": "Nur du siehst das, bis es freigegeben ist. Wähle, wer es sehen soll, und speichere, um es zur Prüfung einzureichen.",
+  "mod_banner_draft_private": "Nur du siehst das. Um es zu teilen, wähle, wer es sehen soll, und speichere: Dann wird es zur Prüfung eingereicht.",
+  "mod_banner_pending": "Wartet auf Prüfung. Bis ein Moderator es freigibt, sehen es nur du, die Moderatoren und die Admins.",
+  "mod_banner_pending_moderator": "Wartet auf deine Prüfung. Freigegeben wird es mit den Personen geteilt, die sein Eigentümer gewählt hat.",
+  "mod_banner_rejected": "Nicht freigegeben. Ändere es und speichere, um es erneut einzureichen.",
+  "mod_banner_rejected_reason": "Nicht freigegeben: {reason}. Ändere es und speichere, um es erneut einzureichen.",
+  "mod_withdraw": "Zurückziehen",
+  "mod_release": "Freigeben",
+  "mod_reject": "Ablehnen",
+  "mod_reject_reason": "Grund für den Eigentümer (optional)",
+  "mod_reject_confirm": "Ablehnen",
+  "mod_cancel": "Abbrechen",
+  "mod_badge_draft": "Nicht geteilt",
+  "mod_badge_pending": "In Prüfung",
+  "mod_badge_rejected": "Nicht freigegeben",
+  "mod_changes_label": "Änderungen an geteilten Playbooks und Personas prüfen",
+  "mod_changes_desc": "Eine Änderung eines Editors an etwas, das das Team nutzt, wartet, bis ein Moderator sie freigibt. Bis dahin nutzt das Team die freigegebene Fassung. Dateien, die ein geteiltes Playbook nutzt, können dann nur Moderatoren und Admins ersetzen oder löschen.",
+  "mod_changes_needs_new": "Wirkt nur zusammen mit der Prüfung neuer: Sonst wäre ein neues Playbook der Weg an der Prüfung vorbei. Schalte das zuerst ein.",
+  "chg_field_title": "Name",
+  "chg_field_description": "Beschreibung",
+  "chg_field_content": "Inhalt",
+  "chg_field_tag": "Tag",
+  "chg_field_kind": "Art",
+  "chg_field_model": "Modell",
+  "chg_field_variables": "Variablen",
+  "chg_field_files": "Dateien",
+  "chg_field_connectors": "Connectoren",
+  "chg_field_routes": "Playbooks",
+  "chg_field_access": "Wer es sehen darf",
+  "chg_mine_pending": "Deine Änderung wartet auf Prüfung. Das Team nutzt bis zur Freigabe die freigegebene Fassung. Du kannst weiter bearbeiten und erneut speichern.",
+  "chg_mine_rejected": "Deine Änderung wurde nicht freigegeben. Bearbeite sie und speichere, um sie erneut einzureichen, oder verwirf sie.",
+  "chg_mine_rejected_reason": "Deine Änderung wurde nicht freigegeben: {reason}. Bearbeite sie und speichere, um sie erneut einzureichen, oder verwirf sie.",
+  "chg_discard": "Verwerfen",
+  "chg_others_pending": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} Änderung wartet auf deine Prüfung.",
+        "countPlural=other": "{count} Änderungen warten auf deine Prüfung."
+      }
+    }
+  ],
+  "chg_review_by": "Änderung von {name} prüfen",
+  "chg_modal_title": "Änderung von {name}",
+  "chg_modal_hint": "Rot ist die freigegebene Fassung, grün die vorgeschlagene. Freigegeben wird die Änderung als neue Version mit ihrem Autor gespeichert.",
+  "chg_no_fields": "Diese Änderung unterscheidet sich nicht mehr von der freigegebenen Fassung.",
+  "chg_conflict": "Es wurde nach dem Einreichen geändert. Freigeben überschreibt diese Änderungen jetzt mit dem Vorschlag.",
+  "chg_release_anyway": "Trotzdem freigeben",
+  "chg_save_submit": "Änderung zur Prüfung einreichen",
+  "chg_submitted": "Änderung zur Prüfung eingereicht",
+  "chg_submit_failed": "Die Änderung konnte nicht eingereicht werden.",
+  "chg_badge": "Änderung in Prüfung",
+  "mq_open": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "Prüfen ({count})",
+        "countPlural=other": "Prüfen ({count})"
+      }
+    }
+  ],
+  "mq_title": "Wartet auf Prüfung",
+  "mq_tab_all": "Alle",
+  "mq_tab_new": "Neu",
+  "mq_tab_changes": "Änderungen",
+  "mq_empty": "Hier wartet nichts.",
+  "mq_new_by": "Neu, von {name}",
+  "mq_change_by": "Änderung, von {name}",
+  "mq_no_access": "Du gehörst nicht zu denen, die es sehen dürfen. Die Änderung kannst du trotzdem vergleichen und entscheiden.",
+  "mq_open_item": "Öffnen",
+  "mq_compare": "Vergleichen",
+  "mq_more": "Mehr laden",
+  "mq_compare_failed": "Die Änderung konnte nicht geladen werden. Vielleicht wurde sie schon entschieden."
 }

@@ -605,7 +605,7 @@ describe('SQEM-658 — an Office context file is read as text', () => {
   it('returns the text, keeps the binary type, stores it and reads it from the database next time', async () => {
     const { lib, client } = await buildWithClient({ files: [docxRow()], blobs: { 'ws-1/Preise.docx': '' }, unzip });
     const first = await lib.readContextFile('f-doc');
-    expect(first.text).toBe("File: Preise.docx (Word document) — converted to text by sqemes (sqemes reader 2); this text is the file's content.\n\nPreis: 99 & mehr");
+    expect(first.text).toBe("File: Preise.docx (Word document) — converted to text by sqemes (sqemes reader 3); this text is the file's content.\n\nPreis: 99 & mehr");
     expect(first.base64).toBeNull();
     expect(first.mimeType).toBe('application/octet-stream');
     expect(client.seen).toContain('upsert:workspace_file_texts:f-doc');
@@ -621,7 +621,7 @@ describe('SQEM-658 — an Office context file is read as text', () => {
       texts: [{ file_id: 'f-doc', workspace_id: WORKSPACE, content: 'File: Preise.docx (Word document) — old reader, wrong count' }],
     });
     const f = await lib.readContextFile('f-doc');
-    expect(f.text).toContain('(sqemes reader 2)');
+    expect(f.text).toContain('(sqemes reader 3)');
     expect(f.text).toContain('Preis: 99 & mehr');
     expect(client.seen).toContain('download:ws-1/Preise.docx');
   });
@@ -636,6 +636,16 @@ describe('SQEM-658 — an Office context file is read as text', () => {
     const { lib, client } = await buildWithClient({ files: [docxRow({ size_bytes: OFFICE_READ_MAX_BYTES + 1 })], blobs: { 'ws-1/Preise.docx': '' }, unzip });
     await expect(lib.readContextFile('f-doc')).rejects.toThrow(LibraryBadRequest);
     await expect(lib.readContextFile('f-doc')).rejects.toThrow(/as: "file"/);
+    expect(client.seen).not.toContain('download:ws-1/Preise.docx');
+  });
+
+  it('SQEM-659 — too large to read here but a text from an older reader is stored: that text, no refusal', async () => {
+    const old = 'File: Preise.docx (Word document) — converted to text by sqemes (sqemes reader 2); this text is the file\'s content.\n\nPreis: 99';
+    const { lib, client } = await buildWithClient({
+      files: [docxRow({ size_bytes: OFFICE_READ_MAX_BYTES + 1 })], blobs: { 'ws-1/Preise.docx': '' }, unzip,
+      texts: [{ file_id: 'f-doc', workspace_id: WORKSPACE, content: old }],
+    });
+    expect((await lib.readContextFile('f-doc')).text).toBe(old);
     expect(client.seen).not.toContain('download:ws-1/Preise.docx');
   });
 

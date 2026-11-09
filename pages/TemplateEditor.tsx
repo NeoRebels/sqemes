@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
 import { useUI, useWorkspace, usePrompts, useData } from '../store';
 import { can } from '../lib/permissions';
@@ -27,6 +27,11 @@ import { moveItem } from '../lib/moveItem';
 import { fetchTemplateAccess, setTemplateAccess } from '../lib/api/templateAccess';
 import { fetchEditors, setEditors, fetchEditRights } from '../lib/api/editors';
 import { fetchGroups } from '../lib/api/groups';
+import { useModeration } from '../hooks/useModeration';
+import { fetchReviewState, submitForReview, fetchPendingChanges, submitChange } from '../lib/api/moderation';
+import { submitsOnSave, changeNeedsReview, changedFields, accessRowsOf, type ReviewInfo, type PendingChange, type ChangePayload } from '../lib/moderation';
+import { ChangeBanner } from '../components/ChangeReview';
+import ReviewBanner from '../components/ReviewBanner';
 import EditorTestPanel from '../components/EditorTestPanel';
 import VersionHistoryPanel from '../components/VersionHistoryPanel';
 import KindBadge from '../components/ui/KindBadge';
@@ -101,7 +106,12 @@ const TemplateEditor = () => {
   // SQEM-581 — Test first and the default: testing is what one does while editing;
   // History is looked up. A new playbook or a marketplace template has no history to show.
   const hasHistory = !!id && !isLibrary;
-  const saveLabel = isLibrary ? txt.ed_save_playbook() : id ? txt.ed_save_changes() : txt.ed_create_playbook();
+  // SQEM-666 — moderation: the state of this playbook, and whether saving also submits it. A new one by a
+  // non-moderator starts as draft (the database sets it), so it is predicted here before it exists.
+  const moderation = useModeration(workspace, currentUser);
+  const [review, setReview] = useState<ReviewInfo | null>(null);
+  const reviewNow: ReviewInfo | null = review ?? (!id && !isLibrary && moderation.enabled && !moderation.moderator ? { state: 'draft', note: null } : null);
+
   const [rightTab, setRightTab] = useState<'history' | 'test'>('test');
   const [historyKey, setHistoryKey] = useState(0);
   // SQEM-142 — per-template role access. New templates inherit the workspace default; existing
@@ -109,6 +119,25 @@ const TemplateEditor = () => {
   // SQEM-211 — "restricted by default" seeds "Only me": nobody else has been picked yet, and that
   // is a state the control can show. It used to seed a role row the editor can no longer represent.
   const [access, setAccess] = useState<TemplateAccessValue>(() => seedFromWorkspaceDefault(workspace?.defaultTemplateAccess ?? []));
+  const isOwnerHere = !id || formData.createdBy === currentUser?.id;
+  // SQEM-667 — the released state (as loaded), the waiting changes this person may see, and whether this
+  // save is a proposed change instead of a write.
+  const releasedRef = useRef<{ form: Prompt | null; access: TemplateAccessValue | null }>({ form: null, access: null });
+  const [releasedTick, setReleasedTick] = useState(0);
+  const [changes, setChanges] = useState<PendingChange[]>([]);
+  const payloadOf = (f: Prompt, a: TemplateAccessValue): ChangePayload => ({
+    title: f.title, description: f.description, content: f.content, tag: f.tag ?? null, kind: f.kind, model: f.model ?? null,
+    variables: JSON.parse(JSON.stringify(f.variables)), context_file_ids: f.contextFileIds,
+    access: accessRowsOf(a.mode, a.mode === 'restricted' ? a.userIds.filter(u => u !== (f.createdBy || null)) : [], a.groupIds ?? []),
+  });
+  const releasedPayload = releasedRef.current.form && releasedRef.current.access ? payloadOf(releasedRef.current.form, releasedRef.current.access) : null;
+  const proposed = releasedPayload ? changedFields(releasedPayload as Record<string, unknown>, payloadOf(formData, access) as Record<string, unknown>) as ChangePayload : {};
+  const changeGoesToReview = !isLibrary && !!id && !!releasedPayload && changeNeedsReview({
+    changesOn: moderation.changes, moderator: moderation.moderator, released: !reviewNow,
+    shared: releasedRef.current.access?.mode !== 'private', accessChanged: 'access' in proposed,
+  });
+  void releasedTick;
+  const saveLabel = isLibrary ? txt.ed_save_playbook() : changeGoesToReview ? txt.chg_save_submit() : submitsOnSave(reviewNow ?? undefined, isOwnerHere, access.mode) ? txt.mod_save_submit() : id ? txt.ed_save_changes() : txt.ed_create_playbook();
   // SQEM-292 — the workspace's groups, so the access control can offer them. Everyone in the
   // workspace may read them (RLS); only admins may change them, which happens in Settings.
   const [groups, setGroups] = useState<{ id: string; name: string; memberIds: string[] }[]>([]);
@@ -195,6 +224,8 @@ const TemplateEditor = () => {
           })
         : fetchPromptDetail(id).then(full => {
             setFormData(full);
+            releasedRef.current.form = full; // SQEM-667 — what a proposed change is compared with
+            setReleasedTick(t => t + 1);
             setIsDirty(false);
           });
       load.catch(() => {});
@@ -216,7 +247,10 @@ const TemplateEditor = () => {
       // SQEM-211 — members are passed so a legacy `role=member` row resolves into the people it
       // currently covers, instead of silently disappearing from a control that no longer shows roles.
       fetchTemplateAccess(id).then(a => {
-        setAccess(accessToValue(a.roles, a.userIds, a.hasRules, workspace?.members ?? [], a.groupIds ?? []));
+        const value = accessToValue(a.roles, a.userIds, a.hasRules, workspace?.members ?? [], a.groupIds ?? []);
+        setAccess(value);
+        releasedRef.current.access = value; // SQEM-667
+        setReleasedTick(t => t + 1);
         setLegacyRoles(unrepresentableRoleGrants(a.roles));
       }).catch(() => {});
     }
@@ -239,6 +273,47 @@ const TemplateEditor = () => {
     if (isLibrary || !workspace?.id) return;
     fetchGroups(workspace.id).then(setGroups).catch(() => {});
   }, [isLibrary, workspace?.id]);
+
+  // SQEM-667 — the waiting changes this person may see (their own; every one as a moderator).
+  const loadChanges = useCallback(() => {
+    if (isLibrary || IS_SELF_HOSTED || !id) { setChanges([]); return; }
+    void fetchPendingChanges('template', id).then(setChanges);
+  }, [isLibrary, id]);
+  useEffect(loadChanges, [loadChanges]);
+  // The author works on their waiting (or rejected) change, not on the released state — once, after both
+  // the released state and the change are there.
+  const appliedMineRef = useRef<string | null>(null);
+  useEffect(() => {
+    const mine = changes.find(c => c.author === currentUser?.id);
+    if (!mine || !releasedRef.current.form || !releasedRef.current.access || appliedMineRef.current === mine.id) return;
+    appliedMineRef.current = mine.id;
+    const p = mine.payload;
+    setFormData(prev => ({
+      ...prev,
+      ...(p.title !== undefined ? { title: p.title } : {}),
+      ...(p.description !== undefined ? { description: p.description } : {}),
+      ...(p.content !== undefined ? { content: p.content } : {}),
+      ...(p.tag !== undefined ? { tag: p.tag } : {}),
+      ...(p.kind !== undefined ? { kind: p.kind as PromptKind } : {}),
+      ...(p.model !== undefined ? { model: p.model ?? undefined } : {}),
+      ...(p.variables !== undefined ? { variables: p.variables as Variable[] } : {}),
+      ...(p.context_file_ids !== undefined ? { contextFileIds: p.context_file_ids } : {}),
+    }));
+    if (p.access) {
+      const rows = p.access;
+      setAccess(rows.length === 0 ? { mode: 'everyone', userIds: [], groupIds: [] }
+        : rows.length === 1 && !rows[0].user_id && !rows[0].group_id ? { mode: 'private', userIds: [], groupIds: [] }
+        : { mode: 'restricted', userIds: rows.flatMap(r => r.user_id ? [r.user_id] : []), groupIds: rows.flatMap(r => r.group_id ? [r.group_id] : []) });
+    }
+  }, [changes, releasedTick, currentUser?.id]);
+
+  // SQEM-666 — the review state of a saved workspace playbook (hosted only).
+  useEffect(() => {
+    if (isLibrary || IS_SELF_HOSTED || !id) { setReview(null); return; }
+    let alive = true;
+    void fetchReviewState('template', id).then(r => { if (alive) setReview(r); });
+    return () => { alive = false; };
+  }, [isLibrary, id]);
 
   const handleSave = async () => {
     if (!formData.title.trim()) {
@@ -263,6 +338,21 @@ const TemplateEditor = () => {
       setIsDirty(false);
       return;
     }
+    // SQEM-667 — a change to something shared goes to review instead of being written; the team keeps
+    // the released version until a moderator releases it.
+    if (id && changeGoesToReview) {
+      if (Object.keys(proposed).length === 0) { setIsDirty(false); showToast(txt.ed_saved(), 'success'); return; }
+      try {
+        await submitChange('template', id, proposed, releasedRef.current.form?.updatedAt ?? null);
+        appliedMineRef.current = null;
+        loadChanges();
+        setIsDirty(false);
+        showToast(txt.chg_submitted(), 'success');
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : txt.chg_submit_failed(), 'error');
+      }
+      return;
+    }
     let savedId = id;
     if (id) {
       // SQEM-606 — a failed save stops here: the store has shown the error, and the "saved" toast and
@@ -274,9 +364,12 @@ const TemplateEditor = () => {
       savedId = created.id;
     }
     // SQEM-142 / SQEM-143 — persist the access rules (roles + users; empty = open). Non-fatal.
+    // SQEM-667 — under moderation of changes, an unchanged access is not rewritten: the database refuses any
+    // access write of a non-moderator to something released, even the same rows.
+    const accessUntouched = moderation.changes && !moderation.moderator && !!releasedPayload && !('access' in proposed) && !reviewNow;
     if (savedId) {
       try {
-        await setTemplateAccess(savedId, workspace.id, accessValueToAccess(access, formData.createdBy || null));
+        if (!accessUntouched) await setTemplateAccess(savedId, workspace.id, accessValueToAccess(access, formData.createdBy || null));
         // SQEM-238 — the old role grant is gone now; the warning must go with it, or it keeps
         // warning about a rule that no longer exists.
         setLegacyRoles([]);
@@ -300,8 +393,19 @@ const TemplateEditor = () => {
         }
       }
     }
+    // SQEM-666 — the owner chose more than "only me" for something not yet released: submit it.
+    let submitted = false;
+    if (savedId && submitsOnSave(reviewNow ?? undefined, isOwnerHere, access.mode)) {
+      try {
+        await submitForReview('template', savedId);
+        submitted = true;
+      } catch {
+        showToast(txt.mod_submit_failed(), 'error');
+      }
+    }
+    if (savedId && !IS_SELF_HOSTED) void fetchReviewState('template', savedId).then(setReview);
     if (!id && savedId) navigate(`/playbooks/${savedId}/edit`, { replace: true });
-    showToast(txt.ed_saved(), 'success');
+    showToast(submitted ? txt.mod_submitted() : txt.ed_saved(), 'success');
     setIsDirty(false);
     setHistoryKey(k => k + 1);
   };
@@ -593,6 +697,20 @@ const TemplateEditor = () => {
           )}
         </div>
       </header>
+
+      {/* SQEM-667 — a waiting change: the author's own, or the ones a moderator decides. */}
+      {!isLibrary && id && releasedPayload && (
+        <ChangeBanner changes={changes} myId={currentUser?.id ?? ''} moderator={moderation.moderator}
+          nameOf={uid => workspace?.members.find(mb => mb.id === uid)?.name || txt.flt_owner_gone()}
+          released={releasedPayload}
+          onChanged={() => { appliedMineRef.current = null; loadChanges(); if (id) void fetchPromptDetail(id).then(full => { setFormData(full); releasedRef.current.form = full; setReleasedTick(t => t + 1); }); }} />
+      )}
+
+      {/* SQEM-666 — where this playbook stands in review; a moderator decides here too. */}
+      {!isLibrary && id && (
+        <ReviewBanner kind="template" id={id} review={review} isOwner={isOwnerHere} moderator={moderation.moderator}
+          onChanged={setReview} privateAccess={access.mode === 'private'} />
+      )}
 
       {/* SQEM-473 — this person may use the playbook but not change it. Said once, at the top, with
           whom to ask: a read-only editor without a reason reads as a bug. */}

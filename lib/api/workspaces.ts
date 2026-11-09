@@ -34,6 +34,9 @@ export function rowToWorkspace(row: WorkspaceRow, members: User[] = []): Workspa
     defaultTemplateAccess: (row as unknown as { default_template_access?: UserRole[] }).default_template_access ?? undefined,
     // SQEM-534 — likewise.
     defaultEditRestricted: (row as unknown as { default_edit_restricted?: boolean }).default_edit_restricted ?? false,
+    // SQEM-666 — likewise; absent before the migration, which reads as "off".
+    moderationNew: (row as unknown as { moderation_new?: boolean }).moderation_new ?? false,
+    moderationChanges: (row as unknown as { moderation_changes?: boolean }).moderation_changes ?? false, // SQEM-667
     // SQEM-311 — likewise added by migration, not yet in the generated types.
     authoringModelId: (row as unknown as { authoring_model_id?: string | null }).authoring_model_id ?? null,
     // SQEM-597 — validated on read; a malformed value becomes null, never a broken document.
@@ -113,6 +116,8 @@ export async function updateWorkspace(id: string, updates: Partial<{
   brand_profile: BrandProfile | null;
   default_template_access: string[] | null;
   default_edit_restricted: boolean;
+  moderation_new: boolean; // SQEM-666 — admins only (guard_moderation_new)
+  moderation_changes: boolean; // SQEM-667 — admins only, and only with moderation_new
   authoring_model_id: string | null;
   document_style: DocumentStyle | null; // SQEM-597 — admins only (guard_document_style)
   language: Locale; // SQEM-600 — admins only (guard_workspace_language)

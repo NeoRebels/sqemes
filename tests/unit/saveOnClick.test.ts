@@ -108,9 +108,10 @@ describe('SQEM-539 — the wiring', () => {
   });
 
   it('both editors use the same verbs', () => {
-    expect(read('pages/TemplateEditor.tsx')).toMatch(/const saveLabel = isLibrary \? txt\.ed_save_playbook\(\) : id \? txt\.ed_save_changes\(\) : txt\.ed_create_playbook\(\);/);
+    // SQEM-666 — under moderation the owner's save also submits, and says so.
+    expect(read('pages/TemplateEditor.tsx')).toMatch(/const saveLabel = isLibrary \? txt\.ed_save_playbook\(\) : changeGoesToReview \? txt\.chg_save_submit\(\) : submitsOnSave\(reviewNow \?\? undefined, isOwnerHere, access\.mode\) \? txt\.mod_save_submit\(\) : id \? txt\.ed_save_changes\(\) : txt\.ed_create_playbook\(\);/);
     expect([en.ed_save_playbook, en.ed_save_changes, en.ed_create_playbook]).toEqual(['Save playbook', 'Save changes', 'Create playbook']); // SQEM-605
-    expect(read('pages/PersonaEditor.tsx')).toMatch(/\{id \? m\.ed_save_changes\(\) : m\.pe_create\(\)\}/);
+    expect(read('pages/PersonaEditor.tsx')).toMatch(/\{changeGoesToReview \? m\.chg_save_submit\(\) : submitsNow \? m\.mod_save_submit\(\) : id \? m\.ed_save_changes\(\) : m\.pe_create\(\)\}/);
     expect(en.pe_create).toBe('Create persona'); // SQEM-605
   });
 });

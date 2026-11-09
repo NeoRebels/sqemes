@@ -17,7 +17,7 @@ describe('SQEM-658 — Office attachments in the chat', () => {
     expect(a.label).toBe('DOCX');
     expect(a.truncated).toBe(false);
     expect(a.dataUrl.startsWith('data:text/plain;base64,')).toBe(true);
-    expect(decode(a.dataUrl)).toBe("File: Brief.docx (Word document) — converted to text by sqemes (sqemes reader 2); this text is the file's content.\n\nGröße: 12 €");
+    expect(decode(a.dataUrl)).toBe("File: Brief.docx (Word document) — converted to text by sqemes (sqemes reader 3); this text is the file's content.\n\nGröße: 12 €");
   });
 
   it('base64 of long UTF-8 text does not overflow the stack', () => {

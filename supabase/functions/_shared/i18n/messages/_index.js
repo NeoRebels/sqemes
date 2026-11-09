@@ -424,6 +424,32 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{ term: NonNullable<unknown> }} Chatsearch_NoneInputs */
 /** @typedef {{}} Chatsearch_PlaceholderInputs */
 /** @typedef {{}} Chatsearch_UntitledInputs */
+/** @typedef {{}} Chg_BadgeInputs */
+/** @typedef {{}} Chg_ConflictInputs */
+/** @typedef {{}} Chg_DiscardInputs */
+/** @typedef {{}} Chg_Field_AccessInputs */
+/** @typedef {{}} Chg_Field_ConnectorsInputs */
+/** @typedef {{}} Chg_Field_ContentInputs */
+/** @typedef {{}} Chg_Field_DescriptionInputs */
+/** @typedef {{}} Chg_Field_FilesInputs */
+/** @typedef {{}} Chg_Field_KindInputs */
+/** @typedef {{}} Chg_Field_ModelInputs */
+/** @typedef {{}} Chg_Field_RoutesInputs */
+/** @typedef {{}} Chg_Field_TagInputs */
+/** @typedef {{}} Chg_Field_TitleInputs */
+/** @typedef {{}} Chg_Field_VariablesInputs */
+/** @typedef {{}} Chg_Mine_PendingInputs */
+/** @typedef {{}} Chg_Mine_RejectedInputs */
+/** @typedef {{ reason: NonNullable<unknown> }} Chg_Mine_Rejected_ReasonInputs */
+/** @typedef {{}} Chg_Modal_HintInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Chg_Modal_TitleInputs */
+/** @typedef {{}} Chg_No_FieldsInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Chg_Others_PendingInputs */
+/** @typedef {{}} Chg_Release_AnywayInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Chg_Review_ByInputs */
+/** @typedef {{}} Chg_Save_SubmitInputs */
+/** @typedef {{}} Chg_Submit_FailedInputs */
+/** @typedef {{}} Chg_SubmittedInputs */
 /** @typedef {{}} Confirm_ConfirmInputs */
 /** @typedef {{}} Confirm_Type_AfterInputs */
 /** @typedef {{}} Confirm_Type_BeforeInputs */
@@ -916,6 +942,36 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Mk_TitleInputs */
 /** @typedef {{}} Mk_Try_Other_SearchInputs */
 /** @typedef {{}} Mk_Vote_FailedInputs */
+/** @typedef {{ names: NonNullable<unknown> }} Mod_Admins_AlwaysInputs */
+/** @typedef {{}} Mod_Admins_Always_NoneInputs */
+/** @typedef {{}} Mod_Badge_DraftInputs */
+/** @typedef {{}} Mod_Badge_PendingInputs */
+/** @typedef {{}} Mod_Badge_RejectedInputs */
+/** @typedef {{}} Mod_Banner_DraftInputs */
+/** @typedef {{}} Mod_Banner_Draft_PrivateInputs */
+/** @typedef {{}} Mod_Banner_PendingInputs */
+/** @typedef {{}} Mod_Banner_Pending_ModeratorInputs */
+/** @typedef {{}} Mod_Banner_RejectedInputs */
+/** @typedef {{ reason: NonNullable<unknown> }} Mod_Banner_Rejected_ReasonInputs */
+/** @typedef {{}} Mod_CancelInputs */
+/** @typedef {{}} Mod_Changes_DescInputs */
+/** @typedef {{}} Mod_Changes_LabelInputs */
+/** @typedef {{}} Mod_Changes_Needs_NewInputs */
+/** @typedef {{}} Mod_DescInputs */
+/** @typedef {{}} Mod_Members_NeverInputs */
+/** @typedef {{}} Mod_ModeratorsInputs */
+/** @typedef {{}} Mod_New_DescInputs */
+/** @typedef {{}} Mod_New_LabelInputs */
+/** @typedef {{}} Mod_No_EditorsInputs */
+/** @typedef {{}} Mod_RejectInputs */
+/** @typedef {{}} Mod_Reject_ConfirmInputs */
+/** @typedef {{}} Mod_Reject_ReasonInputs */
+/** @typedef {{}} Mod_ReleaseInputs */
+/** @typedef {{}} Mod_Save_SubmitInputs */
+/** @typedef {{}} Mod_Submit_FailedInputs */
+/** @typedef {{}} Mod_SubmittedInputs */
+/** @typedef {{}} Mod_TitleInputs */
+/** @typedef {{}} Mod_WithdrawInputs */
 /** @typedef {{}} Model_CostInputs */
 /** @typedef {{}} Model_NoneInputs */
 /** @typedef {{}} Model_SpeedInputs */
@@ -925,6 +981,19 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{ label: NonNullable<unknown> }} Move_Down_LabelInputs */
 /** @typedef {{}} Move_UpInputs */
 /** @typedef {{ label: NonNullable<unknown> }} Move_Up_LabelInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Mq_Change_ByInputs */
+/** @typedef {{}} Mq_CompareInputs */
+/** @typedef {{}} Mq_Compare_FailedInputs */
+/** @typedef {{}} Mq_EmptyInputs */
+/** @typedef {{}} Mq_MoreInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Mq_New_ByInputs */
+/** @typedef {{}} Mq_No_AccessInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Mq_OpenInputs */
+/** @typedef {{}} Mq_Open_ItemInputs */
+/** @typedef {{}} Mq_Tab_AllInputs */
+/** @typedef {{}} Mq_Tab_ChangesInputs */
+/** @typedef {{}} Mq_Tab_NewInputs */
+/** @typedef {{}} Mq_TitleInputs */
 /** @typedef {{}} Nav_ChatInputs */
 /** @typedef {{}} Nav_FilesInputs */
 /** @typedef {{}} Nav_HistoryInputs */
@@ -7938,6 +8007,371 @@ export const chatsearch_untitled = /** @type {((inputs?: Chatsearch_UntitledInpu
 /**
 * | output |
 * | --- |
+* | "Change in review" |
+*
+* @param {Chg_BadgeInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_badge = /** @type {((inputs?: Chg_BadgeInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_BadgeInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_badge(inputs)
+	return __en.chg_badge(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "It was changed after this was submitted. Releasing now overwrites those changes with this proposal." |
+*
+* @param {Chg_ConflictInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_conflict = /** @type {((inputs?: Chg_ConflictInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_ConflictInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_conflict(inputs)
+	return __en.chg_conflict(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Discard" |
+*
+* @param {Chg_DiscardInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_discard = /** @type {((inputs?: Chg_DiscardInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_DiscardInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_discard(inputs)
+	return __en.chg_discard(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Who can see it" |
+*
+* @param {Chg_Field_AccessInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_field_access = /** @type {((inputs?: Chg_Field_AccessInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Field_AccessInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_field_access(inputs)
+	return __en.chg_field_access(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Connectors" |
+*
+* @param {Chg_Field_ConnectorsInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_field_connectors = /** @type {((inputs?: Chg_Field_ConnectorsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Field_ConnectorsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_field_connectors(inputs)
+	return __en.chg_field_connectors(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Content" |
+*
+* @param {Chg_Field_ContentInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_field_content = /** @type {((inputs?: Chg_Field_ContentInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Field_ContentInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_field_content(inputs)
+	return __en.chg_field_content(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Description" |
+*
+* @param {Chg_Field_DescriptionInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_field_description = /** @type {((inputs?: Chg_Field_DescriptionInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Field_DescriptionInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_field_description(inputs)
+	return __en.chg_field_description(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Files" |
+*
+* @param {Chg_Field_FilesInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_field_files = /** @type {((inputs?: Chg_Field_FilesInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Field_FilesInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_field_files(inputs)
+	return __en.chg_field_files(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Kind" |
+*
+* @param {Chg_Field_KindInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_field_kind = /** @type {((inputs?: Chg_Field_KindInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Field_KindInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_field_kind(inputs)
+	return __en.chg_field_kind(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Model" |
+*
+* @param {Chg_Field_ModelInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_field_model = /** @type {((inputs?: Chg_Field_ModelInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Field_ModelInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_field_model(inputs)
+	return __en.chg_field_model(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Playbooks" |
+*
+* @param {Chg_Field_RoutesInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_field_routes = /** @type {((inputs?: Chg_Field_RoutesInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Field_RoutesInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_field_routes(inputs)
+	return __en.chg_field_routes(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Tag" |
+*
+* @param {Chg_Field_TagInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_field_tag = /** @type {((inputs?: Chg_Field_TagInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Field_TagInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_field_tag(inputs)
+	return __en.chg_field_tag(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Name" |
+*
+* @param {Chg_Field_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_field_title = /** @type {((inputs?: Chg_Field_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Field_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_field_title(inputs)
+	return __en.chg_field_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Variables" |
+*
+* @param {Chg_Field_VariablesInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_field_variables = /** @type {((inputs?: Chg_Field_VariablesInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Field_VariablesInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_field_variables(inputs)
+	return __en.chg_field_variables(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Your change waits for review. The team keeps using the released version until a moderator releases it. You can keep editing and save again." |
+*
+* @param {Chg_Mine_PendingInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_mine_pending = /** @type {((inputs?: Chg_Mine_PendingInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Mine_PendingInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_mine_pending(inputs)
+	return __en.chg_mine_pending(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Your change was not released. Edit it and save to submit it again, or discard it." |
+*
+* @param {Chg_Mine_RejectedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_mine_rejected = /** @type {((inputs?: Chg_Mine_RejectedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Mine_RejectedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_mine_rejected(inputs)
+	return __en.chg_mine_rejected(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Your change was not released: {reason}. Edit it and save to submit it again, or discard it." |
+*
+* @param {Chg_Mine_Rejected_ReasonInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_mine_rejected_reason = /** @type {((inputs: Chg_Mine_Rejected_ReasonInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Mine_Rejected_ReasonInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_mine_rejected_reason(inputs)
+	return __en.chg_mine_rejected_reason(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Red is the released version, green the proposed one. Released, the change is written as a new version credited to its author." |
+*
+* @param {Chg_Modal_HintInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_modal_hint = /** @type {((inputs?: Chg_Modal_HintInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Modal_HintInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_modal_hint(inputs)
+	return __en.chg_modal_hint(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Change by {name}" |
+*
+* @param {Chg_Modal_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_modal_title = /** @type {((inputs: Chg_Modal_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Modal_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_modal_title(inputs)
+	return __en.chg_modal_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "This change no longer differs from the released version." |
+*
+* @param {Chg_No_FieldsInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_no_fields = /** @type {((inputs?: Chg_No_FieldsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_No_FieldsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_no_fields(inputs)
+	return __en.chg_no_fields(inputs)
+});
+/**
+* | countPlural | output |
+* | --- | --- |
+* | "one" | "{count} change waits for your review." |
+* | "other" | "{count} changes wait for your review." |
+*
+* @param {Chg_Others_PendingInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_others_pending = /** @type {((inputs: Chg_Others_PendingInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Others_PendingInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_others_pending(inputs)
+	return __en.chg_others_pending(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Release anyway" |
+*
+* @param {Chg_Release_AnywayInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_release_anyway = /** @type {((inputs?: Chg_Release_AnywayInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Release_AnywayInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_release_anyway(inputs)
+	return __en.chg_release_anyway(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Review change by {name}" |
+*
+* @param {Chg_Review_ByInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_review_by = /** @type {((inputs: Chg_Review_ByInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Review_ByInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_review_by(inputs)
+	return __en.chg_review_by(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Submit change for review" |
+*
+* @param {Chg_Save_SubmitInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_save_submit = /** @type {((inputs?: Chg_Save_SubmitInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Save_SubmitInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_save_submit(inputs)
+	return __en.chg_save_submit(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "The change could not be submitted." |
+*
+* @param {Chg_Submit_FailedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_submit_failed = /** @type {((inputs?: Chg_Submit_FailedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_Submit_FailedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_submit_failed(inputs)
+	return __en.chg_submit_failed(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Change submitted for review" |
+*
+* @param {Chg_SubmittedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chg_submitted = /** @type {((inputs?: Chg_SubmittedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chg_SubmittedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chg_submitted(inputs)
+	return __en.chg_submitted(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Confirm" |
 *
 * @param {Confirm_ConfirmInputs} inputs
@@ -14849,6 +15283,426 @@ export const mk_vote_failed = /** @type {((inputs?: Mk_Vote_FailedInputs, option
 /**
 * | output |
 * | --- |
+* | "Admins always moderate: {names}. Add editors who should review too." |
+*
+* @param {Mod_Admins_AlwaysInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_admins_always = /** @type {((inputs: Mod_Admins_AlwaysInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Admins_AlwaysInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_admins_always(inputs)
+	return __en.mod_admins_always(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Admins always moderate. Add editors who should review too." |
+*
+* @param {Mod_Admins_Always_NoneInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_admins_always_none = /** @type {((inputs?: Mod_Admins_Always_NoneInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Admins_Always_NoneInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_admins_always_none(inputs)
+	return __en.mod_admins_always_none(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Not shared" |
+*
+* @param {Mod_Badge_DraftInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_badge_draft = /** @type {((inputs?: Mod_Badge_DraftInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Badge_DraftInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_badge_draft(inputs)
+	return __en.mod_badge_draft(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "In review" |
+*
+* @param {Mod_Badge_PendingInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_badge_pending = /** @type {((inputs?: Mod_Badge_PendingInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Badge_PendingInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_badge_pending(inputs)
+	return __en.mod_badge_pending(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Not released" |
+*
+* @param {Mod_Badge_RejectedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_badge_rejected = /** @type {((inputs?: Mod_Badge_RejectedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Badge_RejectedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_badge_rejected(inputs)
+	return __en.mod_badge_rejected(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Only you can see this until it is released. Choose who should see it and save to submit it for review." |
+*
+* @param {Mod_Banner_DraftInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_banner_draft = /** @type {((inputs?: Mod_Banner_DraftInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Banner_DraftInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_banner_draft(inputs)
+	return __en.mod_banner_draft(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Only you can see this. To share it, choose who should see it and save: it is then submitted for review." |
+*
+* @param {Mod_Banner_Draft_PrivateInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_banner_draft_private = /** @type {((inputs?: Mod_Banner_Draft_PrivateInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Banner_Draft_PrivateInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_banner_draft_private(inputs)
+	return __en.mod_banner_draft_private(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Waiting for review. Until a moderator releases it, only you, the moderators and the admins can see it." |
+*
+* @param {Mod_Banner_PendingInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_banner_pending = /** @type {((inputs?: Mod_Banner_PendingInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Banner_PendingInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_banner_pending(inputs)
+	return __en.mod_banner_pending(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Waiting for your review. Released, it is shared with the people its owner chose." |
+*
+* @param {Mod_Banner_Pending_ModeratorInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_banner_pending_moderator = /** @type {((inputs?: Mod_Banner_Pending_ModeratorInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Banner_Pending_ModeratorInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_banner_pending_moderator(inputs)
+	return __en.mod_banner_pending_moderator(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Not released. Change it and save to submit it again." |
+*
+* @param {Mod_Banner_RejectedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_banner_rejected = /** @type {((inputs?: Mod_Banner_RejectedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Banner_RejectedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_banner_rejected(inputs)
+	return __en.mod_banner_rejected(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Not released: {reason}. Change it and save to submit it again." |
+*
+* @param {Mod_Banner_Rejected_ReasonInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_banner_rejected_reason = /** @type {((inputs: Mod_Banner_Rejected_ReasonInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Banner_Rejected_ReasonInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_banner_rejected_reason(inputs)
+	return __en.mod_banner_rejected_reason(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Cancel" |
+*
+* @param {Mod_CancelInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_cancel = /** @type {((inputs?: Mod_CancelInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_CancelInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_cancel(inputs)
+	return __en.mod_cancel(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "A change from an editor to something the team uses waits until a moderator releases it. Until then the team keeps the released version. Files a shared playbo..." |
+*
+* @param {Mod_Changes_DescInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_changes_desc = /** @type {((inputs?: Mod_Changes_DescInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Changes_DescInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_changes_desc(inputs)
+	return __en.mod_changes_desc(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Review changes to shared playbooks and personas" |
+*
+* @param {Mod_Changes_LabelInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_changes_label = /** @type {((inputs?: Mod_Changes_LabelInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Changes_LabelInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_changes_label(inputs)
+	return __en.mod_changes_label(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Works together with reviewing new ones: otherwise a new playbook would be the way round a review. Switch that on first." |
+*
+* @param {Mod_Changes_Needs_NewInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_changes_needs_new = /** @type {((inputs?: Mod_Changes_Needs_NewInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Changes_Needs_NewInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_changes_needs_new(inputs)
+	return __en.mod_changes_needs_new(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Check what editors create before the whole team sees it. Admins and the moderators you choose decide." |
+*
+* @param {Mod_DescInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_desc = /** @type {((inputs?: Mod_DescInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_DescInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_desc(inputs)
+	return __en.mod_desc(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Members cannot moderate. Someone who becomes a member is removed from this list." |
+*
+* @param {Mod_Members_NeverInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_members_never = /** @type {((inputs?: Mod_Members_NeverInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Members_NeverInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_members_never(inputs)
+	return __en.mod_members_never(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Moderators" |
+*
+* @param {Mod_ModeratorsInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_moderators = /** @type {((inputs?: Mod_ModeratorsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_ModeratorsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_moderators(inputs)
+	return __en.mod_moderators(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "A new playbook or persona from an editor stays with its owner until a moderator releases it. What is shared already stays shared." |
+*
+* @param {Mod_New_DescInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_new_desc = /** @type {((inputs?: Mod_New_DescInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_New_DescInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_new_desc(inputs)
+	return __en.mod_new_desc(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Review new playbooks and personas before they are shared" |
+*
+* @param {Mod_New_LabelInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_new_label = /** @type {((inputs?: Mod_New_LabelInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_New_LabelInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_new_label(inputs)
+	return __en.mod_new_label(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "There are no editors in this workspace yet." |
+*
+* @param {Mod_No_EditorsInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_no_editors = /** @type {((inputs?: Mod_No_EditorsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_No_EditorsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_no_editors(inputs)
+	return __en.mod_no_editors(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Reject" |
+*
+* @param {Mod_RejectInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_reject = /** @type {((inputs?: Mod_RejectInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_RejectInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_reject(inputs)
+	return __en.mod_reject(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Reject" |
+*
+* @param {Mod_Reject_ConfirmInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_reject_confirm = /** @type {((inputs?: Mod_Reject_ConfirmInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Reject_ConfirmInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_reject_confirm(inputs)
+	return __en.mod_reject_confirm(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Reason for the owner (optional)" |
+*
+* @param {Mod_Reject_ReasonInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_reject_reason = /** @type {((inputs?: Mod_Reject_ReasonInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Reject_ReasonInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_reject_reason(inputs)
+	return __en.mod_reject_reason(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Release" |
+*
+* @param {Mod_ReleaseInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_release = /** @type {((inputs?: Mod_ReleaseInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_ReleaseInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_release(inputs)
+	return __en.mod_release(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Save and submit for review" |
+*
+* @param {Mod_Save_SubmitInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_save_submit = /** @type {((inputs?: Mod_Save_SubmitInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Save_SubmitInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_save_submit(inputs)
+	return __en.mod_save_submit(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Saved, but it could not be submitted for review. Save again to try once more." |
+*
+* @param {Mod_Submit_FailedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_submit_failed = /** @type {((inputs?: Mod_Submit_FailedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_Submit_FailedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_submit_failed(inputs)
+	return __en.mod_submit_failed(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Saved and submitted for review" |
+*
+* @param {Mod_SubmittedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_submitted = /** @type {((inputs?: Mod_SubmittedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_SubmittedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_submitted(inputs)
+	return __en.mod_submitted(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Moderation" |
+*
+* @param {Mod_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_title = /** @type {((inputs?: Mod_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_title(inputs)
+	return __en.mod_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Withdraw" |
+*
+* @param {Mod_WithdrawInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mod_withdraw = /** @type {((inputs?: Mod_WithdrawInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mod_WithdrawInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mod_withdraw(inputs)
+	return __en.mod_withdraw(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Cost" |
 *
 * @param {Model_CostInputs} inputs
@@ -14971,6 +15825,189 @@ export const move_up_label = /** @type {((inputs: Move_Up_LabelInputs, options?:
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.move_up_label(inputs)
 	return __en.move_up_label(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Change, by {name}" |
+*
+* @param {Mq_Change_ByInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mq_change_by = /** @type {((inputs: Mq_Change_ByInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mq_Change_ByInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mq_change_by(inputs)
+	return __en.mq_change_by(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Compare" |
+*
+* @param {Mq_CompareInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mq_compare = /** @type {((inputs?: Mq_CompareInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mq_CompareInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mq_compare(inputs)
+	return __en.mq_compare(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "The change could not be loaded. It may have been decided already." |
+*
+* @param {Mq_Compare_FailedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mq_compare_failed = /** @type {((inputs?: Mq_Compare_FailedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mq_Compare_FailedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mq_compare_failed(inputs)
+	return __en.mq_compare_failed(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Nothing waits here." |
+*
+* @param {Mq_EmptyInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mq_empty = /** @type {((inputs?: Mq_EmptyInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mq_EmptyInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mq_empty(inputs)
+	return __en.mq_empty(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Load more" |
+*
+* @param {Mq_MoreInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mq_more = /** @type {((inputs?: Mq_MoreInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mq_MoreInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mq_more(inputs)
+	return __en.mq_more(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "New, by {name}" |
+*
+* @param {Mq_New_ByInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mq_new_by = /** @type {((inputs: Mq_New_ByInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mq_New_ByInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mq_new_by(inputs)
+	return __en.mq_new_by(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "You are not among the people who can see it. You can still compare and decide the change." |
+*
+* @param {Mq_No_AccessInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mq_no_access = /** @type {((inputs?: Mq_No_AccessInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mq_No_AccessInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mq_no_access(inputs)
+	return __en.mq_no_access(inputs)
+});
+/**
+* | countPlural | output |
+* | --- | --- |
+* | "one" | "Review ({count})" |
+* | "other" | "Review ({count})" |
+*
+* @param {Mq_OpenInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mq_open = /** @type {((inputs: Mq_OpenInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mq_OpenInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mq_open(inputs)
+	return __en.mq_open(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Open" |
+*
+* @param {Mq_Open_ItemInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mq_open_item = /** @type {((inputs?: Mq_Open_ItemInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mq_Open_ItemInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mq_open_item(inputs)
+	return __en.mq_open_item(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "All" |
+*
+* @param {Mq_Tab_AllInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mq_tab_all = /** @type {((inputs?: Mq_Tab_AllInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mq_Tab_AllInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mq_tab_all(inputs)
+	return __en.mq_tab_all(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Changes" |
+*
+* @param {Mq_Tab_ChangesInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mq_tab_changes = /** @type {((inputs?: Mq_Tab_ChangesInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mq_Tab_ChangesInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mq_tab_changes(inputs)
+	return __en.mq_tab_changes(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "New" |
+*
+* @param {Mq_Tab_NewInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mq_tab_new = /** @type {((inputs?: Mq_Tab_NewInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mq_Tab_NewInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mq_tab_new(inputs)
+	return __en.mq_tab_new(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Waiting for review" |
+*
+* @param {Mq_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const mq_title = /** @type {((inputs?: Mq_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Mq_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.mq_title(inputs)
+	return __en.mq_title(inputs)
 });
 /**
 * | output |

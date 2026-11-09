@@ -8,6 +8,12 @@ import { fetchRestrictedTemplateIds } from '../lib/api/templateAccess';
 import { bulkSummary } from '../lib/bulkApply';
 import { isMultiSeat } from '../lib/templateAccessScope';
 import RightsIcons from '../components/ui/RightsIcons';
+import ReviewBanner, { ReviewBadge } from '../components/ReviewBanner';
+import { useModeration } from '../hooks/useModeration';
+import { fetchReviewStates, fetchWorkspacePendingChanges } from '../lib/api/moderation';
+import { ChangeBadge } from '../components/ChangeReview';
+import ModerationQueue from '../components/ModerationQueue';
+import { reviewBadgeOf, type ReviewInfo, type ReviewState } from '../lib/moderation';
 import { fetchEditRestrictedIds } from '../lib/api/editors';
 import type { AccessBadgeMode } from '../lib/accessBadge';
 import { exportTemplatesToZip, downloadBlob, readBundle, importBundle, type BundleManifest } from '../lib/templateBundle';
@@ -62,6 +68,8 @@ const PlaybookRow = memo(function PlaybookRow({
   canEdit,
   accessMode,
   editRestricted,
+  review,
+  changed,
   active,
   selected,
   onSelect,
@@ -72,6 +80,8 @@ const PlaybookRow = memo(function PlaybookRow({
   canEdit: boolean;
   accessMode?: AccessBadgeMode; // SQEM-400 — undefined = open to everyone (no badge)
   editRestricted?: boolean; // SQEM-664 — names its editors
+  review?: ReviewState | null; // SQEM-666 — what the viewer should know about its review
+  changed?: boolean; // SQEM-667 — a change waits for review
   active: boolean;
   selected: boolean;
   onSelect: (id: string) => void;
@@ -102,6 +112,8 @@ const PlaybookRow = memo(function PlaybookRow({
         <span className="block text-sm font-semibold text-ink-strong truncate">{prompt.title}</span>
         <span className="block text-xs text-ink-muted truncate capitalize">{prompt.kind}{prompt.tag ? ` · ${prompt.tag}` : ''}</span>
       </button>
+      <ReviewBadge state={review ?? null} />
+      <ChangeBadge show={!review && !!changed} />
       <RightsIcons access={accessMode} editRestricted={editRestricted} />
       <button
         type="button"
@@ -185,6 +197,23 @@ const Templates = () => {
     void fetchEditRestrictedIds('template', workspace.id).then(setEditRestrictedIds);
   }, [workspace?.id]);
   useEffect(loadEditRestricted, [loadEditRestricted, prompts.length]);
+  // SQEM-666 — the review states of this list (one query), for the row badges.
+  const moderation = useModeration(workspace, currentUser);
+  const [reviewStates, setReviewStates] = useState<Map<string, ReviewInfo>>(new Map());
+  const loadReviewStates = useCallback(() => {
+    if (!workspace?.id || IS_SELF_HOSTED) return;
+    void fetchReviewStates('template', workspace.id).then(setReviewStates);
+  }, [workspace?.id]);
+  useEffect(loadReviewStates, [loadReviewStates, prompts.length]);
+  // SQEM-669 — bumped after a decision in the review list, so states and badges are read again.
+  const [reviewTick, setReviewTick] = useState(0);
+  // SQEM-667 — objects with a waiting change the viewer may see (their own; every one as a moderator).
+  const [changedIds, setChangedIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!workspace?.id || IS_SELF_HOSTED) return;
+    void fetchWorkspacePendingChanges(workspace.id).then(cs => setChangedIds(new Set(cs.filter(c => c.kind === 'template' && (c.state === 'pending' || c.author === currentUser?.id)).map(c => c.objectId))));
+  }, [workspace?.id, prompts.length, currentUser?.id, reviewTick]);
+  const reviewOf = (p: Prompt) => reviewBadgeOf(reviewStates.get(p.id), p.createdBy === currentUser?.id, moderation.moderator);
 
   // SQEM-181 — on self-host, publishing is possible only if a publisher token is configured (server-side).
   useEffect(() => {
@@ -483,6 +512,10 @@ const Templates = () => {
         subtitle={m.pb_subtitle()}
         actions={canEdit && (
           <>
+            {/* SQEM-669 — the review list, for moderators and admins when something waits. */}
+            {!IS_SELF_HOSTED && workspace && currentUser && (
+              <ModerationQueue workspace={workspace} user={currentUser} onChanged={() => { loadReviewStates(); setReviewTick(t => t + 1); }} />
+            )}
             <input ref={importInputRef} type="file" accept=".zip,.sqemes" onChange={handleImportFile} className="hidden" />
             <button
               onClick={() => importInputRef.current?.click()}
@@ -623,6 +656,8 @@ const Templates = () => {
                 canEdit={canEdit}
                 accessMode={restrictedIds.get(prompt.id)}
                 editRestricted={editRestrictedIds.has(prompt.id)}
+                review={reviewOf(prompt)}
+                changed={changedIds.has(prompt.id)}
                 active={selectedPrompt?.id === prompt.id}
                 selected={selectedIds.has(prompt.id)}
                 onSelect={selectPlaybook}
@@ -633,6 +668,14 @@ const Templates = () => {
           </ul>
           {selectedPrompt && (
             <div className={`lg:sticky lg:top-4 ${showPreviewOnMobile ? '' : 'hidden lg:block'}`}>
+              {/* SQEM-666 — the review state of the playbook in the preview; moderators decide here. */}
+              {reviewStates.get(selectedPrompt.id) && (
+                <div className="mb-3 rounded-card border border-line overflow-hidden [&>div]:border-b-0">
+                  <ReviewBanner kind="template" id={selectedPrompt.id} review={reviewStates.get(selectedPrompt.id)}
+                    isOwner={selectedPrompt.createdBy === currentUser?.id} moderator={moderation.moderator}
+                    onChanged={next => setReviewStates(prev => { const n = new Map(prev); if (next) n.set(selectedPrompt.id, next); else n.delete(selectedPrompt.id); return n; })} />
+                </div>
+              )}
               <PlaybookPreview
                 prompt={selectedPrompt}
                 members={workspace?.members ?? []}

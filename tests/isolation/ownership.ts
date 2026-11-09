@@ -55,6 +55,8 @@ export const OWNERSHIP: Record<string, Ownership> = {
   workspace_file_texts: ws(),
   workspace_files: ws(),
   workspace_groups: ws(),
+  workspace_moderators: ws(), // SQEM-666
+  pending_changes: ws(), // SQEM-667
   workspace_members: ws(),
   workspaces: { ownedByA: `t.id = '${A}'` },
   library_templates: {

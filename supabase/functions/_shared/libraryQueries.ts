@@ -699,12 +699,15 @@ export async function createLibraryReader(
     return new Map(((data ?? []) as any[]).map(m => [m.user_id as string, (m.profiles?.name || 'Member without a name') as string]));
   })();
   /** The SQEM-663 fields of one row: tag, owner's name, last change. */
+  // ⛔ A playbook's tag is the column `prompts.tag` (text). `prompts.tags` was dropped in June 2026; the
+  // first SQEM-663 build selected it, PostgREST answered 42703, and the unchecked result made list and
+  // search return NOTHING (fixed in the next release). Never select a column by memory here.
   const listFields = (t: any, names: Map<string, string>) => ({
-    ...(Array.isArray(t.tags) && t.tags[0] ? { tag: t.tags[0] as string } : {}),
+    ...(t.tag ? { tag: t.tag as string } : {}),
     ...(t.created_by ? { createdBy: names.get(t.created_by) ?? 'A former member' } : {}),
     ...(t.updated_at ? { updatedAt: t.updated_at as string } : {}),
   });
-  const tagMatches = (t: any, tag: string | null | undefined) => !tag || (Array.isArray(t.tags) && t.tags.includes(tag));
+  const tagMatches = (t: any, tag: string | null | undefined) => !tag || t.tag === tag;
 
   const reader: LibraryReader = {
     canAccessTemplate,
@@ -717,12 +720,14 @@ export async function createLibraryReader(
     async listTemplates({ kind = null, tag = null } = {}) {
       let query = client
         .from('prompts')
-        .select('id, title, description, kind, variables, context_file_ids, tags, created_by, updated_at')
+        .select('id, title, description, kind, variables, context_file_ids, tag, created_by, updated_at')
         .eq('workspace_id', workspaceId)
         .or('published.eq.true,kind.eq.skill') // SQEM-110/210 — vestigial guard
         .order('title');
       if (kind && kind !== 'all') query = query.eq('kind', kind);
-      const { data: templates } = await query;
+      const { data: templates, error: listErr } = await query;
+      // A failed query is an error, never "no playbooks": an empty list reads as a fact to the model.
+      if (listErr) throw new Error(`Could not list templates: ${listErr.message}`);
 
       const visible = (templates || [])
         .filter((t: any) => canAccessTemplate(t.id) && tagMatches(t, tag)); // SQEM-142/210 — access-filtered; SQEM-663 — tag
@@ -753,11 +758,12 @@ export async function createLibraryReader(
 
       let dbQuery = client
         .from('prompts')
-        .select('id, title, description, kind, context_file_ids, tags, created_by, updated_at')
+        .select('id, title, description, kind, context_file_ids, tag, created_by, updated_at')
         .eq('workspace_id', workspaceId)
         .or('published.eq.true,kind.eq.skill'); // SQEM-110/210 — vestigial guard
       if (kind) dbQuery = dbQuery.eq('kind', kind);
-      const { data: templates } = await dbQuery;
+      const { data: templates, error: searchErr } = await dbQuery;
+      if (searchErr) throw new Error(`Could not search templates: ${searchErr.message}`);
 
       const matched = (templates || [])
         .filter((t: any) =>
@@ -1027,6 +1033,9 @@ export async function createLibraryReader(
         const stored = storedTextOf(file);
         // Only a text from the current reader counts; an older one is read again and replaced.
         if (stored != null && stored.includes(OFFICE_READER_MARKER)) return { uri, name: file.name, mimeType: file.mime_type, text: stored, base64: null };
+        // SQEM-659 — a text from an OLDER reader still beats a refusal: a file too large to read here
+        // keeps answering with what it had until the Files page prepares it again in a browser.
+        if (stored != null && (file.size_bytes ?? 0) > OFFICE_READ_MAX_BYTES) return { uri, name: file.name, mimeType: file.mime_type, text: stored, base64: null };
         if ((file.size_bytes ?? 0) > OFFICE_READ_MAX_BYTES) {
           // SQEM-658 — a stored text (prepared in a browser) is served at any size up to the upload
           // limit; only reading it HERE is limited, by the CPU an edge function has.

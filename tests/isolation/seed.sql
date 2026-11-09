@@ -64,6 +64,12 @@ insert into public.workspace_groups (id, workspace_id, name, created_by)
   values ('aaaaaaaa-0000-4000-8000-00000000a201', 'aaaaaaaa-0000-4000-8000-0000000000aa', 'A group', 'aaaaaaaa-0000-4000-8000-0000000000a1');
 insert into public.workspace_group_members (group_id, user_id)
   values ('aaaaaaaa-0000-4000-8000-00000000a201', 'aaaaaaaa-0000-4000-8000-0000000000a2');
+-- SQEM-666 — one moderator row (the admin a1: editors and admins only), so the per-table probes have one of A's.
+insert into public.workspace_moderators (workspace_id, user_id)
+  values ('aaaaaaaa-0000-4000-8000-0000000000aa', 'aaaaaaaa-0000-4000-8000-0000000000a1');
+-- SQEM-667 — one proposed change of A (by the admin a1, on the open playbook a001), for the per-table probes.
+insert into public.pending_changes (workspace_id, kind, object_id, author, payload)
+  values ('aaaaaaaa-0000-4000-8000-0000000000aa', 'template', 'aaaaaaaa-0000-4000-8000-00000000a001', 'aaaaaaaa-0000-4000-8000-0000000000a1', '{"title": "proposed"}'::jsonb);
 -- SQEM-473 — one editor-list row each, so the per-table probes have A's rows to try to read and change.
 insert into public.template_editors (template_id, workspace_id, user_id, created_by)
   values ('aaaaaaaa-0000-4000-8000-00000000a002', 'aaaaaaaa-0000-4000-8000-0000000000aa', 'aaaaaaaa-0000-4000-8000-0000000000a1', 'aaaaaaaa-0000-4000-8000-0000000000a1');

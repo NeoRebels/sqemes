@@ -76,6 +76,10 @@ export interface Workspace {
   defaultTemplateAccess?: UserRole[];
   /** SQEM-534 — new playbooks and personas start with "Who can edit" restricted to their creator (and admins). */
   defaultEditRestricted?: boolean;
+  /** SQEM-666 — new playbooks and personas of non-moderators are reviewed before the team sees them. */
+  moderationNew?: boolean;
+  /** SQEM-667 — changes of non-moderators to shared playbooks and personas wait for review (only with moderationNew). */
+  moderationChanges?: boolean;
 }
 
 /** SQEM-106 — workspace-level brand context, seeded from the onboarding wizard. */
