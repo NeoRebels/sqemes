@@ -26,11 +26,11 @@ describe('SQEM-581 — token-only files', () => {
     });
   }
 
-  it('the editor opens on Test, with History second', () => {
+  it('SQEM-680 — the editor opens on Versions, Test second', () => {
     const ed = readFileSync(resolve(__dirname, '../../pages/TemplateEditor.tsx'), 'utf8');
-    expect(ed).toMatch(/useState<'history' \| 'test'>\('test'\)/);
-    expect(ed).toMatch(/\[\['test', txt\.ed_tab_test\(\), FlaskConical\], \['history', txt\.vh_history_tab\(\), History\]\]/);
-    expect([en.ed_tab_test, en.vh_history_tab]).toEqual(['Test', 'History']); // SQEM-605 — the words live in messages/
+    expect(ed).toMatch(/useState<'history' \| 'test'>\('history'\)/);
+    expect(ed).toMatch(/\[\['history', txt\.vh_history_tab\(\), History\], \['test', txt\.ed_tab_test\(\), FlaskConical\]\]/);
+    expect([en.ed_tab_test, en.vh_history_tab]).toEqual(['Test', 'Versions']); // SQEM-605 — the words live in messages/
   });
 
   it('the version tab confirms through ConfirmModal', () => {

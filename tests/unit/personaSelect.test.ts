@@ -53,22 +53,22 @@ describe('PersonaSelect', () => {
       value: null, onChange, onOpen,
     }));
     const trigger = el.querySelector('button')!;
-    expect(trigger.textContent).toContain('No persona');
+    expect(trigger.textContent).toContain('Automatic');
     click(trigger);
     expect(onOpen).toHaveBeenCalledTimes(1);
     const options = [...el.querySelectorAll('button')].slice(1);
-    expect(options.map(b => b.textContent)).toEqual(['No persona', 'SalesOffers and follow-ups', 'Support']);
+    expect(options.map(b => b.textContent)).toEqual(['Automatic', 'SalesOffers and follow-ups', 'Support']);
     click(options[1]);
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }));
     expect(el.querySelectorAll('button').length).toBe(1); // closed again
   });
 
-  it('shows the applied persona on the trigger, and "No persona" removes it', () => {
+  it('shows the applied persona on the trigger, and "Automatic" removes it', () => {
     const onChange = vi.fn();
     const el = mount(React.createElement(PersonaSelect, { personas: [persona('p1', 'Sales')], value: 'p1', onChange }));
     expect(el.querySelector('button')!.textContent).toContain('Sales');
     click(el.querySelector('button')!);
-    click([...el.querySelectorAll('button')][1]); // the "No persona" row
+    click([...el.querySelectorAll('button')][1]); // the "Automatic" row
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
@@ -87,7 +87,7 @@ describe('PersonaSelect', () => {
   it('with no personas and no action (a member who may not create): a plain empty menu', () => {
     const el = mount(React.createElement(PersonaSelect, { personas: [], value: null, onChange: () => {} }));
     click(el.querySelector('button')!);
-    expect([...el.querySelectorAll('button')].slice(1).map(b => b.textContent)).toEqual(['No persona']);
+    expect([...el.querySelectorAll('button')].slice(1).map(b => b.textContent)).toEqual(['Automatic']);
   });
 
   it('⛔ closes from a mousedown on document, never by stopping propagation', () => {

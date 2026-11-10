@@ -10535,7 +10535,7 @@ export const ed_tab_editor = /** @type {((inputs?: Ed_Tab_EditorInputs, options?
 /**
 * | output |
 * | --- |
-* | "History · Test" |
+* | "Versions · Test" |
 *
 * @param {Ed_Tab_History_TestInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -23026,7 +23026,7 @@ export const rt_sum_no_connectors = /** @type {((inputs?: Rt_Sum_No_ConnectorsIn
 /**
 * | output |
 * | --- |
-* | "no persona" |
+* | "persona automatic" |
 *
 * @param {Rt_Sum_No_PersonaInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -25674,7 +25674,7 @@ export const start_no_favourites = /** @type {((inputs?: Start_No_FavouritesInpu
 /**
 * | output |
 * | --- |
-* | "No persona" |
+* | "Automatic" |
 *
 * @param {Start_No_PersonaInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -31341,7 +31341,7 @@ export const vh_former_member = /** @type {((inputs?: Vh_Former_MemberInputs, op
 /**
 * | output |
 * | --- |
-* | "History" |
+* | "Versions" |
 *
 * @param {Vh_History_TabInputs} inputs
 * @param {{ locale?: "en" | "de" }} options

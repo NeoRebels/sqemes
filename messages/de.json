@@ -112,7 +112,7 @@
   "start_use": "Nutzen",
   "start_composer_label": "Beschreibe die Aufgabe",
   "start_composer_placeholder": "Beschreibe die Aufgabe – oder starte mit / von einem Playbook",
-  "start_no_persona": "Keine Persona",
+  "start_no_persona": "Automatisch",
   "start_playbook_button": "Playbook",
   "start_send": "Senden",
   "start_work_in": "Arbeite in",
@@ -725,7 +725,7 @@
   "ed_readonly_2": "Bearbeiten dürfen nur die Personen, die der Eigentümer ausgewählt hat. Frag sie oder einen Admin des Workspace.",
   "ed_readonly_2_named": "Bearbeiten dürfen nur die Personen, die der Eigentümer ({owner}) ausgewählt hat. Frag sie oder einen Admin des Workspace.",
   "ed_tab_editor": "Editor",
-  "ed_tab_history_test": "Verlauf · Test",
+  "ed_tab_history_test": "Versionen · Test",
   "ed_tab_test": "Test",
   "ed_tab_settings": "Einstellungen",
   "ed_type": "Art",
@@ -970,7 +970,7 @@
   "cf_upload": "Kontextdatei hochladen",
   "cf_no_match": "Keine Dateien passen zu deiner Suche",
   "cf_all_attached": "Alle Dateien sind schon angehängt",
-  "vh_history_tab": "Verlauf",
+  "vh_history_tab": "Versionen",
   "bulk_set_tag": "Tag setzen",
   "chat_no_model": "Kein Modell verfügbar",
   "tags_filter_label": "Nach Tag filtern",
@@ -3089,7 +3089,7 @@
   "rt_advanced_help": "Persona, Playbooks, Connectors, Modell und Websuche. Die meisten Routinen brauchen nichts davon.",
   "rt_model_default": "Standard des Workspace ({name})",
   "rt_sum_default_model": "Standardmodell",
-  "rt_sum_no_persona": "keine Persona",
+  "rt_sum_no_persona": "Persona automatisch",
   "rt_sum_playbooks": [
     {
       "declarations": [

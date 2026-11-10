@@ -102,13 +102,16 @@ describe('LIBRARY_SYSTEM_PROMPT', () => {
     expect(LIBRARY_SYSTEM_PROMPT).toMatch(/1\. Role first\./);
   });
 
-  it('stays short and precise (SQEM-487: 2,258 → under 1,300 characters)', () => {
-    expect(LIBRARY_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1300);
+  it('stays short and precise (SQEM-487: 2,258 → 1,297; SQEM-681 measured the longer steps 2 and 4: under 1,600)', () => {
+    expect(LIBRARY_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1600);
   });
 
-  it('⛔ does not name list_templates — Chat deliberately does not offer it', () => {
-    // SQEM-373: the one call whose response grows with the workspace. A prompt naming a tool half
-    // the surfaces lack is how a model ends up calling something that is not there.
-    expect(LIBRARY_SYSTEM_PROMPT).not.toContain('list_templates');
+  it('names list_templates only because every surface that carries the instruction offers it (SQEM-681)', () => {
+    // SQEM-373 kept it out of Chat; SQEM-561 gave Chat every read tool, SQEM-681 gave routines the read actions too.
+    // A prompt naming a tool a surface lacks is how a model ends up calling something that is not there.
+    expect(LIBRARY_SYSTEM_PROMPT).toContain('list_templates');
+    const chat = readFileSync('supabase/functions/chat-message/index.ts', 'utf8');
+    expect(chat).toMatch(/definitions: chatActionDefinitions\(routine \? 'member' : role,/);
+    expect(chat).not.toMatch(/actions: routine \? undefined/);
   });
 });

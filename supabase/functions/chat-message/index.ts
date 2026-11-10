@@ -790,11 +790,13 @@ async function runAndBroadcast({
            * (`_shared/libraryActions.ts`): one implementation of "may this person change this".
            * ⛔ Still the chat user's own id — never a key (SQEM-346).
            */
-          // SQEM-676 — a routine reads the library and never changes it: no write actions offered.
-          actions: routine ? undefined : {
-            definitions: chatActionDefinitions(role, { selfHosted: SELF_HOSTED }), // SQEM-663
+          // SQEM-676 — a routine reads the library and never changes it. SQEM-681 — it gets the READ actions
+          // (`list_templates` & co., which the library instruction now names) by acting as a member: the same
+          // filter that gives a member no write tools, and the handlers refuse a write for that role regardless.
+          actions: {
+            definitions: chatActionDefinitions(routine ? 'member' : role, { selfHosted: SELF_HOSTED }), // SQEM-663
             run: (name, args, lib) => runLibraryTool(
-              { adminClient: createAdminClient(), workspaceId, userId, role, lib, surface: 'chat' }, name, args),
+              { adminClient: createAdminClient(), workspaceId, userId, role: routine ? 'member' : role, lib, surface: 'chat' }, name, args),
           },
           onChange: (change) => addChange(libraryChanges, change),
           // SQEM-651 — a persona loaded mid-answer fetches its connector services.

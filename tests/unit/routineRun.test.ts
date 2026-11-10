@@ -114,7 +114,8 @@ describe('the wiring', () => {
   });
   it('chat-message: a routine does not stream, reads the library only, makes no files and runs no analysis', () => {
     expect(CHAT).toMatch(/const streams = !funded && !routine;/);
-    expect(CHAT).toMatch(/actions: routine \? undefined : \{/);
+    // SQEM-681 — read actions only: a routine acts as a member, so no write tool is offered or accepted.
+    expect(CHAT).toMatch(/definitions: chatActionDefinitions\(routine \? 'member' : role,/);
     expect(CHAT).toMatch(/if \(base && !routine\) base = withFileTool/);
     expect(CHAT).toMatch(/if \(base && !routine\) base = withAnalysisTool/);
   });

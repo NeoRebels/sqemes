@@ -21,6 +21,7 @@ import {
   routineMissingServicesNote, TICKET_TTL_MS, type RoutinePlaybook,
 } from '../_shared/routineRun.ts';
 import { routineDispatchSecret } from '../_shared/routineSecret.ts';
+import { CHOSEN_PERSONA_NOTE } from '../_shared/libraryPrompt.ts';
 import { resolveRoutineModel, routineModelReplacedNote, type RoutineModel } from '../_shared/routineModel.ts';
 
 const done = (status: number, body: Record<string, unknown> = {}) =>
@@ -113,7 +114,8 @@ Deno.serve(async (req) => {
   if (missingNote) notes.push(missingNote);
   const allowed = new Set(available.map(c => String(c.id)));
   const connectorIds = [...new Set([...(r.connector_ids ?? []), ...fromPersona.ids])].filter(id => allowed.has(id));
-  const systemInstruction = buildRoutineInstruction(personaText, playbooks, fromPersona.missing.map(s => s.name));
+  // SQEM-680 — the person chose this persona for the routine: it stays the role (`CHOSEN_PERSONA_NOTE`).
+  const systemInstruction = buildRoutineInstruction(personaText ? `${CHOSEN_PERSONA_NOTE}\n\n${personaText}` : null, playbooks, fromPersona.missing.map(s => s.name));
 
   // ── The chat ─────────────────────────────────────────────────────────────────────────────────────
   // ⛔ A retry writes into the chat of the first attempt (the queue row keeps it): a load test left one

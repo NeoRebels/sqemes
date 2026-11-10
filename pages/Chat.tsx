@@ -23,7 +23,7 @@ import { normalizeGeneratedFiles, type GeneratedFile } from '../supabase/functio
 import { GeneratedFilesCard, FilePreviewPanel } from '../components/ChatFileOutput';
 import { normalizeLibraryChanges, type LibraryChange } from '../supabase/functions/_shared/libraryChanges.ts';
 import { fetchWorkspaceFiles } from '../lib/api/files';
-import { personaInstruction } from '../lib/personaChat';
+import { chosenPersonaInstruction } from '../lib/personaChat';
 import PullToRefreshIndicator from '../components/PullToRefreshIndicator';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -565,7 +565,7 @@ const Chat = () => {
    */
   const applyPersona = useCallback((persona: Persona) => {
     setActivePersona(persona);
-    setActiveSystemInstruction(personaInstruction(persona, prompts));
+    setActiveSystemInstruction(chosenPersonaInstruction(persona, prompts));
     // SQEM-641 — the persona's services are switched on below, once the connectors are loaded (a
     // persona applied from a card or a handoff can arrive before them).
     if (persona.connectors?.length) setPendingPersonaServices(persona.connectors);
@@ -685,7 +685,7 @@ const Chat = () => {
           const skillCtxs = await Promise.all(skills.map(sk => resolveAppliedContext(sk, workspaceFiles)));
 
           setActivePersona(persona);
-          setActiveSystemInstruction(persona ? personaInstruction(persona, prompts) : '');
+          setActiveSystemInstruction(persona ? chosenPersonaInstruction(persona, prompts) : '');
           setActiveSkills(skills.map((template, i) => ({ template, context: skillCtxs[i].text })));
           setSessionConnectorIds(applied.connectorIds); // SQEM-635 — set unconditionally, like the rest
         } catch {

@@ -190,8 +190,9 @@ describe('wiring', () => {
 
   it('chat-message runs the SHARED handlers as the chat user, with the role from the membership check', () => {
     expect(chat).toMatch(/role: \(membership as \{ role\?: string \}\)\.role \?\? null/);
-    expect(chat).toMatch(/definitions: chatActionDefinitions\(role, \{ selfHosted: SELF_HOSTED \}\)/); // SQEM-663
-    expect(chat).toMatch(/runLibraryTool\(\s*\{ adminClient: createAdminClient\(\), workspaceId, userId, role, lib, surface: 'chat' \}/);
+    expect(chat).toMatch(/definitions: chatActionDefinitions\(routine \? 'member' : role, \{ selfHosted: SELF_HOSTED \}\)/); // SQEM-663, SQEM-681
+    // SQEM-681 — a routine runs them as a member (read only); otherwise the role from the membership check.
+    expect(chat).toMatch(/runLibraryTool\(\s*\{ adminClient: createAdminClient\(\), workspaceId, userId, role: routine \? 'member' : role, lib, surface: 'chat' \}/);
   });
 
   it('⛔ the shared handlers refuse a write without the role before any handler runs', () => {

@@ -103,7 +103,7 @@ describe('⛔ SQEM-389 — the wiring', () => {
     // applying a persona persists it (SQEM-390: nothing else shares the slot any more)
     expect(chat).toMatch(/updateAppliedContext\(sessionId, \{ personaId: persona\.id \}\)/);
     // restore sets the persona's instruction, or nothing; new chat clears it; a pre-session persona rides through create
-    expect(chat).toMatch(/setActiveSystemInstruction\(persona \? personaInstruction\(persona, prompts\) : ''\)/);
+    expect(chat).toMatch(/setActiveSystemInstruction\(persona \? chosenPersonaInstruction\(persona, prompts\) : ''\)/); // SQEM-680
     // These two are anchored by their trailing comment, so they read the RAW source.
     const raw = read('pages/Chat.tsx');
     expect(raw).toMatch(/setActivePersona\(null\); \/\/ SQEM-389/);

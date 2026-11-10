@@ -34,6 +34,11 @@ const CASES = [
   // SQEM-623 — a correction of the loaded playbook should end in ONE offer to update it; T1–T3 must stay quiet.
   { id: 'C1', type: 'correct', want: 'release_notes', q: 'Schreib Release Notes für Version 2.3: Login ist schneller, der Export-Fehler ist behoben. Wichtig: Bei uns haben Release Notes immer einen Abschnitt „Bekannte Probleme“, der fehlt in eurer Vorlage.' },
   { id: 'C2', type: 'correct', want: 'candidate_rejection', q: 'Schreib eine Absage an einen Bewerber für die Stelle als Backend-Entwickler. Achtung: Wir duzen Bewerber grundsätzlich, und wir nennen immer einen konkreten Grund für die Absage.' },
+  // SQEM-681 — the person NAMES a playbook, spelled differently from its title; or one that does not exist.
+  { id: 'S1', type: 'named', want: 'brand_voice', q: 'Nutze unseren Skill „Brand Voice“ und formulier: Wir sind ab Montag wieder erreichbar.' },
+  { id: 'S2', type: 'named', want: 'meeting_notes', q: 'Nimm das Playbook Meeting Protokoll und fass zusammen: Wir verschieben das Projekt bis Q2; Anna klärt das Budget.' },
+  { id: 'S3', type: 'named', want: 'pricing_guidelines', q: 'Wende die Preis-Richtlinien an: Ein Kunde will 30 Prozent Rabatt. Was antworte ich?' },
+  { id: 'S4', type: 'missing', q: 'Nutze unser Playbook „Onboarding-Checkliste“ und erstelle mir die Liste für eine neue Kollegin.' },
   { id: 'N1', type: 'none', q: 'Was ist die Hauptstadt von Australien?' },
   { id: 'N2', type: 'none', q: 'Erklär mir in zwei Sätzen, was ein Mutex ist.' },
 ].filter(c => !only || only.split(',').includes(c.id));
@@ -52,7 +57,7 @@ function runOne(c, n) {
     const cfg = join(OUT, `${c.id}-${n}.mcp.json`);
     writeFileSync(cfg, JSON.stringify({ mcpServers: { sqemes: { type: 'stdio', command: 'node', args: [join(HERE, 'mock-mcp.mjs')], env: { MOCK_LOG: log, MOCK_HINT: process.env.MOCK_HINT ?? '' } } } }));
     const args = ['-p', c.q, '--append-system-prompt', PROMPT, '--mcp-config', cfg, '--strict-mcp-config',
-      '--allowedTools', 'mcp__sqemes__search_templates,mcp__sqemes__get_template,mcp__sqemes__list_personas,mcp__sqemes__get_persona',
+      '--allowedTools', 'mcp__sqemes__search_templates,mcp__sqemes__list_templates,mcp__sqemes__get_template,mcp__sqemes__list_personas,mcp__sqemes__get_persona',
       '--disallowedTools', 'Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,Task,Agent,TodoWrite,NotebookEdit',
       '--setting-sources', 'project', '--model', 'sonnet', '--max-turns', '8', '--output-format', 'json', '--no-session-persistence'];
     const p = spawn('claude', args, { cwd: WORK, env: { ...process.env } });
@@ -79,6 +84,9 @@ function judge(c, n, calls, text) {
   if (c.type === 'two') ok = c.want.every(w => text.includes(w)) && templates.length === 0;
   if (c.type === 'playbook') ok = templates.includes(c.want);
   if (c.type === 'none') ok = tools.length === 0;
+  // SQEM-681 — found despite the spelling; a missing one is SAID, not silently skipped.
+  if (c.type === 'named') ok = templates.includes(c.want);
+  if (c.type === 'missing') ok = templates.length === 0 && /(nicht gefunden|finde[^.?!\n]{0,40}nicht|nicht vorhanden|gibt es[^.?!\n]{0,40}nicht|existiert nicht|kein[^.?!\n]{0,30}(playbook|vorlage)[^.?!\n]{0,30}(namens|mit dem namen|„onboarding))/i.test(text);
   // SQEM-623 — an offer is a sentence naming the playbook/persona/template next to a change verb.
   const offered = /(playbook|vorlage|persona|template)[^.?!\n]{0,160}(anpass|aktualis|ergänz|erweiter|aufnehm|übernehm|hinzufüg|speicher|update)|(anpass|aktualis|ergänz|erweiter|aufnehm|übernehm|hinzufüg|speicher|update)[^.?!\n]{0,160}(playbook|vorlage|persona|template)/i.test(text);
   if (c.type === 'correct') ok = templates.includes(c.want) && offered;

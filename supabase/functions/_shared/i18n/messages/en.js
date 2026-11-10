@@ -4636,7 +4636,7 @@ export const ed_tab_editor = /** @type {(inputs: Ed_Tab_EditorInputs) => Localiz
 };
 
 export const ed_tab_history_test = /** @type {(inputs: Ed_Tab_History_TestInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`History · Test`)
+	return /** @type {LocalizedString} */ (`Versions · Test`)
 };
 
 export const ed_tab_settings = /** @type {(inputs: Ed_Tab_SettingsInputs) => LocalizedString} */ () => {
@@ -8292,7 +8292,7 @@ export const rt_sum_no_connectors = /** @type {(inputs: Rt_Sum_No_ConnectorsInpu
 };
 
 export const rt_sum_no_persona = /** @type {(inputs: Rt_Sum_No_PersonaInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`no persona`)
+	return /** @type {LocalizedString} */ (`persona automatic`)
 };
 
 export const rt_sum_playbooks = /** @type {(inputs: Rt_Sum_PlaybooksInputs) => LocalizedString} */ (i) => {
@@ -9054,7 +9054,7 @@ export const start_no_favourites = /** @type {(inputs: Start_No_FavouritesInputs
 };
 
 export const start_no_persona = /** @type {(inputs: Start_No_PersonaInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`No persona`)
+	return /** @type {LocalizedString} */ (`Automatic`)
 };
 
 export const start_playbook_button = /** @type {(inputs: Start_Playbook_ButtonInputs) => LocalizedString} */ () => {
@@ -10703,7 +10703,7 @@ export const vh_former_member = /** @type {(inputs: Vh_Former_MemberInputs) => L
 };
 
 export const vh_history_tab = /** @type {(inputs: Vh_History_TabInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`History`)
+	return /** @type {LocalizedString} */ (`Versions`)
 };
 
 export const vh_restore = /** @type {(inputs: Vh_RestoreInputs) => LocalizedString} */ () => {

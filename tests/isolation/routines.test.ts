@@ -180,8 +180,10 @@ describe('SQEM-675 — the queue', () => {
     expect(one(`select count(*) from public.routine_queue where routine_id = '${rid(1)}'`)).toBe('1');
     expect(one(`select count(*) from public.routine_queue where routine_id = '${rid(2)}'`)).toBe('0');
     expect(one(`select count(*) from public.routines where id in ('${rid(1)}', '${rid(2)}') and next_run_at > now()`)).toBe('2');
-    // The same local day again (e.g. the schedule was edited back): still one run.
-    sql(`update public.routines set next_run_at = now() - interval '1 minute' where id = '${rid(1)}'`);
+    // The same local day again (e.g. the schedule was edited back): still one run. ⚠️ The SAME due time, not
+    // "now() - 1 minute": shortly after local midnight that is already the next day — a second run, rightly —
+    // and the suite failed when it happened to run just after midnight.
+    sql(`update public.routines set next_run_at = (select due_at from public.routine_queue where routine_id = '${rid(1)}') where id = '${rid(1)}'`);
     expect(one(`select public.enqueue_due_routines()`)).toBe('0');
   });
 

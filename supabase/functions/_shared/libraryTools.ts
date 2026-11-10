@@ -52,7 +52,7 @@ export const LIBRARY_TOOLS: ToolDefinition[] = [
   {
     name: 'search_templates',
     description:
-      "Search this workspace's library of reusable templates (prompts and skills the team has curated) by keyword; matches title and description. " +
+      "Search this workspace's library of reusable templates (prompts and skills the team has curated) by keyword. The query is matched as text in titles and descriptions, so search ONE word; with no match, try another word or list_templates (SQEM-681). " +
       'Call this before writing, drafting, reviewing or rewriting anything substantial from scratch — if the team already has a template for it, following theirs beats improvising. ' +
       'Returns id, name, kind and description. Load one with get_template. ' +
       'A match that carries context files also reports contextFileCount and contextBytes; use them to decide how to load it.',

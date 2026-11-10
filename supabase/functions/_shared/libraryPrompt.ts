@@ -61,6 +61,14 @@
  * on playbook-only requests the client often makes one extra `list_personas` call (6 of 9 runs).
  * ⛔ Do not move the persona step back below the playbook steps without re-running the measurement.
  *
+ * ⭐ **A named playbook is found, a missing one is said (SQEM-681).** `search_templates` matches the WHOLE query as
+ * text in title or description, so "Meeting Protokoll" never finds "Meeting-Protokoll", and step 4 then told the
+ * model to carry on silently. Step 2 now asks for ONE word, step 4 for another word or `list_templates` and an honest
+ * "not there" when the person named it — chosen over changing the search. Measured with `scripts/prompt-eval/` (the
+ * mock searches like the real reader and offers `list_templates`): named playbooks with a different spelling were
+ * found every time and with fewer searches, and no other case got worse — the correction cases measured with the
+ * improvement hint (MOCK_HINT=1), as the real readers serve it. Re-run it before changing steps 2 or 4.
+ *
  * ⚠️ **On several matches it asks rather than picks** (owner's decision, 2026-08-31; the first draft
  * said *pick the most specific one*). A template is this organisation's agreed way of doing the work,
  * so choosing the wrong one silently produces something that looks sanctioned and is not — and the
@@ -71,9 +79,9 @@
 export const LIBRARY_SYSTEM_PROMPT = `Before you write, draft, plan, review or rewrite anything substantial, check the sqemes playbooks: this organisation's agreed way of doing recurring work. (The tools call a playbook a template.)
 
 1. Role first. If the task belongs to a role — sales, recruiting, support, a team's own job — call list_personas. If one persona fits, load it with get_persona, work as that role, and load a route only when its condition applies.
-2. Otherwise call search_templates with a keyword from the request. If one playbook fits, load it with get_template and follow it.
+2. Otherwise call search_templates with one keyword from the request — a single word; it is matched as text in titles and descriptions. If one playbook fits, load it with get_template and follow it.
 3. If several personas or playbooks fit, name them with a one-line difference each, ask which one fits best and wait for the answer — do not choose for them.
-4. If nothing fits, carry on normally and do not mention the playbooks.
+4. If the person names a playbook or persona and you cannot find it, try another word or list_templates; if it is still not there, say so — it may not be shared with them. If nothing fits an unnamed task, carry on normally and do not mention the playbooks.
 
 Playbooks come in two kinds: a prompt is a task with {{variables}} — fill them from the request; a skill is company knowledge — apply it for as long as the task is in its scope. Read a playbook's files only when the task needs them (read_context_file). Say which persona or playbook you use, and do not paste its contents.
 
@@ -119,3 +127,10 @@ export function withLibraryPrompt(systemInstruction: string | undefined): string
  * the length at 400 characters — raise it only with a reason.
  */
 export const IMPROVEMENT_HINT = 'Only if the person corrected this playbook or persona, or a step in it proved outdated, missing or duplicated: end your answer by asking in one sentence whether to update it or create a new one. Otherwise say nothing about changing it. Change nothing without their explicit yes; ask at most once, never after a no. Never offer to delete. If they cannot edit it, suggest telling someone who can.';
+
+/**
+ * SQEM-680 — put in front of a persona the PERSON chose (in Chat or for a routine). Without it the library
+ * instruction above ("Role first … call list_personas") let the model swap the chosen role for another it
+ * thought fitted better. The tools stay, so "switch to X" still works when they ask for it.
+ */
+export const CHOSEN_PERSONA_NOTE = 'The person chose the persona below for this conversation. Work as this role. Do not load another persona with get_persona unless they ask you to.';

@@ -112,7 +112,7 @@ const TemplateEditor = () => {
   const [review, setReview] = useState<ReviewInfo | null>(null);
   const reviewNow: ReviewInfo | null = review ?? (!id && !isLibrary && moderation.enabled && !moderation.moderator ? { state: 'draft', note: null } : null);
 
-  const [rightTab, setRightTab] = useState<'history' | 'test'>('test');
+  const [rightTab, setRightTab] = useState<'history' | 'test'>('history');
   const [historyKey, setHistoryKey] = useState(0);
   // SQEM-142 — per-template role access. New templates inherit the workspace default; existing
   // ones load their rules below. Empty roles = open to everyone.
@@ -1170,12 +1170,12 @@ const TemplateEditor = () => {
           />
         </div>
 
-        {/* SQEM-477 — right panel: History and Test (Test was the only thing here before) */}
+        {/* SQEM-477 — right panel: History and Test (Test was the only thing here before). SQEM-680 — "Versions" first and preselected; without a saved version only Test shows. */}
         {/* SQEM-387 — `flex-1 min-h-0` below `xl` (a column): `shrink-0` let this grow to its content and the shell cut it off; `xl:flex-none` keeps the width on xl. */}
         <div className={`w-full xl:w-[420px] flex-1 min-h-0 xl:flex-none overflow-hidden ${mobileTab === 'test' ? 'flex flex-col' : 'hidden xl:flex xl:flex-col'}`}>
           {hasHistory && (
             <div role="tablist" className="flex border-b border-line bg-surface-raised shrink-0">
-              {([['test', txt.ed_tab_test(), FlaskConical], ['history', txt.vh_history_tab(), History]] as const).map(([key, label, Icon]) => (
+              {([['history', txt.vh_history_tab(), History], ['test', txt.ed_tab_test(), FlaskConical]] as const).map(([key, label, Icon]) => (
                 <button
                   key={key}
                   role="tab"

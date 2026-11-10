@@ -112,7 +112,7 @@
   "start_use": "Use",
   "start_composer_label": "Describe the task",
   "start_composer_placeholder": "Describe the task — or start from a playbook with /",
-  "start_no_persona": "No persona",
+  "start_no_persona": "Automatic",
   "start_playbook_button": "Playbook",
   "start_send": "Send",
   "start_work_in": "Work in",
@@ -725,7 +725,7 @@
   "ed_readonly_2": "Editing is limited to the people its owner chose. Ask them or a workspace admin.",
   "ed_readonly_2_named": "Editing is limited to the people its owner ({owner}) chose. Ask them or a workspace admin.",
   "ed_tab_editor": "Editor",
-  "ed_tab_history_test": "History · Test",
+  "ed_tab_history_test": "Versions · Test",
   "ed_tab_test": "Test",
   "ed_tab_settings": "Settings",
   "ed_type": "Type",
@@ -970,7 +970,7 @@
   "cf_upload": "Upload context file",
   "cf_no_match": "No files match your search",
   "cf_all_attached": "All files already attached",
-  "vh_history_tab": "History",
+  "vh_history_tab": "Versions",
   "bulk_set_tag": "Set tag",
   "chat_no_model": "No model available",
   "tags_filter_label": "Filter by tag",
@@ -3089,7 +3089,7 @@
   "rt_advanced_help": "Persona, playbooks, connectors, model and web search. Most routines need none of it.",
   "rt_model_default": "Workspace default ({name})",
   "rt_sum_default_model": "Default model",
-  "rt_sum_no_persona": "no persona",
+  "rt_sum_no_persona": "persona automatic",
   "rt_sum_playbooks": [
     {
       "declarations": [

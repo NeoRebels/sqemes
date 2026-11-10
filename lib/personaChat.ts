@@ -2,6 +2,7 @@ import type { Persona, Prompt } from '../types';
 // ⛔ The SAME composer the MCP server uses — `_shared/libraryQueries.ts` is import-free, so the
 // browser imports it directly (the SQEM-378/381 pattern). A copy here would be the twin that drifts.
 import { composePersona, toSlug } from '../supabase/functions/_shared/libraryQueries';
+import { CHOSEN_PERSONA_NOTE } from '../supabase/functions/_shared/libraryPrompt';
 
 /**
  * SQEM-389 — the system instruction a persona contributes to a chat session.
@@ -14,6 +15,14 @@ import { composePersona, toSlug } from '../supabase/functions/_shared/libraryQue
  * deletion or by access control, and from here the two are indistinguishable (the SQEM-371 stance).
  * The route's own denormalised title/kind fill in when the template is present but lacks a field.
  */
+/** SQEM-680 — the persona a person picked in Chat: its instruction with the note that it stays (`CHOSEN_PERSONA_NOTE`). */
+export function chosenPersonaInstruction(
+  persona: Parameters<typeof personaInstruction>[0],
+  templates: Parameters<typeof personaInstruction>[1],
+): string {
+  return `${CHOSEN_PERSONA_NOTE}\n\n${personaInstruction(persona, templates)}`;
+}
+
 export function personaInstruction(
   persona: Pick<Persona, 'title' | 'description' | 'content' | 'routes'> & Partial<Pick<Persona, 'connectors'>>,
   templates: Pick<Prompt, 'id' | 'title' | 'kind' | 'description'>[],

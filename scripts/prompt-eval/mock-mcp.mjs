@@ -1,11 +1,12 @@
 // SQEM-487 — a local stdio MCP server with a FAKE library, for measuring tool choice.
 // Tool names and descriptions are read from the real mcp-server source, so the model sees what it
 // would see against Sqemes. No real data: three personas, eight playbooks, all invented.
+// SQEM-681 — descriptions come from `_shared/libraryToolDefs.ts` (the server imports them from there now), the
+// search matches the WHOLE query as text like the real `searchTemplates`, and `list_templates` exists, as in Chat.
 import { readFileSync, appendFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 
-const SRC = readFileSync(new URL('../../supabase/functions/mcp-server/index.ts', import.meta.url), 'utf8');
-const LIST = SRC.slice(SRC.indexOf("if (method === 'tools/list') {"));
+const LIST = readFileSync(new URL('../../supabase/functions/_shared/libraryToolDefs.ts', import.meta.url), 'utf8');
 function realDescription(name) {
   const i = LIST.indexOf(`name: '${name}'`);
   const d = LIST.indexOf("description: '", i) + "description: '".length;
@@ -43,6 +44,7 @@ const PERSONAS = [
 
 const TOOLS = [
   { name: 'search_templates', inputSchema: { type: 'object', properties: { query: { type: 'string' }, kind: { type: 'string', enum: ['prompt', 'skill'] } }, required: ['query'] } },
+  { name: 'list_templates', inputSchema: { type: 'object', properties: { kind: { type: 'string', enum: ['prompt', 'skill'] } } } },
   { name: 'get_template', inputSchema: { type: 'object', properties: { name: { type: 'string' }, id: { type: 'string' } } } },
   { name: 'list_personas', inputSchema: { type: 'object', properties: {} } },
   { name: 'get_persona', inputSchema: { type: 'object', properties: { name: { type: 'string' }, id: { type: 'string' } } } },
@@ -50,7 +52,6 @@ const TOOLS = [
 
 const LOG = process.env.MOCK_LOG;
 const log = (o) => { if (LOG) appendFileSync(LOG, JSON.stringify(o) + '\n'); };
-const words = (s) => String(s || '').toLowerCase().split(/[^a-zäöüß0-9-]+/).filter(w => w.length > 2);
 
 function call(name, args) {
   log({ tool: name, args });
@@ -62,10 +63,12 @@ function call(name, args) {
       + (HINT ? `\n\n## After the task\n\n${HINT}` : '');
   }
   if (name === 'search_templates') {
-    const q = words(args.query);
-    const hits = PLAYBOOKS.filter(p => q.some(w => (p.title + ' ' + p.description).toLowerCase().includes(w)));
+    // SQEM-681 — like `searchTemplates` in `_shared/libraryQueries.ts`: the whole query, as text, in title or description.
+    const needle = String(args.query || '').toLowerCase();
+    const hits = needle ? PLAYBOOKS.filter(p => p.title.toLowerCase().includes(needle) || p.description.toLowerCase().includes(needle)) : [];
     return hits.map(p => ({ id: p.name, name: p.name, title: p.title, kind: p.kind, description: p.description }));
   }
+  if (name === 'list_templates') return PLAYBOOKS.filter(p => !args.kind || p.kind === args.kind).map(p => ({ id: p.name, name: p.name, title: p.title, kind: p.kind, description: p.description }));
   if (name === 'get_template') {
     const p = PLAYBOOKS.find(x => x.name === args.name || x.name === args.id);
     if (!p) return { error: 'Template not found' };
