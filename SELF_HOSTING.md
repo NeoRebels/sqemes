@@ -40,6 +40,7 @@ only** and simply stay off when their secret is absent — nothing breaks.
 | BYOK AI providers (OpenAI, Anthropic, Gemini, Mistral, …) | Error monitoring (Sentry) |
 | Workspace file library + signed-URL delivery | Priority support / SLA, Enterprise SSO, audit logs |
 | Connectors — any MCP server via **Add connector** (OAuth, token or open) | Marketplace **submission review** + the super-admin review surface |
+| **Routines** — a person's own task at a set time (`pg_cron`), set up by the installer | — |
 | — | **One-click connector apps** (Google Workspace, Microsoft 365, Atlassian, Linear, Notion, …) |
 | Marketplace **reading** — browse, vote, copy a published playbook | — |
 
@@ -409,6 +410,40 @@ What that means for an operator:
 
 ---
 
+## Routines — a task that runs at a set time
+
+Each person can set up **routines** under Work → Routines: a task written like a Chat message, run for
+them on chosen days at a set time, its answer waiting as a chat in their history. Up to five active per
+person. A routine runs on your server without anyone watching, with that person's rights at the time of
+the run, and uses only the connectors chosen for it.
+
+**On the Docker bundle there is nothing to do** (since v1.11.41). Every start of the
+`init` container sets the two Vault entries the scheduler needs, and the functions derive the matching
+secret from your `SERVICE_ROLE_KEY` — so a fresh install and an update both come with Routines on.
+`docker compose logs init` ends with `Routines ready: t`.
+
+What runs where: a `pg_cron` job (`routines-tick`, every minute) in your database starts due runs
+through `pg_net`, at most 100 at once; each run is an edge function call (`routine-run`, then
+`chat-routine`) inside the stack, to `http://kong:8000`. A run is paid like a Chat answer, with the
+workspace's own provider key. Without a key it writes the reason into its chat and counts as failed;
+three failures in a row pause the routine.
+
+**Path A (your own Supabase):** Routines stay hidden until both entries exist. Set your own secret
+(at least 32 characters) for the functions and the same value in the Vault:
+
+```bash
+supabase secrets set ROUTINE_DISPATCH_SECRET="$(openssl rand -hex 32)" --project-ref <ref>
+```
+```sql
+select vault.create_secret('<the same secret>', 'routine_dispatch_secret');
+select vault.create_secret('https://<ref>.supabase.co/functions/v1/routine-run', 'routine_run_url');
+```
+
+Your project needs the `pg_cron` and `pg_net` extensions (the migrations enable them), and an edge
+function wall clock long enough for a model answer — the bundle allows 400 seconds.
+
+---
+
 ## Connectors — external MCP tools
 
 Connectors let a workspace attach third-party MCP tools and use them in sqemes Chat — with every text
@@ -532,7 +567,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.11.40       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.11.41       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### ⛔ 3a. Before v1.11.9: count your workspace-wide MCP keys
@@ -736,7 +771,7 @@ If you would rather it did not, block `/#/library/` at your reverse proxy — bu
 reaches the server, so the block has to happen in the browser or not at all. Removing the route in a
 fork is the reliable way.
 
-*Last updated: 2026-11-09 (version pin v1.11.40 — pictures inside Word, Excel and PowerPoint files reach the model: in Chat as attachments of their own for the providers that take them, over MCP as images after the text; a picture that is not sent is never guessed at) · 2026-11-09 (version pin v1.11.39 — Word, Excel and PowerPoint files also give Excel formulas next to their values, the numbers behind charts, SmartArt as a list and a note where a picture sits; MCP list and search return the playbook library again after v1.11.38) · 2026-11-08 (version pin v1.11.38 — the MCP tools take and return a playbook tag, with its creator and last change; the Personas list filters by connector, and access and editing show as icons in both lists; admins filter API & MCP keys by person, linked from Team Members) · 2026-11-07 (version pin v1.11.37 — connector lists as tables for the analysis, Excel files written by the analysis program) · 2026-11-07 (SQEM-662: Excel files written by the analysis program; the build also fetches openpyxl from PyPI) · 2026-11-07 (SQEM-661: lists from connectors are tables for the analysis too) · 2026-11-07 (SQEM-658, SQEM-660: version pin v1.11.36 — Word, Excel and PowerPoint files are read as text in Chat and over MCP, files up to 15 MB, and Chat calculates with attached tables in the browser; the image carries the ~21 MB Python runtime) · 2026-11-04 (SQEM-656: version pin v1.11.35 — Chat answers keep working on long tasks, the AI fetches connectors when a question needs them, large connector results are shortened, personas can name the connector services they work with, prompt caching) · 2026-11-02 (SQEM-618: AI provider and web search keys moved to Settings → AI providers) · 2026-10-27 (SQEM-614: version pin v1.11.34 — sqemes in German: every person chooses English or German under My Profile, admins set a workspace default under Settings → General, and without a choice everything stays in English; messages from the server follow the same language; legal texts, e-mails, the browser extension and MCP stay in English. Before that, SQEM-598: version pin v1.11.33 — web search in Chat with your own Linkup or Brave key, files from Chat (Word, PDF, Excel, PowerPoint, Markdown, text) with a preview beside the chat, and a document style under Settings → Brand. Before that, SQEM-597: document style for files from Chat, also on self-host. Before that, SQEM-594: web search in Chat with a workspace's own Linkup or Brave key; "Settings → Integrations" corrected to API & MCP. Before that, SQEM-593: version pin v1.11.32 — fonts, logos and other binary files uploaded over MCP keep their folder in the file name, so a downloaded skill finds them again. Before that, SQEM-591: version pin v1.11.31 — connectors work with every text model, a Stop button that really stops an answer, no two-minute cut-off for models that think long, custom connectors show their logo, the playbook editor opens on Test. SQEM-589: one-click connector apps are part of sqemes Cloud — the Connectors section now describes custom connectors only. Before that, SQEM-580: version pin v1.11.30 — OpenRouter shows only the models you add and its image models work; a connector OpenAI cannot reach is left out instead of failing the answer, and errors inside an OpenAI stream are reported; the Start card shows your pinned chats; History deletes several chats at once; one default AI model for chats and writing; mobile polish. Before that, SQEM-566: version pin v1.11.29 — every MCP tool in sqemes Chat by role, with a card for what an answer changed; a History page with delete; bulk tag and access actions; the Files filter Media/Documents; a refreshed model list with image models routed again. Before that, SQEM-559: version pin v1.11.28 — a new design (new typefaces served from the image, Work | Manage navigation, an Overview page), playbook versions with restore, “Who can edit” with a workspace default, a Security tab, and the playbook card in Chat. Before that, SQEM-531: v1.11.27 — the file list checks access once per query, an MCP call carries at most 5 MB (larger files go through create_upload_url), a failed import removes what it created, and sqemes is described as the AI Management OS.)*
+*Last updated: 2026-11-10 (version pin v1.11.41 — Routines: a person's own task at a set time, set up by the installer; a cut-off answer says it was stopped on the server instead of "took too long") · 2026-11-10 (SQEM-679: Routines on self-host — set up by the installer on every start, nothing to do on the Docker bundle; two Vault entries and one secret on your own Supabase) · 2026-11-09 (version pin v1.11.40 — pictures inside Word, Excel and PowerPoint files reach the model: in Chat as attachments of their own for the providers that take them, over MCP as images after the text; a picture that is not sent is never guessed at) · 2026-11-09 (version pin v1.11.39 — Word, Excel and PowerPoint files also give Excel formulas next to their values, the numbers behind charts, SmartArt as a list and a note where a picture sits; MCP list and search return the playbook library again after v1.11.38) · 2026-11-08 (version pin v1.11.38 — the MCP tools take and return a playbook tag, with its creator and last change; the Personas list filters by connector, and access and editing show as icons in both lists; admins filter API & MCP keys by person, linked from Team Members) · 2026-11-07 (version pin v1.11.37 — connector lists as tables for the analysis, Excel files written by the analysis program) · 2026-11-07 (SQEM-662: Excel files written by the analysis program; the build also fetches openpyxl from PyPI) · 2026-11-07 (SQEM-661: lists from connectors are tables for the analysis too) · 2026-11-07 (SQEM-658, SQEM-660: version pin v1.11.36 — Word, Excel and PowerPoint files are read as text in Chat and over MCP, files up to 15 MB, and Chat calculates with attached tables in the browser; the image carries the ~21 MB Python runtime) · 2026-11-04 (SQEM-656: version pin v1.11.35 — Chat answers keep working on long tasks, the AI fetches connectors when a question needs them, large connector results are shortened, personas can name the connector services they work with, prompt caching) · 2026-11-02 (SQEM-618: AI provider and web search keys moved to Settings → AI providers) · 2026-10-27 (SQEM-614: version pin v1.11.34 — sqemes in German: every person chooses English or German under My Profile, admins set a workspace default under Settings → General, and without a choice everything stays in English; messages from the server follow the same language; legal texts, e-mails, the browser extension and MCP stay in English. Before that, SQEM-598: version pin v1.11.33 — web search in Chat with your own Linkup or Brave key, files from Chat (Word, PDF, Excel, PowerPoint, Markdown, text) with a preview beside the chat, and a document style under Settings → Brand. Before that, SQEM-597: document style for files from Chat, also on self-host. Before that, SQEM-594: web search in Chat with a workspace's own Linkup or Brave key; "Settings → Integrations" corrected to API & MCP. Before that, SQEM-593: version pin v1.11.32 — fonts, logos and other binary files uploaded over MCP keep their folder in the file name, so a downloaded skill finds them again. Before that, SQEM-591: version pin v1.11.31 — connectors work with every text model, a Stop button that really stops an answer, no two-minute cut-off for models that think long, custom connectors show their logo, the playbook editor opens on Test. SQEM-589: one-click connector apps are part of sqemes Cloud — the Connectors section now describes custom connectors only. Before that, SQEM-580: version pin v1.11.30 — OpenRouter shows only the models you add and its image models work; a connector OpenAI cannot reach is left out instead of failing the answer, and errors inside an OpenAI stream are reported; the Start card shows your pinned chats; History deletes several chats at once; one default AI model for chats and writing; mobile polish. Before that, SQEM-566: version pin v1.11.29 — every MCP tool in sqemes Chat by role, with a card for what an answer changed; a History page with delete; bulk tag and access actions; the Files filter Media/Documents; a refreshed model list with image models routed again. Before that, SQEM-559: version pin v1.11.28 — a new design (new typefaces served from the image, Work | Manage navigation, an Overview page), playbook versions with restore, “Who can edit” with a workspace default, a Security tab, and the playbook card in Chat. Before that, SQEM-531: v1.11.27 — the file list checks access once per query, an MCP call carries at most 5 MB (larger files go through create_upload_url), a failed import removes what it created, and sqemes is described as the AI Management OS.)*
 `/playbooks` and every old link redirects. Nothing changes for an operator. Earlier the same day
 (SQEM-390) — the assistant template kind is gone: on upgrade the migration
 turns every assistant into a skill with the same text, and a role is a persona. Earlier: 2026-08-19

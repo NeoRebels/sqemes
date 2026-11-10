@@ -41,8 +41,8 @@ describe('SQEM-552 — the Overview is the home of Manage', () => {
   it('route, mode and first Manage link', () => {
     expect(modeForPath('/overview')).toBe('manage');
     expect(MODE_HOME.manage).toBe('/overview');
-    expect(navRoutes('manage', 'admin', { marketplace: true })[0]).toBe('/overview');
-    expect(navRoutes('work', 'member', { marketplace: true })).not.toContain('/overview');
+    expect(navRoutes('manage', 'admin', { marketplace: true, routines: true })[0]).toBe('/overview');
+    expect(navRoutes('work', 'member', { marketplace: true, routines: true })).not.toContain('/overview');
     expect(read('App.tsx')).toMatch(/<Route path="\/overview" element=\{<LayoutPage><Overview \/><\/LayoutPage>\} \/>/);
   });
 

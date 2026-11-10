@@ -9,10 +9,14 @@ import { ChatSession } from '../types';
 export interface ChatSessionsState {
   chatSessions: ChatSession[];
   addChatSession: (session: ChatSession) => void;
-  updateChatSession: (id: string, updates: { title?: string; visibility?: 'private' | 'workspace'; model?: string; isGenerating?: boolean; pinned?: boolean }) => Promise<void>;
+  updateChatSession: (id: string, updates: { title?: string; visibility?: 'private' | 'workspace'; model?: string; isGenerating?: boolean; pinned?: boolean; unseen?: boolean }) => Promise<void>;
   deleteChatSession: (id: string) => Promise<void>;
   /** SQEM-576 — several at once, no toast: the caller reports one result for the whole selection. */
   deleteChatSessions: (ids: string[]) => Promise<{ deleted: number; failed: number }>;
+  /** SQEM-677 — mark routine results as read (opened, or "mark all as read" on Start). */
+  markChatsSeen: (ids: string[]) => Promise<void>;
+  /** SQEM-677 — reload the list (a routine result may have arrived while the tab slept). */
+  refreshChatSessions: () => Promise<void>;
 }
 
 export const ChatSessionsContext = createContext<ChatSessionsState | undefined>(undefined);

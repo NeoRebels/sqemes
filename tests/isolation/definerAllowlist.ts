@@ -76,6 +76,9 @@ export const DEFINER_ALLOWLIST: Record<string, DefinerEntry> = {
     why: 'RLS helper (pending_changes_select, SQEM-667); answers only for auth.uid()',
     probe: { sql: `select count(*) from (select 1 where public.am_i_moderator('${A}')) x`, expect: 'zero' },
   },
+  routines_available: {
+    why: 'app: whether this instance can run routines (SQEM-679); true/false from the names of two Vault entries, no tenant input, never a value',
+  },
   review_queue: {
     why: 'app: the review list of a workspace for its moderators and admins (SQEM-669); is_workspace_moderator for auth.uid()',
     probe: { sql: `select public.review_queue('${A}')`, expect: 'error' },

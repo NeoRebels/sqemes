@@ -734,6 +734,7 @@
 /** @typedef {{}} Hi_RemoveInputs */
 /** @typedef {{}} Hi_Remove_TitleInputs */
 /** @typedef {{}} Hi_RemovedInputs */
+/** @typedef {{}} Hi_RoutineInputs */
 /** @typedef {{}} Hi_SearchInputs */
 /** @typedef {{ title: NonNullable<unknown> }} Hi_SelectInputs */
 /** @typedef {{}} Hi_SharedInputs */
@@ -741,6 +742,7 @@
 /** @typedef {{}} Hi_SubtitleInputs */
 /** @typedef {{}} Hi_UnpinInputs */
 /** @typedef {{ title: NonNullable<unknown> }} Hi_Unpin_XInputs */
+/** @typedef {{}} Hi_UnreadInputs */
 /** @typedef {{}} Init_Data_FailedInputs */
 /** @typedef {{}} Init_FailedInputs */
 /** @typedef {{}} Init_Invite_FailedInputs */
@@ -754,6 +756,7 @@
 /** @typedef {{}} Invite_Go_To_StartInputs */
 /** @typedef {{}} Invite_Invalid_LinkInputs */
 /** @typedef {{}} Invite_RedirectingInputs */
+/** @typedef {{}} Job_LostInputs */
 /** @typedef {{}} Job_TimeoutInputs */
 /** @typedef {{}} Keyhint_ActionInputs */
 /** @typedef {{}} Keyhint_Text_ManageInputs */
@@ -1002,8 +1005,10 @@
 /** @typedef {{}} Nav_OverviewInputs */
 /** @typedef {{}} Nav_PersonasInputs */
 /** @typedef {{}} Nav_PlaybooksInputs */
+/** @typedef {{}} Nav_RoutinesInputs */
 /** @typedef {{}} Nav_SettingsInputs */
 /** @typedef {{}} Nav_StartInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Nav_UnreadInputs */
 /** @typedef {{}} Nf_BodyInputs */
 /** @typedef {{}} Nf_HomeInputs */
 /** @typedef {{}} Nf_TitleInputs */
@@ -1395,6 +1400,107 @@
 /** @typedef {{}} Role_Plural_AdminInputs */
 /** @typedef {{}} Role_Plural_EditorInputs */
 /** @typedef {{}} Role_Plural_MemberInputs */
+/** @typedef {{ active: NonNullable<unknown>, limit: NonNullable<unknown> }} Rt_Active_CountInputs */
+/** @typedef {{}} Rt_Add_KeyInputs */
+/** @typedef {{}} Rt_Add_PlaybookInputs */
+/** @typedef {{}} Rt_AdvancedInputs */
+/** @typedef {{}} Rt_Advanced_HelpInputs */
+/** @typedef {{}} Rt_BackInputs */
+/** @typedef {{}} Rt_Chat_FromInputs */
+/** @typedef {{}} Rt_Check_FieldsInputs */
+/** @typedef {{}} Rt_ConnectInputs */
+/** @typedef {{}} Rt_ConnectorsInputs */
+/** @typedef {{}} Rt_Connectors_HelpInputs */
+/** @typedef {{}} Rt_CreateInputs */
+/** @typedef {{}} Rt_CreatedInputs */
+/** @typedef {{ when: NonNullable<unknown> }} Rt_Created_FirstInputs */
+/** @typedef {{ limit: NonNullable<unknown> }} Rt_Created_PausedInputs */
+/** @typedef {{}} Rt_DaysInputs */
+/** @typedef {{}} Rt_Days_RequiredInputs */
+/** @typedef {{}} Rt_DeleteInputs */
+/** @typedef {{}} Rt_Delete_BodyInputs */
+/** @typedef {{}} Rt_Delete_FailedInputs */
+/** @typedef {{}} Rt_Delete_TitleInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Delete_XInputs */
+/** @typedef {{}} Rt_DeletedInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Rt_DroppedInputs */
+/** @typedef {{}} Rt_EditInputs */
+/** @typedef {{}} Rt_Edit_TitleInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Edit_XInputs */
+/** @typedef {{}} Rt_Empty_DescInputs */
+/** @typedef {{}} Rt_Empty_TitleInputs */
+/** @typedef {{ limit: NonNullable<unknown> }} Rt_Err_LimitInputs */
+/** @typedef {{}} Rt_Err_ReferenceInputs */
+/** @typedef {{}} Rt_Err_TimezoneInputs */
+/** @typedef {{}} Rt_Last_ResultInputs */
+/** @typedef {{}} Rt_Load_FailedInputs */
+/** @typedef {{}} Rt_LoadingInputs */
+/** @typedef {{}} Rt_ModelInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Model_DefaultInputs */
+/** @typedef {{}} Rt_Model_PinnedInputs */
+/** @typedef {{}} Rt_Model_RequiredInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Model_UnavailableInputs */
+/** @typedef {{}} Rt_NameInputs */
+/** @typedef {{}} Rt_Name_PhInputs */
+/** @typedef {{}} Rt_Name_RequiredInputs */
+/** @typedef {{}} Rt_NewInputs */
+/** @typedef {{}} Rt_New_TitleInputs */
+/** @typedef {{}} Rt_No_ConnectorsInputs */
+/** @typedef {{}} Rt_No_ModelInputs */
+/** @typedef {{}} Rt_Not_ConnectedInputs */
+/** @typedef {{}} Rt_Not_FoundInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Pause_XInputs */
+/** @typedef {{}} Rt_PersonaInputs */
+/** @typedef {{}} Rt_PlaybooksInputs */
+/** @typedef {{}} Rt_PromptInputs */
+/** @typedef {{}} Rt_Prompt_HelpInputs */
+/** @typedef {{}} Rt_Prompt_PhInputs */
+/** @typedef {{}} Rt_Prompt_RequiredInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Remove_XInputs */
+/** @typedef {{}} Rt_Results_In_History_1Inputs */
+/** @typedef {{}} Rt_Results_In_History_2Inputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Resume_XInputs */
+/** @typedef {{}} Rt_RhythmInputs */
+/** @typedef {{}} Rt_Rhythm_CustomInputs */
+/** @typedef {{}} Rt_Rhythm_DailyInputs */
+/** @typedef {{}} Rt_Rhythm_WeekdaysInputs */
+/** @typedef {{}} Rt_Save_FailedInputs */
+/** @typedef {{}} Rt_SavedInputs */
+/** @typedef {{ time: NonNullable<unknown> }} Rt_Schedule_DailyInputs */
+/** @typedef {{ days: NonNullable<unknown>, time: NonNullable<unknown> }} Rt_Schedule_DaysInputs */
+/** @typedef {{}} Rt_Search_PlaybooksInputs */
+/** @typedef {{}} Rt_Sec_WhatInputs */
+/** @typedef {{}} Rt_Sec_WhenInputs */
+/** @typedef {{}} Rt_SharedInputs */
+/** @typedef {{}} Rt_Start_AllInputs */
+/** @typedef {{}} Rt_Start_Mark_ReadInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Rt_Start_MoreInputs */
+/** @typedef {{}} Rt_Start_TitleInputs */
+/** @typedef {{}} Rt_State_CreditsInputs */
+/** @typedef {{}} Rt_State_FailuresInputs */
+/** @typedef {{ when: NonNullable<unknown> }} Rt_State_NextInputs */
+/** @typedef {{}} Rt_State_PausedInputs */
+/** @typedef {{}} Rt_SubtitleInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Rt_Sum_ConnectorsInputs */
+/** @typedef {{}} Rt_Sum_Default_ModelInputs */
+/** @typedef {{}} Rt_Sum_No_ConnectorsInputs */
+/** @typedef {{}} Rt_Sum_No_PersonaInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Rt_Sum_PlaybooksInputs */
+/** @typedef {{}} Rt_Sum_WebInputs */
+/** @typedef {{}} Rt_TimeInputs */
+/** @typedef {{}} Rt_Time_RequiredInputs */
+/** @typedef {{}} Rt_TimezoneInputs */
+/** @typedef {{}} Rt_Tool_ChoiceInputs */
+/** @typedef {{}} Rt_Tz_ChangeInputs */
+/** @typedef {{}} Rt_Tz_SearchInputs */
+/** @typedef {{}} Rt_Unattended_BodyInputs */
+/** @typedef {{}} Rt_Unattended_TitleInputs */
+/** @typedef {{}} Rt_Use_DefaultInputs */
+/** @typedef {{}} Rt_Via_PersonaInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Via_Persona_ListInputs */
+/** @typedef {{}} Rt_WebInputs */
+/** @typedef {{}} Rt_Web_HelpInputs */
+/** @typedef {{}} Rt_When_HelpInputs */
 /** @typedef {{}} Save_CancelInputs */
 /** @typedef {{}} Save_SaveInputs */
 /** @typedef {{}} Save_UnsavedInputs */
@@ -1937,6 +2043,8 @@
 /** @typedef {{}} Title_Persona_EditorInputs */
 /** @typedef {{}} Title_Playbook_EditorInputs */
 /** @typedef {{}} Title_Reset_PasswordInputs */
+/** @typedef {{}} Title_Routine_EditorInputs */
+/** @typedef {{}} Title_Routine_NewInputs */
 /** @typedef {{}} Tooltip_More_InfoInputs */
 /** @typedef {{}} Tp_ClearInputs */
 /** @typedef {{}} Tp_ContinueInputs */
@@ -5123,6 +5231,10 @@ export const hi_removed = /** @type {(inputs: Hi_RemovedInputs) => LocalizedStri
 	return /** @type {LocalizedString} */ (`Removed from your history`)
 };
 
+export const hi_routine = /** @type {(inputs: Hi_RoutineInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Routine`)
+};
+
 export const hi_search = /** @type {(inputs: Hi_SearchInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Search chats...`)
 };
@@ -5149,6 +5261,10 @@ export const hi_unpin = /** @type {(inputs: Hi_UnpinInputs) => LocalizedString} 
 
 export const hi_unpin_x = /** @type {(inputs: Hi_Unpin_XInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`Unpin ${i?.title}`)
+};
+
+export const hi_unread = /** @type {(inputs: Hi_UnreadInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Unread`)
 };
 
 export const init_data_failed = /** @type {(inputs: Init_Data_FailedInputs) => LocalizedString} */ () => {
@@ -5201,6 +5317,10 @@ export const invite_invalid_link = /** @type {(inputs: Invite_Invalid_LinkInputs
 
 export const invite_redirecting = /** @type {(inputs: Invite_RedirectingInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Redirecting you to the workspace...`)
+};
+
+export const job_lost = /** @type {(inputs: Job_LostInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`The answer was interrupted on the server. Please send your message again.`)
 };
 
 export const job_timeout = /** @type {(inputs: Job_TimeoutInputs) => LocalizedString} */ () => {
@@ -6198,12 +6318,23 @@ export const nav_playbooks = /** @type {(inputs: Nav_PlaybooksInputs) => Localiz
 	return /** @type {LocalizedString} */ (`Playbooks`)
 };
 
+export const nav_routines = /** @type {(inputs: Nav_RoutinesInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Routines`)
+};
+
 export const nav_settings = /** @type {(inputs: Nav_SettingsInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Settings`)
 };
 
 export const nav_start = /** @type {(inputs: Nav_StartInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Start`)
+};
+
+export const nav_unread = /** @type {(inputs: Nav_UnreadInputs) => LocalizedString} */ (i) => {
+	const countPlural = registry.plural("en", i?.count, {}, true);
+	if (countPlural === "one") return /** @type {LocalizedString} */ (`${i?.count} unread result`);
+	if (countPlural === "other") return /** @type {LocalizedString} */ (`${i?.count} unread results`);
+	return /** @type {LocalizedString} */ ("nav_unread");
 };
 
 export const nf_body = /** @type {(inputs: Nf_BodyInputs) => LocalizedString} */ () => {
@@ -7813,6 +7944,422 @@ export const role_plural_editor = /** @type {(inputs: Role_Plural_EditorInputs) 
 
 export const role_plural_member = /** @type {(inputs: Role_Plural_MemberInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`members`)
+};
+
+export const rt_active_count = /** @type {(inputs: Rt_Active_CountInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`${i?.active} of ${i?.limit} active`)
+};
+
+export const rt_add_key = /** @type {(inputs: Rt_Add_KeyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Add a key`)
+};
+
+export const rt_add_playbook = /** @type {(inputs: Rt_Add_PlaybookInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Add playbook`)
+};
+
+export const rt_advanced = /** @type {(inputs: Rt_AdvancedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Advanced settings`)
+};
+
+export const rt_advanced_help = /** @type {(inputs: Rt_Advanced_HelpInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Persona, playbooks, connectors, model and web search. Most routines need none of it.`)
+};
+
+export const rt_back = /** @type {(inputs: Rt_BackInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Back to Routines`)
+};
+
+export const rt_chat_from = /** @type {(inputs: Rt_Chat_FromInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`From the routine`)
+};
+
+export const rt_check_fields = /** @type {(inputs: Rt_Check_FieldsInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Please check the marked fields.`)
+};
+
+export const rt_connect = /** @type {(inputs: Rt_ConnectInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Connect one`)
+};
+
+export const rt_connectors = /** @type {(inputs: Rt_ConnectorsInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Connectors`)
+};
+
+export const rt_connectors_help = /** @type {(inputs: Rt_Connectors_HelpInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Without a choice the routine uses no connector. With a connector chosen it may use every tool that connector offers; you decide which those are in each connector's settings.`)
+};
+
+export const rt_create = /** @type {(inputs: Rt_CreateInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Create routine`)
+};
+
+export const rt_created = /** @type {(inputs: Rt_CreatedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Routine created`)
+};
+
+export const rt_created_first = /** @type {(inputs: Rt_Created_FirstInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Routine created. First run ${i?.when}; the result appears on Start and in your history.`)
+};
+
+export const rt_created_paused = /** @type {(inputs: Rt_Created_PausedInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Routine saved, but paused: you already have ${i?.limit} active ones. Pause another to switch it on.`)
+};
+
+export const rt_days = /** @type {(inputs: Rt_DaysInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Days`)
+};
+
+export const rt_days_required = /** @type {(inputs: Rt_Days_RequiredInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Pick at least one day.`)
+};
+
+export const rt_delete = /** @type {(inputs: Rt_DeleteInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Delete routine`)
+};
+
+export const rt_delete_body = /** @type {(inputs: Rt_Delete_BodyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`It will not run again. The chats from earlier runs stay in your history.`)
+};
+
+export const rt_delete_failed = /** @type {(inputs: Rt_Delete_FailedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`The routine could not be deleted.`)
+};
+
+export const rt_delete_title = /** @type {(inputs: Rt_Delete_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Delete routine?`)
+};
+
+export const rt_delete_x = /** @type {(inputs: Rt_Delete_XInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Delete ${i?.name}`)
+};
+
+export const rt_deleted = /** @type {(inputs: Rt_DeletedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Routine deleted`)
+};
+
+export const rt_dropped = /** @type {(inputs: Rt_DroppedInputs) => LocalizedString} */ (i) => {
+	const countPlural = registry.plural("en", i?.count, {}, true);
+	if (countPlural === "one") return /** @type {LocalizedString} */ (`1 playbook, connector or persona of this routine no longer exists or is no longer available to you. It was removed; save to keep the change.`);
+	if (countPlural === "other") return /** @type {LocalizedString} */ (`${i?.count} playbooks, connectors or personas of this routine no longer exist or are no longer available to you. They were removed; save to keep the change.`);
+	return /** @type {LocalizedString} */ ("rt_dropped");
+};
+
+export const rt_edit = /** @type {(inputs: Rt_EditInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Edit`)
+};
+
+export const rt_edit_title = /** @type {(inputs: Rt_Edit_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Edit routine`)
+};
+
+export const rt_edit_x = /** @type {(inputs: Rt_Edit_XInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Edit ${i?.name}`)
+};
+
+export const rt_empty_desc = /** @type {(inputs: Rt_Empty_DescInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`A routine runs a task for you at a set time, for example a briefing every weekday at 8. Each result lands in your history as a chat.`)
+};
+
+export const rt_empty_title = /** @type {(inputs: Rt_Empty_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`No routine yet`)
+};
+
+export const rt_err_limit = /** @type {(inputs: Rt_Err_LimitInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`You already have ${i?.limit} active routines. Pause one to switch this one on.`)
+};
+
+export const rt_err_reference = /** @type {(inputs: Rt_Err_ReferenceInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`A persona, playbook or connector you picked is no longer available to you. Remove it and save again.`)
+};
+
+export const rt_err_timezone = /** @type {(inputs: Rt_Err_TimezoneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`This time zone is not known. Pick another one from the list.`)
+};
+
+export const rt_last_result = /** @type {(inputs: Rt_Last_ResultInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Last result`)
+};
+
+export const rt_load_failed = /** @type {(inputs: Rt_Load_FailedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Your routines could not be loaded. Try again in a moment.`)
+};
+
+export const rt_loading = /** @type {(inputs: Rt_LoadingInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Loading routines…`)
+};
+
+export const rt_model = /** @type {(inputs: Rt_ModelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Model`)
+};
+
+export const rt_model_default = /** @type {(inputs: Rt_Model_DefaultInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Workspace default (${i?.name})`)
+};
+
+export const rt_model_pinned = /** @type {(inputs: Rt_Model_PinnedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`No default AI model is set for this workspace, so the routine keeps the model chosen here.`)
+};
+
+export const rt_model_required = /** @type {(inputs: Rt_Model_RequiredInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`No model is available. A routine needs an AI provider key.`)
+};
+
+export const rt_model_unavailable = /** @type {(inputs: Rt_Model_UnavailableInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`${i?.name} is no longer offered. Choose another model or the workspace default.`)
+};
+
+export const rt_name = /** @type {(inputs: Rt_NameInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Name`)
+};
+
+export const rt_name_ph = /** @type {(inputs: Rt_Name_PhInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`e.g. Morning briefing`)
+};
+
+export const rt_name_required = /** @type {(inputs: Rt_Name_RequiredInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Give the routine a name.`)
+};
+
+export const rt_new = /** @type {(inputs: Rt_NewInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`New routine`)
+};
+
+export const rt_new_title = /** @type {(inputs: Rt_New_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`New routine`)
+};
+
+export const rt_no_connectors = /** @type {(inputs: Rt_No_ConnectorsInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`You have no connectors yet.`)
+};
+
+export const rt_no_model = /** @type {(inputs: Rt_No_ModelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`No model available`)
+};
+
+export const rt_not_connected = /** @type {(inputs: Rt_Not_ConnectedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`not connected`)
+};
+
+export const rt_not_found = /** @type {(inputs: Rt_Not_FoundInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`This routine no longer exists.`)
+};
+
+export const rt_pause_x = /** @type {(inputs: Rt_Pause_XInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Pause ${i?.name}`)
+};
+
+export const rt_persona = /** @type {(inputs: Rt_PersonaInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Persona`)
+};
+
+export const rt_playbooks = /** @type {(inputs: Rt_PlaybooksInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Playbooks`)
+};
+
+export const rt_prompt = /** @type {(inputs: Rt_PromptInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Task`)
+};
+
+export const rt_prompt_help = /** @type {(inputs: Rt_Prompt_HelpInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Write it the way you would ask in Chat. Whatever a chosen prompt playbook needs to know can be part of the task.`)
+};
+
+export const rt_prompt_ph = /** @type {(inputs: Rt_Prompt_PhInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`e.g. Summarise my unread emails and today's meetings. List what needs a decision first.`)
+};
+
+export const rt_prompt_required = /** @type {(inputs: Rt_Prompt_RequiredInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Describe the task.`)
+};
+
+export const rt_remove_x = /** @type {(inputs: Rt_Remove_XInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Remove ${i?.name}`)
+};
+
+export const rt_results_in_history_1 = /** @type {(inputs: Rt_Results_In_History_1Inputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`All results are in your`)
+};
+
+export const rt_results_in_history_2 = /** @type {(inputs: Rt_Results_In_History_2Inputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`.`)
+};
+
+export const rt_resume_x = /** @type {(inputs: Rt_Resume_XInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Switch ${i?.name} on`)
+};
+
+export const rt_rhythm = /** @type {(inputs: Rt_RhythmInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Repeats`)
+};
+
+export const rt_rhythm_custom = /** @type {(inputs: Rt_Rhythm_CustomInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Chosen days`)
+};
+
+export const rt_rhythm_daily = /** @type {(inputs: Rt_Rhythm_DailyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Daily`)
+};
+
+export const rt_rhythm_weekdays = /** @type {(inputs: Rt_Rhythm_WeekdaysInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Mon–Fri`)
+};
+
+export const rt_save_failed = /** @type {(inputs: Rt_Save_FailedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`The routine could not be saved. Try again in a moment.`)
+};
+
+export const rt_saved = /** @type {(inputs: Rt_SavedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Routine saved`)
+};
+
+export const rt_schedule_daily = /** @type {(inputs: Rt_Schedule_DailyInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Daily at ${i?.time}`)
+};
+
+export const rt_schedule_days = /** @type {(inputs: Rt_Schedule_DaysInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`${i?.days} at ${i?.time}`)
+};
+
+export const rt_search_playbooks = /** @type {(inputs: Rt_Search_PlaybooksInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Search playbooks…`)
+};
+
+export const rt_sec_what = /** @type {(inputs: Rt_Sec_WhatInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`What`)
+};
+
+export const rt_sec_when = /** @type {(inputs: Rt_Sec_WhenInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`When`)
+};
+
+export const rt_shared = /** @type {(inputs: Rt_SharedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`shared`)
+};
+
+export const rt_start_all = /** @type {(inputs: Rt_Start_AllInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`All routines`)
+};
+
+export const rt_start_mark_read = /** @type {(inputs: Rt_Start_Mark_ReadInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Mark all as read`)
+};
+
+export const rt_start_more = /** @type {(inputs: Rt_Start_MoreInputs) => LocalizedString} */ (i) => {
+	const countPlural = registry.plural("en", i?.count, {}, true);
+	if (countPlural === "one") return /** @type {LocalizedString} */ (`+ ${i?.count} more`);
+	if (countPlural === "other") return /** @type {LocalizedString} */ (`+ ${i?.count} more`);
+	return /** @type {LocalizedString} */ ("rt_start_more");
+};
+
+export const rt_start_title = /** @type {(inputs: Rt_Start_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`New results from your routines`)
+};
+
+export const rt_state_credits = /** @type {(inputs: Rt_State_CreditsInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Paused: no AI credits left this month. Switch it back on once new credits are available.`)
+};
+
+export const rt_state_failures = /** @type {(inputs: Rt_State_FailuresInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Paused after three failed runs. Look at the last result, then switch it back on.`)
+};
+
+export const rt_state_next = /** @type {(inputs: Rt_State_NextInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Next run ${i?.when}`)
+};
+
+export const rt_state_paused = /** @type {(inputs: Rt_State_PausedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Paused`)
+};
+
+export const rt_subtitle = /** @type {(inputs: Rt_SubtitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Tasks that run for you at a set time. Every result is a chat in your history.`)
+};
+
+export const rt_sum_connectors = /** @type {(inputs: Rt_Sum_ConnectorsInputs) => LocalizedString} */ (i) => {
+	const countPlural = registry.plural("en", i?.count, {}, true);
+	if (countPlural === "one") return /** @type {LocalizedString} */ (`1 connector`);
+	if (countPlural === "other") return /** @type {LocalizedString} */ (`${i?.count} connectors`);
+	return /** @type {LocalizedString} */ ("rt_sum_connectors");
+};
+
+export const rt_sum_default_model = /** @type {(inputs: Rt_Sum_Default_ModelInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Default model`)
+};
+
+export const rt_sum_no_connectors = /** @type {(inputs: Rt_Sum_No_ConnectorsInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`no connectors`)
+};
+
+export const rt_sum_no_persona = /** @type {(inputs: Rt_Sum_No_PersonaInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`no persona`)
+};
+
+export const rt_sum_playbooks = /** @type {(inputs: Rt_Sum_PlaybooksInputs) => LocalizedString} */ (i) => {
+	const countPlural = registry.plural("en", i?.count, {}, true);
+	if (countPlural === "one") return /** @type {LocalizedString} */ (`1 playbook`);
+	if (countPlural === "other") return /** @type {LocalizedString} */ (`${i?.count} playbooks`);
+	return /** @type {LocalizedString} */ ("rt_sum_playbooks");
+};
+
+export const rt_sum_web = /** @type {(inputs: Rt_Sum_WebInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`web search`)
+};
+
+export const rt_time = /** @type {(inputs: Rt_TimeInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Time`)
+};
+
+export const rt_time_required = /** @type {(inputs: Rt_Time_RequiredInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Enter a time.`)
+};
+
+export const rt_timezone = /** @type {(inputs: Rt_TimezoneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Time zone`)
+};
+
+export const rt_tool_choice = /** @type {(inputs: Rt_Tool_ChoiceInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Go to connector settings`)
+};
+
+export const rt_tz_change = /** @type {(inputs: Rt_Tz_ChangeInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Change`)
+};
+
+export const rt_tz_search = /** @type {(inputs: Rt_Tz_SearchInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Search time zones…`)
+};
+
+export const rt_unattended_body = /** @type {(inputs: Rt_Unattended_BodyInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`It asks no questions and writes to a connected service only when the task asks for it. It returns text: no files and no data analysis.`)
+};
+
+export const rt_unattended_title = /** @type {(inputs: Rt_Unattended_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`A routine runs without you`)
+};
+
+export const rt_use_default = /** @type {(inputs: Rt_Use_DefaultInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Use workspace default`)
+};
+
+export const rt_via_persona = /** @type {(inputs: Rt_Via_PersonaInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`comes with the persona`)
+};
+
+export const rt_via_persona_list = /** @type {(inputs: Rt_Via_Persona_ListInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Connectors that come with ${i?.name}`)
+};
+
+export const rt_web = /** @type {(inputs: Rt_WebInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Web search`)
+};
+
+export const rt_web_help = /** @type {(inputs: Rt_Web_HelpInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Lets the routine search the web for current information.`)
+};
+
+export const rt_when_help = /** @type {(inputs: Rt_When_HelpInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`A routine never starts early. At busy times it may start a few minutes late; if it cannot start within 30 minutes, that run is skipped and it runs again at its next time.`)
 };
 
 export const save_cancel = /** @type {(inputs: Save_CancelInputs) => LocalizedString} */ () => {
@@ -10014,6 +10561,14 @@ export const title_playbook_editor = /** @type {(inputs: Title_Playbook_EditorIn
 
 export const title_reset_password = /** @type {(inputs: Title_Reset_PasswordInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Reset password`)
+};
+
+export const title_routine_editor = /** @type {(inputs: Title_Routine_EditorInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Routine editor`)
+};
+
+export const title_routine_new = /** @type {(inputs: Title_Routine_NewInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`New routine`)
 };
 
 export const tooltip_more_info = /** @type {(inputs: Tooltip_More_InfoInputs) => LocalizedString} */ () => {

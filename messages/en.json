@@ -309,6 +309,7 @@
   "keyhint_action": "Add an AI provider key",
   "keyhint_text_member": "No AI provider key yet. Ask a workspace admin or editor to add one.",
   "job_timeout": "The model took too long to respond. Try a shorter prompt.",
+  "job_lost": "The answer was interrupted on the server. Please send your message again.",
   "server_connector_refused_one": "Answered without {list}: the connector refused the connection. Reconnect it in Settings → Connectors.",
   "server_connector_refused_many": "Answered without {list}: the connectors refused the connection. Reconnect them in Settings → Connectors.",
   "server_web_allowance": "The web searches included in your plan are used up for this month. A workspace admin can add an own search key in Settings → AI providers → Web search, or upgrade the plan.",
@@ -2992,5 +2993,182 @@
   "mq_open_item": "Open",
   "mq_compare": "Compare",
   "mq_more": "Load more",
-  "mq_compare_failed": "The change could not be loaded. It may have been decided already."
+  "mq_compare_failed": "The change could not be loaded. It may have been decided already.",
+  "nav_routines": "Routines",
+  "nav_unread": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} unread result",
+        "countPlural=other": "{count} unread results"
+      }
+    }
+  ],
+  "title_routine_editor": "Routine editor",
+  "rt_schedule_daily": "Daily at {time}",
+  "rt_schedule_days": "{days} at {time}",
+  "rt_state_failures": "Paused after three failed runs. Look at the last result, then switch it back on.",
+  "rt_state_credits": "Paused: no AI credits left this month. Switch it back on once new credits are available.",
+  "rt_state_paused": "Paused",
+  "rt_state_next": "Next run {when}",
+  "rt_load_failed": "Your routines could not be loaded. Try again in a moment.",
+  "rt_err_limit": "You already have {limit} active routines. Pause one to switch this one on.",
+  "rt_save_failed": "The routine could not be saved. Try again in a moment.",
+  "rt_deleted": "Routine deleted",
+  "rt_delete_failed": "The routine could not be deleted.",
+  "rt_last_result": "Last result",
+  "rt_pause_x": "Pause {name}",
+  "rt_resume_x": "Switch {name} on",
+  "rt_edit": "Edit",
+  "rt_edit_x": "Edit {name}",
+  "rt_delete": "Delete routine",
+  "rt_delete_x": "Delete {name}",
+  "rt_subtitle": "Tasks that run for you at a set time. Every result is a chat in your history.",
+  "rt_new": "New routine",
+  "rt_loading": "Loading routines…",
+  "rt_empty_title": "No routine yet",
+  "rt_empty_desc": "A routine runs a task for you at a set time, for example a briefing every weekday at 8. Each result lands in your history as a chat.",
+  "rt_active_count": "{active} of {limit} active",
+  "rt_results_in_history_1": "All results are in your",
+  "rt_results_in_history_2": ".",
+  "rt_delete_title": "Delete routine?",
+  "rt_delete_body": "It will not run again. The chats from earlier runs stay in your history.",
+  "rt_not_found": "This routine no longer exists.",
+  "rt_saved": "Routine saved",
+  "rt_created": "Routine created",
+  "rt_created_paused": "Routine saved, but paused: you already have {limit} active ones. Pause another to switch it on.",
+  "rt_err_timezone": "This time zone is not known. Pick another one from the list.",
+  "rt_err_reference": "A persona, playbook or connector you picked is no longer available to you. Remove it and save again.",
+  "rt_edit_title": "Edit routine",
+  "rt_new_title": "New routine",
+  "rt_back": "Back to Routines",
+  "rt_create": "Create routine",
+  "rt_sec_what": "What",
+  "rt_name": "Name",
+  "rt_name_ph": "e.g. Morning briefing",
+  "rt_name_required": "Give the routine a name.",
+  "rt_prompt": "Task",
+  "rt_prompt_ph": "e.g. Summarise my unread emails and today's meetings. List what needs a decision first.",
+  "rt_prompt_help": "Write it the way you would ask in Chat. Whatever a chosen prompt playbook needs to know can be part of the task.",
+  "rt_prompt_required": "Describe the task.",
+  "rt_sec_when": "When",
+  "rt_rhythm": "Repeats",
+  "rt_rhythm_daily": "Daily",
+  "rt_rhythm_weekdays": "Mon–Fri",
+  "rt_rhythm_custom": "Chosen days",
+  "rt_days": "Days",
+  "rt_days_required": "Pick at least one day.",
+  "rt_time": "Time",
+  "rt_timezone": "Time zone",
+  "rt_when_help": "A routine never starts early. At busy times it may start a few minutes late; if it cannot start within 30 minutes, that run is skipped and it runs again at its next time.",
+  "rt_persona": "Persona",
+  "rt_playbooks": "Playbooks",
+  "rt_remove_x": "Remove {name}",
+  "rt_add_playbook": "Add playbook",
+  "rt_search_playbooks": "Search playbooks…",
+  "rt_connectors": "Connectors",
+  "rt_via_persona_list": "Connectors that come with {name}",
+  "rt_via_persona": "comes with the persona",
+  "rt_not_connected": "not connected",
+  "rt_no_connectors": "You have no connectors yet.",
+  "rt_connect": "Connect one",
+  "rt_shared": "shared",
+  "rt_connectors_help": "Without a choice the routine uses no connector. With a connector chosen it may use every tool that connector offers; you decide which those are in each connector's settings.",
+  "rt_tool_choice": "Go to connector settings",
+  "rt_model": "Model",
+  "rt_no_model": "No model available",
+  "rt_web": "Web search",
+  "rt_web_help": "Lets the routine search the web for current information.",
+  "rt_advanced": "Advanced settings",
+  "rt_advanced_help": "Persona, playbooks, connectors, model and web search. Most routines need none of it.",
+  "rt_model_default": "Workspace default ({name})",
+  "rt_sum_default_model": "Default model",
+  "rt_sum_no_persona": "no persona",
+  "rt_sum_playbooks": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "1 playbook",
+        "countPlural=other": "{count} playbooks"
+      }
+    }
+  ],
+  "rt_sum_no_connectors": "no connectors",
+  "rt_sum_connectors": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "1 connector",
+        "countPlural=other": "{count} connectors"
+      }
+    }
+  ],
+  "rt_sum_web": "web search",
+  "rt_model_pinned": "No default AI model is set for this workspace, so the routine keeps the model chosen here.",
+  "rt_model_unavailable": "{name} is no longer offered. Choose another model or the workspace default.",
+  "rt_use_default": "Use workspace default",
+  "rt_unattended_title": "A routine runs without you",
+  "rt_unattended_body": "It asks no questions and writes to a connected service only when the task asks for it. It returns text: no files and no data analysis.",
+  "rt_start_title": "New results from your routines",
+  "rt_start_mark_read": "Mark all as read",
+  "rt_start_all": "All routines",
+  "rt_start_more": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "+ {count} more",
+        "countPlural=other": "+ {count} more"
+      }
+    }
+  ],
+  "rt_chat_from": "From the routine",
+  "hi_routine": "Routine",
+  "hi_unread": "Unread",
+  "rt_check_fields": "Please check the marked fields.",
+  "rt_created_first": "Routine created. First run {when}; the result appears on Start and in your history.",
+  "rt_time_required": "Enter a time.",
+  "rt_model_required": "No model is available. A routine needs an AI provider key.",
+  "rt_add_key": "Add a key",
+  "rt_tz_change": "Change",
+  "rt_tz_search": "Search time zones…",
+  "rt_dropped": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "1 playbook, connector or persona of this routine no longer exists or is no longer available to you. It was removed; save to keep the change.",
+        "countPlural=other": "{count} playbooks, connectors or personas of this routine no longer exist or are no longer available to you. They were removed; save to keep the change."
+      }
+    }
+  ],
+  "title_routine_new": "New routine"
 }

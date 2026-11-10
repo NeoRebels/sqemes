@@ -57,6 +57,8 @@ export const OWNERSHIP: Record<string, Ownership> = {
   workspace_groups: ws(),
   workspace_moderators: ws(), // SQEM-666
   pending_changes: ws(), // SQEM-667
+  routines: ws(),      // SQEM-675 — personal; RLS: own rows while a member
+  routine_queue: ws(), // SQEM-675 — service role only; a row lives while a run waits or runs
   workspace_members: ws(),
   workspaces: { ownedByA: `t.id = '${A}'` },
   library_templates: {

@@ -309,6 +309,7 @@
   "keyhint_action": "KI-Anbieter-Schlüssel hinterlegen",
   "keyhint_text_member": "Noch kein KI-Anbieter-Schlüssel. Bitte einen Admin oder Editor des Workspace, einen zu hinterlegen.",
   "job_timeout": "Das Modell hat zu lange gebraucht. Versuch es mit einer kürzeren Eingabe.",
+  "job_lost": "Die Antwort wurde auf dem Server abgebrochen. Bitte sende die Nachricht noch einmal.",
   "server_connector_refused_one": "Ohne {list} beantwortet: Der Connector hat die Verbindung abgelehnt. Verbinde ihn neu unter Einstellungen → Connectors.",
   "server_connector_refused_many": "Ohne {list} beantwortet: Die Connectors haben die Verbindung abgelehnt. Verbinde sie neu unter Einstellungen → Connectors.",
   "server_web_allowance": "Die Websuchen in deinem Plan sind für diesen Monat aufgebraucht. Ein Admin des Workspace kann unter Einstellungen → KI-Anbieter → Websuche einen eigenen Suchschlüssel hinterlegen oder den Plan erweitern.",
@@ -2992,5 +2993,182 @@
   "mq_open_item": "Öffnen",
   "mq_compare": "Vergleichen",
   "mq_more": "Mehr laden",
-  "mq_compare_failed": "Die Änderung konnte nicht geladen werden. Vielleicht wurde sie schon entschieden."
+  "mq_compare_failed": "Die Änderung konnte nicht geladen werden. Vielleicht wurde sie schon entschieden.",
+  "nav_routines": "Routinen",
+  "nav_unread": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "{count} ungelesenes Ergebnis",
+        "countPlural=other": "{count} ungelesene Ergebnisse"
+      }
+    }
+  ],
+  "title_routine_editor": "Routine bearbeiten",
+  "rt_schedule_daily": "Täglich um {time}",
+  "rt_schedule_days": "{days} um {time}",
+  "rt_state_failures": "Pausiert nach drei Fehlschlägen. Sieh dir das letzte Ergebnis an und schalte sie dann wieder ein.",
+  "rt_state_credits": "Pausiert: Die KI-Credits für diesen Monat sind aufgebraucht. Schalte sie wieder ein, sobald neue Credits da sind.",
+  "rt_state_paused": "Pausiert",
+  "rt_state_next": "Nächster Lauf {when}",
+  "rt_load_failed": "Deine Routinen konnten nicht geladen werden. Versuch es gleich noch einmal.",
+  "rt_err_limit": "Du hast schon {limit} aktive Routinen. Pausiere eine, um diese einzuschalten.",
+  "rt_save_failed": "Die Routine konnte nicht gespeichert werden. Versuch es gleich noch einmal.",
+  "rt_deleted": "Routine gelöscht",
+  "rt_delete_failed": "Die Routine konnte nicht gelöscht werden.",
+  "rt_last_result": "Letztes Ergebnis",
+  "rt_pause_x": "{name} pausieren",
+  "rt_resume_x": "{name} einschalten",
+  "rt_edit": "Bearbeiten",
+  "rt_edit_x": "{name} bearbeiten",
+  "rt_delete": "Routine löschen",
+  "rt_delete_x": "{name} löschen",
+  "rt_subtitle": "Aufgaben, die zu festen Zeiten für dich laufen. Jedes Ergebnis ist ein Chat in deinem Verlauf.",
+  "rt_new": "Neue Routine",
+  "rt_loading": "Routinen werden geladen…",
+  "rt_empty_title": "Noch keine Routine",
+  "rt_empty_desc": "Eine Routine erledigt eine Aufgabe zu einer festen Zeit für dich, zum Beispiel ein Briefing an jedem Werktag um 8 Uhr. Jedes Ergebnis landet als Chat in deinem Verlauf.",
+  "rt_active_count": "{active} von {limit} aktiv",
+  "rt_results_in_history_1": "Alle Ergebnisse findest du im",
+  "rt_results_in_history_2": ".",
+  "rt_delete_title": "Routine löschen?",
+  "rt_delete_body": "Sie läuft dann nicht mehr. Die Chats aus früheren Läufen bleiben in deinem Verlauf.",
+  "rt_not_found": "Diese Routine gibt es nicht mehr.",
+  "rt_saved": "Routine gespeichert",
+  "rt_created": "Routine angelegt",
+  "rt_created_paused": "Routine gespeichert, aber pausiert: Du hast schon {limit} aktive. Pausiere eine andere, um sie einzuschalten.",
+  "rt_err_timezone": "Diese Zeitzone ist unbekannt. Wähle eine andere aus der Liste.",
+  "rt_err_reference": "Eine gewählte Persona, ein Playbook oder ein Connector steht dir nicht mehr zur Verfügung. Entferne den Eintrag und speichere noch einmal.",
+  "rt_edit_title": "Routine bearbeiten",
+  "rt_new_title": "Neue Routine",
+  "rt_back": "Zurück zu Routinen",
+  "rt_create": "Routine anlegen",
+  "rt_sec_what": "Was",
+  "rt_name": "Name",
+  "rt_name_ph": "z. B. Morgen-Briefing",
+  "rt_name_required": "Gib der Routine einen Namen.",
+  "rt_prompt": "Auftrag",
+  "rt_prompt_ph": "z. B. Fasse meine ungelesenen E-Mails und die heutigen Termine zusammen. Nenne zuerst, was eine Entscheidung braucht.",
+  "rt_prompt_help": "Schreib ihn so, wie du im Chat fragen würdest. Was ein gewähltes Prompt-Playbook wissen muss, kann direkt im Auftrag stehen.",
+  "rt_prompt_required": "Beschreib den Auftrag.",
+  "rt_sec_when": "Wann",
+  "rt_rhythm": "Wiederholung",
+  "rt_rhythm_daily": "Täglich",
+  "rt_rhythm_weekdays": "Mo–Fr",
+  "rt_rhythm_custom": "Bestimmte Tage",
+  "rt_days": "Tage",
+  "rt_days_required": "Wähle mindestens einen Tag.",
+  "rt_time": "Uhrzeit",
+  "rt_timezone": "Zeitzone",
+  "rt_when_help": "Eine Routine startet nie zu früh. Zu Stoßzeiten kann sie ein paar Minuten später starten. Startet sie nicht binnen 30 Minuten, fällt dieser Lauf aus und sie läuft zum nächsten Termin.",
+  "rt_persona": "Persona",
+  "rt_playbooks": "Playbooks",
+  "rt_remove_x": "{name} entfernen",
+  "rt_add_playbook": "Playbook hinzufügen",
+  "rt_search_playbooks": "Playbooks durchsuchen…",
+  "rt_connectors": "Connectors",
+  "rt_via_persona_list": "Connectors, die mit {name} kommen",
+  "rt_via_persona": "kommt mit der Persona",
+  "rt_not_connected": "nicht verbunden",
+  "rt_no_connectors": "Du hast noch keine Connectors.",
+  "rt_connect": "Einen verbinden",
+  "rt_shared": "geteilt",
+  "rt_connectors_help": "Ohne Auswahl nutzt die Routine keinen Connector. Bei einem gewählten Connector darf sie alle Werkzeuge nutzen, die er anbietet. Welche das sind, legst du für jeden Connector in den Einstellungen fest.",
+  "rt_tool_choice": "Zu den Connector-Einstellungen",
+  "rt_model": "Modell",
+  "rt_no_model": "Kein Modell verfügbar",
+  "rt_web": "Websuche",
+  "rt_web_help": "Die Routine darf im Web nach aktuellen Informationen suchen.",
+  "rt_advanced": "Erweiterte Einstellungen",
+  "rt_advanced_help": "Persona, Playbooks, Connectors, Modell und Websuche. Die meisten Routinen brauchen nichts davon.",
+  "rt_model_default": "Standard des Workspace ({name})",
+  "rt_sum_default_model": "Standardmodell",
+  "rt_sum_no_persona": "keine Persona",
+  "rt_sum_playbooks": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "1 Playbook",
+        "countPlural=other": "{count} Playbooks"
+      }
+    }
+  ],
+  "rt_sum_no_connectors": "keine Connectors",
+  "rt_sum_connectors": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "1 Connector",
+        "countPlural=other": "{count} Connectors"
+      }
+    }
+  ],
+  "rt_sum_web": "Websuche",
+  "rt_model_pinned": "Für diesen Workspace ist kein Standardmodell gesetzt. Die Routine behält deshalb das hier gewählte Modell.",
+  "rt_model_unavailable": "{name} wird nicht mehr angeboten. Wähle ein anderes Modell oder den Standard des Workspace.",
+  "rt_use_default": "Standard des Workspace verwenden",
+  "rt_unattended_title": "Eine Routine läuft ohne dich",
+  "rt_unattended_body": "Sie stellt keine Rückfragen und schreibt in einen verbundenen Dienst nur, wenn der Auftrag es verlangt. Sie liefert Text als Ergebnis, keine Dateien und keine Datenanalyse.",
+  "rt_start_title": "Neue Ergebnisse aus deinen Routinen",
+  "rt_start_mark_read": "Alle als gelesen markieren",
+  "rt_start_all": "Alle Routinen",
+  "rt_start_more": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "+ {count} weiteres",
+        "countPlural=other": "+ {count} weitere"
+      }
+    }
+  ],
+  "rt_chat_from": "Aus der Routine",
+  "hi_routine": "Routine",
+  "hi_unread": "Ungelesen",
+  "rt_check_fields": "Bitte prüf die markierten Felder.",
+  "rt_created_first": "Routine angelegt. Erster Lauf {when}; das Ergebnis erscheint auf Start und in deinem Verlauf.",
+  "rt_time_required": "Gib eine Uhrzeit an.",
+  "rt_model_required": "Es ist kein Modell verfügbar. Eine Routine braucht einen API-Schlüssel für einen KI-Anbieter.",
+  "rt_add_key": "Schlüssel hinterlegen",
+  "rt_tz_change": "Ändern",
+  "rt_tz_search": "Zeitzone suchen…",
+  "rt_dropped": [
+    {
+      "declarations": [
+        "input count",
+        "local countPlural = count: plural"
+      ],
+      "selectors": [
+        "countPlural"
+      ],
+      "match": {
+        "countPlural=one": "1 Playbook, Connector oder Persona dieser Routine gibt es nicht mehr oder steht dir nicht mehr zur Verfügung. Der Eintrag wurde entfernt; speichere, um das zu übernehmen.",
+        "countPlural=other": "{count} Playbooks, Connectors oder Personas dieser Routine gibt es nicht mehr oder stehen dir nicht mehr zur Verfügung. Die Einträge wurden entfernt; speichere, um das zu übernehmen."
+      }
+    }
+  ],
+  "title_routine_new": "Neue Routine"
 }

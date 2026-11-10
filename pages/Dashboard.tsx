@@ -9,8 +9,11 @@ import SetupWizard from '../components/SetupWizard';
 import RecentChatsWidget from '../components/RecentChatsWidget';
 import StartComposer from '../components/StartComposer';
 import AiToolLinks from '../components/AiToolLinks';
+import RoutineResultsCard from '../components/RoutineResultsCard';
+import { useRoutinesAvailable } from '../hooks/useRoutinesAvailable';
 
 const Dashboard = () => {
+  const routinesOn = useRoutinesAvailable(); // SQEM-679
   const { workspace, currentUser } = useWorkspace();
   const { prompts } = usePrompts();
   const { isLoading, showToast } = useUI();
@@ -82,6 +85,9 @@ const Dashboard = () => {
       {/* SQEM-555 — the trial and setup banners moved to the Manage Overview: they
           speak to whoever decides about the plan and the setup. The wizard still opens here on the
           first visit of an empty workspace. */}
+      {/* SQEM-677 — unread routine results, only while there are some. */}
+      {routinesOn && <RoutineResultsCard />}
+
       {/* SQEM-550 (a) — favourites as tiles with "Use" (redesign C), above the rest. */}
       <section aria-labelledby="start-favourites" className="max-w-3xl mx-auto mb-10">
         {/* SQEM-604 — the row wraps as a whole, its items never: at 375 px the German labels broke

@@ -24,7 +24,7 @@ import { buildHistory, filterHistory, historySources, deleteWarning, bulkDeleteW
  */
 const History = () => {
   const navigate = useNavigate();
-  const { chatSessions, updateChatSession, deleteChatSession, deleteChatSessions } = useChatSessions();
+  const { chatSessions, updateChatSession, deleteChatSession, deleteChatSessions, refreshChatSessions } = useChatSessions();
   const { showToast } = useUI();
   const [external, setExternal] = useState<ExternalChat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +35,9 @@ const History = () => {
   // SQEM-576 — multi-select by entry key (sqemes and extension ids could collide; keys cannot).
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [bulkDelete, setBulkDelete] = useState<HistoryEntry[] | null>(null);
+
+  // SQEM-677 — a routine result may have arrived while the tab slept.
+  useEffect(() => { void refreshChatSessions(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchExternalChatHistory().then(setExternal).catch(() => { /* the sqemes half still shows */ }).finally(() => setLoading(false));
@@ -126,9 +129,11 @@ const History = () => {
         <button
           type="button"
           onClick={() => open(e)}
-          className="block w-full text-left text-sm font-medium text-ink break-words after:absolute after:inset-0 after:content-[''] after:rounded-control"
+          className={`flex items-center gap-2 w-full text-left text-sm break-words after:absolute after:inset-0 after:content-[''] after:rounded-control ${e.unseen ? 'font-semibold text-ink-strong' : 'font-medium text-ink'}`}
         >
-          {e.title}
+          {/* SQEM-677 — an unread routine result; opening the chat marks it read. */}
+          {e.unseen && <><span aria-hidden className="shrink-0 w-2 h-2 rounded-full bg-accent" /><span className="sr-only">{m.hi_unread()}: </span></>}
+          <span className="min-w-0">{e.title}</span>
         </button>
         <p className="text-xs text-ink-subtle truncate">{e.label}{e.shared ? m.hi_shared() : ''} · {relTime(e.ts)}</p>
       </div>

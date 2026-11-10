@@ -59,7 +59,8 @@ describe('SQEM-612 — the server reads it', () => {
   it('every function in scope reads the locale once at the start of the handler', () => {
     for (const f of FUNCTIONS) {
       const src = read(`supabase/functions/${f}/index.ts`);
-      expect(src, f).toMatch(/Deno\.serve\(async \(req\) => \{\n {2}(const|let) locale(: Locale)? = requestLocale\(req\);/);
+      // SQEM-676 — chat-message's handler is `handleChat`, wrapped by Deno.serve for routine starts.
+      expect(src, f).toMatch(/(Deno\.serve\(async \(req\) => |async function handleChat\(req: Request, ctx: RoutineContext\): Promise<Response> )\{\n {2}(const|let) locale(: Locale)? = requestLocale\(req\);/);
     }
   });
 

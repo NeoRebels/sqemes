@@ -52,25 +52,33 @@ describe('SQEM-548 — the mode in effect', () => {
 });
 
 describe('SQEM-548 — the links per mode and role (Variante 1)', () => {
-  it('Work: Start, Chat, History (SQEM-563); Manage: Overview, Playbooks, Personas, Files, Marketplace', () => {
-    expect(navRoutes('work', 'admin', { marketplace: true })).toEqual(['/', '/chat', '/history']);
-    expect(navRoutes('manage', 'editor', { marketplace: true })).toEqual(['/overview', '/playbooks', '/personas', '/files', '/library']);
+  it('Work: Start, Chat, Routines, History (SQEM-563/677); Manage: Overview, Playbooks, Personas, Files, Marketplace', () => {
+    expect(navRoutes('work', 'admin', { marketplace: true, routines: true })).toEqual(['/', '/chat', '/routines', '/history']);
+    expect(navRoutes('manage', 'editor', { marketplace: true, routines: true })).toEqual(['/overview', '/playbooks', '/personas', '/files', '/library']);
   });
 
   it('no page appears in both modes', () => {
-    const work = navRoutes('work', 'admin', { marketplace: true });
-    const manage = navRoutes('manage', 'admin', { marketplace: true });
+    const work = navRoutes('work', 'admin', { marketplace: true, routines: true });
+    const manage = navRoutes('manage', 'admin', { marketplace: true, routines: true });
     expect(work.filter(r => manage.includes(r))).toEqual([]);
   });
 
   it('members get one list, whatever the mode', () => {
     for (const mode of ['work', 'manage'] as const) {
-      expect(navRoutes(mode, 'member', { marketplace: true })).toEqual(['/', '/chat', '/history', '/playbooks', '/personas']);
+      expect(navRoutes(mode, 'member', { marketplace: true, routines: true })).toEqual(['/', '/chat', '/routines', '/history', '/playbooks', '/personas']);
     }
   });
 
+  it('⛔ SQEM-677 — no Routines where nothing would run them (self-host without the scheduler), for every role', () => {
+    for (const role of ['member', 'editor', 'admin'] as const) {
+      expect(navRoutes('work', role, { marketplace: true, routines: false })).not.toContain('/routines');
+    }
+    expect(modeForPath('/routines')).toBe('work');
+    expect(modeForPath('/routines/new')).toBe('work');
+  });
+
   it('a self-host instance without a marketplace drops the link (SQEM-178)', () => {
-    expect(navRoutes('manage', 'admin', { marketplace: false })).not.toContain('/library');
+    expect(navRoutes('manage', 'admin', { marketplace: false, routines: true })).not.toContain('/library');
   });
 
   it('each mode lands on a page of its own mode', () => {
@@ -106,7 +114,7 @@ describe('SQEM-548 — the Sidebar wires it up', () => {
   const src = read('components/Sidebar.tsx');
 
   it('the links come from navRoutes, not from a role check of its own', () => {
-    expect(src).toMatch(/const visibleRoutes = navRoutes\(mode, role, \{ marketplace: MARKETPLACE_ENABLED \}\);/);
+    expect(src).toMatch(/const visibleRoutes = navRoutes\(mode, role, \{ marketplace: MARKETPLACE_ENABLED, routines: routinesOn \}\);/);
     expect(src).not.toMatch(/can\(currentUser, workspace, 'settings:general'\)/);
   });
 

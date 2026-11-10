@@ -736,6 +736,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Hi_RemoveInputs */
 /** @typedef {{}} Hi_Remove_TitleInputs */
 /** @typedef {{}} Hi_RemovedInputs */
+/** @typedef {{}} Hi_RoutineInputs */
 /** @typedef {{}} Hi_SearchInputs */
 /** @typedef {{ title: NonNullable<unknown> }} Hi_SelectInputs */
 /** @typedef {{}} Hi_SharedInputs */
@@ -743,6 +744,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Hi_SubtitleInputs */
 /** @typedef {{}} Hi_UnpinInputs */
 /** @typedef {{ title: NonNullable<unknown> }} Hi_Unpin_XInputs */
+/** @typedef {{}} Hi_UnreadInputs */
 /** @typedef {{}} Init_Data_FailedInputs */
 /** @typedef {{}} Init_FailedInputs */
 /** @typedef {{}} Init_Invite_FailedInputs */
@@ -756,6 +758,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Invite_Go_To_StartInputs */
 /** @typedef {{}} Invite_Invalid_LinkInputs */
 /** @typedef {{}} Invite_RedirectingInputs */
+/** @typedef {{}} Job_LostInputs */
 /** @typedef {{}} Job_TimeoutInputs */
 /** @typedef {{}} Keyhint_ActionInputs */
 /** @typedef {{}} Keyhint_Text_ManageInputs */
@@ -1004,8 +1007,10 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Nav_OverviewInputs */
 /** @typedef {{}} Nav_PersonasInputs */
 /** @typedef {{}} Nav_PlaybooksInputs */
+/** @typedef {{}} Nav_RoutinesInputs */
 /** @typedef {{}} Nav_SettingsInputs */
 /** @typedef {{}} Nav_StartInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Nav_UnreadInputs */
 /** @typedef {{}} Nf_BodyInputs */
 /** @typedef {{}} Nf_HomeInputs */
 /** @typedef {{}} Nf_TitleInputs */
@@ -1397,6 +1402,107 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Role_Plural_AdminInputs */
 /** @typedef {{}} Role_Plural_EditorInputs */
 /** @typedef {{}} Role_Plural_MemberInputs */
+/** @typedef {{ active: NonNullable<unknown>, limit: NonNullable<unknown> }} Rt_Active_CountInputs */
+/** @typedef {{}} Rt_Add_KeyInputs */
+/** @typedef {{}} Rt_Add_PlaybookInputs */
+/** @typedef {{}} Rt_AdvancedInputs */
+/** @typedef {{}} Rt_Advanced_HelpInputs */
+/** @typedef {{}} Rt_BackInputs */
+/** @typedef {{}} Rt_Chat_FromInputs */
+/** @typedef {{}} Rt_Check_FieldsInputs */
+/** @typedef {{}} Rt_ConnectInputs */
+/** @typedef {{}} Rt_ConnectorsInputs */
+/** @typedef {{}} Rt_Connectors_HelpInputs */
+/** @typedef {{}} Rt_CreateInputs */
+/** @typedef {{}} Rt_CreatedInputs */
+/** @typedef {{ when: NonNullable<unknown> }} Rt_Created_FirstInputs */
+/** @typedef {{ limit: NonNullable<unknown> }} Rt_Created_PausedInputs */
+/** @typedef {{}} Rt_DaysInputs */
+/** @typedef {{}} Rt_Days_RequiredInputs */
+/** @typedef {{}} Rt_DeleteInputs */
+/** @typedef {{}} Rt_Delete_BodyInputs */
+/** @typedef {{}} Rt_Delete_FailedInputs */
+/** @typedef {{}} Rt_Delete_TitleInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Delete_XInputs */
+/** @typedef {{}} Rt_DeletedInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Rt_DroppedInputs */
+/** @typedef {{}} Rt_EditInputs */
+/** @typedef {{}} Rt_Edit_TitleInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Edit_XInputs */
+/** @typedef {{}} Rt_Empty_DescInputs */
+/** @typedef {{}} Rt_Empty_TitleInputs */
+/** @typedef {{ limit: NonNullable<unknown> }} Rt_Err_LimitInputs */
+/** @typedef {{}} Rt_Err_ReferenceInputs */
+/** @typedef {{}} Rt_Err_TimezoneInputs */
+/** @typedef {{}} Rt_Last_ResultInputs */
+/** @typedef {{}} Rt_Load_FailedInputs */
+/** @typedef {{}} Rt_LoadingInputs */
+/** @typedef {{}} Rt_ModelInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Model_DefaultInputs */
+/** @typedef {{}} Rt_Model_PinnedInputs */
+/** @typedef {{}} Rt_Model_RequiredInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Model_UnavailableInputs */
+/** @typedef {{}} Rt_NameInputs */
+/** @typedef {{}} Rt_Name_PhInputs */
+/** @typedef {{}} Rt_Name_RequiredInputs */
+/** @typedef {{}} Rt_NewInputs */
+/** @typedef {{}} Rt_New_TitleInputs */
+/** @typedef {{}} Rt_No_ConnectorsInputs */
+/** @typedef {{}} Rt_No_ModelInputs */
+/** @typedef {{}} Rt_Not_ConnectedInputs */
+/** @typedef {{}} Rt_Not_FoundInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Pause_XInputs */
+/** @typedef {{}} Rt_PersonaInputs */
+/** @typedef {{}} Rt_PlaybooksInputs */
+/** @typedef {{}} Rt_PromptInputs */
+/** @typedef {{}} Rt_Prompt_HelpInputs */
+/** @typedef {{}} Rt_Prompt_PhInputs */
+/** @typedef {{}} Rt_Prompt_RequiredInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Remove_XInputs */
+/** @typedef {{}} Rt_Results_In_History_1Inputs */
+/** @typedef {{}} Rt_Results_In_History_2Inputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Resume_XInputs */
+/** @typedef {{}} Rt_RhythmInputs */
+/** @typedef {{}} Rt_Rhythm_CustomInputs */
+/** @typedef {{}} Rt_Rhythm_DailyInputs */
+/** @typedef {{}} Rt_Rhythm_WeekdaysInputs */
+/** @typedef {{}} Rt_Save_FailedInputs */
+/** @typedef {{}} Rt_SavedInputs */
+/** @typedef {{ time: NonNullable<unknown> }} Rt_Schedule_DailyInputs */
+/** @typedef {{ days: NonNullable<unknown>, time: NonNullable<unknown> }} Rt_Schedule_DaysInputs */
+/** @typedef {{}} Rt_Search_PlaybooksInputs */
+/** @typedef {{}} Rt_Sec_WhatInputs */
+/** @typedef {{}} Rt_Sec_WhenInputs */
+/** @typedef {{}} Rt_SharedInputs */
+/** @typedef {{}} Rt_Start_AllInputs */
+/** @typedef {{}} Rt_Start_Mark_ReadInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Rt_Start_MoreInputs */
+/** @typedef {{}} Rt_Start_TitleInputs */
+/** @typedef {{}} Rt_State_CreditsInputs */
+/** @typedef {{}} Rt_State_FailuresInputs */
+/** @typedef {{ when: NonNullable<unknown> }} Rt_State_NextInputs */
+/** @typedef {{}} Rt_State_PausedInputs */
+/** @typedef {{}} Rt_SubtitleInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Rt_Sum_ConnectorsInputs */
+/** @typedef {{}} Rt_Sum_Default_ModelInputs */
+/** @typedef {{}} Rt_Sum_No_ConnectorsInputs */
+/** @typedef {{}} Rt_Sum_No_PersonaInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Rt_Sum_PlaybooksInputs */
+/** @typedef {{}} Rt_Sum_WebInputs */
+/** @typedef {{}} Rt_TimeInputs */
+/** @typedef {{}} Rt_Time_RequiredInputs */
+/** @typedef {{}} Rt_TimezoneInputs */
+/** @typedef {{}} Rt_Tool_ChoiceInputs */
+/** @typedef {{}} Rt_Tz_ChangeInputs */
+/** @typedef {{}} Rt_Tz_SearchInputs */
+/** @typedef {{}} Rt_Unattended_BodyInputs */
+/** @typedef {{}} Rt_Unattended_TitleInputs */
+/** @typedef {{}} Rt_Use_DefaultInputs */
+/** @typedef {{}} Rt_Via_PersonaInputs */
+/** @typedef {{ name: NonNullable<unknown> }} Rt_Via_Persona_ListInputs */
+/** @typedef {{}} Rt_WebInputs */
+/** @typedef {{}} Rt_Web_HelpInputs */
+/** @typedef {{}} Rt_When_HelpInputs */
 /** @typedef {{}} Save_CancelInputs */
 /** @typedef {{}} Save_SaveInputs */
 /** @typedef {{}} Save_UnsavedInputs */
@@ -1939,6 +2045,8 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Title_Persona_EditorInputs */
 /** @typedef {{}} Title_Playbook_EditorInputs */
 /** @typedef {{}} Title_Reset_PasswordInputs */
+/** @typedef {{}} Title_Routine_EditorInputs */
+/** @typedef {{}} Title_Routine_NewInputs */
 /** @typedef {{}} Tooltip_More_InfoInputs */
 /** @typedef {{}} Tp_ClearInputs */
 /** @typedef {{}} Tp_ContinueInputs */
@@ -12399,6 +12507,20 @@ export const hi_removed = /** @type {((inputs?: Hi_RemovedInputs, options?: { lo
 /**
 * | output |
 * | --- |
+* | "Routine" |
+*
+* @param {Hi_RoutineInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const hi_routine = /** @type {((inputs?: Hi_RoutineInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Hi_RoutineInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.hi_routine(inputs)
+	return __en.hi_routine(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Search chats..." |
 *
 * @param {Hi_SearchInputs} inputs
@@ -12493,6 +12615,20 @@ export const hi_unpin_x = /** @type {((inputs: Hi_Unpin_XInputs, options?: { loc
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.hi_unpin_x(inputs)
 	return __en.hi_unpin_x(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Unread" |
+*
+* @param {Hi_UnreadInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const hi_unread = /** @type {((inputs?: Hi_UnreadInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Hi_UnreadInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.hi_unread(inputs)
+	return __en.hi_unread(inputs)
 });
 /**
 * | output |
@@ -12675,6 +12811,20 @@ export const invite_redirecting = /** @type {((inputs?: Invite_RedirectingInputs
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.invite_redirecting(inputs)
 	return __en.invite_redirecting(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "The answer was interrupted on the server. Please send your message again." |
+*
+* @param {Job_LostInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const job_lost = /** @type {((inputs?: Job_LostInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Job_LostInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.job_lost(inputs)
+	return __en.job_lost(inputs)
 });
 /**
 * | output |
@@ -16152,6 +16302,20 @@ export const nav_playbooks = /** @type {((inputs?: Nav_PlaybooksInputs, options?
 /**
 * | output |
 * | --- |
+* | "Routines" |
+*
+* @param {Nav_RoutinesInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const nav_routines = /** @type {((inputs?: Nav_RoutinesInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Nav_RoutinesInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.nav_routines(inputs)
+	return __en.nav_routines(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Settings" |
 *
 * @param {Nav_SettingsInputs} inputs
@@ -16176,6 +16340,21 @@ export const nav_start = /** @type {((inputs?: Nav_StartInputs, options?: { loca
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.nav_start(inputs)
 	return __en.nav_start(inputs)
+});
+/**
+* | countPlural | output |
+* | --- | --- |
+* | "one" | "{count} unread result" |
+* | "other" | "{count} unread results" |
+*
+* @param {Nav_UnreadInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const nav_unread = /** @type {((inputs: Nav_UnreadInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Nav_UnreadInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.nav_unread(inputs)
+	return __en.nav_unread(inputs)
 });
 /**
 * | output |
@@ -21664,6 +21843,1424 @@ export const role_plural_member = /** @type {((inputs?: Role_Plural_MemberInputs
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.role_plural_member(inputs)
 	return __en.role_plural_member(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "{active} of {limit} active" |
+*
+* @param {Rt_Active_CountInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_active_count = /** @type {((inputs: Rt_Active_CountInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Active_CountInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_active_count(inputs)
+	return __en.rt_active_count(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Add a key" |
+*
+* @param {Rt_Add_KeyInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_add_key = /** @type {((inputs?: Rt_Add_KeyInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Add_KeyInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_add_key(inputs)
+	return __en.rt_add_key(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Add playbook" |
+*
+* @param {Rt_Add_PlaybookInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_add_playbook = /** @type {((inputs?: Rt_Add_PlaybookInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Add_PlaybookInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_add_playbook(inputs)
+	return __en.rt_add_playbook(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Advanced settings" |
+*
+* @param {Rt_AdvancedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_advanced = /** @type {((inputs?: Rt_AdvancedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_AdvancedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_advanced(inputs)
+	return __en.rt_advanced(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Persona, playbooks, connectors, model and web search. Most routines need none of it." |
+*
+* @param {Rt_Advanced_HelpInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_advanced_help = /** @type {((inputs?: Rt_Advanced_HelpInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Advanced_HelpInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_advanced_help(inputs)
+	return __en.rt_advanced_help(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Back to Routines" |
+*
+* @param {Rt_BackInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_back = /** @type {((inputs?: Rt_BackInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_BackInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_back(inputs)
+	return __en.rt_back(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "From the routine" |
+*
+* @param {Rt_Chat_FromInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_chat_from = /** @type {((inputs?: Rt_Chat_FromInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Chat_FromInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_chat_from(inputs)
+	return __en.rt_chat_from(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Please check the marked fields." |
+*
+* @param {Rt_Check_FieldsInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_check_fields = /** @type {((inputs?: Rt_Check_FieldsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Check_FieldsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_check_fields(inputs)
+	return __en.rt_check_fields(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Connect one" |
+*
+* @param {Rt_ConnectInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_connect = /** @type {((inputs?: Rt_ConnectInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_ConnectInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_connect(inputs)
+	return __en.rt_connect(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Connectors" |
+*
+* @param {Rt_ConnectorsInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_connectors = /** @type {((inputs?: Rt_ConnectorsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_ConnectorsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_connectors(inputs)
+	return __en.rt_connectors(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Without a choice the routine uses no connector. With a connector chosen it may use every tool that connector offers; you decide which those are in each conne..." |
+*
+* @param {Rt_Connectors_HelpInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_connectors_help = /** @type {((inputs?: Rt_Connectors_HelpInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Connectors_HelpInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_connectors_help(inputs)
+	return __en.rt_connectors_help(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Create routine" |
+*
+* @param {Rt_CreateInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_create = /** @type {((inputs?: Rt_CreateInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_CreateInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_create(inputs)
+	return __en.rt_create(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Routine created" |
+*
+* @param {Rt_CreatedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_created = /** @type {((inputs?: Rt_CreatedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_CreatedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_created(inputs)
+	return __en.rt_created(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Routine created. First run {when}; the result appears on Start and in your history." |
+*
+* @param {Rt_Created_FirstInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_created_first = /** @type {((inputs: Rt_Created_FirstInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Created_FirstInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_created_first(inputs)
+	return __en.rt_created_first(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Routine saved, but paused: you already have {limit} active ones. Pause another to switch it on." |
+*
+* @param {Rt_Created_PausedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_created_paused = /** @type {((inputs: Rt_Created_PausedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Created_PausedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_created_paused(inputs)
+	return __en.rt_created_paused(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Days" |
+*
+* @param {Rt_DaysInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_days = /** @type {((inputs?: Rt_DaysInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_DaysInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_days(inputs)
+	return __en.rt_days(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Pick at least one day." |
+*
+* @param {Rt_Days_RequiredInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_days_required = /** @type {((inputs?: Rt_Days_RequiredInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Days_RequiredInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_days_required(inputs)
+	return __en.rt_days_required(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Delete routine" |
+*
+* @param {Rt_DeleteInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_delete = /** @type {((inputs?: Rt_DeleteInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_DeleteInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_delete(inputs)
+	return __en.rt_delete(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "It will not run again. The chats from earlier runs stay in your history." |
+*
+* @param {Rt_Delete_BodyInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_delete_body = /** @type {((inputs?: Rt_Delete_BodyInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Delete_BodyInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_delete_body(inputs)
+	return __en.rt_delete_body(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "The routine could not be deleted." |
+*
+* @param {Rt_Delete_FailedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_delete_failed = /** @type {((inputs?: Rt_Delete_FailedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Delete_FailedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_delete_failed(inputs)
+	return __en.rt_delete_failed(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Delete routine?" |
+*
+* @param {Rt_Delete_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_delete_title = /** @type {((inputs?: Rt_Delete_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Delete_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_delete_title(inputs)
+	return __en.rt_delete_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Delete {name}" |
+*
+* @param {Rt_Delete_XInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_delete_x = /** @type {((inputs: Rt_Delete_XInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Delete_XInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_delete_x(inputs)
+	return __en.rt_delete_x(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Routine deleted" |
+*
+* @param {Rt_DeletedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_deleted = /** @type {((inputs?: Rt_DeletedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_DeletedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_deleted(inputs)
+	return __en.rt_deleted(inputs)
+});
+/**
+* | countPlural | output |
+* | --- | --- |
+* | "one" | "1 playbook, connector or persona of this routine no longer exists or is no longer available to you. It was removed; save to keep the change." |
+* | "other" | "{count} playbooks, connectors or personas of this routine no longer exist or are no longer available to you. They were removed; save to keep the change." |
+*
+* @param {Rt_DroppedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_dropped = /** @type {((inputs: Rt_DroppedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_DroppedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_dropped(inputs)
+	return __en.rt_dropped(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Edit" |
+*
+* @param {Rt_EditInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_edit = /** @type {((inputs?: Rt_EditInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_EditInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_edit(inputs)
+	return __en.rt_edit(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Edit routine" |
+*
+* @param {Rt_Edit_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_edit_title = /** @type {((inputs?: Rt_Edit_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Edit_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_edit_title(inputs)
+	return __en.rt_edit_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Edit {name}" |
+*
+* @param {Rt_Edit_XInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_edit_x = /** @type {((inputs: Rt_Edit_XInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Edit_XInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_edit_x(inputs)
+	return __en.rt_edit_x(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "A routine runs a task for you at a set time, for example a briefing every weekday at 8. Each result lands in your history as a chat." |
+*
+* @param {Rt_Empty_DescInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_empty_desc = /** @type {((inputs?: Rt_Empty_DescInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Empty_DescInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_empty_desc(inputs)
+	return __en.rt_empty_desc(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "No routine yet" |
+*
+* @param {Rt_Empty_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_empty_title = /** @type {((inputs?: Rt_Empty_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Empty_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_empty_title(inputs)
+	return __en.rt_empty_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "You already have {limit} active routines. Pause one to switch this one on." |
+*
+* @param {Rt_Err_LimitInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_err_limit = /** @type {((inputs: Rt_Err_LimitInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Err_LimitInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_err_limit(inputs)
+	return __en.rt_err_limit(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "A persona, playbook or connector you picked is no longer available to you. Remove it and save again." |
+*
+* @param {Rt_Err_ReferenceInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_err_reference = /** @type {((inputs?: Rt_Err_ReferenceInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Err_ReferenceInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_err_reference(inputs)
+	return __en.rt_err_reference(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "This time zone is not known. Pick another one from the list." |
+*
+* @param {Rt_Err_TimezoneInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_err_timezone = /** @type {((inputs?: Rt_Err_TimezoneInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Err_TimezoneInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_err_timezone(inputs)
+	return __en.rt_err_timezone(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Last result" |
+*
+* @param {Rt_Last_ResultInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_last_result = /** @type {((inputs?: Rt_Last_ResultInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Last_ResultInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_last_result(inputs)
+	return __en.rt_last_result(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Your routines could not be loaded. Try again in a moment." |
+*
+* @param {Rt_Load_FailedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_load_failed = /** @type {((inputs?: Rt_Load_FailedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Load_FailedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_load_failed(inputs)
+	return __en.rt_load_failed(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Loading routines…" |
+*
+* @param {Rt_LoadingInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_loading = /** @type {((inputs?: Rt_LoadingInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_LoadingInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_loading(inputs)
+	return __en.rt_loading(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Model" |
+*
+* @param {Rt_ModelInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_model = /** @type {((inputs?: Rt_ModelInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_ModelInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_model(inputs)
+	return __en.rt_model(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Workspace default ({name})" |
+*
+* @param {Rt_Model_DefaultInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_model_default = /** @type {((inputs: Rt_Model_DefaultInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Model_DefaultInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_model_default(inputs)
+	return __en.rt_model_default(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "No default AI model is set for this workspace, so the routine keeps the model chosen here." |
+*
+* @param {Rt_Model_PinnedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_model_pinned = /** @type {((inputs?: Rt_Model_PinnedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Model_PinnedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_model_pinned(inputs)
+	return __en.rt_model_pinned(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "No model is available. A routine needs an AI provider key." |
+*
+* @param {Rt_Model_RequiredInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_model_required = /** @type {((inputs?: Rt_Model_RequiredInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Model_RequiredInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_model_required(inputs)
+	return __en.rt_model_required(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "{name} is no longer offered. Choose another model or the workspace default." |
+*
+* @param {Rt_Model_UnavailableInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_model_unavailable = /** @type {((inputs: Rt_Model_UnavailableInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Model_UnavailableInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_model_unavailable(inputs)
+	return __en.rt_model_unavailable(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Name" |
+*
+* @param {Rt_NameInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_name = /** @type {((inputs?: Rt_NameInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_NameInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_name(inputs)
+	return __en.rt_name(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "e.g. Morning briefing" |
+*
+* @param {Rt_Name_PhInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_name_ph = /** @type {((inputs?: Rt_Name_PhInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Name_PhInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_name_ph(inputs)
+	return __en.rt_name_ph(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Give the routine a name." |
+*
+* @param {Rt_Name_RequiredInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_name_required = /** @type {((inputs?: Rt_Name_RequiredInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Name_RequiredInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_name_required(inputs)
+	return __en.rt_name_required(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "New routine" |
+*
+* @param {Rt_NewInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_new = /** @type {((inputs?: Rt_NewInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_NewInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_new(inputs)
+	return __en.rt_new(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "New routine" |
+*
+* @param {Rt_New_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_new_title = /** @type {((inputs?: Rt_New_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_New_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_new_title(inputs)
+	return __en.rt_new_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "You have no connectors yet." |
+*
+* @param {Rt_No_ConnectorsInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_no_connectors = /** @type {((inputs?: Rt_No_ConnectorsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_No_ConnectorsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_no_connectors(inputs)
+	return __en.rt_no_connectors(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "No model available" |
+*
+* @param {Rt_No_ModelInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_no_model = /** @type {((inputs?: Rt_No_ModelInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_No_ModelInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_no_model(inputs)
+	return __en.rt_no_model(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "not connected" |
+*
+* @param {Rt_Not_ConnectedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_not_connected = /** @type {((inputs?: Rt_Not_ConnectedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Not_ConnectedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_not_connected(inputs)
+	return __en.rt_not_connected(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "This routine no longer exists." |
+*
+* @param {Rt_Not_FoundInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_not_found = /** @type {((inputs?: Rt_Not_FoundInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Not_FoundInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_not_found(inputs)
+	return __en.rt_not_found(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Pause {name}" |
+*
+* @param {Rt_Pause_XInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_pause_x = /** @type {((inputs: Rt_Pause_XInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Pause_XInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_pause_x(inputs)
+	return __en.rt_pause_x(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Persona" |
+*
+* @param {Rt_PersonaInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_persona = /** @type {((inputs?: Rt_PersonaInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_PersonaInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_persona(inputs)
+	return __en.rt_persona(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Playbooks" |
+*
+* @param {Rt_PlaybooksInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_playbooks = /** @type {((inputs?: Rt_PlaybooksInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_PlaybooksInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_playbooks(inputs)
+	return __en.rt_playbooks(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Task" |
+*
+* @param {Rt_PromptInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_prompt = /** @type {((inputs?: Rt_PromptInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_PromptInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_prompt(inputs)
+	return __en.rt_prompt(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Write it the way you would ask in Chat. Whatever a chosen prompt playbook needs to know can be part of the task." |
+*
+* @param {Rt_Prompt_HelpInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_prompt_help = /** @type {((inputs?: Rt_Prompt_HelpInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Prompt_HelpInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_prompt_help(inputs)
+	return __en.rt_prompt_help(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "e.g. Summarise my unread emails and today's meetings. List what needs a decision first." |
+*
+* @param {Rt_Prompt_PhInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_prompt_ph = /** @type {((inputs?: Rt_Prompt_PhInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Prompt_PhInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_prompt_ph(inputs)
+	return __en.rt_prompt_ph(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Describe the task." |
+*
+* @param {Rt_Prompt_RequiredInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_prompt_required = /** @type {((inputs?: Rt_Prompt_RequiredInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Prompt_RequiredInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_prompt_required(inputs)
+	return __en.rt_prompt_required(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Remove {name}" |
+*
+* @param {Rt_Remove_XInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_remove_x = /** @type {((inputs: Rt_Remove_XInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Remove_XInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_remove_x(inputs)
+	return __en.rt_remove_x(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "All results are in your" |
+*
+* @param {Rt_Results_In_History_1Inputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_results_in_history_1 = /** @type {((inputs?: Rt_Results_In_History_1Inputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Results_In_History_1Inputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_results_in_history_1(inputs)
+	return __en.rt_results_in_history_1(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "." |
+*
+* @param {Rt_Results_In_History_2Inputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_results_in_history_2 = /** @type {((inputs?: Rt_Results_In_History_2Inputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Results_In_History_2Inputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_results_in_history_2(inputs)
+	return __en.rt_results_in_history_2(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Switch {name} on" |
+*
+* @param {Rt_Resume_XInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_resume_x = /** @type {((inputs: Rt_Resume_XInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Resume_XInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_resume_x(inputs)
+	return __en.rt_resume_x(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Repeats" |
+*
+* @param {Rt_RhythmInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_rhythm = /** @type {((inputs?: Rt_RhythmInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_RhythmInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_rhythm(inputs)
+	return __en.rt_rhythm(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Chosen days" |
+*
+* @param {Rt_Rhythm_CustomInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_rhythm_custom = /** @type {((inputs?: Rt_Rhythm_CustomInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Rhythm_CustomInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_rhythm_custom(inputs)
+	return __en.rt_rhythm_custom(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Daily" |
+*
+* @param {Rt_Rhythm_DailyInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_rhythm_daily = /** @type {((inputs?: Rt_Rhythm_DailyInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Rhythm_DailyInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_rhythm_daily(inputs)
+	return __en.rt_rhythm_daily(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Mon–Fri" |
+*
+* @param {Rt_Rhythm_WeekdaysInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_rhythm_weekdays = /** @type {((inputs?: Rt_Rhythm_WeekdaysInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Rhythm_WeekdaysInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_rhythm_weekdays(inputs)
+	return __en.rt_rhythm_weekdays(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "The routine could not be saved. Try again in a moment." |
+*
+* @param {Rt_Save_FailedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_save_failed = /** @type {((inputs?: Rt_Save_FailedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Save_FailedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_save_failed(inputs)
+	return __en.rt_save_failed(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Routine saved" |
+*
+* @param {Rt_SavedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_saved = /** @type {((inputs?: Rt_SavedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_SavedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_saved(inputs)
+	return __en.rt_saved(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Daily at {time}" |
+*
+* @param {Rt_Schedule_DailyInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_schedule_daily = /** @type {((inputs: Rt_Schedule_DailyInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Schedule_DailyInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_schedule_daily(inputs)
+	return __en.rt_schedule_daily(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "{days} at {time}" |
+*
+* @param {Rt_Schedule_DaysInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_schedule_days = /** @type {((inputs: Rt_Schedule_DaysInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Schedule_DaysInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_schedule_days(inputs)
+	return __en.rt_schedule_days(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Search playbooks…" |
+*
+* @param {Rt_Search_PlaybooksInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_search_playbooks = /** @type {((inputs?: Rt_Search_PlaybooksInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Search_PlaybooksInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_search_playbooks(inputs)
+	return __en.rt_search_playbooks(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "What" |
+*
+* @param {Rt_Sec_WhatInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_sec_what = /** @type {((inputs?: Rt_Sec_WhatInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Sec_WhatInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_sec_what(inputs)
+	return __en.rt_sec_what(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "When" |
+*
+* @param {Rt_Sec_WhenInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_sec_when = /** @type {((inputs?: Rt_Sec_WhenInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Sec_WhenInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_sec_when(inputs)
+	return __en.rt_sec_when(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "shared" |
+*
+* @param {Rt_SharedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_shared = /** @type {((inputs?: Rt_SharedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_SharedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_shared(inputs)
+	return __en.rt_shared(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "All routines" |
+*
+* @param {Rt_Start_AllInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_start_all = /** @type {((inputs?: Rt_Start_AllInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Start_AllInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_start_all(inputs)
+	return __en.rt_start_all(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Mark all as read" |
+*
+* @param {Rt_Start_Mark_ReadInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_start_mark_read = /** @type {((inputs?: Rt_Start_Mark_ReadInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Start_Mark_ReadInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_start_mark_read(inputs)
+	return __en.rt_start_mark_read(inputs)
+});
+/**
+* | countPlural | output |
+* | --- | --- |
+* | "one" | "+ {count} more" |
+* | "other" | "+ {count} more" |
+*
+* @param {Rt_Start_MoreInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_start_more = /** @type {((inputs: Rt_Start_MoreInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Start_MoreInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_start_more(inputs)
+	return __en.rt_start_more(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "New results from your routines" |
+*
+* @param {Rt_Start_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_start_title = /** @type {((inputs?: Rt_Start_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Start_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_start_title(inputs)
+	return __en.rt_start_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Paused: no AI credits left this month. Switch it back on once new credits are available." |
+*
+* @param {Rt_State_CreditsInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_state_credits = /** @type {((inputs?: Rt_State_CreditsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_State_CreditsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_state_credits(inputs)
+	return __en.rt_state_credits(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Paused after three failed runs. Look at the last result, then switch it back on." |
+*
+* @param {Rt_State_FailuresInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_state_failures = /** @type {((inputs?: Rt_State_FailuresInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_State_FailuresInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_state_failures(inputs)
+	return __en.rt_state_failures(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Next run {when}" |
+*
+* @param {Rt_State_NextInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_state_next = /** @type {((inputs: Rt_State_NextInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_State_NextInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_state_next(inputs)
+	return __en.rt_state_next(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Paused" |
+*
+* @param {Rt_State_PausedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_state_paused = /** @type {((inputs?: Rt_State_PausedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_State_PausedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_state_paused(inputs)
+	return __en.rt_state_paused(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Tasks that run for you at a set time. Every result is a chat in your history." |
+*
+* @param {Rt_SubtitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_subtitle = /** @type {((inputs?: Rt_SubtitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_SubtitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_subtitle(inputs)
+	return __en.rt_subtitle(inputs)
+});
+/**
+* | countPlural | output |
+* | --- | --- |
+* | "one" | "1 connector" |
+* | "other" | "{count} connectors" |
+*
+* @param {Rt_Sum_ConnectorsInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_sum_connectors = /** @type {((inputs: Rt_Sum_ConnectorsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Sum_ConnectorsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_sum_connectors(inputs)
+	return __en.rt_sum_connectors(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Default model" |
+*
+* @param {Rt_Sum_Default_ModelInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_sum_default_model = /** @type {((inputs?: Rt_Sum_Default_ModelInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Sum_Default_ModelInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_sum_default_model(inputs)
+	return __en.rt_sum_default_model(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "no connectors" |
+*
+* @param {Rt_Sum_No_ConnectorsInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_sum_no_connectors = /** @type {((inputs?: Rt_Sum_No_ConnectorsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Sum_No_ConnectorsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_sum_no_connectors(inputs)
+	return __en.rt_sum_no_connectors(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "no persona" |
+*
+* @param {Rt_Sum_No_PersonaInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_sum_no_persona = /** @type {((inputs?: Rt_Sum_No_PersonaInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Sum_No_PersonaInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_sum_no_persona(inputs)
+	return __en.rt_sum_no_persona(inputs)
+});
+/**
+* | countPlural | output |
+* | --- | --- |
+* | "one" | "1 playbook" |
+* | "other" | "{count} playbooks" |
+*
+* @param {Rt_Sum_PlaybooksInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_sum_playbooks = /** @type {((inputs: Rt_Sum_PlaybooksInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Sum_PlaybooksInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_sum_playbooks(inputs)
+	return __en.rt_sum_playbooks(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "web search" |
+*
+* @param {Rt_Sum_WebInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_sum_web = /** @type {((inputs?: Rt_Sum_WebInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Sum_WebInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_sum_web(inputs)
+	return __en.rt_sum_web(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Time" |
+*
+* @param {Rt_TimeInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_time = /** @type {((inputs?: Rt_TimeInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_TimeInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_time(inputs)
+	return __en.rt_time(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Enter a time." |
+*
+* @param {Rt_Time_RequiredInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_time_required = /** @type {((inputs?: Rt_Time_RequiredInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Time_RequiredInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_time_required(inputs)
+	return __en.rt_time_required(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Time zone" |
+*
+* @param {Rt_TimezoneInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_timezone = /** @type {((inputs?: Rt_TimezoneInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_TimezoneInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_timezone(inputs)
+	return __en.rt_timezone(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Go to connector settings" |
+*
+* @param {Rt_Tool_ChoiceInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_tool_choice = /** @type {((inputs?: Rt_Tool_ChoiceInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Tool_ChoiceInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_tool_choice(inputs)
+	return __en.rt_tool_choice(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Change" |
+*
+* @param {Rt_Tz_ChangeInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_tz_change = /** @type {((inputs?: Rt_Tz_ChangeInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Tz_ChangeInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_tz_change(inputs)
+	return __en.rt_tz_change(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Search time zones…" |
+*
+* @param {Rt_Tz_SearchInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_tz_search = /** @type {((inputs?: Rt_Tz_SearchInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Tz_SearchInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_tz_search(inputs)
+	return __en.rt_tz_search(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "It asks no questions and writes to a connected service only when the task asks for it. It returns text: no files and no data analysis." |
+*
+* @param {Rt_Unattended_BodyInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_unattended_body = /** @type {((inputs?: Rt_Unattended_BodyInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Unattended_BodyInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_unattended_body(inputs)
+	return __en.rt_unattended_body(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "A routine runs without you" |
+*
+* @param {Rt_Unattended_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_unattended_title = /** @type {((inputs?: Rt_Unattended_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Unattended_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_unattended_title(inputs)
+	return __en.rt_unattended_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Use workspace default" |
+*
+* @param {Rt_Use_DefaultInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_use_default = /** @type {((inputs?: Rt_Use_DefaultInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Use_DefaultInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_use_default(inputs)
+	return __en.rt_use_default(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "comes with the persona" |
+*
+* @param {Rt_Via_PersonaInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_via_persona = /** @type {((inputs?: Rt_Via_PersonaInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Via_PersonaInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_via_persona(inputs)
+	return __en.rt_via_persona(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Connectors that come with {name}" |
+*
+* @param {Rt_Via_Persona_ListInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_via_persona_list = /** @type {((inputs: Rt_Via_Persona_ListInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Via_Persona_ListInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_via_persona_list(inputs)
+	return __en.rt_via_persona_list(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Web search" |
+*
+* @param {Rt_WebInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_web = /** @type {((inputs?: Rt_WebInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_WebInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_web(inputs)
+	return __en.rt_web(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Lets the routine search the web for current information." |
+*
+* @param {Rt_Web_HelpInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_web_help = /** @type {((inputs?: Rt_Web_HelpInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_Web_HelpInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_web_help(inputs)
+	return __en.rt_web_help(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "A routine never starts early. At busy times it may start a few minutes late; if it cannot start within 30 minutes, that run is skipped and it runs again at i..." |
+*
+* @param {Rt_When_HelpInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const rt_when_help = /** @type {((inputs?: Rt_When_HelpInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Rt_When_HelpInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.rt_when_help(inputs)
+	return __en.rt_when_help(inputs)
 });
 /**
 * | output |
@@ -29263,6 +30860,34 @@ export const title_reset_password = /** @type {((inputs?: Title_Reset_PasswordIn
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.title_reset_password(inputs)
 	return __en.title_reset_password(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Routine editor" |
+*
+* @param {Title_Routine_EditorInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const title_routine_editor = /** @type {((inputs?: Title_Routine_EditorInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Title_Routine_EditorInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.title_routine_editor(inputs)
+	return __en.title_routine_editor(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "New routine" |
+*
+* @param {Title_Routine_NewInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const title_routine_new = /** @type {((inputs?: Title_Routine_NewInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Title_Routine_NewInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.title_routine_new(inputs)
+	return __en.title_routine_new(inputs)
 });
 /**
 * | output |

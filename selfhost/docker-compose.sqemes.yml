@@ -36,6 +36,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       SQEMES_APP_PORT: ${SQEMES_APP_PORT:-3000}
+      # SQEM-679 — Routines: the dispatch secret is derived from it and written into the Vault.
+      SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
     volumes:
       - ./init/apply.sh:/init/apply.sh:ro
       - ../supabase/migrations:/migrations:ro

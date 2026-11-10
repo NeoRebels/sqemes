@@ -282,9 +282,38 @@ export interface ChatSession {
   isOwner: boolean; // derived: userId === currentUser.id
   isGenerating: boolean;
   pinned: boolean; // SQEM-038/085 — pinned chats are exempt from the retention cap
+  /** SQEM-677 — the routine whose run made this chat (SQEM-675); unset for an ordinary chat. */
+  routineId?: string;
+  /** SQEM-677 — a routine result nobody has opened yet. */
+  unseen: boolean;
   ownerName?: string;
   ownerAvatar?: string;
 }
+
+/** SQEM-677 — a person's own scheduled chat (SQEM-672/675). */
+export interface Routine {
+  id: string;
+  workspaceId: string;
+  name: string;
+  prompt: string;
+  personaId: string | null;
+  playbookIds: string[];
+  connectorIds: string[];
+  model: string | null;
+  webSearch: boolean;
+  /** 1 = Monday … 7 = Sunday. */
+  days: number[];
+  /** 'HH:MM:SS' in `timeZone`. */
+  timeOfDay: string;
+  timeZone: string;
+  pausedReason: 'user' | 'failures' | 'credits' | null;
+  nextRunAt: string | null;
+  lastSessionId: string | null;
+  createdAt: string;
+}
+
+/** What the editor saves; the rest is the server's. */
+export type RoutineInput = Pick<Routine, 'name' | 'prompt' | 'personaId' | 'playbookIds' | 'connectorIds' | 'model' | 'webSearch' | 'days' | 'timeOfDay' | 'timeZone'>;
 
 /** SQEM-551 — see lib/playbookRef.ts for what each field means and how it is capped. */
 export interface PlaybookRefField { name: string; value: string }

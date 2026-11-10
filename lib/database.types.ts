@@ -421,6 +421,10 @@ export type Database = {
           pinned: boolean;
           created_at: string;
           last_active_at: string;
+          /** SQEM-675 — the routine this chat is a run of; set by the server only. */
+          routine_id: string | null;
+          /** SQEM-675 — a routine's chat nobody has opened yet (the counter on Routines). */
+          unseen: boolean;
         };
         Insert: {
           id?: string;
@@ -437,6 +441,8 @@ export type Database = {
           pinned?: boolean;
           created_at?: string;
           last_active_at?: string;
+          routine_id?: string | null;
+          unseen?: boolean;
         };
         Update: {
           id?: string;
@@ -453,6 +459,8 @@ export type Database = {
           pinned?: boolean;
           created_at?: string;
           last_active_at?: string;
+          routine_id?: string | null;
+          unseen?: boolean;
         };
         Relationships: [];
       };
@@ -786,11 +794,77 @@ export type Database = {
         };
         Relationships: [];
       };
+      /** SQEM-675 — a person's own scheduled chat. RLS: own rows while a member; at most 5 active. */
+      routines: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          user_id: string;
+          name: string;
+          prompt: string;
+          persona_id: string | null;
+          playbook_ids: string[];
+          connector_ids: string[];
+          model: string | null;
+          web_search: boolean;
+          /** 1 = Monday … 7 = Sunday. */
+          days: number[];
+          /** 'HH:MM:SS', in `time_zone`. */
+          time_of_day: string;
+          time_zone: string;
+          paused_reason: 'user' | 'failures' | 'credits' | null;
+          failure_count: number;
+          next_run_at: string | null;
+          last_session_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        /** The client writes these; owner, failures, next run and last chat are the server's. */
+        Insert: {
+          workspace_id: string;
+          name: string;
+          prompt: string;
+          persona_id?: string | null;
+          playbook_ids?: string[];
+          connector_ids?: string[];
+          model?: string | null;
+          web_search?: boolean;
+          days: number[];
+          time_of_day: string;
+          time_zone: string;
+          /** Only 'user' (pause) or null (resume) from a client. */
+          paused_reason?: 'user' | null;
+        };
+        Update: {
+          name?: string;
+          prompt?: string;
+          persona_id?: string | null;
+          playbook_ids?: string[];
+          connector_ids?: string[];
+          model?: string | null;
+          web_search?: boolean;
+          days?: number[];
+          time_of_day?: string;
+          time_zone?: string;
+          paused_reason?: 'user' | null;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
+      /** SQEM-675 — the next run after `p_after`, in the routine's time zone. */
+      routine_next_run: {
+        Args: { p_days: number[]; p_time: string; p_tz: string; p_after: string };
+        Returns: string | null;
+      };
+      // SQEM-679 — both Vault entries for routines exist (no values).
+      routines_available: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
       get_user_workspace_ids: {
         Args: Record<string, never>;
         Returns: string[];

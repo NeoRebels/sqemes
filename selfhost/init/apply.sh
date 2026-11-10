@@ -64,6 +64,34 @@ for f in /migrations/*.sql; do
 done
 echo "[init] migrations done — applied ${applied}, skipped ${skipped}."
 
+# SQEM-679 — Routines: the two Vault entries `routines_tick()` needs, set on every start (new install and
+# update alike, no step for the operator). The dispatch secret is DERIVED from the service key — the same
+# value `routine-run` and `chat-message` compute when ROUTINE_DISPATCH_SECRET is unset on a self-hosted
+# instance (supabase/functions/_shared/routineSecret.ts). Nothing is printed. Without SERVICE_ROLE_KEY the
+# step is skipped and Routines stay hidden in the app (`routines_available()`).
+if [ -n "${SERVICE_ROLE_KEY:-}" ]; then
+  echo "[init] setting up Routines (Vault) ..."
+  $PSQL -q -v svc="${SERVICE_ROLE_KEY}" -v url="${ROUTINE_RUN_URL:-http://kong:8000/functions/v1/routine-run}" <<'SQL'
+select set_config('sqemes.svc', :'svc', false), set_config('sqemes.url', :'url', false) \g /dev/null
+do $$
+declare
+  v_secret text := encode(extensions.hmac('sqemes-routine-dispatch', current_setting('sqemes.svc'), 'sha256'), 'hex');
+  v_url text := current_setting('sqemes.url');
+  v_id uuid;
+begin
+  select id into v_id from vault.secrets where name = 'routine_dispatch_secret';
+  if v_id is null then perform vault.create_secret(v_secret, 'routine_dispatch_secret');
+  else perform vault.update_secret(v_id, v_secret); end if;
+  select id into v_id from vault.secrets where name = 'routine_run_url';
+  if v_id is null then perform vault.create_secret(v_url, 'routine_run_url');
+  else perform vault.update_secret(v_id, v_url); end if;
+end $$;
+SQL
+  echo "[init] Routines ready: $($PSQL -tAq -c "select public.routines_available()")"
+else
+  echo "[init] SERVICE_ROLE_KEY not set — Routines stay off."
+fi
+
 # Ensure the private workspace-files bucket exists (RLS policies come from the migrations).
 echo "[init] ensuring 'workspace-files' storage bucket (private) ..."
 $PSQL -q -c "insert into storage.buckets (id, name, public) values ('workspace-files', 'workspace-files', false) on conflict (id) do nothing;"

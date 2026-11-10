@@ -140,6 +140,13 @@ insert into public.user_prompt_favorites (user_id, prompt_id)
 insert into public.user_persona_favorites (user_id, persona_id)
   values ('aaaaaaaa-0000-4000-8000-0000000000a1', 'aaaaaaaa-0000-4000-8000-00000000a101');
 
+-- SQEM-675 — a routine of a1 and a waiting run of it.
+insert into public.routines (id, workspace_id, user_id, name, prompt, days, time_of_day, time_zone) values
+  ('aaaaaaaa-0000-4000-8000-00000000a501', 'aaaaaaaa-0000-4000-8000-0000000000aa', 'aaaaaaaa-0000-4000-8000-0000000000a1',
+   'A briefing', 'What is new?', '{1,2,3,4,5}', '08:00', 'Europe/Berlin');
+insert into public.routine_queue (routine_id, workspace_id, user_id, due_at, run_day) values
+  ('aaaaaaaa-0000-4000-8000-00000000a501', 'aaaaaaaa-0000-4000-8000-0000000000aa', 'aaaaaaaa-0000-4000-8000-0000000000a1', now(), current_date);
+
 -- Platform rows no tenant may see.
 insert into public.marketplace_publishers (display_name, token_hash) values ('SQEM-504 publisher', 'sqem504-publisher-hash');
 insert into public.mcp_oauth_clients (client_id, client_name) values ('sqem504-client', 'SQEM-504');

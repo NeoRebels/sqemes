@@ -83,7 +83,7 @@ describe('wiring', () => {
   });
   it('a stopped job broadcasts nothing and always ends its watch', () => {
     expect(fn).toMatch(/if \(cancel\.signal\.aborted\) \{\s*console\.log\('\[chat-cancel\]'[\s\S]*?return;\s*\}/);
-    expect(fn).toMatch(/finally \{\s*cancelWatch\.stop\(\);\s*\}/);
+    expect(fn).toMatch(/finally \{\s*cancelWatch\.stop\(\);\s*heartbeat\.stop\(\);\s*\}/);
   });
   it('the job only stops for a row with its own user', () => {
     expect(fn).toMatch(/\.eq\('job_id', j\)\.eq\('user_id', u\)/);

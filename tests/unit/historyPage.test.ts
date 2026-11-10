@@ -103,7 +103,8 @@ describe('wiring', () => {
 
   it('full titles on the History page; the sidebar block is "Recent Chats"', () => {
     const page = read('pages/History.tsx');
-    expect(page).toMatch(/text-sm font-medium text-ink break-words/);
+    expect(page).toMatch(/text-sm break-words/); // SQEM-677 — weight follows unread
+    expect(page).toMatch(/'font-medium text-ink'/);
     expect(page).not.toMatch(/font-medium text-ink truncate/);
     expect(read('components/Sidebar.tsx')).toMatch(/>\{m\.sb_recent\(\)\}<\/p>/);
     expect(en.sb_recent).toBe('Recent Chats'); // SQEM-611

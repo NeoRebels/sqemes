@@ -14,6 +14,53 @@
  * say no.
  */
 export const LOADTEST_MODEL = 'sqemes-loadtest-mock';
+/**
+ * SQEM-673 — a run that lasts like a routine with tool rounds: `sqemes-loadtest-mock:<seconds>` streams
+ * its answer over that many seconds (at most 300, an invocation's wall clock is ~400 s). The suffix lives
+ * in the model id so it travels with the request through every hand-over and needs no new field.
+ */
+const TIMED_MODEL = /^sqemes-loadtest-mock:(\d{1,3})(:quiet|:die)?(:nobeat)?$/;
+export const MAX_LOADTEST_SECONDS = 300;
+/**
+ * SQEM-673 — `…:<seconds>:quiet` streams nothing and only answers at the end, like a routine with nobody
+ * watching would. In load tests, streaming runs packed onto one worker exceed its CPU time and the
+ * worker takes every run on it down at once; this variant shows what the same runs cost without it.
+ */
+export function loadtestQuiet(modelId: unknown): boolean {
+  return typeof modelId === 'string' && modelId.match(TIMED_MODEL)?.[2] === ':quiet';
+}
+/**
+ * SQEM-674 — `…:<seconds>:die` behaves like a run whose worker was killed: the heartbeat stops after
+ * `LOST_AFTER_MS` and no answer ever arrives. It is the only way to show the browser's "interrupted"
+ * message on purpose; a real CPU kill needs hundreds of runs at once.
+ */
+export function loadtestDies(modelId: unknown): boolean {
+  return typeof modelId === 'string' && modelId.match(TIMED_MODEL)?.[2] === ':die';
+}
+export const LOST_AFTER_MS = 20_000;
+/**
+ * SQEM-676 — `…:nobeat` (after `:quiet` or `:die`, or alone) runs without the SQEM-674 heartbeat. Only for
+ * the A/B measurement of what the heartbeat costs under load; behind the load-test secret like every variant.
+ */
+export function loadtestNoBeat(modelId: unknown): boolean {
+  return typeof modelId === 'string' && modelId.match(TIMED_MODEL)?.[3] === ':nobeat';
+}
+
+/** SQEM-674 — stop the heartbeat, stay silent for the rest of `seconds`, then fail to nobody. */
+export async function simulateLostWorker(
+  heartbeat: { stop: () => void },
+  seconds: number,
+  sleep: (ms: number) => Promise<unknown> = ms => new Promise(r => setTimeout(r, ms)),
+): Promise<never> {
+  await sleep(LOST_AFTER_MS);
+  heartbeat.stop();
+  await sleep(Math.max(0, seconds * 1000 - LOST_AFTER_MS));
+  throw new Error('loadtest: simulated lost worker');
+}
+export function loadtestSeconds(modelId: unknown): number | null {
+  const m = typeof modelId === 'string' ? modelId.match(TIMED_MODEL) : null;
+  return m ? Math.min(Number(m[1]), MAX_LOADTEST_SECONDS) : null;
+}
 export const LOADTEST_HEADER = 'x-sqemes-loadtest';
 const MIN_SECRET_LENGTH = 32;
 
@@ -30,7 +77,7 @@ export function isLoadtestRequest(
   headerValue: string | null | undefined,
   envSecret: string | null | undefined,
 ): boolean {
-  if (modelId !== LOADTEST_MODEL) return false;
+  if (modelId !== LOADTEST_MODEL && loadtestSeconds(modelId) === null) return false;
   if (typeof envSecret !== 'string' || envSecret.length < MIN_SECRET_LENGTH) return false;
   if (typeof headerValue !== 'string') return false;
   return sameSecret(headerValue, envSecret);
@@ -47,9 +94,11 @@ interface MockTools {
 export async function runLoadtestMock(
   onDelta: ((text: string) => void) | undefined,
   tools: MockTools | null,
-  { tokens = 60, delayMs = 30, sleep = (ms: number) => new Promise(r => setTimeout(r, ms)) }:
-    { tokens?: number; delayMs?: number; sleep?: (ms: number) => Promise<unknown> } = {},
+  { tokens = 60, delayMs = 30, seconds = null, sleep = (ms: number) => new Promise(r => setTimeout(r, ms)) }:
+    { tokens?: number; delayMs?: number; seconds?: number | null; sleep?: (ms: number) => Promise<unknown> } = {},
 ): Promise<string> {
+  // SQEM-673 — a timed run spreads the same tokens over the requested seconds.
+  if (seconds != null) delayMs = Math.round((seconds * 1000) / tokens);
   let loaded = 'no library';
   if (tools) {
     const found = await tools.execute('search_templates', { query: 'design' });

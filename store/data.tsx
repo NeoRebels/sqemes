@@ -131,7 +131,7 @@ export function useDataState(
     setChatSessions(prev => prev.some(s => s.id === session.id) ? prev : [session, ...prev]);
   }, []);
 
-  const updateChatSession = useCallback(async (id: string, updates: { title?: string; visibility?: 'private' | 'workspace'; model?: string; isGenerating?: boolean; pinned?: boolean }) => {
+  const updateChatSession = useCallback(async (id: string, updates: { title?: string; visibility?: 'private' | 'workspace'; model?: string; isGenerating?: boolean; pinned?: boolean; unseen?: boolean }) => {
     try {
       const updated = await chatSessionsApi.updateChatSession(id, updates);
       if (updated) setChatSessions(prev => prev.map(s => s.id === id ? updated : s));
@@ -149,6 +149,15 @@ export function useDataState(
       showToast(err.message || m.chat_delete_failed(), 'error');
     }
   }, [showToast]);
+
+  // SQEM-677 — a routine's results are read: the list drops them at once, the rows follow. A failed
+  // write leaves them unread on the next load, which is the honest state.
+  const markChatsSeen = useCallback(async (ids: string[]) => {
+    if (!ids.length) return;
+    const set = new Set(ids);
+    setChatSessions(prev => prev.map(s => set.has(s.id) ? { ...s, unseen: false } : s));
+    try { await chatSessionsApi.markChatsSeen(ids); } catch { /* shown again after the next load */ }
+  }, []);
 
   // SQEM-576 — bulk delete from History. In parallel, every result counted; only what was really
   // deleted leaves the list, and the page shows ONE toast instead of one per chat.
@@ -169,7 +178,7 @@ export function useDataState(
     updateLibraryTemplate: updateLibraryTemplateAction,
     deleteLibraryTemplate: deleteLibraryTemplateAction,
     copyTemplateToWorkspace: copyTemplateToWorkspaceAction,
-    addChatSession, updateChatSession, deleteChatSession, deleteChatSessions,
+    addChatSession, updateChatSession, deleteChatSession, deleteChatSessions, markChatsSeen,
     addWorkspaceFile, patchWorkspaceFile, removeWorkspaceFile, removeWorkspaceFiles,
   };
 }

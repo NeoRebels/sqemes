@@ -265,7 +265,8 @@ describe('SQEM-656 — self-host workers', () => {
     expect(router).not.toMatch(/workerTimeoutMs = 1 \* 60 \* 1000/);
   });
   it('a hand-over asks for a fresh worker, and the router gives one', () => {
-    expect(chat).toMatch(/\/functions\/v1\/chat-message\?handover=1`/);
+    // SQEM-676 — a routine run hands over to chat-routine (its own workers), everything else to chat-message.
+    expect(chat).toMatch(/\/functions\/v1\/\$\{routine \? 'chat-routine' : 'chat-message'\}\?handover=1`/);
     expect(router).toMatch(/forceCreate: url\.searchParams\.get\('handover'\) === '1'/);
   });
 });

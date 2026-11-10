@@ -370,6 +370,14 @@ allow_dynamic_registration = false
 [functions.chat-message]
 verify_jwt = false
 
+# SQEM-676 — called by the routines-tick cron job with its own secret (x-routine-dispatch), never with a JWT.
+[functions.routine-run]
+verify_jwt = false
+
+# SQEM-676 — chat-message's code under its own name, for routine runs only (own workers).
+[functions.chat-routine]
+verify_jwt = false
+
 [functions.execute-step]
 verify_jwt = false
 

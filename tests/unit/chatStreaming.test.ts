@@ -35,7 +35,7 @@ describe('SQEM-372 — what must not stream', () => {
     // neither be printed nor executed. The proof lives next door, with the filters it depends on:
     // `tests/unit/connectorStreaming.test.ts`. Do not re-add the connector clause here without
     // taking that file apart first.
-    expect(CHAT_FN).toMatch(/const streams = !funded;/);
+    expect(CHAT_FN).toMatch(/const streams = !funded && !routine;/); // SQEM-676 — a routine has nobody listening
     expect(CHAT_FN).not.toMatch(/const streams = !funded && !connectors/);
   });
 

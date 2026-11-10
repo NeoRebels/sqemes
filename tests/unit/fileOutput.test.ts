@@ -202,7 +202,7 @@ describe('lib/fileExport', () => {
 describe('wiring', () => {
   it('chat-message offers create_file to every text model and sends the files with the result', () => {
     const chat = code(read('supabase/functions/chat-message/index.ts'));
-    expect(chat).toMatch(/if \(base\) base = withFileTool\(base, generatedFiles\);/);
+    expect(chat).toMatch(/if \(base && !routine\) base = withFileTool\(base, generatedFiles\);/);
     expect(chat).toMatch(/\{ generatedFiles \}/);
   });
 

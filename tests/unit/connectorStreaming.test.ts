@@ -23,7 +23,7 @@ const RESPONSES = read('supabase/functions/_shared/openaiResponses.ts');
 
 describe('SQEM-435 — streaming with connectors', () => {
   it('⭐ connectors no longer switch streaming off; funded still does', () => {
-    expect(CHAT).toMatch(/const streams = !funded;/);
+    expect(CHAT).toMatch(/const streams = !funded && !routine;/); // SQEM-676 — a routine has nobody listening
     expect(CHAT).not.toMatch(/const streams = !funded && !connectors\?\.length/);
   });
 

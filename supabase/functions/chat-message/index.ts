@@ -11,6 +11,7 @@ import { withTimeContext, timeContextLine } from '../_shared/timeContext.ts';
 import { withLibraryPrompt } from '../_shared/libraryPrompt.ts';
 import { providerTimeoutMs } from '../_shared/chatTimeouts.ts';
 import { watchForCancel } from '../_shared/chatCancel.ts';
+import { startHeartbeat } from '../_shared/jobHeartbeat.ts';
 import { loadConnectorTools, withConnectorTools } from '../_shared/mcpClient.ts';
 import { ConnectorPool, withConnectorPool, connectorsFetchedNotice, type AvailableConnector } from '../_shared/connectorPool.ts';
 import { claudeUsage, responsesUsage, geminiUsage, chatCompletionsUsage, addUsage, type TokenCount } from '../_shared/tokenUsage.ts';
@@ -51,7 +52,8 @@ import {
 import { createClaudeBlockCollector, isPauseTurn, MAX_PAUSE_RESUMES } from '../_shared/claudePause.ts';
 import { OUTPUT_LIMIT, outputLimit } from '../_shared/outputLimits.ts';
 import { FUNDED_MODEL } from '../_shared/funded.ts';
-import { isLoadtestRequest, runLoadtestMock, LOADTEST_HEADER } from '../_shared/loadtestMock.ts';
+import { providerOfModelId } from '../_shared/modelProvider.ts';
+import { isLoadtestRequest, runLoadtestMock, loadtestSeconds, loadtestQuiet, loadtestDies, loadtestNoBeat, simulateLostWorker, LOADTEST_HEADER } from '../_shared/loadtestMock.ts';
 import { isWorkspaceSubscriptionActive } from '../_shared/subscription.ts';
 import { countUsage } from '../_shared/usageCounts.ts';
 import { MAX_LOADED_IDS } from '../_shared/chatPlaybooks.ts';
@@ -60,6 +62,9 @@ import {
   type SearchProvider, type WebSources, type WebState,
 } from '../_shared/webSearch.ts';
 import { withFileTool, type GeneratedFile } from '../_shared/fileOutput.ts';
+import { openTicket, signTicket, sameSecret, routineFailureText, routineCreditsText, TICKET_TTL_MS, type RoutineTicket, type SignedTicket } from '../_shared/routineRun.ts';
+import { routineModelReplacedNote } from '../_shared/routineModel.ts';
+import { routineDispatchSecret } from '../_shared/routineSecret.ts';
 
 // SQEM-082 — keyless chat + editor test-run route through the Sqemes-funded model
 // (direct Mistral, EU/GDPR), metered against the workspace's monthly AI credits.
@@ -72,7 +77,33 @@ declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 // 300 s provider call would outlive the worker — silence instead of an honest 504.
 const SELF_HOSTED = Deno.env.get('SELF_HOSTED') === 'true';
 
+/** SQEM-676 — what the wrapper below needs to know about a routine start the handler accepted. */
+interface RoutineContext { routine: RoutineTicket | null; locale: Locale }
+
+/**
+ * SQEM-676 — a routine start arrives from the database (pg_net, `routine_dispatch_chat`), so nobody reads its
+ * HTTP response. Whatever the handler answers before the model runs — no key, no subscription, no credits —
+ * or an image model's immediate answer, is written into the routine's chat here instead.
+ */
 Deno.serve(async (req) => {
+  const ctx: RoutineContext = { routine: null, locale: 'en' };
+  const res = await handleChat(req, ctx);
+  if (!ctx.routine) return res;
+  let answer: any = {};
+  try { answer = await res.clone().json(); } catch { /* not JSON: treated as a failure below */ }
+  if (res.ok && answer?.jobId) return res; // running in the background; it finishes itself
+  const lang = ctx.locale === 'de' ? 'de' : 'en';
+  if (res.ok && typeof answer?.result === 'string') {
+    await finishRoutine(ctx.routine, { ok: true, content: answer.result }, Date.now());
+  } else if (answer?.code === 'out_of_credits') {
+    await finishRoutine(ctx.routine, { ok: true, content: routineCreditsText(lang) }, Date.now(), 'credits');
+  } else {
+    await finishRoutine(ctx.routine, { ok: false, content: routineFailureText(String(answer?.error ?? `HTTP ${res.status}`), lang) }, Date.now());
+  }
+  return res;
+});
+
+async function handleChat(req: Request, ctx: RoutineContext): Promise<Response> {
   let locale: Locale = requestLocale(req); // SQEM-612 — refusals before the body is read are in the person's language too
   const cors = getCorsHeaders(req);
 
@@ -90,7 +121,21 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    // SQEM-676 — a routine start from the database carries the dispatch secret instead of a login; from here on
+    // it counts as the service key (a hand-over then calls this function with the service key and the ticket).
+    const dispatch = req.headers.get('x-routine-dispatch');
+    // SQEM-679 — on self-host derived from the service key when unset (`_shared/routineSecret.ts`).
+    const dispatchSecret = dispatch !== null ? await routineDispatchSecret(name => Deno.env.get(name)) : '';
+    if (dispatch !== null && !(dispatchSecret.length >= 32 && serviceKey && sameSecret(dispatch, dispatchSecret))) {
+      return new Response(JSON.stringify({ error: 'Invalid routine dispatch' }), {
+        status: 401,
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+    const authHeader = dispatch !== null ? `Bearer ${serviceKey}` : req.headers.get('Authorization');
+    // SQEM-676 — deployed a second time as chat-routine (routine runs only, own workers): nothing else is served there.
+    const routineOnly = new URL(req.url).pathname.includes('chat-routine');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
         status: 401,
@@ -100,15 +145,55 @@ Deno.serve(async (req) => {
 
     const adminClient = createAdminClient();
     const token = authHeader.replace(/^Bearer\s+/i, '');
-    const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: txt.srv_unauthorized({}, { locale }) }), {
-        status: 401,
-        headers: { ...cors, 'Content-Type': 'application/json' },
-      });
+    let user: { id: string } | null = null;
+    let body: any = null;
+    /**
+     * SQEM-676 — a routine run: the service key in the header plus a ticket `routine-run` signed. It replaces
+     * the person's login, because a routine has no browser. ⛔ Accepted only while the queue row it names is
+     * still `running` for exactly that routine, person and workspace — a finished or foreign run starts nothing.
+     */
+    let routineTicket: RoutineTicket | null = null;
+    if (serviceKey && sameSecret(token, serviceKey)) {
+      body = await req.json();
+      const opened = await openTicket(body?.routine, serviceKey, Date.now());
+      if (!opened.ok) {
+        console.warn('[routine-run] ticket refused:', opened.reason);
+        return new Response(JSON.stringify({ error: 'Invalid routine ticket' }), {
+          status: 401,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+      const t = opened.ticket;
+      const { data: q } = await adminClient.from('routine_queue')
+        .select('routine_id, user_id, workspace_id, state').eq('id', t.queueId).maybeSingle();
+      if (!q || q.state !== 'running' || q.routine_id !== t.routineId || q.user_id !== t.userId || q.workspace_id !== t.workspaceId
+          || (!body.continuation && body.workspaceId !== t.workspaceId)) {
+        return new Response(JSON.stringify({ error: 'Routine run is not running' }), {
+          status: 409,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+      routineTicket = t;
+      user = { id: t.userId };
+      ctx.routine = t;
+      ctx.locale = requestLocale(req, body?.locale);
+    } else {
+      if (routineOnly) {
+        return new Response(JSON.stringify({ error: 'Routine runs only' }), {
+          status: 403,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+      const { data: { user: authed }, error: authError } = await adminClient.auth.getUser(token);
+      if (authError || !authed) {
+        return new Response(JSON.stringify({ error: txt.srv_unauthorized({}, { locale }) }), {
+          status: 401,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+      user = authed;
+      body = await req.json();
     }
-
-    const body = await req.json();
     /**
      * SQEM-649 — a continuation: this function called itself because one invocation's time was up.
      * ⛔ Everything comes from the SIGNED state, never from the body around it — the request a
@@ -228,28 +313,14 @@ Deno.serve(async (req) => {
       effectiveModelId = modelId;
     } else {
       // BYOK: derive the provider from the model id, then fetch + decrypt the workspace key.
-      const byokLower = modelId.toLowerCase();
-      if (byokLower.includes('/')) {
-        // OpenRouter model ids are `vendor/model` — none of the direct providers use a slash.
-        provider = 'openrouter';
-      } else if (byokLower.startsWith('gpt-') || byokLower.startsWith('o3') || byokLower.startsWith('o4') || byokLower.startsWith('dall-e')) {
-        provider = 'openai';
-      } else if (byokLower.includes('gemini') || byokLower.includes('veo')) {
-        provider = 'gemini';
-      } else if (byokLower.includes('claude')) {
-        provider = 'claude';
-      } else if (byokLower.includes('grok')) {
-        provider = 'grok';
-      } else if (byokLower.includes('deepseek')) {
-        provider = 'deepseek';
-      } else if (byokLower.includes('mistral') || byokLower.includes('codestral') || byokLower.includes('ministral') || byokLower.includes('magistral') || byokLower.includes('pixtral')) {
-        provider = 'mistral';
-      } else {
+      const byokProvider = providerOfModelId(modelId);
+      if (!byokProvider) {
         return new Response(JSON.stringify({ error: txt.srv_unsupported_model({ model: modelId }, { locale }) }), {
           status: 400,
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
       }
+      provider = byokProvider;
 
       const { data: keyRow } = await adminClient
         .from('workspace_api_keys')
@@ -395,6 +466,8 @@ Deno.serve(async (req) => {
       // SQEM-649 — what a hand-over needs: the person's own JWT (header only, never in the state), the
       // request to carry on, and — on a continuation — where the last invocation stopped.
       authHeader,
+      // SQEM-676 — a routine run: carried through every hand-over, finished by the last invocation.
+      routine: routineTicket ? { ticket: routineTicket, envelope: body.routine as SignedTicket } : null,
       request: { modelId, funded: !!funded, systemInstruction, timeZone, connectorIds, webSearch: webSearch === true, locale, ...(analysisTables.length ? { analysisTables } : {}), ...(connectorAnalysis ? { connectorAnalysis: true } : {}), ...(images ? { images, officePictures } : {}) } satisfies ContinuationRequest,
       continuation,
     }));
@@ -415,7 +488,7 @@ Deno.serve(async (req) => {
       headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
     });
   }
-});
+}
 
 // ── Connectors (SQEM-149) ────────────────────────────────────────────────────
 
@@ -512,6 +585,11 @@ interface JobRequest {
   request: ContinuationRequest;
   /** SQEM-649 — set when this invocation continues an answer an earlier one started. */
   continuation: ContinuationState | null;
+  /**
+   * SQEM-676 — set for a routine run: no streaming, the library read-only, no files and no analysis, the
+   * answer written into the routine's chat here (no browser saves it), and the queue row finished.
+   */
+  routine: { ticket: RoutineTicket; envelope: SignedTicket } | null;
 }
 
 interface WebSearchConfig {
@@ -604,7 +682,7 @@ const TOOL_BUDGET_MS = 90_000;
 async function runAndBroadcast({
   jobId, provider, apiKey, modelId, systemInstruction, timeLine, messages,
   funded, workspaceId, creditLimit, connectors, availableConnectors, userId, role, web, webRequested, locale,
-  authHeader, request, continuation,
+  authHeader, request, continuation, routine,
 }: JobRequest): Promise<void> {
   /**
    * SQEM-372 — the streaming decision, made ONCE and in one place rather than inside each provider.
@@ -638,7 +716,8 @@ async function runAndBroadcast({
    * ⭐ `broadcaster` is created per MESSAGE, not per provider call — so the tool loop below can call
    * a provider several times and the client still sees one continuous stream.
    */
-  const streams = !funded;
+  // SQEM-676 — a routine run has nobody listening: no deltas (the lean start SQEM-673 measured for).
+  const streams = !funded && !routine;
   // SQEM-649 — a continued answer starts from the text the earlier invocations already streamed.
   const broadcaster = streams
     ? createDeltaBroadcaster(text => broadcastJobResult(jobId, { delta: text }), { initial: continuation?.loop.answer ?? '' })
@@ -711,7 +790,8 @@ async function runAndBroadcast({
            * (`_shared/libraryActions.ts`): one implementation of "may this person change this".
            * ⛔ Still the chat user's own id — never a key (SQEM-346).
            */
-          actions: {
+          // SQEM-676 — a routine reads the library and never changes it: no write actions offered.
+          actions: routine ? undefined : {
             definitions: chatActionDefinitions(role, { selfHosted: SELF_HOSTED }), // SQEM-663
             run: (name, args, lib) => runLibraryTool(
               { adminClient: createAdminClient(), workspaceId, userId, role, lib, surface: 'chat' }, name, args),
@@ -783,6 +863,17 @@ async function runAndBroadcast({
     return true;
   }, cancel);
 
+  // SQEM-674 — `alive` every 15 s while this invocation works. A killed worker goes silent, and the
+  // browser says "interrupted" instead of waiting minutes for "took too long".
+  // SQEM-676 — a routine run's beat moves its queue lease on instead (nobody listens on Realtime), with ONE
+  // client for the whole run: load tests lost runs to CPU kills, and a new client every
+  // 15 s per run was avoidable work.
+  const routineDb = routine ? createAdminClient() : null;
+  // SQEM-676 — `:nobeat` (simulated provider, load tests only) leaves the beat out, for the A/B measurement.
+  const heartbeat = provider === 'loadtest' && loadtestNoBeat(modelId) ? { stop: () => {} } : startHeartbeat(() => routineDb
+    ? routineDb.rpc('routine_run_heartbeat', { p_queue_id: routine!.ticket.queueId })
+    : broadcastJobResult(jobId, { alive: true }));
+
   /**
    * SQEM-649 — call this function again with the state, as the person (their JWT in the header). True
    * when the next invocation accepted it. ⛔ A state with a secret in it is never sent.
@@ -796,10 +887,12 @@ async function runAndBroadcast({
         return false;
       }
       // SQEM-656 — `?handover=1`: the self-host router starts a fresh worker for it (Cloud ignores it).
-      const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/chat-message?handover=1`, {
+      // SQEM-676 — a routine run stays on chat-routine's own workers through its hand-overs.
+      const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/${routine ? 'chat-routine' : 'chat-message'}?handover=1`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': authHeader },
-        body: JSON.stringify({ continuation: signed }),
+        // SQEM-676 — a routine run carries its ticket on; the header is then the service key.
+        body: JSON.stringify(routine ? { continuation: signed, routine: routine.envelope } : { continuation: signed }),
         signal: cancel.signal,
       });
       const ok = res.ok;
@@ -842,9 +935,10 @@ async function runAndBroadcast({
       }, webSources, cancel.signal, webState);
     }
     // SQEM-595 — create_file for every text model, always: it costs nothing until it is used.
-    if (base) base = withFileTool(base, generatedFiles);
+    // SQEM-676 — not in a routine: the files are built in the browser, and nobody is there.
+    if (base && !routine) base = withFileTool(base, generatedFiles);
     // SQEM-660 — run_analysis only with attached tables; the program runs in the person's browser.
-    if (base) base = withAnalysisTool(base, analysisTables, (code, pending) => requestBrowserAnalysis(jobId, code, cancel.signal, pending), analyses, connectorTables);
+    if (base && !routine) base = withAnalysisTool(base, analysisTables, (code, pending) => requestBrowserAnalysis(jobId, code, cancel.signal, pending), analyses, connectorTables);
     let runtime = base;
     let unreachable: string[] = [];
     /**
@@ -897,7 +991,8 @@ async function runAndBroadcast({
         totalTokens += r.totalTokens;
         return r.content;
       }
-      if (provider === 'loadtest') return runLoadtestMock(onDelta, tools);
+      if (provider === 'loadtest' && loadtestDies(modelId)) return simulateLostWorker(heartbeat, loadtestSeconds(modelId) ?? 0); // SQEM-674
+      if (provider === 'loadtest') return runLoadtestMock(loadtestQuiet(modelId) ? undefined : onDelta, tools, { seconds: loadtestSeconds(modelId) }); // SQEM-673
       return `[${provider}] Model ${modelId} is not yet supported.`;
     };
 
@@ -1019,7 +1114,8 @@ async function runAndBroadcast({
     // SQEM-551 — `loadedTemplateIds` rides on the same message as the text, so the two cannot be
     // separated by a dropped broadcast. A client from before 551 ignores the extra key.
     // SQEM-561 — `libraryChanges` the same way; an older client ignores the key.
-    await broadcastJobResult(jobId, {
+    // SQEM-676 — a routine's answer goes into its chat below; nobody listens on Realtime.
+    if (!routine) await broadcastJobResult(jobId, {
       result,
       ...(loadedTemplateIds.length ? { loadedTemplateIds } : {}),
       ...(libraryChanges.length ? { libraryChanges } : {}),
@@ -1032,6 +1128,13 @@ async function runAndBroadcast({
       // SQEM-651 — what the session carries on with; the browser stores it. An older client ignores it.
       ...(pool?.fetchedNames.length ? { connectorIds: pool.activeIds() } : {}),
     });
+    // SQEM-676 — nobody's browser saves a routine's answer: it goes into the routine's chat here.
+    if (routine) {
+      const notes = (routine.ticket.notes ?? []).map(n => `\n\n_${n}_`).join('');
+      await finishRoutine(routine.ticket, {
+        ok: true, content: result + notes, loadedTemplateIds, webSources, connectorIds: pool?.activeIds() ?? null,
+      }, chainStartedAt);
+    }
   } catch (err: any) {
     // SQEM-583 — stopped by the person: nobody is listening any more, and an error would be a lie.
     if (cancel.signal.aborted) {
@@ -1044,9 +1147,81 @@ async function runAndBroadcast({
     console.error('[chat-error]', JSON.stringify({ jobId, provider, model: modelId, funded, kind: chatErrorKind(message), status: errorStatus(message), ...(request.images ? { images: request.images, officePictures: request.officePictures ?? 0 } : {}) }));
     // No flush here on purpose: a partial answer followed by an error reads as if the fragment were
     // the reply. The client drops what it has when an error arrives.
-    await broadcastJobResult(jobId, { error: err?.message ?? 'Unknown error' });
+    if (!routine) await broadcastJobResult(jobId, { error: err?.message ?? 'Unknown error' });
+    // SQEM-678 — the provider no longer knows the chosen model: once more with the workspace's default.
+    if (routine && chatErrorKind(message) === 'model' && routine.ticket.fallback
+      && await retryRoutineOnDefault(routine.ticket, request, locale === 'de' ? 'de' : 'en')) return;
+    // SQEM-676 — the failure is said in the routine's chat, and counted (three in a row pause it).
+    if (routine) {
+      await finishRoutine(routine.ticket, { ok: false, content: routineFailureText(err?.message ?? 'Unknown error', locale === 'de' ? 'de' : 'en') }, chainStartedAt);
+    }
   } finally {
     cancelWatch.stop();
+    heartbeat.stop();
+  }
+}
+
+/**
+ * SQEM-678 — a routine whose chosen model the provider no longer knows (retired, renamed) starts once more
+ * on the workspace's default, through the database like its first start (never fetch(), SQEM-676), into the
+ * same chat and on the same queue row. The new ticket carries the note and NO fallback, so there is no third
+ * try. `false` = the second start could not be sent; the caller then writes the failure as before.
+ */
+async function retryRoutineOnDefault(t: RoutineTicket, request: ContinuationRequest, locale: 'de' | 'en'): Promise<boolean> {
+  try {
+    const admin = createAdminClient();
+    const { data: first } = await admin.from('chat_messages').select('content')
+      .eq('session_id', t.sessionId).eq('role', 'user').order('created_at', { ascending: true }).limit(1).maybeSingle();
+    if (!first?.content || !t.fallback) return false;
+    const { fallback, model, ...rest } = t;
+    const envelope = await signTicket({
+      ...rest,
+      notes: [...(t.notes ?? []), routineModelReplacedNote(model ?? request.modelId ?? '', locale)],
+      exp: Date.now() + TICKET_TTL_MS,
+    }, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+    const { error } = await admin.rpc('routine_dispatch_chat', {
+      p_body: {
+        workspaceId: t.workspaceId, ...fallback, systemInstruction: request.systemInstruction,
+        messages: [{ role: 'user', content: first.content }], jobId: crypto.randomUUID(),
+        timeZone: request.timeZone, webSearch: request.webSearch === true, connectorIds: request.connectorIds, locale,
+        routine: envelope,
+      },
+    });
+    if (error) throw new Error(error.message);
+    console.log('[routine-model-fallback]', JSON.stringify({ to: 'funded' in fallback ? 'credits' : 'default' }));
+    return true;
+  } catch (e: any) {
+    console.error('[routine-model-fallback] not started:', e?.message ?? e);
+    return false;
+  }
+}
+
+/**
+ * SQEM-676 — the end of a routine run: the answer (or the failure) as the assistant's message in the
+ * routine's chat, the chat marked unseen, and the queue row finished — `complete_routine_run` deletes it
+ * (no run log) and resets or counts the failures, all in one transaction. ⛔ Counts only in the log, never content.
+ */
+async function finishRoutine(
+  t: RoutineTicket,
+  r: { ok: boolean; content: string; loadedTemplateIds?: string[]; webSources?: WebSources; connectorIds?: string[] | null },
+  chainStartedAt: number,
+  pause: 'credits' | null = null,
+): Promise<void> {
+  try {
+    // ⛔ ONE call, one transaction: the queue row, the answer, the chat and the routine. Two calls left a window —
+    // routine chats stayed silent in a load test because the worker died between them. Only the run
+    // that still owns its queue row writes; a late finisher after a retry or the reaper gets false and writes nothing.
+    const webSources = r.webSources && (r.webSources.queries.length || r.webSources.pages.length) ? r.webSources : null;
+    const { data: owned, error } = await createAdminClient().rpc('complete_routine_run', {
+      p_queue_id: t.queueId, p_ok: r.ok, p_session_id: t.sessionId, p_content: r.content,
+      p_loaded_template_ids: r.loadedTemplateIds?.length ? r.loadedTemplateIds.slice(0, MAX_LOADED_IDS) : null,
+      p_web_sources: webSources, p_connector_ids: r.connectorIds ?? null, p_pause: pause,
+    });
+    if (error) throw new Error(error.message);
+    console.log('[routine-done]', JSON.stringify({ ok: r.ok, ...(owned !== true ? { late: true } : {}), ...(pause ? { paused: pause } : {}), durationMs: Date.now() - chainStartedAt }));
+  } catch (e: any) {
+    // The lease runs out and the reaper retries once; nothing else is lost.
+    console.error('[routine-done] could not finish:', e?.message ?? e);
   }
 }
 

@@ -11,6 +11,7 @@ import LegalGate from './components/LegalGate';
 import { needsSubscriptionGate } from './lib/subscription';
 import { publicListingIdFromHash } from './lib/publicRoutes';
 import { IS_SELF_HOSTED } from './lib/env';
+import { useRoutinesAvailable } from './hooks/useRoutinesAvailable';
 
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const Templates = React.lazy(() => import('./pages/Templates'));
@@ -57,6 +58,8 @@ const Chat = React.lazy(() => import('./pages/Chat'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Files = React.lazy(() => import('./pages/Files'));
 const History = React.lazy(() => import('./pages/History')); // SQEM-563
+const Routines = React.lazy(() => import('./pages/Routines')); // SQEM-677
+const RoutineEditor = React.lazy(() => import('./pages/RoutineEditor')); // SQEM-677
 const InviteAccept = React.lazy(() => import('./pages/InviteAccept'));
 const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
 const Auth = React.lazy(() => import('./pages/Auth'));
@@ -247,6 +250,8 @@ const AppRoutes = () => {
   const { noWorkspace, isLoading, showToast } = useUI();
   const { workspace, currentUser, isSqemesAdmin } = useWorkspace();
   const { pathname } = useLocation();
+  // SQEM-679 — on self-host only once the instance can run them (`routines_available()`).
+  const routinesOn = useRoutinesAvailable(!!currentUser.id);
   // SQEM-600 — the language in effect, applied once the person and the workspace are loaded.
   useApplyLocale(!isLoading && !!workspace.id && !!currentUser.id, currentUser.language, workspace.language, isSqemesAdmin);
 
@@ -310,6 +315,10 @@ const AppRoutes = () => {
         <Route path="/library/new" element={<TemplateEditor />} />
         <Route path="/library/:id/edit" element={<TemplateEditor />} />
         <Route path="/library/:id" element={<MarketplaceTemplate />} />
+        {/* SQEM-677 — the routine editor is full-screen like the other editors; not on self-host until
+            its scheduler is set up (the nav hides the page there too). */}
+        {routinesOn && <Route path="/routines/new" element={<RoutineEditor />} />}
+        {routinesOn && <Route path="/routines/:id/edit" element={<RoutineEditor />} />}
 
         {/* Dashboard Layout Routes */}
         <Route path="/" element={<LayoutPage><Dashboard /></LayoutPage>} />
@@ -326,6 +335,7 @@ const AppRoutes = () => {
         <Route path="/chat/:sessionId" element={<Chat />} />
         <Route path="/chat-history" element={<Navigate to="/history" replace />} />
         <Route path="/history" element={<LayoutPage><History /></LayoutPage>} />
+        {routinesOn && <Route path="/routines" element={<LayoutPage><Routines /></LayoutPage>} />}
         <Route path="/library" element={<LayoutPage><Library /></LayoutPage>} />
         <Route path="/settings" element={<LayoutPage><Settings /></LayoutPage>} />
         <Route path="/design" element={<LayoutPage><DesignSystem /></LayoutPage>} />
@@ -345,6 +355,9 @@ const pageTitleForPath = (pathname: string): string => {
   if (pathname === '/') return m.nav_start(); // SQEM-550 (a)
   if (pathname.startsWith('/chat')) return m.nav_chat();
   if (pathname.startsWith('/history')) return m.nav_history(); // SQEM-611 — was missing, tab said just "sqemes"
+  if (pathname === '/routines/new') return m.title_routine_new(); // SQEM-677
+  if (pathname.startsWith('/routines/')) return m.title_routine_editor();
+  if (pathname === '/routines') return m.nav_routines();
   if (pathname.startsWith('/design')) return m.title_design();
   if (pathname === '/overview') return m.nav_overview(); // SQEM-552
   if (pathname.startsWith('/playbooks/') || pathname.startsWith('/prompts/')) return m.title_playbook_editor();

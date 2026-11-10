@@ -90,6 +90,18 @@ export const CLIENT_JOB_TIMEOUT_MS = {
 export const DELTA_GRACE_MS = 60_000;
 
 /**
+ * SQEM-674 — a running answer broadcasts `alive` this often (`_shared/jobHeartbeat.ts`) ...
+ */
+export const HEARTBEAT_MS = 15_000;
+
+/**
+ * ... and the browser gives up after this long without ANY event once it has heard one `alive`. Three
+ * beats, so one or two lost broadcasts (Realtime is best-effort) are not a lost answer. ⛔ Must stay
+ * well under every deadline above, or the old "took too long" fires first and nothing changed.
+ */
+export const HEARTBEAT_SILENCE_MS = 45_000;
+
+/**
  * SQEM-649 — how long new tool rounds may still START for one answer, counted from the person's
  * message, across every invocation it is handed to (`_shared/chatContinuation.ts`). Decided 2026-11-04:
  * 10 minutes ("25 Minuten sind zu lang … 10 Minuten würden reichen"). After it the next round is the

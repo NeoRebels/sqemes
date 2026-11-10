@@ -12,7 +12,7 @@ import { AVAILABLE_MODELS } from '../constants';
 import { buildEnabledModels, isFundedModel, isImageModel } from '../lib/enabledModels';
 import { authoringModelId } from '../lib/authoringAI';
 import { edgeError } from '../lib/edgeError';
-import { Send, Square, Bot, User, Sparkles, AlertTriangle, Loader2, Copy, Check, Pencil, Paperclip, Plug, X, FileText, MessageSquarePlus, Search, MoreHorizontal, Globe, Users, Lock, Trash2, MessageSquare, Wand2, Key, Upload, Files } from 'lucide-react';
+import { Send, Square, Bot, User, Sparkles, AlertTriangle, Loader2, Copy, Check, Pencil, Paperclip, Plug, X, FileText, MessageSquarePlus, Search, MoreHorizontal, Globe, Users, Lock, Trash2, MessageSquare, Wand2, Key, Upload, Files, CalendarClock } from 'lucide-react';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { fetchPersona, fetchPersonas } from '../lib/api/personas';
 import { clearChatHandoff, peekChatHandoff } from '../lib/chatHandoff';
@@ -56,6 +56,7 @@ import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import { uploadWorkspaceFile, getWorkspaceFileSignedUrl } from '../lib/api/files';
 import { fetchConnectors, type Connector } from '../lib/api/connectors';
+import { fetchRoutine } from '../lib/api/routines';
 import { resolvePersonaConnectors } from '../supabase/functions/_shared/connectorService';
 import { WorkspaceFilePickerModal } from '../components/WorkspaceFilePickerModal';
 import type { ChatSession, Persona, PersonaConnector, PlaybookRef, Prompt, PromptKind, WorkspaceFile } from '../types';
@@ -384,7 +385,7 @@ const Chat = () => {
   // renders from it. Emptying the composer drops it (effect below).
   const pendingPlaybookRef = useRef<PendingPlaybookRef | null>(null);
   const { chatSessions, addChatSession, updateChatSession: storeUpdateSession,
-    deleteChatSession: storeDeleteSession } = useChatSessions();
+    deleteChatSession: storeDeleteSession, markChatsSeen } = useChatSessions();
   const { showToast } = useUI();
 
   const location  = useLocation();
@@ -1450,6 +1451,21 @@ const Chat = () => {
   // after a page change that answer is still ours; for anyone else's it says someone is waiting.
   const otherIsGenerating = !!activeSession?.isGenerating && !generatingHere;
 
+  // SQEM-677 — a routine's result: opening it marks it read (Start, Routines and the nav count follow),
+  // and a line above the messages names the routine it came from.
+  const routineId = activeSession?.routineId;
+  useEffect(() => {
+    if (activeSession?.unseen && activeSession.isOwner) void markChatsSeen([activeSession.id]);
+  }, [activeSession?.id, activeSession?.unseen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [routineName, setRoutineName] = useState<string | null>(null);
+  useEffect(() => {
+    setRoutineName(null);
+    if (!routineId) return;
+    let cancelled = false;
+    fetchRoutine(routineId).then(r => { if (!cancelled) setRoutineName(r?.name ?? null); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [routineId]);
+
   // ── Session list item ─────────────────────────────────────────────────────
 
   const renderSession = (session: ChatSession) => {
@@ -1828,6 +1844,13 @@ const Chat = () => {
               </div>
             ) : (
               <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+                {routineId && routineName && (
+                  <p className="flex items-center justify-center gap-1.5 text-xs text-ink-subtle">
+                    <CalendarClock className="w-3.5 h-3.5" />
+                    {txt.rt_chat_from()}{' '}
+                    <Link to={`/routines/${routineId}/edit`} className="font-semibold text-accent hover:underline">{routineName}</Link>
+                  </p>
+                )}
                 {shownMessages.map((msg, index) => (
                   <MessageItem
                     key={msg.id}

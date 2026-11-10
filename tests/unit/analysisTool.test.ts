@@ -174,7 +174,7 @@ describe('SQEM-660 — wiring', () => {
     expect(fn).toMatch(/const analysisTables = normalizeAnalysisTables\(src\.analysisTables\);/);
     expect(fn).toMatch(/\.\.\.\(analysisTables\.length \? \{ analysisTables \} : \{\}\), \.\.\.\(connectorAnalysis \? \{ connectorAnalysis: true \} : \{\}\), \.\.\.\(images \? \{ images, officePictures \} : \{\}\) \} satisfies ContinuationRequest/);
     // SQEM-661 — the connector tables of this answer travel with the program (`pending`).
-    expect(fn).toMatch(/if \(base\) base = withAnalysisTool\(base, analysisTables, \(code, pending\) => requestBrowserAnalysis\(jobId, code, cancel\.signal, pending\), analyses, connectorTables\);/);
+    expect(fn).toMatch(/if \(base && !routine\) base = withAnalysisTool\(base, analysisTables, \(code, pending\) => requestBrowserAnalysis\(jobId, code, cancel\.signal, pending\), analyses, connectorTables\);/);
     expect(fn).toMatch(/generatedFiles, analyses,/);
     expect(fn).toMatch(/\.\.\.\(analyses\.length \? \{ analyses \} : \{\}\),/);
     expect(fn).toMatch(/tools && analysisTables\.length \? ANALYSIS_INSTRUCTION : null/);

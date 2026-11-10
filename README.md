@@ -17,7 +17,9 @@ when to load it.
 Your instance also reads the **community marketplace** (browse, vote, copy a published playbook —
 no setup needed) and can attach **connectors** — any MCP server you add by its URL, usable with every
 text model. (One-click apps such as Google Workspace or Microsoft 365 are part of sqemes Cloud.) Both
-are covered in [SELF_HOSTING.md](./SELF_HOSTING.md).
+are covered in [SELF_HOSTING.md](./SELF_HOSTING.md). Each person can also set up **routines**: a task
+that runs for them at a set time, its answer waiting as a chat in their history — on the Docker bundle
+the installer sets them up.
 
 This repository is the **open core**: the full app + backend you can run on your own
 infrastructure. Sqemes Cloud adds hosted convenience and a few proprietary pieces — none of

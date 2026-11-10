@@ -10,9 +10,13 @@ import type { StoredAnalysis } from '../../supabase/functions/_shared/analysisTo
 // SQEM-390 — `assistant_id` is optional here because the explicit column lists no longer select it;
 // the column itself stays on the table (legacy, unread) and `select('*')` still returns it.
 // SQEM-635 — `connector_ids` likewise: the list queries do not select it; `fetchAppliedContext` does.
-export type ChatSessionRow = Omit<Database['public']['Tables']['chat_sessions']['Row'], 'assistant_id' | 'connector_ids'> & {
+// SQEM-677 — `routine_id` and `unseen` are selected since the Routines UI; optional for rows that
+// come from elsewhere without them.
+export type ChatSessionRow = Omit<Database['public']['Tables']['chat_sessions']['Row'], 'assistant_id' | 'connector_ids' | 'routine_id' | 'unseen'> & {
   assistant_id?: string | null;
   connector_ids?: string[];
+  routine_id?: string | null;
+  unseen?: boolean;
   profiles?: { name: string; avatar: string } | null;
 };
 
@@ -40,6 +44,8 @@ function rowToChatSession(row: ChatSessionRow, currentUserId: string): ChatSessi
     isOwner: row.user_id === currentUserId,
     isGenerating: row.is_generating ?? false,
     pinned: row.pinned ?? false,
+    routineId: row.routine_id || undefined,
+    unseen: row.unseen ?? false,
     ownerName: row.profiles?.name || undefined,
     ownerAvatar: row.profiles?.avatar || undefined,
   };
@@ -97,7 +103,7 @@ export async function fetchChatSessions(
 ): Promise<ChatSession[]> {
   const { data, error } = await supabase
     .from('chat_sessions')
-    .select('id, title, user_id, created_at, last_active_at, visibility, model, applied_skill_ids, persona_id, is_generating, workspace_id, pinned')
+    .select('id, title, user_id, created_at, last_active_at, visibility, model, applied_skill_ids, persona_id, is_generating, workspace_id, pinned, routine_id, unseen')
     .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
     .order('last_active_at', { ascending: false });
@@ -173,7 +179,7 @@ export async function addChatMessage(
 
 export async function updateChatSession(
   id: string,
-  updates: { title?: string; visibility?: 'private' | 'workspace'; model?: string; isGenerating?: boolean; pinned?: boolean }
+  updates: { title?: string; visibility?: 'private' | 'workspace'; model?: string; isGenerating?: boolean; pinned?: boolean; unseen?: boolean }
 ): Promise<ChatSession | null> {
   const row: Record<string, unknown> = {};
   if (updates.title !== undefined) row.title = updates.title;
@@ -181,6 +187,7 @@ export async function updateChatSession(
   if (updates.model !== undefined) row.model = updates.model;
   if (updates.isGenerating !== undefined) row.is_generating = updates.isGenerating;
   if (updates.pinned !== undefined) row.pinned = updates.pinned;
+  if (updates.unseen !== undefined) row.unseen = updates.unseen; // SQEM-677 — the one column a client may set on a routine's chat
 
   const { data, error } = await supabase
     .from('chat_sessions')
@@ -192,6 +199,12 @@ export async function updateChatSession(
   if (error) throw error;
   // isOwner is always true here since only owners can update
   return rowToChatSession(data, data.user_id);
+}
+
+/** SQEM-677 — routine results read; the person's own rows only (RLS), one statement for all. */
+export async function markChatsSeen(ids: string[]): Promise<void> {
+  const { error } = await supabase.from('chat_sessions').update({ unseen: false }).in('id', ids);
+  if (error) throw error;
 }
 
 export async function deleteChatSession(id: string): Promise<void> {

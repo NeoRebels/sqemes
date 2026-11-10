@@ -316,6 +316,33 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
     };
   }, [ws.activeWorkspaceId, ws.currentUser.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * SQEM-677 — a routine run writes its chat on the server. The realtime channel above brings it in
+   * while the tab is awake; a tab that slept may have missed it, so coming back reloads the list (at
+   * most every 30 s, the list only — never the messages).
+   */
+  const lastSessionsLoad = useRef(0);
+  const refreshChatSessions = useCallback(async () => {
+    const wsId = ws.activeWorkspaceId;
+    // The 30 s apply to every caller (tab return, Routines, History), not only to the tab return.
+    if (!wsId || Date.now() - lastSessionsLoad.current < 30_000) return;
+    lastSessionsLoad.current = Date.now();
+    try {
+      const fresh = await chatSessionsApi.fetchChatSessions(wsId, ws.currentUser.id);
+      if (wsId === activeWsRef.current) {
+        // Keep colleagues' shared sessions the realtime channel added; replace the person's own.
+        da.setChatSessions(prev => [...fresh, ...prev.filter(s => !s.isOwner && !fresh.some(f => f.id === s.id))]);
+      }
+    } catch { /* the next visit tries again */ }
+  }, [ws.activeWorkspaceId, ws.currentUser.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refreshChatSessions();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refreshChatSessions]);
+
   // ---- Memoized context values ----
   const uiValue = useMemo(() => ({
     showToast: ui.showToast,
@@ -377,8 +404,9 @@ export const AppProvider = ({ children }: React.PropsWithChildren<{}>) => {
   const chatSessionsValue = useMemo(() => ({
     chatSessions: da.chatSessions, addChatSession: da.addChatSession,
     updateChatSession: da.updateChatSession, deleteChatSession: da.deleteChatSession,
+    markChatsSeen: da.markChatsSeen, refreshChatSessions,
     deleteChatSessions: da.deleteChatSessions,
-  }), [da.chatSessions, da.addChatSession, da.updateChatSession, da.deleteChatSession, da.deleteChatSessions]);
+  }), [da.chatSessions, da.addChatSession, da.updateChatSession, da.deleteChatSession, da.deleteChatSessions, da.markChatsSeen, refreshChatSessions]);
 
   return (
     <UIContext.Provider value={uiValue}>

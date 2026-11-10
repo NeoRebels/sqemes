@@ -40,6 +40,8 @@ export interface HistoryEntry {
   url?: string;
   /** A sqemes chat shared with the workspace — deleting it removes it for collaborators too. */
   shared?: boolean;
+  /** SQEM-677 — a routine's result nobody has opened yet. */
+  unseen?: boolean;
 }
 
 /**
@@ -47,10 +49,12 @@ export interface HistoryEntry {
  * can add a colleague's shared session, and History is a person's own record, not the workspace's.
  */
 export function buildHistory(sessions: ChatSession[], external: ExternalChat[]): HistoryEntry[] {
+  // SQEM-677 — a routine's chat is its own source, so the filter can show only those.
   const own: HistoryEntry[] = sessions.filter(s => s.isOwner).map(s => ({
-    key: `s-${s.id}`, kind: 'sqemes', id: s.id, source: 'sqemes', icon: 'sqemes', label: 'sqemes',
+    key: `s-${s.id}`, kind: 'sqemes', id: s.id,
+    source: s.routineId ? 'routine' : 'sqemes', icon: 'sqemes', label: s.routineId ? m.hi_routine() : 'sqemes',
     title: s.title || m.hi_new_chat(), pinned: s.pinned, ts: new Date(s.lastActiveAt).getTime(),
-    shared: s.visibility === 'workspace',
+    shared: s.visibility === 'workspace', unseen: !!s.routineId && s.unseen,
   }));
   const ext: HistoryEntry[] = external.map(e => {
     const meta = PLATFORM[e.platform] ?? { label: e.platform, icon: e.platform };
@@ -68,12 +72,15 @@ export function filterHistory(entries: HistoryEntry[], { query = '', source = 'a
   return entries.filter(e => (source === 'all' || e.source === source) && (!q || e.title.toLowerCase().includes(q)));
 }
 
-/** The sources present, sqemes first, then by label — for the filter, so it never offers an empty one. */
+/** The sources present, sqemes first, then routines, then by label — for the filter, so it never offers an empty one. */
 export function historySources(entries: HistoryEntry[]): { value: string; label: string }[] {
   const seen = new Map<string, string>();
   for (const e of entries) if (!seen.has(e.source)) seen.set(e.source, e.label);
   return [...seen.entries()]
-    .sort(([a, la], [b, lb]) => (a === 'sqemes' ? -1 : b === 'sqemes' ? 1 : la.localeCompare(lb)))
+    .sort(([a, la], [b, lb]) => {
+      const rank = (x: string) => (x === 'sqemes' ? 0 : x === 'routine' ? 1 : 2);
+      return rank(a) - rank(b) || la.localeCompare(lb);
+    })
     .map(([value, label]) => ({ value, label }));
 }
 

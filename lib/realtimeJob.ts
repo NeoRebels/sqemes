@@ -8,6 +8,7 @@
 import { supabase } from './supabase';
 import { m } from './i18n';
 import { CLIENT_JOB_TIMEOUT_MS, nextJobDeadline } from '../supabase/functions/_shared/chatTimeouts.ts';
+import { createSilenceWatch } from '../supabase/functions/_shared/jobHeartbeat.ts';
 
 /**
  * SQEM-372 — `onDelta` receives the answer as it is written.
@@ -65,9 +66,16 @@ export function waitForJobResult(
     let deadline = startedAt + timeoutMs;
     let cap = hardCapMs;
     let timeout: ReturnType<typeof setTimeout>;
+    // SQEM-674 — armed by the first `alive`; a killed worker goes silent and this ends the wait.
+    const watch = createSilenceWatch(() => {
+      clearTimeout(timeout);
+      supabase.removeChannel(channel);
+      reject(new Error(m.job_lost()));
+    });
     const arm = () => {
       clearTimeout(timeout);
       timeout = setTimeout(() => {
+        watch.stop();
         supabase.removeChannel(channel);
         reject(new Error(m.job_timeout()));
       }, Math.max(0, deadline - Date.now()));
@@ -80,6 +88,7 @@ export function waitForJobResult(
         // stream that is writing is not cut off at a fixed mark any more; one that starts and then
         // stalls still ends — a minute after its last delta at most — which is what the old rule
         // ("deltas never touch the timeout") protected: a wedged provider must not hold the UI open.
+        watch.signal();
         if (typeof payload.delta === 'string') {
           const next = nextJobDeadline(deadline, Date.now(), startedAt, cap);
           if (next !== deadline) { deadline = next; arm(); }
@@ -88,6 +97,7 @@ export function waitForJobResult(
       })
       // SQEM-649 — a new invocation took the answer over: it gets a full wait of its own, up to the chain cap.
       .on('broadcast', { event: 'continued' }, () => {
+        watch.signal();
         cap = Math.max(cap, chainCapMs);
         deadline = Math.min(Math.max(deadline, Date.now() + timeoutMs), startedAt + cap);
         arm();
@@ -95,11 +105,13 @@ export function waitForJobResult(
       })
       // SQEM-660 — run_analysis: the program comes here, the result goes back on analysis:<jobId>.
       .on('broadcast', { event: 'analysis_table' }, ({ payload }: { payload: { analysisTable?: { key?: unknown; part?: unknown; parts?: unknown; csv?: unknown } } }) => {
+        watch.signal();
         const t = payload?.analysisTable;
         if (!t || typeof t.key !== 'string' || typeof t.csv !== 'string' || !Number.isInteger(t.part) || !Number.isInteger(t.parts)) return;
         onAnalysisTable?.({ key: t.key, part: t.part as number, parts: t.parts as number, csv: t.csv });
       })
       .on('broadcast', { event: 'analysis' }, ({ payload }: { payload: { analysis?: { callId?: unknown; code?: unknown; tables?: unknown } } }) => {
+        watch.signal();
         const a = payload?.analysis;
         if (!a || typeof a.callId !== 'string' || typeof a.code !== 'string') return;
         cap = Math.max(cap, chainCapMs);
@@ -110,8 +122,11 @@ export function waitForJobResult(
           : undefined;
         onAnalysis?.({ callId: a.callId, code: a.code, ...(tables?.length ? { tables } : {}) });
       })
+      // SQEM-674 — the heartbeat of a running answer.
+      .on('broadcast', { event: 'alive' }, () => watch.alive())
       .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string; loadedTemplateIds?: unknown; libraryChanges?: unknown; webSources?: unknown; generatedFiles?: unknown; connectorIds?: unknown; analyses?: unknown } }) => {
         clearTimeout(timeout);
+        watch.stop();
         supabase.removeChannel(channel);
         if (payload.error) {
           reject(new Error(payload.error));
@@ -121,10 +136,12 @@ export function waitForJobResult(
           resolve(payload.result ?? '');
         }
       })
-      .subscribe();
+      // SQEM-674 — silence counts only while joined; a rejoin starts it afresh.
+      .subscribe((status: string) => { if (status === 'SUBSCRIBED') watch.resume(); else watch.pause(); });
 
     signal?.addEventListener('abort', () => {
       clearTimeout(timeout);
+      watch.stop();
       supabase.removeChannel(channel);
       reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
     });

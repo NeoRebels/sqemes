@@ -25,7 +25,7 @@ import {
   Loader2,
   Bot,
   Briefcase,
-  SlidersHorizontal, History as HistoryIcon } from 'lucide-react';
+  SlidersHorizontal, History as HistoryIcon, CalendarClock } from 'lucide-react';
 import { useUI, useWorkspace, useChatSessions } from '../store';
 import SegmentedTabs from './ui/SegmentedTabs';
 import { m } from '../lib/i18n';
@@ -37,6 +37,7 @@ import type { PlanTier } from '../types';
 import { startCheckout, type BillingCycle } from '../lib/billing';
 import { CHROME_STORE_URL } from '../lib/links';
 import { IS_SELF_HOSTED, MARKETPLACE_ENABLED } from '../lib/env';
+import { unseenRoutineChats } from '../lib/routineSchedule';
 import { openWhatsNew, gleapConfigured } from '../lib/gleap';
 import { WHATS_NEW_FALLBACK_URL, SELF_HOST_RELEASES_URL } from '../lib/links';
 import { CURRENT_VERSION } from '../lib/version';
@@ -44,6 +45,7 @@ import { useExtensionInstalled } from '../hooks/useExtensionInstalled';
 import { useUpdateStatus } from '../hooks/useUpdateStatus';
 import PlanBadge from './PlanBadge';
 import { Input } from './ui/Input';
+import { useRoutinesAvailable } from '../hooks/useRoutinesAvailable';
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -51,6 +53,7 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
+  const routinesOn = useRoutinesAvailable(); // SQEM-679
   const location = useLocation();
   const navigate = useNavigate();
   const { workspace, currentUser, availableWorkspaces, switchWorkspace, createWorkspace } = useWorkspace();
@@ -176,7 +179,9 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
    */
   // SQEM-548 — the link metadata, by route. WHICH links show, and in which order, is lib/navMode.ts
   // (Work | Manage, by role); this table only says what each one looks like.
-  const navLinks: { to: NavRoute; icon: any; label: string; badge?: string; arrow?: boolean }[] = [
+  const { chatSessions } = useChatSessions();
+  const unseenRoutines = unseenRoutineChats(chatSessions).length; // SQEM-677
+  const navLinks: { to: NavRoute; icon: any; label: string; badge?: string; arrow?: boolean; count?: number }[] = [
     { to: "/", icon: Home, label: m.nav_start() }, // SQEM-550 (a) — was "Dashboard"
     { to: "/overview", icon: LayoutDashboard, label: m.nav_overview() }, // SQEM-552 — Manage home
     // SQEM-394 — "Playbooks", the word the landing page uses; "Templates" was the app's own word and
@@ -196,6 +201,8 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
     { to: "/library", icon: Store, label: m.nav_marketplace() },
     { to: "/files", icon: Paperclip, label: m.nav_files() },
     { to: "/chat", icon: MessageSquare, label: m.nav_chat(), arrow: true },
+    // SQEM-677 — the count is the person's unread routine results.
+    { to: "/routines", icon: CalendarClock, label: m.nav_routines(), count: unseenRoutines },
     // SQEM-563 — the chat list (sqemes + extension). Not the History VISION removed (PromptRunner's log).
     { to: "/history", icon: HistoryIcon, label: m.nav_history() },
   ];
@@ -217,16 +224,15 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
     closeMobileMenu();
   };
 
-  const visibleRoutes = navRoutes(mode, role, { marketplace: MARKETPLACE_ENABLED });
+  const visibleRoutes = navRoutes(mode, role, { marketplace: MARKETPLACE_ENABLED, routines: routinesOn });
   const visibleNavLinks = visibleRoutes.map(to => navLinks.find(l => l.to === to)!).filter(Boolean);
 
   // SQEM-548 — Work shows the person's three most recent chats (already in the store; no new query).
-  const { chatSessions } = useChatSessions();
   const recentChats = mode === 'work'
     ? chatSessions.filter(c => c.isOwner).sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt)).slice(0, 3)
     : [];
 
-  const renderNavItem = (to: string, Icon: any, label: string, badge?: string, arrow?: boolean) => {
+  const renderNavItem = (to: string, Icon: any, label: string, badge?: string, arrow?: boolean, count?: number) => {
     const active = isActive(to);
     return (
       <Link
@@ -248,6 +254,8 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
         }`}
       >
         <Icon className={`w-5 h-5 transition-colors shrink-0 ${active ? 'text-accent' : 'text-ink-subtle group-hover:text-ink'}`} />
+        {/* SQEM-677 — collapsed, a count shrinks to a dot on the icon; the number is in the label below. */}
+        {isCollapsed && !!count && <><span aria-hidden className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-accent" /><span className="sr-only">{m.nav_unread({ count })}</span></>}
         {!isCollapsed && (
           <>
             <span className="truncate">{label}</span>
@@ -256,6 +264,12 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
               // amber the old Beta badge used is the colour this app reserves for caution.
               <span className="ml-auto text-2xs font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 shrink-0 whitespace-nowrap">
                 {badge}
+              </span>
+            )}
+            {!!count && (
+              // accent-strong: white on the dark theme's lighter accent measured 2.64:1 (impeccable audit).
+              <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-accent-strong text-white text-2xs font-bold tabular-nums flex items-center justify-center shrink-0">
+                <span aria-hidden>{count > 99 ? '99+' : count}</span><span className="sr-only">{m.nav_unread({ count })}</span>
               </span>
             )}
             {arrow && (
@@ -400,7 +414,7 @@ const Sidebar = ({ mobileOpen = false, setMobileOpen }: SidebarProps) => {
             </div>
           ))}
           <div className="mb-6 space-y-1">
-            {visibleNavLinks.map(link => renderNavItem(link.to, link.icon, link.label, link.badge, link.arrow))}
+            {visibleNavLinks.map(link => renderNavItem(link.to, link.icon, link.label, link.badge, link.arrow, link.count))}
           </div>
           {recentChats.length > 0 && !isCollapsed && (
             // SQEM-563 — more air above "Recent Chats". ⛔ PADDING, not margin: the
