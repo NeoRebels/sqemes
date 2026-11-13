@@ -27,6 +27,7 @@ export interface RunningMsg {
   pending?: boolean;
   continuing?: boolean;
   analysing?: boolean; // SQEM-660 — a program runs in this browser right now
+  resuming?: boolean; // SQEM-686 — the worker died; the answer goes on from its last finished round
   model?: string;
 }
 
@@ -42,6 +43,7 @@ export interface RunningAnswer<M extends RunningMsg = RunningMsg> {
   text: string;
   continuing: boolean;
   analysing: boolean;
+  resuming: boolean;
   stopped: boolean;
   controller: AbortController;
 }
@@ -77,7 +79,7 @@ export function getRunningChat<M extends RunningMsg>(): RunningChatState<M> {
 
 /** Starts an answer; clears the previous error (a new send is the moment it stops being news). */
 export function startRunning<M extends RunningMsg>(init: { sessionId: string | null; userMsg: M; model: string; controller: AbortController }): RunningAnswer<M> {
-  const run: RunningAnswer<M> = { ...init, jobId: null, assistantMsgId: null, text: '', continuing: false, analysing: false, stopped: false };
+  const run: RunningAnswer<M> = { ...init, jobId: null, assistantMsgId: null, text: '', continuing: false, analysing: false, resuming: false, stopped: false };
   set({ running: run, failed: null });
   return run;
 }
@@ -90,7 +92,7 @@ export function startRunning<M extends RunningMsg>(init: { sessionId: string | n
  * Stop set from the page is what the handler's catch reads. The state wrapper is replaced instead —
  * that new object is what tells `useSyncExternalStore` to render.
  */
-export function updateRunning<M extends RunningMsg>(run: RunningAnswer<M>, patch: Partial<Pick<RunningAnswer<M>, 'sessionId' | 'jobId' | 'assistantMsgId' | 'model' | 'text' | 'continuing' | 'analysing' | 'stopped'>>): void {
+export function updateRunning<M extends RunningMsg>(run: RunningAnswer<M>, patch: Partial<Pick<RunningAnswer<M>, 'sessionId' | 'jobId' | 'assistantMsgId' | 'model' | 'text' | 'continuing' | 'analysing' | 'resuming' | 'stopped'>>): void {
   if (state.running !== run) return;
   Object.assign(run, patch);
   set({});
@@ -132,7 +134,7 @@ export function resetRunningChat(): void {
 /** The bubble of the running answer: "thinking" until the first text, then the text so far. */
 export function runningBubble<M extends RunningMsg>(run: RunningAnswer<M>): RunningMsg | null {
   if (!run.assistantMsgId) return null;
-  return { id: run.assistantMsgId, role: 'assistant', content: run.text, pending: !run.text, continuing: run.continuing, analysing: run.analysing, model: run.model };
+  return { id: run.assistantMsgId, role: 'assistant', content: run.text, pending: !run.text, continuing: run.continuing, analysing: run.analysing, resuming: run.resuming, model: run.model };
 }
 
 /**

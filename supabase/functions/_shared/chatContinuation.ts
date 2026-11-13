@@ -15,6 +15,8 @@
  * ⛔ **The state travels in the request, never in the database.** It holds tool results — search
  * results, page contents, mail — and the privacy policy (section 4) says those are not stored. A
  * table with a TTL would have needed a new policy version and re-acceptance by every user.
+ * SQEM-686 kept that when it made an answer survive a killed worker: the same envelope goes to the
+ * person's browser after every round (`_shared/chatCheckpoint.ts`) and comes back from there.
  *
  * ⛔ **No secret is in it.** The API key and the connector tokens are re-read from the database by
  * the next invocation; the person's JWT travels only in the `Authorization` header of the self-call.
@@ -86,6 +88,11 @@ export interface ContinuationState {
   chainStartedAt: number;
   /** 1 = the person's own request; the first self-call is 2. */
   gen: number;
+  /**
+   * SQEM-686 — how often this answer was resumed from a checkpoint after its worker died. Signed, so the
+   * browser that posts the checkpoint back cannot reset it (`MAX_RESUMES` in `_shared/chatCheckpoint.ts`).
+   */
+  resumes?: number;
   request: ContinuationRequest;
   provider: string;
   loop: LoopSnapshot;

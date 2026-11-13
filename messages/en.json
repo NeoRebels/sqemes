@@ -130,6 +130,7 @@
   "chat_thinking": "Thinking...",
   "chat_analysis_running": "Computing in your browser …",
   "chat_still_working": "Still working on it: a longer task, up to 10 minutes.",
+  "chat_resuming": "Resuming: the answer carries on from its last finished step.",
   "chat_time_just_now": "just now",
   "chat_time_minutes": "{count}m ago",
   "chat_time_hours": "{count}h ago",

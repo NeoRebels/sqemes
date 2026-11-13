@@ -329,6 +329,7 @@
 /** @typedef {{}} Chat_Private_ExpiryInputs */
 /** @typedef {{}} Chat_RemoveInputs */
 /** @typedef {{}} Chat_RenameInputs */
+/** @typedef {{}} Chat_ResumingInputs */
 /** @typedef {{}} Chat_Running_ElsewhereInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Save_To_Workspace_FailedInputs */
 /** @typedef {{}} Chat_Save_UploadsInputs */
@@ -3537,6 +3538,10 @@ export const chat_remove = /** @type {(inputs: Chat_RemoveInputs) => LocalizedSt
 
 export const chat_rename = /** @type {(inputs: Chat_RenameInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Rename`)
+};
+
+export const chat_resuming = /** @type {(inputs: Chat_ResumingInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Resuming: the answer carries on from its last finished step.`)
 };
 
 export const chat_running_elsewhere = /** @type {(inputs: Chat_Running_ElsewhereInputs) => LocalizedString} */ () => {

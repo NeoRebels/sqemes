@@ -26,7 +26,7 @@ describe('LIBRARY_SYSTEM_PROMPT', () => {
   // often *be* the org instruction, it has to yield explicitly — otherwise we override what somebody
   // deliberately set for themselves, from a settings page they never saw.
   it('yields to the person rather than overriding them', () => {
-    expect(LIBRARY_SYSTEM_PROMPT).toContain('does not replace it');
+    expect(LIBRARY_SYSTEM_PROMPT).toContain('does not replace them'); // SQEM-687 — "your other instructions"
     expect(LIBRARY_SYSTEM_PROMPT).toContain('follow theirs');
   });
 
@@ -43,9 +43,15 @@ describe('LIBRARY_SYSTEM_PROMPT', () => {
   // ⛔ "wait for the answer" is the load-bearing half. Without it a model asks and then answers
   // anyway — worse than not asking, because the choice now looks confirmed.
   it('asks on an ambiguous match instead of choosing', () => {
-    expect(LIBRARY_SYSTEM_PROMPT).toContain('ask which one fits best');
-    expect(LIBRARY_SYSTEM_PROMPT).toContain('wait for the answer');
+    // SQEM-687 — shorter wording, the same two halves: ask, and wait. SQEM-689 — for playbooks.
+    expect(LIBRARY_SYSTEM_PROMPT).toContain('If several playbooks fit, name each with a one-line difference, ask which one and wait; do not choose for them');
     expect(LIBRARY_SYSTEM_PROMPT).not.toMatch(/pick the most specific/i);
+  });
+
+  // ⭐ SQEM-689 — between personas the model picked anyway instead of asking, so for personas
+  // the rule is the pick made visible: the closest one, said which, the other named so the person can switch.
+  it('picks the closest of several personas and names the others', () => {
+    expect(LIBRARY_SYSTEM_PROMPT).toContain('If several personas fit, take the closest, say which and name the others in one sentence.');
   });
 
   it('covers both kinds, since a reader has to tell them apart — and no longer a third', () => {
@@ -55,7 +61,7 @@ describe('LIBRARY_SYSTEM_PROMPT', () => {
     // SQEM-390 — the assistant line went with the kind; a model told about three kinds would look
     // for one the tools never return.
     expect(LIBRARY_SYSTEM_PROMPT).not.toMatch(/assistant/i);
-    expect(LIBRARY_SYSTEM_PROMPT).toContain('two kinds');
+    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/A prompt has \{\{variables\}\}[\s\S]*A skill is company knowledge/); // SQEM-687 — no heading sentence
   });
   // ── SQEM-378 — the three surfaces, and that they really are one text ──────────────────────────
 
@@ -97,13 +103,15 @@ describe('LIBRARY_SYSTEM_PROMPT', () => {
   // 1 of 9 runs and offered a choice between two in 0 of 6; with the role step first, 9/9 and 6/6.
   // The order IS the fix, so it is pinned (scripts/prompt-eval re-measures it).
   it('⛔ puts the role step before the playbook search', () => {
-    expect(LIBRARY_SYSTEM_PROMPT.indexOf('list_personas')).toBeGreaterThan(-1);
-    expect(LIBRARY_SYSTEM_PROMPT.indexOf('list_personas')).toBeLessThan(LIBRARY_SYSTEM_PROMPT.indexOf('search_templates'));
-    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/1\. Role first\./);
+    // SQEM-682 — a NAMED one comes before both; the role step still precedes the playbook search.
+    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/1\. Named first\./);
+    expect(LIBRARY_SYSTEM_PROMPT.indexOf('2. Role.')).toBeGreaterThan(-1);
+    expect(LIBRARY_SYSTEM_PROMPT.indexOf('2. Role.')).toBeLessThan(LIBRARY_SYSTEM_PROMPT.indexOf('3. Playbook.'));
   });
 
-  it('stays short and precise (SQEM-487: 2,258 → 1,297; SQEM-681 measured the longer steps 2 and 4: under 1,600)', () => {
-    expect(LIBRARY_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1600);
+  it('stays short and precise (SQEM-487: 2,258 → 1,297; SQEM-681: under 1,600; SQEM-682: 1,850; SQEM-683: 1,950; SQEM-685: 2,000)', () => {
+    // The hard limit is Claude's 3,000 for organisation instructions; this guard only makes every growth a decision.
+    expect(LIBRARY_SYSTEM_PROMPT.length).toBeLessThanOrEqual(2000);
   });
 
   it('names list_templates only because every surface that carries the instruction offers it (SQEM-681)', () => {

@@ -106,14 +106,15 @@ describe('the wiring', () => {
   const SERVER = readFileSync(root('supabase/functions/chat-message/index.ts'), 'utf8');
 
   it('the browser arms on alive, follows the channel status and stops on every exit', () => {
-    expect(CLIENT).toMatch(/event: 'alive' \}, \(\) => watch\.alive\(\)/);
+    // SQEM-686 — the beat also carries the round whose tools run (`toolsRound`).
+    expect(CLIENT).toMatch(/event: 'alive' \}, \(\{ payload \}[^)]*\) => \{\s*checkpoints\.toolsRunning\(payload\?\.toolsRound\);\s*watch\.alive\(\);/);
     expect(CLIENT).toMatch(/status === 'SUBSCRIBED'\) watch\.resume\(\); else watch\.pause\(\)/);
     expect(CLIENT).toMatch(/m\.job_lost\(\)/);
     expect((CLIENT.match(/watch\.stop\(\)/g) ?? []).length).toBeGreaterThanOrEqual(3);
   });
 
   it('the server starts the heartbeat for every answer and stops it in finally', () => {
-    expect(SERVER).toMatch(/const heartbeat = provider === 'loadtest' && loadtestNoBeat\(modelId\) \? \{ stop: \(\) => \{\} \} : startHeartbeat\(\(\) => routineDb\s*\? routineDb\.rpc\('routine_run_heartbeat'[^)]*\)\s*: broadcastJobResult\(jobId, \{ alive: true \}\)\);/); // SQEM-676 — a routine beats on its lease instead
+    expect(SERVER).toMatch(/const heartbeat = provider === 'loadtest' && loadtestNoBeat\(modelId\) \? \{ stop: \(\) => \{\} \} : startHeartbeat\(\(\) => routineDb\s*\? routineDb\.rpc\('routine_run_heartbeat'[^)]*\)\s*: broadcastJobResult\(jobId, \{ alive: true, \.\.\.\(toolsRound \? \{ toolsRound \} : \{\}\) \}\)\);/); // SQEM-676 — a routine beats on its lease instead; SQEM-686 — the tools mark rides along
     expect(SERVER).toMatch(/finally \{\s*cancelWatch\.stop\(\);\s*heartbeat\.stop\(\);/);
   });
 

@@ -187,6 +187,7 @@ interface ChatMsg {
   analyses?: ShownAnalysis[];         // SQEM-660 — answer: what run_analysis ran (live with the program; after a reload only ok)
   analysing?: boolean;                // SQEM-660 — answer: a program is running in this browser right now
   continuing?: boolean;               // SQEM-649 — answer: handed to a new invocation, still being worked on
+  resuming?: boolean;                 // SQEM-686 — answer: its worker died, it goes on from the last finished round
 }
 
 // SQEM-185 — a memoized single message. Extracting this out of the Chat component means composer
@@ -319,7 +320,7 @@ const MessageItem = memo(function MessageItem({
               {msg.continuing && (
                 <div className="flex items-center gap-2 mt-2 text-xs text-slate-400 dark:text-slate-500">
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>{msg.analysing ? txt.chat_analysis_running() : txt.chat_still_working()}</span>
+                  <span>{msg.analysing ? txt.chat_analysis_running() : msg.resuming ? txt.chat_resuming() : txt.chat_still_working()}</span>
                 </div>
               )}
               {msg.model && !msg.pending && <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2 font-mono">{msg.model}</p>}
@@ -1274,7 +1275,7 @@ const Chat = () => {
       const programFiles: AnalysisFile[] = [];
       const dfKey = dfTableKey(analysisTableMeta(chatTables));
       const resultPromise = waitForJobResult(jobId, controller.signal, (textSoFar) => {
-        updateRunning(run, { text: textSoFar });
+        updateRunning(run, { text: textSoFar, resuming: false }); // SQEM-686 — the resumed worker writes again
       }, clientJobTimeoutMs({ selfHosted: IS_SELF_HOSTED }),
       // SQEM-551 — what the model loaded for this answer ("Used" chips).
       (meta) => {
@@ -1304,7 +1305,22 @@ const Chat = () => {
           return sendAnalysisResult(jobId, { callId, ...rest, ...(files?.length ? { files: files.map(f => ({ name: f.name, size: f.data.byteLength })) } : {}) });
         });
       },
-      (part) => { connectorParts.add(part); preloadAnalysis(); });
+      (part) => { connectorParts.add(part); preloadAnalysis(); },
+      // SQEM-686 — the worker went silent after a finished round: the answer goes on from there, once
+      // more on a new worker. The server checks the signed checkpoint and how often this answer resumed.
+      async (checkpoint) => {
+        updateRunning(run, { continuing: true, resuming: true });
+        const { data: { session: now } } = await supabase.auth.getSession();
+        if (!now) return false;
+        const r = await fetch(functionCallUrl('chat-message'), {
+          method: 'POST',
+          signal: controller.signal,
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${now.access_token}` },
+          body: JSON.stringify({ resume: checkpoint, jobId, locale: getLocale() }),
+        });
+        await r.body?.cancel();
+        return r.ok;
+      });
 
       const res = await fetch(functionCallUrl('chat-message'), {
         method: 'POST',

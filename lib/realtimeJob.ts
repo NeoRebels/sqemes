@@ -9,6 +9,7 @@ import { supabase } from './supabase';
 import { m } from './i18n';
 import { CLIENT_JOB_TIMEOUT_MS, nextJobDeadline } from '../supabase/functions/_shared/chatTimeouts.ts';
 import { createSilenceWatch } from '../supabase/functions/_shared/jobHeartbeat.ts';
+import { createCheckpointHolder, MAX_RESUMES } from '../supabase/functions/_shared/chatCheckpoint.ts';
 
 /**
  * SQEM-372 — `onDelta` receives the answer as it is written.
@@ -59,6 +60,12 @@ export function waitForJobResult(
    * request names what it expects). The caller collects them; a broadcast can be lost, so it checks.
    */
   onAnalysisTable?: (part: { key: string; part: number; parts: number; csv: string }) => void,
+  /**
+   * SQEM-686 — the worker went silent and there is a checkpoint to go on from: post it back (Chat:
+   * `chat-message` with `{ resume }`). True when the server took it; the wait then goes on on this channel.
+   * Absent ⇒ silence ends the wait as before (every caller but Chat).
+   */
+  onResume?: (checkpoint: { state: string; sig: string }) => Promise<boolean>,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const channel = supabase.channel(`job:${jobId}`);
@@ -66,15 +73,38 @@ export function waitForJobResult(
     let deadline = startedAt + timeoutMs;
     let cap = hardCapMs;
     let timeout: ReturnType<typeof setTimeout>;
-    // SQEM-674 — armed by the first `alive`; a killed worker goes silent and this ends the wait.
-    const watch = createSilenceWatch(() => {
+    // SQEM-686 — the newest complete checkpoint, and whether tools ran after it.
+    const checkpoints = createCheckpointHolder();
+    let resumes = 0;
+    let settled = false; // a result or Stop may come while a resume is on its way
+    const lost = () => {
+      settled = true;
       clearTimeout(timeout);
       supabase.removeChannel(channel);
       reject(new Error(m.job_lost()));
-    });
+    };
+    // SQEM-674 — armed by the first `alive`; a killed worker goes silent and this ends the wait.
+    // SQEM-686 — unless the answer can go on from its last checkpoint: then once more, on a new watch.
+    const onSilence = () => {
+      const envelope = onResume && resumes < MAX_RESUMES ? checkpoints.resumable() : null;
+      if (!envelope) return lost();
+      resumes += 1;
+      onResume!(envelope).catch(() => false).then(ok => {
+        if (settled) return;
+        if (!ok) return lost();
+        watch = createSilenceWatch(onSilence);
+        watch.alive(); // the silence counts from now, even if the new worker's first beat is lost
+        cap = Math.max(cap, chainCapMs);
+        deadline = Math.min(Math.max(deadline, Date.now() + timeoutMs), startedAt + cap);
+        arm();
+        onContinued?.();
+      });
+    };
+    let watch = createSilenceWatch(onSilence);
     const arm = () => {
       clearTimeout(timeout);
       timeout = setTimeout(() => {
+        settled = true;
         watch.stop();
         supabase.removeChannel(channel);
         reject(new Error(m.job_timeout()));
@@ -122,9 +152,22 @@ export function waitForJobResult(
           : undefined;
         onAnalysis?.({ callId: a.callId, code: a.code, ...(tables?.length ? { tables } : {}) });
       })
-      // SQEM-674 — the heartbeat of a running answer.
-      .on('broadcast', { event: 'alive' }, () => watch.alive())
+      // SQEM-674 — the heartbeat of a running answer. SQEM-686 — it repeats the round whose tools run.
+      .on('broadcast', { event: 'alive' }, ({ payload }: { payload: { toolsRound?: unknown } }) => {
+        checkpoints.toolsRunning(payload?.toolsRound);
+        watch.alive();
+      })
+      // SQEM-686 — the state after a finished round, in parts; and the mark that a round's tools run now.
+      .on('broadcast', { event: 'checkpoint' }, ({ payload }: { payload: { checkpoint?: unknown } }) => {
+        watch.signal();
+        checkpoints.add(payload?.checkpoint);
+      })
+      .on('broadcast', { event: 'tools' }, ({ payload }: { payload: { toolsRound?: unknown } }) => {
+        watch.signal();
+        checkpoints.toolsRunning(payload?.toolsRound);
+      })
       .on('broadcast', { event: 'result' }, ({ payload }: { payload: { result?: string; error?: string; loadedTemplateIds?: unknown; libraryChanges?: unknown; webSources?: unknown; generatedFiles?: unknown; connectorIds?: unknown; analyses?: unknown } }) => {
+        settled = true;
         clearTimeout(timeout);
         watch.stop();
         supabase.removeChannel(channel);
@@ -140,6 +183,7 @@ export function waitForJobResult(
       .subscribe((status: string) => { if (status === 'SUBSCRIBED') watch.resume(); else watch.pause(); });
 
     signal?.addEventListener('abort', () => {
+      settled = true;
       clearTimeout(timeout);
       watch.stop();
       supabase.removeChannel(channel);

@@ -98,7 +98,7 @@ describe('SQEM-372 — the client', () => {
     // running answer (lib/runningChat.ts, behaviour tested in runningChat.test.ts), which draws the bubble.
     const handler = CHAT_PAGE.slice(CHAT_PAGE.indexOf('waitForJobResult(jobId, controller.signal'));
     const body = handler.slice(0, handler.indexOf('}, clientJobTimeoutMs'));
-    expect(body).toMatch(/updateRunning\(run, \{ text: textSoFar \}\)/);
+    expect(body).toMatch(/updateRunning\(run, \{ text: textSoFar(, resuming: false)? \}\)/); // SQEM-686
     expect(body).not.toMatch(/\+ textSoFar|textSoFar \+/);
   });
 

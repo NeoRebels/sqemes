@@ -29,6 +29,7 @@ import { officeKindOf, officePicturesNote, officeUploadNote } from './officeText
 import { readSkillMd, toSlug as skillSlug, withoutOwnFrontmatter, buildSkillMd } from './skillMd.ts';
 import { relativeSkillPaths, uploadedFileName } from './skillPaths.ts';
 import { isTextContentMime, deliveryOf } from './skillFile.ts';
+import { personaList } from './libraryPrompt.ts';
 import { onPublicHost, dailyLimitMessage, MAX_PATHS_PER_CALL, sandboxReachHint } from './fileLinks.ts';
 import {
   findSkillRoot,
@@ -485,7 +486,8 @@ export async function runLibraryTool(
   // from a client menu; this is what answers "use the Sales persona from Sqemes" typed as a
   // sentence, which is how it is actually used in Claude Code.
   if (toolName === 'list_personas') {
-    return libraryResult(id, () => lib.listPersonas());
+    // SQEM-688 — with the rule for choosing among them; MCP has no routines, so always the interactive one.
+    return libraryResult(id, async () => personaList(await lib.listPersonas()));
   }
 
   if (toolName === 'get_persona') {

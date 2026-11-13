@@ -22,6 +22,7 @@ import { describeChange, type LibraryChange } from './libraryChanges.ts';
 import { m, type Locale } from './locale.ts';
 import type { PersonaConnector } from './connectorService.ts';
 import { isTruncatedArgs, parseToolArgs } from './toolStream.ts';
+import { personaList } from './libraryPrompt.ts';
 
 // ── Provider-neutral definitions ────────────────────────────────────────────
 
@@ -400,6 +401,14 @@ export interface ToolRuntime {
    * its state over (`ChatContinuation`) rather than starting another round in this worker.
    */
   handoff?: boolean;
+  /**
+   * SQEM-686 — called once per round, before the first call that really runs (`runToolCall`), with the
+   * number of that round. `chat-message` tells the browser, which then does not resume from an earlier
+   * checkpoint: a worker that died inside a tool call may already have written to a connector.
+   */
+  onToolsStart?: (round: number) => Promise<void> | void;
+  /** SQEM-686 — a round is over and the loop goes on (`endOfRound`): `chat-message` sends a checkpoint. */
+  onRoundEnd?: (loop: { convo: unknown[]; answer: string }, tokens: number, round: number) => Promise<void> | void;
   execute(name: string, args: Record<string, unknown>): Promise<string>;
   stats: ToolStats;
 }
@@ -456,6 +465,7 @@ export async function runToolCall(tools: ToolRuntime, call: { name: string; args
     if (n > REPEAT_WARN_AT) return note;
     // The earlier result is from an earlier invocation (SQEM-649): run it once more, with the note.
   }
+  await tools.onToolsStart?.(tools.stats.rounds + 1); // SQEM-686 — before anything can be written
   const result = await tools.execute(call.name, parseToolArgs(call.args));
   (tools.lastResults ??= new Map()).set(key, result);
   return n >= REPEAT_WARN_AT ? `You already called ${call.name} with exactly these arguments ${n - 1} times. Do not repeat it again.\n\n${result}` : result;
@@ -568,7 +578,7 @@ export function toolsWereRefused(status: number, body: string): boolean {
 
 export function createLibraryToolRuntime(
   getReader: () => Promise<LibraryReader>,
-  { maxRounds = MAX_TOOL_ROUNDS, budgetMs = 90_000, now = () => Date.now(), onTemplateLoaded, actions, onChange, onPersonaLoaded }:
+  { maxRounds = MAX_TOOL_ROUNDS, budgetMs = 90_000, now = () => Date.now(), onTemplateLoaded, actions, onChange, onPersonaLoaded, unattended = false }:
     {
       maxRounds?: number; budgetMs?: number; now?: () => number;
       /** SQEM-517 — told after a playbook was loaded, so the caller can count it. Never awaited. */
@@ -582,6 +592,8 @@ export function createLibraryToolRuntime(
        * added to the persona, so the model knows what it now has and what is missing.
        */
       onPersonaLoaded?: (connectors: PersonaConnector[]) => Promise<string>;
+      /** SQEM-688 — a scheduled routine: nobody can answer, so `list_personas` says to pick, not to ask. */
+      unattended?: boolean;
     } = {},
 ): ToolRuntime {
   const stats: ToolStats = { rounds: 0, calls: 0, byTool: {}, cappedAt: null, cappedBy: null, toolsRefused: false, refusedConnectors: [], stopReason: null, truncated: {}, libraryRounds: 0, nativeConnectorCalls: 0 };
@@ -645,8 +657,8 @@ export function createLibraryToolRuntime(
             return bound(JSON.stringify({ name: file.name, mimeType: file.mimeType, text: file.text }));
           }
 
-          case 'list_personas':
-            return bound(JSON.stringify(await lib.listPersonas()));
+          case 'list_personas': // SQEM-688 — with the rule for choosing, where the choice is made
+            return bound(JSON.stringify(personaList(await lib.listPersonas(), { unattended })));
 
           case 'get_persona': {
             // Markdown, returned as-is: it is written to be read by the model, and wrapping it in
@@ -742,6 +754,19 @@ export function advanceToolRound(tools: ToolRuntime, callNames: string[] = [], n
   tools.stats.cappedAt = tools.stats.rounds;
   tools.stats.cappedBy = 'rounds';
   return { ...tools, final: true };
+}
+
+/**
+ * SQEM-686 — after `advanceToolRound`: the round is finished (its tool results are in the conversation)
+ * and the loop starts another one in this worker. That is the state a checkpoint is made of. Not after
+ * a hand-over (the next invocation has it), and not before the last round (nothing is left to resume).
+ * ⛔ Never throws: a checkpoint that cannot be sent costs the resume, never the answer.
+ */
+export async function endOfRound(tools: ToolRuntime | null, loop: { convo: unknown[]; answer: string }, tokens = 0): Promise<void> {
+  if (!tools?.onRoundEnd || tools.final || tools.handoff) return;
+  try { await tools.onRoundEnd(loop, tokens, tools.stats.rounds); } catch (e) {
+    console.warn('[chat-checkpoint] not sent:', (e as Error)?.message ?? e);
+  }
 }
 
 /**

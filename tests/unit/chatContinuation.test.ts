@@ -216,10 +216,14 @@ describe('wiring in chat-message', () => {
   });
 
   it('⛔ the state carries no secret: no key, no token, no login', () => {
-    const block = src.slice(src.indexOf('const state: ContinuationState = {'), src.indexOf('const handed = await handOver('));
+    // SQEM-686 — one builder for the hand-over and the checkpoint.
+    const block = src.slice(src.indexOf('const stateFor = (loop: LoopSnapshot'), src.indexOf('const stateSecrets = '));
+    expect(block).toMatch(/v: 1, jobId, userId/);
     expect(block).not.toMatch(/apiKey|authHeader|\.token\b|access_token|authorization/i); // `tokenCarry` is a count
     expect(src).toMatch(/containsSecret\(signed\.state, secrets\)/);
-    expect(src).toMatch(/handOver\(state, \[apiKey, authHeader\.replace/);
+    expect(src).toMatch(/const stateSecrets = \(\) => \[apiKey, authHeader\.replace/);
+    expect(src).toMatch(/handOver\(state, stateSecrets\(\)\)/);
+    expect(src).toMatch(/const state = stateFor\(err\.loop, carry\);/);
   });
 
   it('⛔ nothing goes into the database', () => {

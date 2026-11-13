@@ -35,6 +35,11 @@ const PLAYBOOKS = [
   { name: 'meeting_notes', title: 'Meeting-Protokoll', kind: 'prompt', description: 'Ein Meeting zusammenfassen: Entscheidungen, Verantwortliche, nächste Schritte.' },
   { name: 'release_notes', title: 'Release Notes', kind: 'prompt', description: 'Release Notes für Kunden aus einer Liste von Änderungen.' },
   { name: 'brand_voice', title: 'Markenstimme', kind: 'skill', description: 'Unsere Tonalität: kurze Sätze, kein Jargon, freundlich, aber direkt.' },
+  // SQEM-683 — titled in English, as many real libraries are; a German request has to search in English to find them.
+  { name: 'process_diagrams', title: 'Process diagrams', kind: 'skill', description: 'Draw flowcharts and process diagrams: steps, systems, hand-offs, in our house style.' },
+  { name: 'proposal_checklist', title: 'Proposal checklist', kind: 'skill', description: 'What to check before an offer goes out: scope, price, terms, payment, signature.' },
+  // SQEM-685 — named the way the real library names them: its slug is the title's (`toSlug`), which a model passing the title misses.
+  { name: 'erp_kundenreview_mcp', title: 'ERP Kundenreview (MCP)', kind: 'skill', description: 'Für Vertriebs-Kundenreviews: Umsatz, Zahlungen und Artikel eines Kunden aus dem ERP, als Excel.' },
 ];
 const PERSONAS = [
   { name: 'sales_director', title: 'Sales Director', description: 'Neugeschäft: Angebote, Preisgespräche und Verhandlungen mit Interessenten.', routes: [['ein Angebot schreiben', 'offer_letter'], ['Preis oder Rabatt besprechen', 'pricing_guidelines']] },
@@ -50,12 +55,15 @@ const TOOLS = [
   { name: 'get_persona', inputSchema: { type: 'object', properties: { name: { type: 'string' }, id: { type: 'string' } } } },
 ].map(t => ({ ...t, description: realDescription(t.name) }));
 
+const PROMPT_SRC = readFileSync(new URL('../../supabase/functions/_shared/libraryPrompt.ts', import.meta.url), 'utf8');
+const CHOOSE = PROMPT_SRC.match(/PERSONA_CHOICE_NOTE = '([^']*)'/)[1];
+const CHOOSE_UNATTENDED = PROMPT_SRC.match(/PERSONA_CHOICE_NOTE_UNATTENDED = '([^']*)'/)[1];
 const LOG = process.env.MOCK_LOG;
 const log = (o) => { if (LOG) appendFileSync(LOG, JSON.stringify(o) + '\n'); };
 
 function call(name, args) {
-  log({ tool: name, args });
-  if (name === 'list_personas') return PERSONAS.map(p => ({ id: p.name, name: p.name, title: p.title, description: p.description, routeCount: p.routes.length }));
+  // SQEM-688 — the same shape as `personaList` in `_shared/libraryPrompt.ts`: the list and the rule for choosing.
+  if (name === 'list_personas') return { personas: PERSONAS.map(p => ({ id: p.name, name: p.name, title: p.title, description: p.description, routeCount: p.routes.length })), choose: process.env.MOCK_UNATTENDED === '1' ? CHOOSE_UNATTENDED : CHOOSE };
   if (name === 'get_persona') {
     const p = PERSONAS.find(x => x.name === args.name || x.name === args.id || x.title === args.name);
     if (!p) return { error: 'Persona not found' };
@@ -89,6 +97,8 @@ rl.on('line', (line) => {
   if (m.method === 'tools/list') return send({ jsonrpc: '2.0', id: m.id, result: { tools: TOOLS } });
   if (m.method === 'tools/call') {
     const r = call(m.params.name, m.params.arguments || {});
+    // SQEM-683 — `found: false` marks a call that hit nothing (a get_template on a name that does not exist).
+    log({ tool: m.params.name, args: m.params.arguments || {}, found: !(r && typeof r === 'object' && 'error' in r) });
     return send({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: typeof r === 'string' ? r : JSON.stringify(r, null, 2) }] } });
   }
   if (m.id !== undefined) send({ jsonrpc: '2.0', id: m.id, result: {} });

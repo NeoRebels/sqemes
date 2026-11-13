@@ -331,6 +331,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Chat_Private_ExpiryInputs */
 /** @typedef {{}} Chat_RemoveInputs */
 /** @typedef {{}} Chat_RenameInputs */
+/** @typedef {{}} Chat_ResumingInputs */
 /** @typedef {{}} Chat_Running_ElsewhereInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Save_To_Workspace_FailedInputs */
 /** @typedef {{}} Chat_Save_UploadsInputs */
@@ -6809,6 +6810,20 @@ export const chat_rename = /** @type {((inputs?: Chat_RenameInputs, options?: { 
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.chat_rename(inputs)
 	return __en.chat_rename(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Resuming: the answer carries on from its last finished step." |
+*
+* @param {Chat_ResumingInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_resuming = /** @type {((inputs?: Chat_ResumingInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_ResumingInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_resuming(inputs)
+	return __en.chat_resuming(inputs)
 });
 /**
 * | output |

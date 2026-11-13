@@ -69,7 +69,45 @@
  * found every time and with fewer searches, and no other case got worse — the correction cases measured with the
  * improvement hint (MOCK_HINT=1), as the real readers serve it. Re-run it before changing steps 2 or 4.
  *
- * ⚠️ **On several matches it asks rather than picks** (owner's decision, 2026-08-31; the first draft
+ * ⭐ **Named first, then role, then playbook (SQEM-682).** A persona or playbook the person names is step 1 and is
+ * never swapped silently for another; the role step follows, and step 3 searches a playbook **also** when a persona is
+ * loaded, unless one of its routes covers the task — "Otherwise" used to make it persona OR playbook, so a role's task
+ * that needed one more playbook (a job ad in the house voice) lost it. The two SQEM-681 hints stay: one word per
+ * search, and `list_templates` before saying a named one is missing. Measured with `scripts/prompt-eval/` against the
+ * SQEM-681 text, with two new cases (R1/R2, "persona and a playbook outside its routes"): R1 went from a minority of
+ * runs to every run, nothing else got worse. The price: playbook-only requests make about one call more.
+ * Re-run it before changing a step.
+ *
+ * ⭐ **One search rule, the library's language, routines that cannot ask (SQEM-683).** A German request ("Diagramm")
+ * never reached an English title ("Design diagrams"): the search compares text. The search advice now stands once,
+ * below the steps, and names the English word with an example — the vaguer "try it in English" did not move the model
+ * at all. Step 4 lets a scheduled routine, which may not ask, take the closest one; said for every case ("if nobody can
+ * answer") it leaked into the interactive chat, which then chose instead of asking. Measured with `scripts/prompt-eval/`
+ * against the SQEM-682 text, with two English-titled playbooks in the mock and three new cases (L1 named, L2 unnamed,
+ * L3 a routine with two fitting personas): L2 and L3 from never to every run, everything else unchanged. The price:
+ * about one search more per request. Re-run it before changing a step or the search paragraph.
+ *
+ * ⛔ **Step 1 keeps its own search (SQEM-685).** SQEM-683 cut step 1 to "(get_persona or get_template) … If you cannot
+ * find it, say so" and moved the search advice below the steps. A model then answered a request naming a skill with
+ * ONE call, get_template on a guessed name, and said it could not find it; the skill was there. The paragraph below
+ * the steps was read as a rule for step 3, not for step 1. So step 1 names search_templates before get_template again
+ * and says "missing" only after the search and list_templates. The mock (Claude) never showed it; case L4 (a title
+ * with a bracket, whose slug a model does not guess) was added, but the mock is not the only measurement that counts.
+ *
+ * ⭐ **Shorter, the same steps (SQEM-687).** About a sixth shorter: the search rule stands in ONE paragraph (two places
+ * were what SQEM-685 tripped over), steps 1, 4 and the last paragraph lost their filler, the two kinds lost their
+ * heading sentence. Kept on purpose, each measured before: the order named → role → playbook, "also" in step 3
+ * (SQEM-682, persona AND playbook), "wait; do not choose for them" (below), the routine exception (SQEM-683), "does not
+ * replace" and "follow theirs". Measured with `scripts/prompt-eval/` against the SQEM-685 text: no case worse, the
+ * same tool calls, no named case opening with a guessed get_template.
+ *
+ * ⭐ **Personas: pick the closest and name the other (SQEM-689).** Between two fitting PERSONAS the model no longer
+ * asks: models did not ask with the rule here nor with SQEM-688's note in the result of `list_personas`, even with
+ * two clearly overlapping personas; they picked one and said which. So the rule now asks for what they do reliably
+ * plus the missing half: name the other in one sentence, so the person can switch. The choice is visible, not silent,
+ * which was the point of the decision below. Playbooks are unchanged.
+ *
+ * ⚠️ **On several matching PLAYBOOKS it asks rather than picks** (owner's decision, 2026-08-31; the first draft
  * said *pick the most specific one*). A template is this organisation's agreed way of doing the work,
  * so choosing the wrong one silently produces something that looks sanctioned and is not — and the
  * person who could tell them apart in a second is the one already sitting there. **The instruction to
@@ -78,14 +116,17 @@
  */
 export const LIBRARY_SYSTEM_PROMPT = `Before you write, draft, plan, review or rewrite anything substantial, check the sqemes playbooks: this organisation's agreed way of doing recurring work. (The tools call a playbook a template.)
 
-1. Role first. If the task belongs to a role — sales, recruiting, support, a team's own job — call list_personas. If one persona fits, load it with get_persona, work as that role, and load a route only when its condition applies.
-2. Otherwise call search_templates with one keyword from the request — a single word; it is matched as text in titles and descriptions. If one playbook fits, load it with get_template and follow it.
-3. If several personas or playbooks fit, name them with a one-line difference each, ask which one fits best and wait for the answer — do not choose for them.
-4. If the person names a playbook or persona and you cannot find it, try another word or list_templates; if it is still not there, say so — it may not be shared with them. If nothing fits an unnamed task, carry on normally and do not mention the playbooks.
+1. Named first. If the person names a persona or playbook, load exactly that one (get_persona, or search_templates then get_template). Say it is missing only after search and list_templates find nothing; it may not be shared with them. Never swap in another.
+2. Role. If the task belongs to a role (sales, recruiting, support, a team's own job), call list_personas, load the fitting one with get_persona and work as that role. Load a route only when its condition applies.
+3. Playbook. If no route covers the task, also call search_templates and load the fitting playbook with get_template, within the persona's role if there is one.
+4. If several playbooks fit, name each with a one-line difference, ask which one and wait; do not choose for them. If several personas fit, take the closest, say which and name the others in one sentence. In a scheduled routine nobody can answer: take the closest and say why.
+5. If nothing fits, carry on without mentioning playbooks.
 
-Playbooks come in two kinds: a prompt is a task with {{variables}} — fill them from the request; a skill is company knowledge — apply it for as long as the task is in its scope. Read a playbook's files only when the task needs them (read_context_file). Say which persona or playbook you use, and do not paste its contents.
+search_templates matches titles and descriptions: search one word at a time, and also the English word, as many titles are English (Diagramm: diagram). Then try another word or list_templates.
 
-This instruction adds to whatever else you have been told; it does not replace it. Where it conflicts with a more specific instruction from the person you are talking to, follow theirs.`;
+A prompt has {{variables}}: fill them from the request. A skill is company knowledge: apply it while the task is in its scope. Read files (read_context_file) only when needed. Say which persona or playbook you use; never paste its contents.
+
+This adds to your other instructions and does not replace them. Where a more specific instruction from the person conflicts, follow theirs.`;
 
 /**
  * Puts the library instruction in front of whatever system instruction the session already has.
@@ -129,8 +170,28 @@ export function withLibraryPrompt(systemInstruction: string | undefined): string
 export const IMPROVEMENT_HINT = 'Only if the person corrected this playbook or persona, or a step in it proved outdated, missing or duplicated: end your answer by asking in one sentence whether to update it or create a new one. Otherwise say nothing about changing it. Change nothing without their explicit yes; ask at most once, never after a no. Never offer to delete. If they cannot edit it, suggest telling someone who can.';
 
 /**
+ * SQEM-688 — what to do with the list `list_personas` returns, served IN its result (`personaList`), the moment the
+ * choice is made. The rule "several fit: ask and wait" stood only in the library instruction above, far from that
+ * moment, and was not followed: models picked one, or loaded both. Same lever as SQEM-623's hint in `get_template`:
+ * a result reaches every client, including those that pasted an older instruction.
+ * ⭐ SQEM-689 — the asking was not followed here either; models picked one and named it. The note now asks for the
+ * pick plus one sentence naming the other.
+ * ⚠️ "If one clearly fits, do not mention the others" is load-bearing: without it the mock named a persona that did NOT
+ * fit in most clear role cases ("die Persona Sales Director passt hier nicht" in a job ad), never with it.
+ * ⛔ A routine gets the other sentence: nobody can answer it (SQEM-683), it picks and says why.
+ * ⛔ No apostrophe in either: the prompt-eval mock reads them from this file with a single-quote pattern.
+ */
+export const PERSONA_CHOICE_NOTE = 'Only if two or more personas could fit: load only the closest one, say which one you use and name the other in one sentence, so the person can switch. If one clearly fits, do not mention the others.';
+export const PERSONA_CHOICE_NOTE_UNATTENDED = 'This is a scheduled routine and nobody can answer. If two or more personas could fit, take the closest one and say why.';
+
+/** SQEM-688 — the result of `list_personas` in Chat and over MCP: the personas, and how to choose among them. */
+export function personaList<T>(personas: T[], { unattended = false }: { unattended?: boolean } = {}): { personas: T[]; choose: string } {
+  return { personas, choose: unattended ? PERSONA_CHOICE_NOTE_UNATTENDED : PERSONA_CHOICE_NOTE };
+}
+
+/**
  * SQEM-680 — put in front of a persona the PERSON chose (in Chat or for a routine). Without it the library
- * instruction above ("Role first … call list_personas") let the model swap the chosen role for another it
+ * instruction above (its role step, "call list_personas") let the model swap the chosen role for another it
  * thought fitted better. The tools stay, so "switch to X" still works when they ask for it.
  */
 export const CHOSEN_PERSONA_NOTE = 'The person chose the persona below for this conversation. Work as this role. Do not load another persona with get_persona unless they ask you to.';

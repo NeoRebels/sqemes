@@ -204,7 +204,7 @@ describe('SQEM-660 — wiring', () => {
   it('step C: stored with the answer, loaded with the history, carried by the shared mapping; the bubble says it computes', () => {
     expect(chat).toMatch(/generatedFiles, analyses: storedAnalyses\(analyses\) \}\)\.catch/);
     expect(chat).toMatch(/analyses: m\.analyses, \/\/ SQEM-660/);
-    expect(chat).toMatch(/msg\.analysing \? txt\.chat_analysis_running\(\) : txt\.chat_still_working\(\)/);
+    expect(chat).toMatch(/msg\.analysing \? txt\.chat_analysis_running\(\) : (msg\.resuming \? txt\.chat_resuming\(\) : )?txt\.chat_still_working\(\)/);
     expect(chat).toMatch(/updateRunning\(run, \{ analysing: false \}\)/);
     expect(readFileSync('lib/api/chatSessions.ts', 'utf8')).toMatch(/extra\?\.analyses\?\.length \? \{ analyses: extra\.analyses as unknown as Json \}/);
     expect(readFileSync('lib/playbookRef.ts', 'utf8')).toMatch(/analyses: normalizeStoredAnalyses\(row\.analyses\)/);

@@ -24,7 +24,7 @@ import { withAnalysisTool, normalizeAnalysisTables, normalizeAnalyses, analysisL
 import { ConnectorTableStore } from '../_shared/connectorTables.ts';
 import { requestBrowserAnalysis } from '../_shared/analysisRoundTrip.ts';
 import {
-  createLibraryToolRuntime, advanceToolRound, restoreToolRuntime, MAX_TOOL_ROUNDS, countNativeConnectorCalls, toolCapNotice, toolsWereRefused, runToolCall, truncatedNotice, afterToolsRefused, toolsRefusedNotice, noAnswerText, type ToolRuntime,
+  createLibraryToolRuntime, advanceToolRound, restoreToolRuntime, MAX_TOOL_ROUNDS, countNativeConnectorCalls, toolCapNotice, toolsWereRefused, runToolCall, endOfRound, truncatedNotice, afterToolsRefused, toolsRefusedNotice, noAnswerText, type ToolRuntime,
   toOpenAiTools, toClaudeTools, toGeminiTools, toResponsesTools, chatActionDefinitions,
 } from '../_shared/libraryTools.ts';
 import { runLibraryTool } from '../_shared/libraryActions.ts';
@@ -49,6 +49,7 @@ import {
   ChatContinuation, canContinue, invocationDeadline, containsSecret, signContinuation, openContinuation, splitTokens,
   type ContinuationState, type ContinuationRequest, type LoopSnapshot,
 } from '../_shared/chatContinuation.ts';
+import { checkpointParts, MAX_RESUMES } from '../_shared/chatCheckpoint.ts';
 import { createClaudeBlockCollector, isPauseTurn, MAX_PAUSE_RESUMES } from '../_shared/claudePause.ts';
 import { OUTPUT_LIMIT, outputLimit } from '../_shared/outputLimits.ts';
 import { FUNDED_MODEL } from '../_shared/funded.ts';
@@ -200,16 +201,31 @@ async function handleChat(req: Request, ctx: RoutineContext): Promise<Response> 
      * continuation carries on is the one the person made, and only its own counters say how far it got.
      */
     let continuation: ContinuationState | null = null;
-    if (body.continuation) {
-      const opened = await openContinuation(body.continuation, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', user.id, Date.now());
-      if (!opened.ok) {
-        console.warn('[chat-continue] refused:', opened.reason);
-        return new Response(JSON.stringify({ error: 'Invalid continuation' }), {
+    /**
+     * SQEM-686 — a resume: the person's browser sends back the last checkpoint because this answer's worker
+     * went silent. The same envelope as a hand-over, checked the same way, plus the signed resume count.
+     * ⛔ Only with the person's own login — never on the routine path, which has no browser.
+     */
+    const resume = !routineTicket && !body.continuation && body.resume ? body.resume : null;
+    if (body.continuation || resume) {
+      const opened = await openContinuation(body.continuation ?? resume, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', user.id, Date.now());
+      const refused = !opened.ok ? opened.reason
+        : resume && (opened.state.resumes ?? 0) >= MAX_RESUMES ? 'resumes'
+        : resume && opened.state.jobId !== body.jobId ? 'job' : null;
+      if (resume) {
+        // Logged: resumes, and the ones refused (with the reason, never the state).
+        console.log('[chat-resume]', JSON.stringify(opened.ok
+          ? { jobId: opened.state.jobId, gen: opened.state.gen, resumes: (opened.state.resumes ?? 0) + 1, rounds: (opened.state.tools?.stats as any)?.rounds ?? null, ...(refused ? { refused } : {}) }
+          : { refused }));
+      }
+      if (refused) {
+        if (!resume) console.warn('[chat-continue] refused:', refused);
+        return new Response(JSON.stringify({ error: resume ? 'Invalid resume' : 'Invalid continuation' }), {
           status: 400,
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
       }
-      continuation = opened.state;
+      continuation = opened.ok ? (resume ? { ...opened.state, resumes: (opened.state.resumes ?? 0) + 1 } : opened.state) : null;
     }
     const src: Record<string, any> = continuation
       ? { ...continuation.request, jobId: continuation.jobId, workspaceId: continuation.workspaceId }
@@ -802,6 +818,7 @@ async function runAndBroadcast({
           // SQEM-651 — a persona loaded mid-answer fetches its connector services.
           onPersonaLoaded: (services) => pool ? pool.fetchForPersona(services, userId) : Promise.resolve(''),
           // SQEM-517 — counted per workspace and day, never per person; fire-and-forget.
+          unattended: !!routine, // SQEM-688 — a routine picks among fitting personas, it cannot ask
           onTemplateLoaded: (templateId) => {
             if (!loadedTemplateIds.includes(templateId) && loadedTemplateIds.length < MAX_LOADED_IDS) loadedTemplateIds.push(templateId);
             countUsage(createAdminClient(), workspaceId, 'chat', 'playbook_loaded', templateId);
@@ -811,6 +828,23 @@ async function runAndBroadcast({
     : null;
   // SQEM-649 — past the budget, the answer goes on in a new invocation while the chain has time.
   if (tools) tools.mayContinue = () => canContinue(chainStartedAt, gen, Date.now());
+  /**
+   * SQEM-686 — after every finished round the browser gets the state a resume needs, and before the first
+   * tool call of a round it is told that tools run (`_shared/chatCheckpoint.ts`). Indirect, because the
+   * state is built inside the try below and the runtime is copied by every wrapper before that.
+   * ⛔ Not for a routine: nobody's browser holds anything, and its queue has its own lease.
+   */
+  let sendCheckpoint: ((loop: LoopSnapshot, tokens: number, round: number) => Promise<void>) | null = null;
+  let toolsRound = 0;
+  if (tools && !routine) {
+    tools.onRoundEnd = (loop, tokens, round) => sendCheckpoint?.(loop as LoopSnapshot, tokens, round);
+    tools.onToolsStart = async (round) => {
+      if (round <= toolsRound) return;
+      toolsRound = round; // the next heartbeat repeats it, so a lost event is not the end of it
+      // ⛔ Never fails the call: a mark that did not go out is repeated by the beat, an answer lost is not.
+      try { await broadcastJobResult(jobId, { toolsRound: round }); } catch { /* the heartbeat carries it */ }
+    };
+  }
 
   /**
    * SQEM-378 — the standing library instruction, **only when the tools are really in the request.**
@@ -874,7 +908,7 @@ async function runAndBroadcast({
   // SQEM-676 — `:nobeat` (simulated provider, load tests only) leaves the beat out, for the A/B measurement.
   const heartbeat = provider === 'loadtest' && loadtestNoBeat(modelId) ? { stop: () => {} } : startHeartbeat(() => routineDb
     ? routineDb.rpc('routine_run_heartbeat', { p_queue_id: routine!.ticket.queueId })
-    : broadcastJobResult(jobId, { alive: true }));
+    : broadcastJobResult(jobId, { alive: true, ...(toolsRound ? { toolsRound } : {}) })); // SQEM-686 — repeats the tools mark
 
   /**
    * SQEM-649 — call this function again with the state, as the person (their JWT in the header). True
@@ -998,6 +1032,48 @@ async function runAndBroadcast({
       return `[${provider}] Model ${modelId} is not yet supported.`;
     };
 
+    /**
+     * The state the next invocation carries on from: on a hand-over (SQEM-649), and SQEM-686 after every
+     * finished round, for the browser to send back if this worker dies.
+     */
+    const stateFor = (loop: LoopSnapshot, tokenCarry: number): ContinuationState => ({
+      // SQEM-651 — the connectors fetched so far ride on as part of the request the next one resolves.
+      v: 1, jobId, userId, workspaceId: workspaceId!, chainStartedAt, gen: gen + 1, provider,
+      resumes: continuation?.resumes ?? 0, // SQEM-686
+      request: pool ? { ...request, connectorIds: pool.activeIds() } : request,
+      loop, tokenCarry,
+      // SQEM-650 — the repeat counts travel too, so a loop is still a loop after a hand-over.
+      tools: tools ? { stats: { ...tools.stats }, callCounts: { ...(tools.callCounts ?? {}) } } : null,
+      collected: {
+        loadedTemplateIds, libraryChanges, webSources,
+        webAllowanceExhausted: webState.allowanceExhausted, generatedFiles, analyses,
+        connectorTables: connectorTablesCarried + (connectorTables?.built ?? 0), // SQEM-661
+        unreachable: [...new Set([...unreachable, ...(pool?.failed ?? [])])],
+        fetchedConnectors: pool?.fetchedNames ?? [],
+      },
+    });
+    // ⛔ The same three secrets a hand-over refuses to carry; a checkpoint goes to the browser, so even more so.
+    const stateSecrets = () => [apiKey, authHeader.replace(/^Bearer\s+/i, ''), ...(pool?.active ?? connectors ?? []).map(c => c.token)];
+    /**
+     * SQEM-686 — the checkpoint. Nothing was charged in this invocation yet, so ALL its tokens ride on
+     * (`tokenCarry`): a resume charges them once, and if nobody resumes, nobody is charged twice either.
+     */
+    sendCheckpoint = async (loop, loopTokens, round) => {
+      await broadcaster?.flush(); // the text in the state and on screen are the same text
+      const signed = await signContinuation(stateFor(loop, totalTokens + loopTokens), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+      if (containsSecret(signed.state, stateSecrets())) {
+        console.error('[chat-checkpoint] state carried a secret — not sent', JSON.stringify({ jobId }));
+        return;
+      }
+      const parts = checkpointParts(signed, round);
+      if (!parts) {
+        console.warn('[chat-checkpoint] too large — not sent', JSON.stringify({ jobId, round, bytes: signed.state.length }));
+        return;
+      }
+      // One message per part, like SQEM-661's tables; at the same time, the browser orders them by number.
+      await Promise.all(parts.map(checkpoint => broadcastJobResult(jobId, { checkpoint })));
+    };
+
     try {
       result = await dispatch(base, runtime, continuation?.loop);
     } catch (err) {
@@ -1008,22 +1084,8 @@ async function runAndBroadcast({
        */
       totalTokens += err.totalTokens;
       const { charge, carry } = splitTokens(totalTokens);
-      const state: ContinuationState = {
-        // SQEM-651 — the connectors fetched so far ride on as part of the request the next one resolves.
-        v: 1, jobId, userId, workspaceId: workspaceId!, chainStartedAt, gen: gen + 1, provider,
-        request: pool ? { ...request, connectorIds: pool.activeIds() } : request,
-        loop: err.loop, tokenCarry: carry,
-        // SQEM-650 — the repeat counts travel too, so a loop is still a loop after a hand-over.
-        tools: tools ? { stats: { ...tools.stats }, callCounts: { ...(tools.callCounts ?? {}) } } : null,
-        collected: {
-          loadedTemplateIds, libraryChanges, webSources,
-          webAllowanceExhausted: webState.allowanceExhausted, generatedFiles, analyses,
-          connectorTables: connectorTablesCarried + (connectorTables?.built ?? 0), // SQEM-661
-          unreachable: [...new Set([...unreachable, ...(pool?.failed ?? [])])],
-          fetchedConnectors: pool?.fetchedNames ?? [],
-        },
-      };
-      const handed = await handOver(state, [apiKey, authHeader.replace(/^Bearer\s+/i, ''), ...(pool?.active ?? connectors ?? []).map(c => c.token)]);
+      const state = stateFor(err.loop, carry);
+      const handed = await handOver(state, stateSecrets());
       if (handed) {
         if (funded && workspaceId) {
           try { await debitCredits(createAdminClient(), workspaceId, charge, creditLimit); } catch (debitErr: any) {
@@ -1413,6 +1475,7 @@ async function callGemini(
     contents.push(geminiToolResults(results) as any);
     activeTools = advanceToolRound(activeTools, toolCalls.map(c => c.name));
     if (activeTools?.handoff) throw new ChatContinuation({ convo: contents, answer }); // SQEM-649
+    await endOfRound(activeTools, { convo: contents, answer }); // SQEM-686
   }
 }
 
@@ -1536,6 +1599,7 @@ async function callOpenAIResponses(
     if (activeTools?.handoff) { // SQEM-649
       throw new ChatContinuation({ convo: input, answer });
     }
+    await endOfRound(activeTools, { convo: input, answer }); // SQEM-686
   }
 }
 
@@ -1748,6 +1812,7 @@ async function callClaude(
     if (activeTools?.handoff) { // SQEM-649
       throw new ChatContinuation({ convo: apiMessages, answer });
     }
+    await endOfRound(activeTools, { convo: apiMessages, answer }); // SQEM-686
   }
 }
 
@@ -1901,6 +1966,7 @@ async function callOpenAICompatible(
     activeTools = advanceToolRound(activeTools, toolCalls.map(c => c.name));
     // SQEM-649 — the tokens of THIS invocation go with it and are charged before the hand-over.
     if (activeTools?.handoff) throw new ChatContinuation({ convo: apiMessages, answer }, totalTokens);
+    await endOfRound(activeTools, { convo: apiMessages, answer }, totalTokens); // SQEM-686 — with this invocation's tokens
   }
 }
 
