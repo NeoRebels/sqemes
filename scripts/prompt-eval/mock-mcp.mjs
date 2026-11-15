@@ -39,8 +39,29 @@ const PLAYBOOKS = [
   { name: 'process_diagrams', title: 'Process diagrams', kind: 'skill', description: 'Draw flowcharts and process diagrams: steps, systems, hand-offs, in our house style.' },
   { name: 'proposal_checklist', title: 'Proposal checklist', kind: 'skill', description: 'What to check before an offer goes out: scope, price, terms, payment, signature.' },
   // SQEM-685 — named the way the real library names them: its slug is the title's (`toSlug`), which a model passing the title misses.
+  // SQEM-690 — work that is not writing: an analysis, a workflow, a translation.
+  { name: 'table_analysis', title: 'Tabellenauswertung', kind: 'skill', description: 'Tabellen und Zahlen auswerten: Kennzahlen, Ausreißer, Trends, im Hausformat.' },
+  { name: 'n8n_workflows', title: 'n8n workflows', kind: 'skill', description: 'Build n8n workflows: structure, error handling, naming rules.' },
+  { name: 'translation_glossary', title: 'Übersetzungen', kind: 'skill', description: 'Übersetzen ins Englische: unser Glossar und unser Ton.' },
   { name: 'erp_kundenreview_mcp', title: 'ERP Kundenreview (MCP)', kind: 'skill', description: 'Für Vertriebs-Kundenreviews: Umsatz, Zahlungen und Artikel eines Kunden aus dem ERP, als Excel.' },
 ];
+// SQEM-690 — enough content that a model has a playbook to follow: with "be concise; follow the house style" alone it
+// fairly offered to extend the playbook, which the judge counted as a miss (L2, X2).
+const CONTENT = {
+  offer_letter: 'Write the offer for {{subject}}: scope, number of licences, price per licence, total, payment in 30 days, valid for 4 weeks. Ask for any figure that is not given; never invent one. Under 200 words.',
+  pricing_guidelines: 'List price 40 EUR per licence and month. Discounts: 10 % from 20 licences, 15 % from 50, never more than 20 % without the managing director. Annual billing adds 5 %. Answer a discount request with what we can offer and what we ask in return.',
+  job_ad: 'Write the job ad for {{subject}}: who we are (two sentences), the tasks (bullet list), what the person brings, what we offer, how to apply. We use "du". Under 250 words.',
+  complaint_handling: 'Thank the customer, apologise once, say what happens next and by when. We may offer a credit up to 10 % of the order; anything more goes to the account manager. Never blame the carrier.',
+  meeting_notes: 'Write the notes for {{subject}}: date, participants, decisions, action items with owner and due date, open questions. Bullet lists, no prose.',
+  release_notes: 'Write the release notes for {{subject}}: a one-line summary, then New, Improved, Fixed, each a bullet list in plain language. No internal ticket numbers.',
+  brand_voice: 'Short sentences. No jargon, no superlatives. Friendly but direct. Address the reader with "du" unless the reader is a customer we already address with "Sie".',
+  process_diagrams: 'Draw the process top to bottom as a flowchart: one box per step, a diamond for each decision, the system or team in brackets in each box. Use Mermaid when the output is text.',
+  proposal_checklist: 'Before an offer goes out, check: scope matches the request, price per licence and total, discount within the pricing guidelines, payment terms, validity date, signature line.',
+  table_analysis: 'For a table of figures: total, average, highest and lowest, change from period to period in per cent, and the one or two outliers with a likely reason. End with one recommendation.',
+  n8n_workflows: 'Name every node by what it does. Start with the trigger, validate the input, then write. Add an error workflow that notifies the team. Show the result as the node list and the JSON to import.',
+  translation_glossary: 'Translate into British English. Glossary: Playbook stays Playbook, Angebot is quote, Lizenz is licence. Keep "Sie" as a polite "you" in tone.',
+};
+
 const PERSONAS = [
   { name: 'sales_director', title: 'Sales Director', description: 'Neugeschäft: Angebote, Preisgespräche und Verhandlungen mit Interessenten.', routes: [['ein Angebot schreiben', 'offer_letter'], ['Preis oder Rabatt besprechen', 'pricing_guidelines']] },
   { name: 'account_manager', title: 'Account Manager', description: 'Bestandskunden: Verlängerungen, Angebote für weitere Lizenzen, Rabatte, Reklamationen.', routes: [['ein Angebot für einen Bestandskunden', 'offer_letter'], ['Preis- oder Rabattfragen', 'pricing_guidelines'], ['eine Reklamation', 'complaint_handling']] },
@@ -74,7 +95,10 @@ function call(name, args) {
     // SQEM-681 — like `searchTemplates` in `_shared/libraryQueries.ts`: the whole query, as text, in title or description.
     const needle = String(args.query || '').toLowerCase();
     const hits = needle ? PLAYBOOKS.filter(p => p.title.toLowerCase().includes(needle) || p.description.toLowerCase().includes(needle)) : [];
-    return hits.map(p => ({ id: p.name, name: p.name, title: p.title, kind: p.kind, description: p.description }));
+    const list = hits.map(p => ({ id: p.name, name: p.name, title: p.title, kind: p.kind, description: p.description }));
+    // SQEM-690 — measured variant: an empty result says what to do next (read by the model, never shown to the person).
+    if (!list.length && process.env.MOCK_EMPTY_HINT === '1') return { results: [], next: 'No match for this word. Try another word, or call list_templates.' };
+    return list;
   }
   if (name === 'list_templates') return PLAYBOOKS.filter(p => !args.kind || p.kind === args.kind).map(p => ({ id: p.name, name: p.name, title: p.title, kind: p.kind, description: p.description }));
   if (name === 'get_template') {
@@ -83,7 +107,7 @@ function call(name, args) {
     // SQEM-623 — the rejection playbook states a rule (formal "Sie", no reason given) that case C2 contradicts.
     const content = p.name === 'candidate_rejection'
       ? 'Write the rejection for {{subject}}. Address the candidate formally ("Sie"). Do not state a reason for the rejection. Keep it under 150 words.'
-      : p.kind === 'skill' ? `Rules for ${p.title}: be concise; follow the house style.` : `Write the ${p.title.toLowerCase()} for {{subject}}. Keep it under 150 words.`;
+      : CONTENT[p.name] ?? (p.kind === 'skill' ? `Rules for ${p.title}: be concise; follow the house style.` : `Write the ${p.title.toLowerCase()} for {{subject}}. Keep it under 150 words.`);
     return { ...p, content, variables: p.kind === 'prompt' ? ['subject'] : [], ...(HINT ? { afterUse: HINT } : {}) };
   }
   return { error: `Unknown tool ${name}` };

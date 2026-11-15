@@ -25,6 +25,7 @@ import { mcpKeyExpiry, isMcpKeyExpired } from '../lib/mcpKeys';
 import { ProviderIcon } from '../components/ProviderIcon';
 import McpIcon from '../components/McpIcon';
 import ConnectorsCard from '../components/ConnectorsCard';
+import DevicesCard from '../components/DevicesCard';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import SettingsCardHeader, { SETTINGS_FIELD_LABEL } from '../components/ui/SettingsCardHeader';
@@ -761,6 +762,16 @@ const Settings = () => {
     if ((location.state as any)?.scrollTo === 'about' && activeTab === 'general') {
       const t = setTimeout(() => {
         document.getElementById('about')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+      return () => clearTimeout(t);
+    }
+  }, [location, activeTab]);
+
+  // SQEM-692 — the new-device mail links to ?tab=profile&section=devices: scroll to the Devices card.
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('section') === 'devices' && activeTab === 'profile') {
+      const t = setTimeout(() => {
+        document.getElementById('devices')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
       return () => clearTimeout(t);
     }
@@ -2389,6 +2400,9 @@ const Settings = () => {
                   </Button>
                 </div>
               </Card>
+
+              {/* SQEM-691 — where this person is signed in; ends any other session. Own sessions only. */}
+              <DevicesCard showToast={showToast} />
 
               {/* SQEM-600 — the personal override; "Workspace default" (null) follows the workspace. */}
               {canChooseLanguage(isSqemesAdmin) && (

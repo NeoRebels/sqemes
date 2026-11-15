@@ -1576,6 +1576,17 @@
 /** @typedef {{}} Srv_Invalid_PlanInputs */
 /** @typedef {{}} Srv_Key_FormatInputs */
 /** @typedef {{}} Srv_Key_Format_OriginalInputs */
+/** @typedef {{}} Srv_Newdevice_ButtonInputs */
+/** @typedef {{}} Srv_Newdevice_DeviceInputs */
+/** @typedef {{}} Srv_Newdevice_FooterInputs */
+/** @typedef {{}} Srv_Newdevice_HeadingInputs */
+/** @typedef {{ email: NonNullable<unknown> }} Srv_Newdevice_IntroInputs */
+/** @typedef {{}} Srv_Newdevice_IpInputs */
+/** @typedef {{}} Srv_Newdevice_LocationInputs */
+/** @typedef {{}} Srv_Newdevice_Not_YouInputs */
+/** @typedef {{}} Srv_Newdevice_SubjectInputs */
+/** @typedef {{}} Srv_Newdevice_TimeInputs */
+/** @typedef {{}} Srv_Newdevice_Was_YouInputs */
 /** @typedef {{}} Srv_No_BillingInputs */
 /** @typedef {{ provider: NonNullable<unknown> }} Srv_No_KeyInputs */
 /** @typedef {{}} Srv_No_SubscriptionInputs */
@@ -1786,6 +1797,31 @@
 /** @typedef {{}} Stp_DeleteInputs */
 /** @typedef {{}} Stp_Delete_BodyInputs */
 /** @typedef {{}} Stp_Delete_TitleInputs */
+/** @typedef {{ browser: NonNullable<unknown>, os: NonNullable<unknown> }} Stp_Devices_Browser_On_OsInputs */
+/** @typedef {{}} Stp_Devices_Col_ActionInputs */
+/** @typedef {{}} Stp_Devices_Col_DeviceInputs */
+/** @typedef {{}} Stp_Devices_Col_Last_ActiveInputs */
+/** @typedef {{}} Stp_Devices_Col_LocationInputs */
+/** @typedef {{}} Stp_Devices_Col_Signed_InInputs */
+/** @typedef {{}} Stp_Devices_DescriptionInputs */
+/** @typedef {{}} Stp_Devices_FailedInputs */
+/** @typedef {{}} Stp_Devices_HintInputs */
+/** @typedef {{}} Stp_Devices_Load_FailedInputs */
+/** @typedef {{}} Stp_Devices_LoadingInputs */
+/** @typedef {{}} Stp_Devices_NowInputs */
+/** @typedef {{ device: NonNullable<unknown> }} Stp_Devices_One_BodyInputs */
+/** @typedef {{}} Stp_Devices_One_DoneInputs */
+/** @typedef {{}} Stp_Devices_One_TitleInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Stp_Devices_Others_BodyInputs */
+/** @typedef {{}} Stp_Devices_Others_DoneInputs */
+/** @typedef {{}} Stp_Devices_Others_TitleInputs */
+/** @typedef {{}} Stp_Devices_Sign_Out_OneInputs */
+/** @typedef {{ device: NonNullable<unknown> }} Stp_Devices_Sign_Out_One_LabelInputs */
+/** @typedef {{}} Stp_Devices_Sign_Out_OthersInputs */
+/** @typedef {{}} Stp_Devices_This_DeviceInputs */
+/** @typedef {{}} Stp_Devices_TitleInputs */
+/** @typedef {{}} Stp_Devices_Unknown_DeviceInputs */
+/** @typedef {{}} Stp_Devices_Unknown_LocationInputs */
 /** @typedef {{}} Stp_Download_DataInputs */
 /** @typedef {{}} Stp_EmailInputs */
 /** @typedef {{}} Stp_Email_Change_FailedInputs */
@@ -8663,6 +8699,50 @@ export const srv_key_format_original = /** @type {(inputs: Srv_Key_Format_Origin
 	return /** @type {LocalizedString} */ (`Ungültiges Format des API-Schlüssels. Füge den Originalschlüssel des Anbieters ein.`)
 };
 
+export const srv_newdevice_button = /** @type {(inputs: Srv_Newdevice_ButtonInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Geräte verwalten`)
+};
+
+export const srv_newdevice_device = /** @type {(inputs: Srv_Newdevice_DeviceInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Gerät`)
+};
+
+export const srv_newdevice_footer = /** @type {(inputs: Srv_Newdevice_FooterInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Diese Mail kommt jedes Mal, wenn dein Konto auf einem neuen Gerät genutzt wird.`)
+};
+
+export const srv_newdevice_heading = /** @type {(inputs: Srv_Newdevice_HeadingInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Neue Anmeldung auf einem Gerät`)
+};
+
+export const srv_newdevice_intro = /** @type {(inputs: Srv_Newdevice_IntroInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Dein Konto ${i?.email} wurde gerade auf einem Gerät angemeldet, das wir für dich noch nicht kennen.`)
+};
+
+export const srv_newdevice_ip = /** @type {(inputs: Srv_Newdevice_IpInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`IP-Adresse`)
+};
+
+export const srv_newdevice_location = /** @type {(inputs: Srv_Newdevice_LocationInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Ort`)
+};
+
+export const srv_newdevice_not_you = /** @type {(inputs: Srv_Newdevice_Not_YouInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Warst du das nicht? Melde das Gerät ab und ändere dein Passwort.`)
+};
+
+export const srv_newdevice_subject = /** @type {(inputs: Srv_Newdevice_SubjectInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Neue Anmeldung bei sqemes`)
+};
+
+export const srv_newdevice_time = /** @type {(inputs: Srv_Newdevice_TimeInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Zeit`)
+};
+
+export const srv_newdevice_was_you = /** @type {(inputs: Srv_Newdevice_Was_YouInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Warst du das? Dann musst du nichts tun.`)
+};
+
 export const srv_no_billing = /** @type {(inputs: Srv_No_BillingInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Für diesen Workspace gibt es kein Abrechnungskonto.`)
 };
@@ -9504,6 +9584,106 @@ export const stp_delete_body = /** @type {(inputs: Stp_Delete_BodyInputs) => Loc
 
 export const stp_delete_title = /** @type {(inputs: Stp_Delete_TitleInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Dein Konto löschen?`)
+};
+
+export const stp_devices_browser_on_os = /** @type {(inputs: Stp_Devices_Browser_On_OsInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`${i?.browser} auf ${i?.os}`)
+};
+
+export const stp_devices_col_action = /** @type {(inputs: Stp_Devices_Col_ActionInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Aktion`)
+};
+
+export const stp_devices_col_device = /** @type {(inputs: Stp_Devices_Col_DeviceInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Gerät`)
+};
+
+export const stp_devices_col_last_active = /** @type {(inputs: Stp_Devices_Col_Last_ActiveInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Zuletzt aktiv`)
+};
+
+export const stp_devices_col_location = /** @type {(inputs: Stp_Devices_Col_LocationInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Ort`)
+};
+
+export const stp_devices_col_signed_in = /** @type {(inputs: Stp_Devices_Col_Signed_InInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Angemeldet`)
+};
+
+export const stp_devices_description = /** @type {(inputs: Stp_Devices_DescriptionInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Hier bist du gerade angemeldet. Kennst du ein Gerät nicht, melde es ab und ändere dein Passwort.`)
+};
+
+export const stp_devices_failed = /** @type {(inputs: Stp_Devices_FailedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Das Abmelden hat nicht geklappt. Versuch es bitte noch einmal.`)
+};
+
+export const stp_devices_hint = /** @type {(inputs: Stp_Devices_HintInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Ein abgemeldetes Gerät verliert den Zugang spätestens nach einer Stunde. Der Ort ist ungefähr und wird aus der IP abgeleitet.`)
+};
+
+export const stp_devices_load_failed = /** @type {(inputs: Stp_Devices_Load_FailedInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Die Geräte konnten nicht geladen werden.`)
+};
+
+export const stp_devices_loading = /** @type {(inputs: Stp_Devices_LoadingInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Geräte werden geladen`)
+};
+
+export const stp_devices_now = /** @type {(inputs: Stp_Devices_NowInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Jetzt`)
+};
+
+export const stp_devices_one_body = /** @type {(inputs: Stp_Devices_One_BodyInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`${i?.device} wird abgemeldet. Wer dort weiterarbeiten will, muss sich neu anmelden.`)
+};
+
+export const stp_devices_one_done = /** @type {(inputs: Stp_Devices_One_DoneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Das Gerät ist abgemeldet.`)
+};
+
+export const stp_devices_one_title = /** @type {(inputs: Stp_Devices_One_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Gerät abmelden`)
+};
+
+export const stp_devices_others_body = /** @type {(inputs: Stp_Devices_Others_BodyInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`Alle anderen Geräte (${i?.count}) werden abgemeldet. Dieses Gerät bleibt angemeldet.`)
+};
+
+export const stp_devices_others_done = /** @type {(inputs: Stp_Devices_Others_DoneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Alle anderen Geräte sind abgemeldet.`)
+};
+
+export const stp_devices_others_title = /** @type {(inputs: Stp_Devices_Others_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Alle anderen Geräte abmelden`)
+};
+
+export const stp_devices_sign_out_one = /** @type {(inputs: Stp_Devices_Sign_Out_OneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Abmelden`)
+};
+
+export const stp_devices_sign_out_one_label = /** @type {(inputs: Stp_Devices_Sign_Out_One_LabelInputs) => LocalizedString} */ (i) => {
+	return /** @type {LocalizedString} */ (`${i?.device} abmelden`)
+};
+
+export const stp_devices_sign_out_others = /** @type {(inputs: Stp_Devices_Sign_Out_OthersInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Alle anderen abmelden`)
+};
+
+export const stp_devices_this_device = /** @type {(inputs: Stp_Devices_This_DeviceInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Dieses Gerät`)
+};
+
+export const stp_devices_title = /** @type {(inputs: Stp_Devices_TitleInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Geräte`)
+};
+
+export const stp_devices_unknown_device = /** @type {(inputs: Stp_Devices_Unknown_DeviceInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Unbekanntes Gerät`)
+};
+
+export const stp_devices_unknown_location = /** @type {(inputs: Stp_Devices_Unknown_LocationInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Ort unbekannt`)
 };
 
 export const stp_download_data = /** @type {(inputs: Stp_Download_DataInputs) => LocalizedString} */ () => {

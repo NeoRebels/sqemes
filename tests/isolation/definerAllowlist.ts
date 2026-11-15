@@ -79,6 +79,14 @@ export const DEFINER_ALLOWLIST: Record<string, DefinerEntry> = {
   routines_available: {
     why: 'app: whether this instance can run routines (SQEM-679); true/false from the names of two Vault entries, no tenant input, never a value',
   },
+  list_my_sessions: {
+    why: 'app: the Devices card (SQEM-691); rows of auth.sessions where user_id = auth.uid() only',
+    probe: { sql: `select count(*) from public.list_my_sessions() s where s.id in (select id from auth.sessions where user_id = '${USERS.a1}')`, expect: 'zeroOrError' },
+  },
+  revoke_my_session: {
+    why: 'app: ends one of the caller\'s own other sessions (SQEM-691); deletes only where user_id = auth.uid()',
+    probe: { sql: `select count(*) from (select public.revoke_my_session('00000000-0000-4000-8000-000000000691') v) x where v`, expect: 'zero' },
+  },
   review_queue: {
     why: 'app: the review list of a workspace for its moderators and admins (SQEM-669); is_workspace_moderator for auth.uid()',
     probe: { sql: `select public.review_queue('${A}')`, expect: 'error' },
@@ -128,6 +136,9 @@ export const DEFINER_ALLOWLIST: Record<string, DefinerEntry> = {
   template_version_files_present: {
     why: 'app (restore a playbook version, SQEM-477); answers only for a version of a playbook auth.uid() can see',
     probe: { sql: `select count(*) from public.template_version_files_present((select id from public.template_versions where template_id = '${A_OPEN}' order by version desc limit 1))`, expect: 'zero' },
+  },
+  set_my_session_location: {
+    why: 'app: files the place of the caller\'s current session (SQEM-691); writes only for the session_id in the caller\'s own JWT and only if that session belongs to auth.uid()',
   },
   unshare_chat_session: {
     why: 'app (admin withdraws a shared chat); refuses unless the caller is admin of the session\'s workspace',

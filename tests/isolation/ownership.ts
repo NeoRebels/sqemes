@@ -79,6 +79,8 @@ export const OWNERSHIP: Record<string, Ownership> = {
 
   // Per-person data of A's members.
   external_chat_history: byUser('user_id'),
+  session_locations: { ...byUser('user_id'), mayBeEmpty: 'rows exist only once a Cloud browser filed the place of its sign-in session (SQEM-691); no grant to any client role' },
+  known_devices: { ...byUser('user_id'), mayBeEmpty: 'rows exist only once the new-device check ran for a sign-in (SQEM-692); no grant to any client role' },
   legal_acceptances: byUser('user_id'),
   user_prompt_favorites: byUser('user_id'),
   user_persona_favorites: byUser('user_id'),
@@ -89,6 +91,7 @@ export const OWNERSHIP: Record<string, Ownership> = {
   // Platform rows no tenant may see (Sqemes admins / service role only).
   marketplace_publishers: { ownedByA: 'true' },
   mcp_oauth_clients: { ownedByA: 'true' },
+  sign_in_check_state: { ownedByA: 'true', mayBeEmpty: 'one row, written by the first run of the new-device check (SQEM-692); no grant to any client role' },
   marketplace_publisher_config: {
     ownedByA: 'true',
     mayBeEmpty: 'single-row instance config of a self-host publisher; not present on a fresh database',

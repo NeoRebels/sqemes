@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { clearMonitoringUser } from '../lib/monitoring';
+import { recordSessionLocation } from '../lib/api/sessions';
 import type { Session, User } from '@supabase/supabase-js';
 
 const INVITE_KEYS = ['pendingInviteToken', 'pendingInviteTokenAt', 'pendingInviteEmail'] as const;
@@ -19,6 +20,8 @@ export function useAuth() {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      // SQEM-691 — the place of this session for the Devices card; once per session, Cloud only.
+      if (session) void recordSessionLocation(session.access_token);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -26,6 +29,7 @@ export function useAuth() {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        if (_event === 'SIGNED_IN' && session) void recordSessionLocation(session.access_token);
         // SQEM-091 — when supabase-js establishes the recovery session from the URL it
         // fires PASSWORD_RECOVERY; route to the reset page (the route bypasses the
         // loading/workspace guards in App.tsx so the form renders from the recovery

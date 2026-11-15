@@ -1578,6 +1578,17 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Srv_Invalid_PlanInputs */
 /** @typedef {{}} Srv_Key_FormatInputs */
 /** @typedef {{}} Srv_Key_Format_OriginalInputs */
+/** @typedef {{}} Srv_Newdevice_ButtonInputs */
+/** @typedef {{}} Srv_Newdevice_DeviceInputs */
+/** @typedef {{}} Srv_Newdevice_FooterInputs */
+/** @typedef {{}} Srv_Newdevice_HeadingInputs */
+/** @typedef {{ email: NonNullable<unknown> }} Srv_Newdevice_IntroInputs */
+/** @typedef {{}} Srv_Newdevice_IpInputs */
+/** @typedef {{}} Srv_Newdevice_LocationInputs */
+/** @typedef {{}} Srv_Newdevice_Not_YouInputs */
+/** @typedef {{}} Srv_Newdevice_SubjectInputs */
+/** @typedef {{}} Srv_Newdevice_TimeInputs */
+/** @typedef {{}} Srv_Newdevice_Was_YouInputs */
 /** @typedef {{}} Srv_No_BillingInputs */
 /** @typedef {{ provider: NonNullable<unknown> }} Srv_No_KeyInputs */
 /** @typedef {{}} Srv_No_SubscriptionInputs */
@@ -1788,6 +1799,31 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Stp_DeleteInputs */
 /** @typedef {{}} Stp_Delete_BodyInputs */
 /** @typedef {{}} Stp_Delete_TitleInputs */
+/** @typedef {{ browser: NonNullable<unknown>, os: NonNullable<unknown> }} Stp_Devices_Browser_On_OsInputs */
+/** @typedef {{}} Stp_Devices_Col_ActionInputs */
+/** @typedef {{}} Stp_Devices_Col_DeviceInputs */
+/** @typedef {{}} Stp_Devices_Col_Last_ActiveInputs */
+/** @typedef {{}} Stp_Devices_Col_LocationInputs */
+/** @typedef {{}} Stp_Devices_Col_Signed_InInputs */
+/** @typedef {{}} Stp_Devices_DescriptionInputs */
+/** @typedef {{}} Stp_Devices_FailedInputs */
+/** @typedef {{}} Stp_Devices_HintInputs */
+/** @typedef {{}} Stp_Devices_Load_FailedInputs */
+/** @typedef {{}} Stp_Devices_LoadingInputs */
+/** @typedef {{}} Stp_Devices_NowInputs */
+/** @typedef {{ device: NonNullable<unknown> }} Stp_Devices_One_BodyInputs */
+/** @typedef {{}} Stp_Devices_One_DoneInputs */
+/** @typedef {{}} Stp_Devices_One_TitleInputs */
+/** @typedef {{ count: NonNullable<unknown> }} Stp_Devices_Others_BodyInputs */
+/** @typedef {{}} Stp_Devices_Others_DoneInputs */
+/** @typedef {{}} Stp_Devices_Others_TitleInputs */
+/** @typedef {{}} Stp_Devices_Sign_Out_OneInputs */
+/** @typedef {{ device: NonNullable<unknown> }} Stp_Devices_Sign_Out_One_LabelInputs */
+/** @typedef {{}} Stp_Devices_Sign_Out_OthersInputs */
+/** @typedef {{}} Stp_Devices_This_DeviceInputs */
+/** @typedef {{}} Stp_Devices_TitleInputs */
+/** @typedef {{}} Stp_Devices_Unknown_DeviceInputs */
+/** @typedef {{}} Stp_Devices_Unknown_LocationInputs */
 /** @typedef {{}} Stp_Download_DataInputs */
 /** @typedef {{}} Stp_EmailInputs */
 /** @typedef {{}} Stp_Email_Change_FailedInputs */
@@ -24316,6 +24352,160 @@ export const srv_key_format_original = /** @type {((inputs?: Srv_Key_Format_Orig
 /**
 * | output |
 * | --- |
+* | "Manage devices" |
+*
+* @param {Srv_Newdevice_ButtonInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const srv_newdevice_button = /** @type {((inputs?: Srv_Newdevice_ButtonInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Srv_Newdevice_ButtonInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.srv_newdevice_button(inputs)
+	return __en.srv_newdevice_button(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Device" |
+*
+* @param {Srv_Newdevice_DeviceInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const srv_newdevice_device = /** @type {((inputs?: Srv_Newdevice_DeviceInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Srv_Newdevice_DeviceInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.srv_newdevice_device(inputs)
+	return __en.srv_newdevice_device(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "We send this mail whenever your account is used on a new device." |
+*
+* @param {Srv_Newdevice_FooterInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const srv_newdevice_footer = /** @type {((inputs?: Srv_Newdevice_FooterInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Srv_Newdevice_FooterInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.srv_newdevice_footer(inputs)
+	return __en.srv_newdevice_footer(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "New sign-in on a device" |
+*
+* @param {Srv_Newdevice_HeadingInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const srv_newdevice_heading = /** @type {((inputs?: Srv_Newdevice_HeadingInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Srv_Newdevice_HeadingInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.srv_newdevice_heading(inputs)
+	return __en.srv_newdevice_heading(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Your account {email} was just signed in on a device we have not seen for you before." |
+*
+* @param {Srv_Newdevice_IntroInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const srv_newdevice_intro = /** @type {((inputs: Srv_Newdevice_IntroInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Srv_Newdevice_IntroInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.srv_newdevice_intro(inputs)
+	return __en.srv_newdevice_intro(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "IP address" |
+*
+* @param {Srv_Newdevice_IpInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const srv_newdevice_ip = /** @type {((inputs?: Srv_Newdevice_IpInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Srv_Newdevice_IpInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.srv_newdevice_ip(inputs)
+	return __en.srv_newdevice_ip(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Location" |
+*
+* @param {Srv_Newdevice_LocationInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const srv_newdevice_location = /** @type {((inputs?: Srv_Newdevice_LocationInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Srv_Newdevice_LocationInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.srv_newdevice_location(inputs)
+	return __en.srv_newdevice_location(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Wasn't you? Sign the device out and change your password." |
+*
+* @param {Srv_Newdevice_Not_YouInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const srv_newdevice_not_you = /** @type {((inputs?: Srv_Newdevice_Not_YouInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Srv_Newdevice_Not_YouInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.srv_newdevice_not_you(inputs)
+	return __en.srv_newdevice_not_you(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "New sign-in to sqemes" |
+*
+* @param {Srv_Newdevice_SubjectInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const srv_newdevice_subject = /** @type {((inputs?: Srv_Newdevice_SubjectInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Srv_Newdevice_SubjectInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.srv_newdevice_subject(inputs)
+	return __en.srv_newdevice_subject(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Time" |
+*
+* @param {Srv_Newdevice_TimeInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const srv_newdevice_time = /** @type {((inputs?: Srv_Newdevice_TimeInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Srv_Newdevice_TimeInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.srv_newdevice_time(inputs)
+	return __en.srv_newdevice_time(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Was this you? Then there is nothing to do." |
+*
+* @param {Srv_Newdevice_Was_YouInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const srv_newdevice_was_you = /** @type {((inputs?: Srv_Newdevice_Was_YouInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Srv_Newdevice_Was_YouInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.srv_newdevice_was_you(inputs)
+	return __en.srv_newdevice_was_you(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "No billing account found for this workspace." |
 *
 * @param {Srv_No_BillingInputs} inputs
@@ -27253,6 +27443,356 @@ export const stp_delete_title = /** @type {((inputs?: Stp_Delete_TitleInputs, op
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.stp_delete_title(inputs)
 	return __en.stp_delete_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "{browser} on {os}" |
+*
+* @param {Stp_Devices_Browser_On_OsInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_browser_on_os = /** @type {((inputs: Stp_Devices_Browser_On_OsInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Browser_On_OsInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_browser_on_os(inputs)
+	return __en.stp_devices_browser_on_os(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Action" |
+*
+* @param {Stp_Devices_Col_ActionInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_col_action = /** @type {((inputs?: Stp_Devices_Col_ActionInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Col_ActionInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_col_action(inputs)
+	return __en.stp_devices_col_action(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Device" |
+*
+* @param {Stp_Devices_Col_DeviceInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_col_device = /** @type {((inputs?: Stp_Devices_Col_DeviceInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Col_DeviceInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_col_device(inputs)
+	return __en.stp_devices_col_device(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Last active" |
+*
+* @param {Stp_Devices_Col_Last_ActiveInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_col_last_active = /** @type {((inputs?: Stp_Devices_Col_Last_ActiveInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Col_Last_ActiveInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_col_last_active(inputs)
+	return __en.stp_devices_col_last_active(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Location" |
+*
+* @param {Stp_Devices_Col_LocationInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_col_location = /** @type {((inputs?: Stp_Devices_Col_LocationInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Col_LocationInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_col_location(inputs)
+	return __en.stp_devices_col_location(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Signed in" |
+*
+* @param {Stp_Devices_Col_Signed_InInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_col_signed_in = /** @type {((inputs?: Stp_Devices_Col_Signed_InInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Col_Signed_InInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_col_signed_in(inputs)
+	return __en.stp_devices_col_signed_in(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "You are signed in here right now. If you do not recognise a device, sign it out and change your password." |
+*
+* @param {Stp_Devices_DescriptionInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_description = /** @type {((inputs?: Stp_Devices_DescriptionInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_DescriptionInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_description(inputs)
+	return __en.stp_devices_description(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Signing out did not work. Please try again." |
+*
+* @param {Stp_Devices_FailedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_failed = /** @type {((inputs?: Stp_Devices_FailedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_FailedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_failed(inputs)
+	return __en.stp_devices_failed(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "A signed out device loses access within an hour at the latest. The location is approximate and derived from the IP address." |
+*
+* @param {Stp_Devices_HintInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_hint = /** @type {((inputs?: Stp_Devices_HintInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_HintInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_hint(inputs)
+	return __en.stp_devices_hint(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "The devices could not be loaded." |
+*
+* @param {Stp_Devices_Load_FailedInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_load_failed = /** @type {((inputs?: Stp_Devices_Load_FailedInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Load_FailedInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_load_failed(inputs)
+	return __en.stp_devices_load_failed(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Loading devices" |
+*
+* @param {Stp_Devices_LoadingInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_loading = /** @type {((inputs?: Stp_Devices_LoadingInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_LoadingInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_loading(inputs)
+	return __en.stp_devices_loading(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Now" |
+*
+* @param {Stp_Devices_NowInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_now = /** @type {((inputs?: Stp_Devices_NowInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_NowInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_now(inputs)
+	return __en.stp_devices_now(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "{device} will be signed out. Anyone who wants to keep working there has to sign in again." |
+*
+* @param {Stp_Devices_One_BodyInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_one_body = /** @type {((inputs: Stp_Devices_One_BodyInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_One_BodyInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_one_body(inputs)
+	return __en.stp_devices_one_body(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "The device is signed out." |
+*
+* @param {Stp_Devices_One_DoneInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_one_done = /** @type {((inputs?: Stp_Devices_One_DoneInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_One_DoneInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_one_done(inputs)
+	return __en.stp_devices_one_done(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign out device" |
+*
+* @param {Stp_Devices_One_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_one_title = /** @type {((inputs?: Stp_Devices_One_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_One_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_one_title(inputs)
+	return __en.stp_devices_one_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "All other devices ({count}) will be signed out. This device stays signed in." |
+*
+* @param {Stp_Devices_Others_BodyInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_others_body = /** @type {((inputs: Stp_Devices_Others_BodyInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Others_BodyInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_others_body(inputs)
+	return __en.stp_devices_others_body(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "All other devices are signed out." |
+*
+* @param {Stp_Devices_Others_DoneInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_others_done = /** @type {((inputs?: Stp_Devices_Others_DoneInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Others_DoneInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_others_done(inputs)
+	return __en.stp_devices_others_done(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign out all other devices" |
+*
+* @param {Stp_Devices_Others_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_others_title = /** @type {((inputs?: Stp_Devices_Others_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Others_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_others_title(inputs)
+	return __en.stp_devices_others_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign out" |
+*
+* @param {Stp_Devices_Sign_Out_OneInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_sign_out_one = /** @type {((inputs?: Stp_Devices_Sign_Out_OneInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Sign_Out_OneInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_sign_out_one(inputs)
+	return __en.stp_devices_sign_out_one(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign out {device}" |
+*
+* @param {Stp_Devices_Sign_Out_One_LabelInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_sign_out_one_label = /** @type {((inputs: Stp_Devices_Sign_Out_One_LabelInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Sign_Out_One_LabelInputs, { locale?: "en" | "de" }, {}>} */ ((inputs, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_sign_out_one_label(inputs)
+	return __en.stp_devices_sign_out_one_label(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Sign out all other devices" |
+*
+* @param {Stp_Devices_Sign_Out_OthersInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_sign_out_others = /** @type {((inputs?: Stp_Devices_Sign_Out_OthersInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Sign_Out_OthersInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_sign_out_others(inputs)
+	return __en.stp_devices_sign_out_others(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "This device" |
+*
+* @param {Stp_Devices_This_DeviceInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_this_device = /** @type {((inputs?: Stp_Devices_This_DeviceInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_This_DeviceInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_this_device(inputs)
+	return __en.stp_devices_this_device(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Devices" |
+*
+* @param {Stp_Devices_TitleInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_title = /** @type {((inputs?: Stp_Devices_TitleInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_TitleInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_title(inputs)
+	return __en.stp_devices_title(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Unknown device" |
+*
+* @param {Stp_Devices_Unknown_DeviceInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_unknown_device = /** @type {((inputs?: Stp_Devices_Unknown_DeviceInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Unknown_DeviceInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_unknown_device(inputs)
+	return __en.stp_devices_unknown_device(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Location unknown" |
+*
+* @param {Stp_Devices_Unknown_LocationInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const stp_devices_unknown_location = /** @type {((inputs?: Stp_Devices_Unknown_LocationInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Stp_Devices_Unknown_LocationInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.stp_devices_unknown_location(inputs)
+	return __en.stp_devices_unknown_location(inputs)
 });
 /**
 * | output |

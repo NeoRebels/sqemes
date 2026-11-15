@@ -56,6 +56,12 @@ const CASES = [
   // SQEM-685 — a named title with a bracket: one get_template on a guessed name, then "not found".
   { id: 'L4', type: 'named', want: 'erp_kundenreview_mcp', q: 'Nutze den Skill "ERP Kundenreview (MCP)" und erstelle den Kundenreview für die Musterfirma GmbH als Excel.' },
   { id: 'L3', type: 'routine', want: ['sales_director', 'account_manager'], extra: ROUTINE, q: 'Erstelle ein Angebot über 50 Lizenzen für einen Kunden.' },
+  // SQEM-690 — tasks that are not writing, planning or review: an analysis, a workflow, a decision, a translation.
+  { id: 'X1', type: 'task', want: 'table_analysis', q: 'Werte diese Umsätze aus: Januar 120, Februar 95, März 140, April 60. Was fällt auf?' },
+  { id: 'X2', type: 'task', want: 'n8n_workflows', q: 'Bau mir einen n8n-Ablauf, der neue Formular-Einträge in eine Tabelle schreibt.' },
+  { id: 'X3', type: 'task', want: 'pricing_guidelines', q: 'Ein Interessent will 20 Lizenzen mit 25 Prozent Rabatt. Sollen wir das machen?' },
+  { id: 'X4', type: 'task', want: 'translation_glossary', q: 'Übersetz ins Englische: Wir sind ab Montag wieder für Sie erreichbar.' },
+  { id: 'N3', type: 'none', q: 'Wie spät ist es in Tokio, wenn es in Berlin 9 Uhr ist?' },
   { id: 'N1', type: 'none', q: 'Was ist die Hauptstadt von Australien?' },
   { id: 'N2', type: 'none', q: 'Erklär mir in zwei Sätzen, was ein Mutex ist.' },
 ].filter(c => !only || only.split(',').includes(c.id));
@@ -72,7 +78,7 @@ function runOne(c, n) {
     const log = join(OUT, `${c.id}-${n}.calls.jsonl`);
     if (existsSync(log)) rmSync(log);
     const cfg = join(OUT, `${c.id}-${n}.mcp.json`);
-    writeFileSync(cfg, JSON.stringify({ mcpServers: { sqemes: { type: 'stdio', command: 'node', args: [join(HERE, 'mock-mcp.mjs')], env: { MOCK_LOG: log, MOCK_HINT: process.env.MOCK_HINT ?? '', MOCK_UNATTENDED: c.type === 'routine' ? '1' : '' } } } }));
+    writeFileSync(cfg, JSON.stringify({ mcpServers: { sqemes: { type: 'stdio', command: 'node', args: [join(HERE, 'mock-mcp.mjs')], env: { MOCK_LOG: log, MOCK_HINT: process.env.MOCK_HINT ?? '', MOCK_EMPTY_HINT: process.env.MOCK_EMPTY_HINT ?? '', MOCK_UNATTENDED: c.type === 'routine' ? '1' : '' } } } }));
     const args = ['-p', c.q, '--append-system-prompt', c.extra ? `${PROMPT}\n\n${c.extra}` : PROMPT, '--mcp-config', cfg, '--strict-mcp-config',
       '--allowedTools', 'mcp__sqemes__search_templates,mcp__sqemes__list_templates,mcp__sqemes__get_template,mcp__sqemes__list_personas,mcp__sqemes__get_persona',
       '--disallowedTools', 'Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,Task,Agent,TodoWrite,NotebookEdit',
@@ -106,6 +112,8 @@ function judge(c, n, calls, text) {
   // SQEM-689 — noise check: a clear role case should not name another persona as an alternative (recorded, not judged).
   const alt = ['sales_director', 'account_manager', 'recruiter'].some(w => !personaLoaded.includes(w) && named(w));
   if (c.type === 'playbook') ok = templates.includes(c.want);
+  // SQEM-690 — a task outside writing: the fitting playbook loaded is the measure (its mock content is thin, so an offer to extend it is fair).
+  if (c.type === 'task') ok = templates.includes(c.want);
   if (c.type === 'none') ok = tools.length === 0;
   // SQEM-683 — a routine may not ask: it loads one of the two fitting personas instead of offering the choice.
   if (c.type === 'routine') ok = personaLoaded.some(p => c.want.includes(p));
@@ -113,10 +121,10 @@ function judge(c, n, calls, text) {
   // SQEM-681 — found despite the spelling; a missing one is SAID, not silently skipped.
   if (c.type === 'named') ok = templates.includes(c.want);
   // SQEM-685 — also "nichts … gefunden", "konnte … nicht finden", "finde … keine" (three false misses in one run).
-  if (c.type === 'missing') ok = templates.length === 0 && /(nicht gefunden|nichts[^.?!\n]{0,60}gefunden|nicht finden|finde[^.?!\n]{0,60}kein|kein[^.?!\n]{0,40}gefunden|finde[^.?!\n]{0,40}nicht|nicht vorhanden|gibt es[^.?!\n]{0,40}nicht|existiert nicht|kein[^.?!\n]{0,30}(playbook|vorlage)[^.?!\n]{0,30}(namens|mit dem namen|„onboarding))/i.test(text);
+  if (c.type === 'missing') ok = templates.length === 0 && /(nicht gefunden|nichts[^.?!\n]{0,60}gefunden|nicht finden|finde[^.?!\n]{0,60}kein|kein[^.?!\n]{0,40}gefunden|finde[^.?!\n]{0,40}nicht|nicht vorhanden|gibt es[^.?!\n]{0,40}nicht|existiert nicht|es gibt keins|gibt kein[^.?!\n]{0,20}(playbook|vorlage)|kein[^.?!\n]{0,30}(playbook|vorlage)[^.?!\n]{0,30}(namens|mit dem namen|„onboarding))/i.test(text);
   // SQEM-623 — an offer is a sentence naming the playbook/persona/template next to a change verb.
   // SQEM-683 — also "Soll ich es … aktualisieren / umstellen", where the playbook was named one sentence earlier.
-  const offered = /(playbook|vorlage|persona|template)[^.?!\n]{0,160}(anpass|aktualis|ergänz|erweiter|aufnehm|übernehm|hinzufüg|speicher|update)|(anpass|aktualis|ergänz|erweiter|aufnehm|übernehm|hinzufüg|speicher|update)[^.?!\n]{0,160}(playbook|vorlage|persona|template)|soll ich (es|sie|das)[^.?!\n]{0,80}(anpass|aktualis|ergänz|umstell|überarbeit)/i.test(text);
+  const offered = /(playbook|vorlage|persona|template)[^.?!\n]{0,160}(anpass|aktualis|ergänz|erweiter|aufnehm|übernehm|hinzufüg|speicher|update)|(anpass|aktualis|ergänz|erweiter|aufnehm|übernehm|hinzufüg|speicher|update)[^.?!\n]{0,160}(playbook|vorlage|persona|template)|soll ich (es|sie|das)[^.?!\n]{0,80}(anpass|aktualis|ergänz|umstell|überarbeit)|soll ich [^?\n]{0,60}(aktualis|anpass)/i.test(text);
   if (c.type === 'correct') ok = templates.includes(c.want) && offered;
   if (c.type === 'playbook') ok = ok && !offered;
   const r = { variant, id: c.id, type: c.type, n, ok, offered, alt, first: tools[0] ?? '-', tools: tools.join('>'), persona: personaLoaded.join(','), templates: templates.join(','), text: text.slice(0, 3000) };

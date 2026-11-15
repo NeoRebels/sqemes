@@ -374,6 +374,10 @@ verify_jwt = false
 [functions.routine-run]
 verify_jwt = false
 
+# SQEM-692 — called by the new-sign-in-tick cron job with the routine dispatch secret, never with a JWT.
+[functions.notify-new-sign-in]
+verify_jwt = false
+
 # SQEM-676 — chat-message's code under its own name, for routine runs only (own workers).
 [functions.chat-routine]
 verify_jwt = false

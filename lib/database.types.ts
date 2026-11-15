@@ -910,6 +910,32 @@ export type Database = {
         Args: { p_session_id: string };
         Returns: undefined;
       };
+      // SQEM-691 — the Devices card; every one acts on the caller's own sessions only.
+      list_my_sessions: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          created_at: string;
+          last_active_at: string;
+          user_agent: string | null;
+          ip: string | null;
+          city: string | null;
+          country: string | null;
+          is_current: boolean;
+        }[];
+      };
+      revoke_my_session: {
+        Args: { p_session_id: string };
+        Returns: boolean;
+      };
+      set_my_session_location: {
+        Args: { p_city: string | null; p_country: string | null };
+        Returns: undefined;
+      };
+      current_session_id: {
+        Args: Record<string, never>;
+        Returns: string | null;
+      };
       increment_credits: {
         Args: { ws_id: string; amount: number };
         Returns: undefined;

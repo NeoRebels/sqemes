@@ -6,38 +6,45 @@ import { LIBRARY_TOOL_DEFS } from '../../supabase/functions/_shared/libraryToolD
 describe('the library instruction', () => {
   // SQEM-682 — five steps; SQEM-683 — one search rule below them, with the library's language.
   it('step 1 loads a named one exactly, says when it is missing and never swaps it', () => {
-    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/1\. Named first\. If the person names a persona or playbook, load exactly that one/);
-    // SQEM-687 — the same rule, shorter.
-    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/Say it is missing only after search and list_templates find nothing; it may not be shared with them\. Never swap in another\./);
+    // SQEM-687 — the same rule, shorter; SQEM-690 — imperative.
+    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/1\. Named: load exactly the persona or playbook the person names/);
+    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/Search before you say it is missing; it may not be shared with them\. Never swap it\./);
   });
 
   // SQEM-685 — without its own search, step 1 made one get_template on a guessed name and said "not found".
   it('step 1 searches before it loads a named playbook', () => {
-    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/load exactly that one \(get_persona, or search_templates then get_template\)/);
+    // SQEM-690 — the tool names stay in step 1: the cut that dropped them is what SQEM-685 repaired.
+    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/names \(get_persona, or search_templates then get_template\)/);
     expect(LIBRARY_SYSTEM_PROMPT).not.toMatch(/If you cannot find it, say so/);
   });
 
   it('step 3 searches a playbook with or without a persona', () => {
     // ⛔ "also" is SQEM-682's: a role's task that needs one more playbook gets the persona AND the playbook.
-    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/3\. Playbook\. If no route covers the task, also call search_templates/);
-    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/within the persona's role if there is one\./);
-    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/5\. If nothing fits, carry on without mentioning playbooks\./);
+    // SQEM-690 — measured: without "also" the persona-plus-playbook case got worse.
+    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/3\. Playbook: also call search_templates for anything the persona's routes do not cover/);
+    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/5\. Nothing fits: carry on without mentioning sqemes\./);
   });
 
-  it('only a routine may pick instead of asking (SQEM-683: said for every case, the chat stopped asking)', () => {
-    // SQEM-689 — the persona sentence sits between them; the routine exception still closes step 4.
-    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/name the others in one sentence\. In a scheduled routine nobody can answer: take the closest and say why\./);
+  it('the routine exception lives where a routine runs, not in the pasted text (SQEM-690)', () => {
+    // SQEM-683 said "if nobody can answer" for every case and the chat stopped asking; SQEM-690 drops the sentence:
+    // a routine already reads "Do not ask questions" and gets the routine note from list_personas.
+    expect(LIBRARY_SYSTEM_PROMPT).not.toMatch(/nobody can answer/);
   });
 
-  it('the search rule stands once: one word, the English word too, then another word or list_templates', () => {
-    // ⛔ ONE paragraph: split over step 1 and a paragraph, a model applied it to step 3 only (SQEM-685/687).
-    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/search_templates matches titles and descriptions: search one word at a time, and also the English word, as many titles are English \(Diagramm: diagram\)\. Then try another word or list_templates\./);
-    expect(LIBRARY_SYSTEM_PROMPT.match(/one word at a time|a single word/g)).toHaveLength(1);
+  it('the search rule lives in the search tool, not in the instruction (SQEM-690)', () => {
+    // It stood in both; the tool description is what every client reads when it searches. The English word moved there.
+    expect(LIBRARY_SYSTEM_PROMPT).not.toMatch(/one word at a time|a single word/);
+    const search = (LIBRARY_TOOL_DEFS as Array<{ name: string; description: string }>).find(t => t.name === 'search_templates')!;
+    expect(search.description).toMatch(/Many titles are English: also search the English word \(Diagramm: diagram\)\./);
   });
 
   it('Chat\'s own search tool says the same', async () => {
     const { readFileSync } = await import('node:fs');
-    expect(readFileSync('supabase/functions/_shared/libraryTools.ts', 'utf8')).toMatch(/matched as text in titles and descriptions, so search ONE word; with no match, try another word or list_templates/);
+    const chat = readFileSync('supabase/functions/_shared/libraryTools.ts', 'utf8');
+    expect(chat).toMatch(/matched as text in titles and descriptions, so search ONE word; with no match, try another word or list_templates/);
+    expect(chat).toMatch(/Many titles are English: also search the English word \(Diagramm: diagram\)\./);
+    // SQEM-690 — the same widening as the instruction: any task, not only writing.
+    expect(chat).toMatch(/'Call this before a task — /);
   });
 
   it('the search tool tells every MCP client the same: one word, then list_templates', () => {

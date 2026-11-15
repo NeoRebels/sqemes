@@ -26,8 +26,7 @@ describe('LIBRARY_SYSTEM_PROMPT', () => {
   // often *be* the org instruction, it has to yield explicitly — otherwise we override what somebody
   // deliberately set for themselves, from a settings page they never saw.
   it('yields to the person rather than overriding them', () => {
-    expect(LIBRARY_SYSTEM_PROMPT).toContain('does not replace them'); // SQEM-687 — "your other instructions"
-    expect(LIBRARY_SYSTEM_PROMPT).toContain('follow theirs');
+    expect(LIBRARY_SYSTEM_PROMPT).toContain("The person's own instructions win."); // SQEM-690 — imperative
   });
 
   // ⛔ Ships to self-host, where the endpoint is the operator's own machine.
@@ -44,24 +43,22 @@ describe('LIBRARY_SYSTEM_PROMPT', () => {
   // anyway — worse than not asking, because the choice now looks confirmed.
   it('asks on an ambiguous match instead of choosing', () => {
     // SQEM-687 — shorter wording, the same two halves: ask, and wait. SQEM-689 — for playbooks.
-    expect(LIBRARY_SYSTEM_PROMPT).toContain('If several playbooks fit, name each with a one-line difference, ask which one and wait; do not choose for them');
+    expect(LIBRARY_SYSTEM_PROMPT).toContain('Several playbooks fit: name them, ask, wait.'); // SQEM-690 — imperative
     expect(LIBRARY_SYSTEM_PROMPT).not.toMatch(/pick the most specific/i);
   });
 
   // ⭐ SQEM-689 — between personas the model picked anyway instead of asking, so for personas
   // the rule is the pick made visible: the closest one, said which, the other named so the person can switch.
   it('picks the closest of several personas and names the others', () => {
-    expect(LIBRARY_SYSTEM_PROMPT).toContain('If several personas fit, take the closest, say which and name the others in one sentence.');
+    expect(LIBRARY_SYSTEM_PROMPT).toContain('Several personas fit: take the closest, say which, name the other.');
   });
 
   it('covers both kinds, since a reader has to tell them apart — and no longer a third', () => {
-    for (const kind of ['prompt', 'skill']) {
-      expect(LIBRARY_SYSTEM_PROMPT).toContain(kind);
-    }
+    // SQEM-690 — the two kinds are explained where they are loaded (get_template); the instruction names neither.
     // SQEM-390 — the assistant line went with the kind; a model told about three kinds would look
     // for one the tools never return.
     expect(LIBRARY_SYSTEM_PROMPT).not.toMatch(/assistant/i);
-    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/A prompt has \{\{variables\}\}[\s\S]*A skill is company knowledge/); // SQEM-687 — no heading sentence
+    expect(LIBRARY_SYSTEM_PROMPT).not.toMatch(/A prompt has \{\{variables\}\}/);
   });
   // ── SQEM-378 — the three surfaces, and that they really are one text ──────────────────────────
 
@@ -104,20 +101,20 @@ describe('LIBRARY_SYSTEM_PROMPT', () => {
   // The order IS the fix, so it is pinned (scripts/prompt-eval re-measures it).
   it('⛔ puts the role step before the playbook search', () => {
     // SQEM-682 — a NAMED one comes before both; the role step still precedes the playbook search.
-    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/1\. Named first\./);
-    expect(LIBRARY_SYSTEM_PROMPT.indexOf('2. Role.')).toBeGreaterThan(-1);
-    expect(LIBRARY_SYSTEM_PROMPT.indexOf('2. Role.')).toBeLessThan(LIBRARY_SYSTEM_PROMPT.indexOf('3. Playbook.'));
+    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/1\. Named:/);
+    expect(LIBRARY_SYSTEM_PROMPT.indexOf('2. Role:')).toBeGreaterThan(-1);
+    expect(LIBRARY_SYSTEM_PROMPT.indexOf('2. Role:')).toBeLessThan(LIBRARY_SYSTEM_PROMPT.indexOf('3. Playbook:'));
   });
 
-  it('stays short and precise (SQEM-487: 2,258 → 1,297; SQEM-681: under 1,600; SQEM-682: 1,850; SQEM-683: 1,950; SQEM-685: 2,000)', () => {
+  it('stays short and precise (SQEM-487: 2,258 → 1,297; SQEM-681: under 1,600; SQEM-682: 1,850; SQEM-683: 1,950; SQEM-685: 2,000; SQEM-690: ~1,000, cap 1,200)', () => {
     // The hard limit is Claude's 3,000 for organisation instructions; this guard only makes every growth a decision.
-    expect(LIBRARY_SYSTEM_PROMPT.length).toBeLessThanOrEqual(2000);
+    expect(LIBRARY_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1200);
   });
 
-  it('names list_templates only because every surface that carries the instruction offers it (SQEM-681)', () => {
+  it('names only tools every surface that carries the instruction offers (SQEM-681; SQEM-690: list_templates now only in the search tool)', () => {
     // SQEM-373 kept it out of Chat; SQEM-561 gave Chat every read tool, SQEM-681 gave routines the read actions too.
     // A prompt naming a tool a surface lacks is how a model ends up calling something that is not there.
-    expect(LIBRARY_SYSTEM_PROMPT).toContain('list_templates');
+    expect(LIBRARY_SYSTEM_PROMPT).not.toContain('list_templates');
     const chat = readFileSync('supabase/functions/chat-message/index.ts', 'utf8');
     expect(chat).toMatch(/definitions: chatActionDefinitions\(routine \? 'member' : role,/);
     expect(chat).not.toMatch(/actions: routine \? undefined/);

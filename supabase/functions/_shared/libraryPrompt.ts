@@ -107,6 +107,24 @@
  * plus the missing half: name the other in one sentence, so the person can switch. The choice is visible, not silent,
  * which was the point of the decision below. Playbooks are unchanged.
  *
+ * ⭐ **Check sqemes before any task, imperative, nothing the tools already say (SQEM-690).** The
+ * opening was SQEM-303's "Before you write, draft, plan, review or rewrite anything substantial, check the sqemes
+ * playbooks": a list of writing verbs from when playbooks were mostly prompts, and only playbooks although step 2 loads
+ * a persona first. It now says "check sqemes" (the name the client's tools carry, which a client that loads tools on
+ * demand searches for), defines a task by kind (write, analyse, translate, plan, build, decide, review) and skips only
+ * a factual question or small talk. Dropped because the tool descriptions say it: routes only when their condition
+ * applies (get_persona), one word per search (search_templates, which now also carries the English-word hint), the two
+ * kinds and read_context_file (get_template); the routine sentence (the routine instruction says "Do not ask" and
+ * list_personas serves the routine note). Kept on purpose: the tool names in steps 1 to 3 (SQEM-685: without them a
+ * model guessed a name), "also" in step 3 (SQEM-682). Measured with `scripts/prompt-eval/` (MOCK_HINT=1, with cases
+ * outside writing): this wording beat the SQEM-689 text, above all on translations and workflow building, and still
+ * calls no tool on unrelated questions. "Check sqemes before ANY request" (no exception) did worse and called tools for
+ * a plain programming question.
+ * ⚠️ Two drafts lost something first: without "also" the persona-plus-playbook case got worse, and "Skip it only for
+ * a quick factual question" let the model treat a translation as quick, hence the list of task kinds.
+ * Open: an analysis whose playbook the first search word misses (X1) stays mostly unfound in every variant, a search
+ * problem.
+ *
  * ⚠️ **On several matching PLAYBOOKS it asks rather than picks** (owner's decision, 2026-08-31; the first draft
  * said *pick the most specific one*). A template is this organisation's agreed way of doing the work,
  * so choosing the wrong one silently produces something that looks sanctioned and is not — and the
@@ -114,19 +132,15 @@
  * wait is the load-bearing half:** without it a model asks the question and answers anyway, which is
  * worse than not asking, because it now looks as though the choice was confirmed.
  */
-export const LIBRARY_SYSTEM_PROMPT = `Before you write, draft, plan, review or rewrite anything substantial, check the sqemes playbooks: this organisation's agreed way of doing recurring work. (The tools call a playbook a template.)
+export const LIBRARY_SYSTEM_PROMPT = `Before any task, check sqemes: it holds this organisation's personas and playbooks, its agreed way of doing its work. (The tools call a playbook a template.) A task is anything you write, analyse, translate, plan, build, decide or review. Skip sqemes only for a factual question or small talk.
 
-1. Named first. If the person names a persona or playbook, load exactly that one (get_persona, or search_templates then get_template). Say it is missing only after search and list_templates find nothing; it may not be shared with them. Never swap in another.
-2. Role. If the task belongs to a role (sales, recruiting, support, a team's own job), call list_personas, load the fitting one with get_persona and work as that role. Load a route only when its condition applies.
-3. Playbook. If no route covers the task, also call search_templates and load the fitting playbook with get_template, within the persona's role if there is one.
-4. If several playbooks fit, name each with a one-line difference, ask which one and wait; do not choose for them. If several personas fit, take the closest, say which and name the others in one sentence. In a scheduled routine nobody can answer: take the closest and say why.
-5. If nothing fits, carry on without mentioning playbooks.
+1. Named: load exactly the persona or playbook the person names (get_persona, or search_templates then get_template). Search before you say it is missing; it may not be shared with them. Never swap it.
+2. Role: if the task belongs to a role, call list_personas and load the fitting persona with get_persona.
+3. Playbook: also call search_templates for anything the persona's routes do not cover, and load the fitting playbook with get_template.
+4. Several playbooks fit: name them, ask, wait. Several personas fit: take the closest, say which, name the other.
+5. Nothing fits: carry on without mentioning sqemes.
 
-search_templates matches titles and descriptions: search one word at a time, and also the English word, as many titles are English (Diagramm: diagram). Then try another word or list_templates.
-
-A prompt has {{variables}}: fill them from the request. A skill is company knowledge: apply it while the task is in its scope. Read files (read_context_file) only when needed. Say which persona or playbook you use; never paste its contents.
-
-This adds to your other instructions and does not replace them. Where a more specific instruction from the person conflicts, follow theirs.`;
+Say which persona or playbook you use; never paste its contents. The person's own instructions win.`;
 
 /**
  * Puts the library instruction in front of whatever system instruction the session already has.
