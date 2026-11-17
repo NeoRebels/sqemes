@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { Download, FileText, FileSpreadsheet, FileType, Presentation, X, Loader2 } from 'lucide-react';
 import { markdownUrlTransform } from '../lib/markdownUrlTransform';
 import { FILE_LABELS, type GeneratedFile } from '../supabase/functions/_shared/fileOutput.ts';
-import { downloadGeneratedFile, plainTextFromMarkdown, sheetsFromMarkdown, slidesFromMarkdown, pdfFontFor } from '../lib/fileExport';
+import { downloadGeneratedFile, plainTextFromMarkdown, sheetsFromMarkdown, slidesFromMarkdown, pdfFontFor, safeFormula } from '../lib/fileExport';
 import { effectiveStyle, type DocumentStyle } from '../supabase/functions/_shared/documentStyle.ts';
 import { loadLogo } from '../lib/logoImage';
 import type { WorkspaceFile } from '../types';
@@ -109,12 +109,18 @@ function XlsxPreview({ content }: { content: string }) {
           <tbody>
             {sheet.rows.map((row, r) => (
               <tr key={r} className={r === 0 ? 'bg-surface-sunken font-semibold' : 'border-t border-line'}>
-                {row.map((cell, c) => <td key={c} className="px-3 py-1.5 whitespace-nowrap text-ink">{cell}</td>)}
+                {row.map((cell, c) => r > 0 && safeFormula(cell)
+                  // SQEM-697 — a formula is written as one; Excel computes it, the preview cannot.
+                  ? <td key={c} className="px-3 py-1.5 whitespace-nowrap font-mono text-xs text-accent" title={m.chatfile_formula_hint()}>{safeFormula(cell)}</td>
+                  : <td key={c} className="px-3 py-1.5 whitespace-nowrap text-ink">{cell}</td>)}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {sheet.rows.some((row, r) => r > 0 && row.some(cell => safeFormula(cell))) && (
+        <p className="mt-2 text-xs text-ink-subtle">{m.chatfile_formula_hint()}</p>
+      )}
     </div>
   );
 }

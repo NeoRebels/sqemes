@@ -59,3 +59,18 @@ export function buildEnabledModels(
   }
   return enabled;
 }
+
+/**
+ * SQEM-698 — the name to show for a reply's model. A live reply carries the model's name, a reloaded
+ * one the id stored with it, so the same answer used to read "Gemini 3.7 Flash" and then
+ * "gemini-3.7-flash". An id found in the fixed list or in the workspace's models becomes its name; a
+ * retired model keeps its id (there is no name left for it), and a value that already is a name stays.
+ */
+export function modelLabel(value: string, models: ReadonlyArray<Pick<EnabledModel, 'id' | 'name'>> = []): string {
+  return AVAILABLE_MODELS.find(m => m.id === value)?.name ?? models.find(m => m.id === value)?.name ?? value;
+}
+
+/** SQEM-698 — the model menu's width: 384 px, but never wider than the screen with an 8 px margin each side. */
+export function modelMenuWidth(viewportWidth: number): number {
+  return Math.max(0, Math.min(384, viewportWidth - 16));
+}

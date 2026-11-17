@@ -132,6 +132,42 @@ export function sheetsFromMarkdown(md: string): SheetSpec[] {
   return sheets;
 }
 
+/**
+ * SQEM-697 — the functions a cell may call. ⛔ A short list on purpose: a table can carry text from a
+ * connector or a web page, and a formula such as HYPERLINK or WEBSERVICE in a file somebody opens is a
+ * formula injection. Anything outside it stays text, as every formula did before.
+ */
+const FORMULA_FUNCTIONS = new Set(['SUM', 'AVERAGE', 'MIN', 'MAX', 'COUNT', 'ROUND', 'IF']);
+
+/**
+ * "=SUM(D2:D4)" → the formula Excel should compute, or null when it is not one we write as a formula:
+ * cell references, numbers, + - * / ^ ( ) , : < > = and the functions above, English names with commas
+ * (Excel's file format; a German "=SUMME(A1;A2)" stays text). No strings, no sheet references.
+ */
+export function safeFormula(text: string): string | null {
+  const t = text.trim();
+  if (!/^=[^=]/.test(t) || t.length > 300) return null;
+  const body = t.slice(1);
+  if (!/^[A-Za-z0-9$.:,+\-*/^()<>= ]+$/.test(body)) return null;
+  let depth = 0;
+  for (const ch of body) {
+    if (ch === '(') depth++;
+    if (ch === ')' && --depth < 0) return null;
+  }
+  if (depth !== 0) return null;
+  const words = body.matchAll(/[A-Za-z_][A-Za-z0-9_.$]*/g);
+  for (const w of words) {
+    const word = w[0];
+    const next = body.slice((w.index ?? 0) + word.length).trimStart()[0];
+    if (next === '(') {
+      if (!FORMULA_FUNCTIONS.has(word.toUpperCase())) return null;
+    } else if (!/^\$?[A-Za-z]{1,3}\$?\d+$/.test(word)) {
+      return null;
+    }
+  }
+  return '=' + body.replace(/[A-Za-z_][A-Za-z0-9_.$]*(?=\s*\()/g, f => f.toUpperCase());
+}
+
 /** "1.234,50" / "1234.5" / "-3" → a number, so Excel can sum it; anything else stays text. */
 export function cellValue(text: string): string | number {
   const t = text.replace(/\s/g, '');
@@ -450,13 +486,21 @@ async function pptxBlob(md: string, title: string, style: DocumentStyle = {}, lo
   return new Blob([await pres.write({ outputType: 'arraybuffer' }) as ArrayBuffer], { type: MIME.pptx });
 }
 
+/** SQEM-697 — a body cell: a formula Excel computes, a number, or text. */
+function cellOf(text: string): { type?: 'Formula'; value: string | number } {
+  const formula = safeFormula(text);
+  // ⚠️ Without the '=': write-excel-file puts the value into <f> as is, and the file format stores a
+  // formula without it (its README shows one with '=', which yields <f>=B2*C2</f>).
+  return formula ? { type: 'Formula', value: formula.slice(1) } : { value: cellValue(text) };
+}
+
 async function xlsxBlob(md: string, style: DocumentStyle = {}): Promise<Blob> {
   const { default: writeXlsxFile } = await import('write-excel-file/browser');
   const sheets = sheetsFromMarkdown(md).map(s => ({
     sheet: s.name,
     // SQEM-597 — header row in the house colour; the font on every cell (Excel shows it if installed).
     data: s.rows.map((row, r) => row.map(text => ({
-      ...(r === 0 ? { value: text, fontWeight: 'bold' as const } : { value: cellValue(text) }),
+      ...(r === 0 ? { value: text, fontWeight: 'bold' as const } : cellOf(text)),
       ...(style.font ? { fontFamily: style.font } : {}),
       ...(r === 0 && style.primaryColor ? { backgroundColor: style.primaryColor, textColor: '#FFFFFF' } : {}),
     }))),

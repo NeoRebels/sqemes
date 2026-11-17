@@ -745,9 +745,9 @@ async function runAndBroadcast({
    *
    * ⭐ **No provider excludes the library any more.** It used to be `workspaceId && !connectors?.length`,
    * because on chat completions a connector and our tools fought over one `tools` field. SQEM-377 gave
-   * OpenAI the shared array on `/v1/responses`, and **SQEM-428 established that Claude never had the
-   * conflict either**: its connectors live in `mcp_servers`, and what sits in `tools` alongside our
-   * definitions is only the `mcp_toolset` entries pointing at them. One array, both writers, no loss.
+   * OpenAI the shared array on `/v1/responses`, and SQEM-428 showed Claude never had the conflict
+   * either. Since SQEM-652 connectors are functions in the same runtime as the library tools for
+   * every provider (the `mcp_servers` / `mcp_toolset` path is gone), so there is one array and no loss.
    *
    * ⚠️ The runtime is cheap to create — the reader behind it is a thunk, so a message that never
    * calls a tool pays nothing beyond the tool definitions in the request.
@@ -950,11 +950,11 @@ async function runAndBroadcast({
     let result: string;
     // SQEM-649 — starts with what the last invocation used and did not charge (`tokenCarry`).
     let totalTokens = continuation?.tokenCarry ?? 0;
-    // SQEM-584 — providers without their own MCP support get the connectors' tools as functions in the
-    // same loop as the library. A connector whose tool list cannot be fetched is left out and named
-    // under the answer, as Claude and OpenAI do (SQEM-466/572) — never the whole answer lost.
-    // SQEM-594 — the web tools go into the BASE runtime: Claude and OpenAI get `base` (they run
-    // connectors themselves), every other provider gets it wrapped with the connectors on top.
+    // SQEM-584 — the connectors' tools run as functions in the same loop as the library (for every
+    // provider since SQEM-652). A connector whose tool list cannot be fetched is left out and named
+    // under the answer — never the whole answer lost.
+    // SQEM-594 — the web tools go into the BASE runtime; since SQEM-652 every provider, Claude and
+    // OpenAI included, gets `runtime`: `base` wrapped with the connectors on top.
     let base = tools;
     if (base && web) {
       base = withWebTools(base, {

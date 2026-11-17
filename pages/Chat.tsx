@@ -9,7 +9,8 @@ import { supabase } from '../lib/supabase';
 import { waitForJobResult, sendAnalysisResult } from '../lib/realtimeJob';
 import { clientJobTimeoutMs, clientHardCapMs, clientChainCapMs } from '../supabase/functions/_shared/chatTimeouts.ts';
 import { AVAILABLE_MODELS } from '../constants';
-import { buildEnabledModels, isFundedModel, isImageModel } from '../lib/enabledModels';
+import { buildEnabledModels, isFundedModel, isImageModel, modelLabel } from '../lib/enabledModels';
+import { splitStoredAttachments } from '../lib/storedAttachments';
 import { authoringModelId } from '../lib/authoringAI';
 import { edgeError } from '../lib/edgeError';
 import { Send, Square, Bot, User, Sparkles, AlertTriangle, Loader2, Copy, Check, Pencil, Paperclip, Plug, X, FileText, MessageSquarePlus, Search, MoreHorizontal, Globe, Users, Lock, Trash2, MessageSquare, Wand2, Key, Upload, Files, CalendarClock } from 'lucide-react';
@@ -174,6 +175,8 @@ interface ChatMsg {
   content: string;
   pending?: boolean;
   attachments?: Array<{ mimeType: string; dataUrl: string; label?: string; tables?: AttachmentTable[]; officePicture?: boolean; officePictures?: number }>;
+  /** SQEM-699 — the types of a reloaded message's attachments, whose content was never stored. */
+  lostAttachments?: string[];
   model?: string;
   userId?: string;
   userName?: string;
@@ -210,6 +213,8 @@ interface MessageItemProps {
   playbookTitles: ReadonlyMap<string, { title: string; kind: PromptKind }>;
   /** SQEM-561 — the viewer's own current title for a changed object; undefined when not theirs to see. */
   libraryTitle: (c: LibraryChange) => string | undefined;
+  /** SQEM-698 — the name of a reply's model, whether the message carries its name (live) or its id (reloaded). */
+  modelName: (model: string) => string;
   /** SQEM-595 — open a generated file in the preview beside the chat (stable callback). */
   onOpenFile: (f: GeneratedFile) => void;
 }
@@ -233,11 +238,31 @@ function PersonaConnectorNotice({ persona, services, onConnect }: { persona: str
   );
 }
 
+/** SQEM-699 — the attachments of a reloaded message: their content was never stored, so say so. */
+function LostAttachments({ types, onAccent }: { types: string[]; onAccent: boolean }) {
+  return (
+    <div className="mb-2">
+      <div className="flex flex-wrap gap-2">
+        {types.map((t, i) => (
+          <span key={i} className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium line-through decoration-1 ${onAccent ? 'bg-white/10 text-white/70' : 'bg-surface-sunken text-ink-muted'}`}>
+            <FileText className="w-4 h-4" aria-hidden="true" />{t.includes('/') ? fileTypeLabel(t) : t}
+            <span className="sr-only">{txt.chat_attachment_gone()}</span>
+          </span>
+        ))}
+      </div>
+      <p className={`mt-1.5 text-xs ${onAccent ? 'text-white/80' : 'text-ink-muted'}`}>{txt.chat_attachment_gone_hint()}</p>
+    </div>
+  );
+}
+
 const MessageItem = memo(function MessageItem({
   msg, currentUserId, currentUserName, userAvatar, showUserAvatar, onAvatarError,
-  isLastAssistant, isLoading, isCopied, onCopy, onEdit, innerRef, playbookTitles, libraryTitle, onOpenFile,
+  isLastAssistant, isLoading, isCopied, onCopy, onEdit, innerRef, playbookTitles, libraryTitle, onOpenFile, modelName,
 }: MessageItemProps) {
   const isOtherUser = msg.role === 'user' && !!msg.userId && msg.userId !== currentUserId;
+  // SQEM-699 — a reloaded message shows its attachments as gone instead of the raw "[Attachment: …]" lines.
+  const lost = msg.lostAttachments ?? [];
+  const shownText = lost.length ? splitStoredAttachments(msg.content).text : msg.content;
   return (
     <div ref={innerRef} className={`flex gap-3 ${msg.role === 'user' && !isOtherUser ? 'justify-end' : 'justify-start'}${isLastAssistant ? ' scroll-mt-5' : ''}`}>
       {msg.role === 'assistant' && (
@@ -259,7 +284,7 @@ const MessageItem = memo(function MessageItem({
             {msg.playbookRef ? (
               // SQEM-551 — the card, with the text it produced collapsed inside it.
               <div className={`flex ${isOtherUser ? 'justify-start' : 'justify-end'}`}>
-                <ChatPlaybookCard playbookRef={msg.playbookRef} content={msg.content} linkable={playbookTitles.has(msg.playbookRef.id)}>
+                <ChatPlaybookCard playbookRef={msg.playbookRef} content={shownText} linkable={playbookTitles.has(msg.playbookRef.id)}>
                   {msg.attachments && msg.attachments.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
                       {msg.attachments.map((att, i) =>
@@ -269,6 +294,7 @@ const MessageItem = memo(function MessageItem({
                       )}
                     </div>
                   )}
+                  {lost.length > 0 && <LostAttachments types={lost} onAccent={false} />}
                 </ChatPlaybookCard>
               </div>
             ) : (
@@ -287,7 +313,8 @@ const MessageItem = memo(function MessageItem({
                   )}
                 </div>
               )}
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+              {lost.length > 0 && <LostAttachments types={lost} onAccent={!isOtherUser} />}
+              {shownText && <p className="text-sm leading-relaxed whitespace-pre-wrap">{shownText}</p>}
             </div>
             )}
             <div className={`mt-2 flex gap-2 ${isOtherUser ? 'ml-1' : 'mr-1 justify-end'}`}>
@@ -323,7 +350,7 @@ const MessageItem = memo(function MessageItem({
                   <span>{msg.analysing ? txt.chat_analysis_running() : msg.resuming ? txt.chat_resuming() : txt.chat_still_working()}</span>
                 </div>
               )}
-              {msg.model && !msg.pending && <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2 font-mono">{msg.model}</p>}
+              {msg.model && !msg.pending && <p className="text-2xs text-slate-400 dark:text-slate-500 mt-2 font-mono">{modelName(msg.model)}</p>}
             </div>
             {!msg.pending && <UsedPlaybookChips used={usedPlaybooks(msg.loadedTemplateIds, playbookTitles)} />}
             {!msg.pending && <LibraryChangesCard changes={msg.libraryChanges} currentTitle={libraryTitle} />}
@@ -596,6 +623,7 @@ const Chat = () => {
   // SQEM-561 — the card under an answer shows the viewer's own CURRENT title, read from the lists
   // they can see: playbooks (store, realtime), personas (above), files (store). Nothing found means
   // the viewer cannot open it, or it is gone — `changeLabel` decides what to show then.
+  const modelName = useCallback((model: string) => modelLabel(model, enabledModels), [enabledModels]);
   const libraryTitle = useCallback((c: LibraryChange): string | undefined => {
     if (c.kind === 'persona') return personas.find(p => p.id === c.id)?.title;
     if (c.kind === 'file') return workspaceFiles.find(f => f.id === c.id)?.name;
@@ -657,6 +685,9 @@ const Chat = () => {
           webSources: m.webSources, // SQEM-594
           generatedFiles: m.generatedFiles, // SQEM-595
           analyses: m.analyses, // SQEM-660 — count and success only
+          // SQEM-699 — `content` keeps its "[Attachment: …]" lines (the model reads them and asks for the
+          // file again); the bubble shows them as attachments that are gone.
+          ...(m.role === 'user' ? { lostAttachments: splitStoredAttachments(m.content).lost } : {}),
         })));
         setSessionId(routeSessionId);
         setMobileTab('chat');
@@ -1885,6 +1916,7 @@ const Chat = () => {
                     playbookTitles={playbookTitles}
                     onOpenFile={setPreviewFile}
                     libraryTitle={libraryTitle}
+                    modelName={modelName}
                   />
                 ))}
 

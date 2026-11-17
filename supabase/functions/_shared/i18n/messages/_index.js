@@ -290,6 +290,8 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Attach_TruncatedInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Attach_Truncated_TableInputs */
 /** @typedef {{}} Chat_Attachment_AltInputs */
+/** @typedef {{}} Chat_Attachment_GoneInputs */
+/** @typedef {{}} Chat_Attachment_Gone_HintInputs */
 /** @typedef {{}} Chat_Back_To_StartInputs */
 /** @typedef {{}} Chat_CancelInputs */
 /** @typedef {{}} Chat_Choose_WorkspaceInputs */
@@ -410,6 +412,7 @@ import { getLocale, experimentalStaticLocale } from "../runtime.js"
 /** @typedef {{}} Chatfile_Create_FailedInputs */
 /** @typedef {{}} Chatfile_DownloadInputs */
 /** @typedef {{ font: NonNullable<unknown> }} Chatfile_Font_FallbackInputs */
+/** @typedef {{}} Chatfile_Formula_HintInputs */
 /** @typedef {{}} Chatfile_From_AnalysisInputs */
 /** @typedef {{}} Chatfile_LogoInputs */
 /** @typedef {{}} Chatfile_No_SlidesInputs */
@@ -6275,6 +6278,34 @@ export const chat_attachment_alt = /** @type {((inputs?: Chat_Attachment_AltInpu
 /**
 * | output |
 * | --- |
+* | "not available any more" |
+*
+* @param {Chat_Attachment_GoneInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_attachment_gone = /** @type {((inputs?: Chat_Attachment_GoneInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Attachment_GoneInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_attachment_gone(inputs)
+	return __en.chat_attachment_gone(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "This attachment was not kept after the reload. To ask about it again, attach it again." |
+*
+* @param {Chat_Attachment_Gone_HintInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chat_attachment_gone_hint = /** @type {((inputs?: Chat_Attachment_Gone_HintInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chat_Attachment_Gone_HintInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chat_attachment_gone_hint(inputs)
+	return __en.chat_attachment_gone_hint(inputs)
+});
+/**
+* | output |
+* | --- |
 * | "Back to Start" |
 *
 * @param {Chat_Back_To_StartInputs} inputs
@@ -7952,6 +7983,20 @@ export const chatfile_font_fallback = /** @type {((inputs: Chatfile_Font_Fallbac
 	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
 	if (locale === "de") return __de.chatfile_font_fallback(inputs)
 	return __en.chatfile_font_fallback(inputs)
+});
+/**
+* | output |
+* | --- |
+* | "Formulas are computed by Excel when the file is opened." |
+*
+* @param {Chatfile_Formula_HintInputs} inputs
+* @param {{ locale?: "en" | "de" }} options
+* @returns {LocalizedString}
+*/
+export const chatfile_formula_hint = /** @type {((inputs?: Chatfile_Formula_HintInputs, options?: { locale?: "en" | "de" }) => LocalizedString) & import('../runtime.js').MessageMetadata<Chatfile_Formula_HintInputs, { locale?: "en" | "de" }, {}>} */ ((inputs = {}, options = {}) => {
+	const locale = experimentalStaticLocale ?? options.locale ?? getLocale()
+	if (locale === "de") return __de.chatfile_formula_hint(inputs)
+	return __en.chatfile_formula_hint(inputs)
 });
 /**
 * | output |

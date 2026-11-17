@@ -18,6 +18,12 @@ const ALLOWLIST = new Map([
   //
   // SQEM-569 (2026-10-23) — the SQEM-498 braces entry (GHSA-vfj7-8cjw-p6xm) is gone: GitHub withdrew that
   // advisory on 2026-10-23, so it matched nothing and the strict nightly run would have turned red.
+  //
+  // SQEM-701 (2026-11-17) — picomatch ReDoS, no patched release (4.0.7 is the newest). It reaches us only
+  // through build and dev tooling (tailwindcss → chokidar/micromatch, vite, vitest, paraglide-js →
+  // unplugin): none of it is in dist/ (checked) and the edge functions run on Deno without npm. The
+  // attack needs an attacker-chosen glob; ours are fixed in config. Remove when picomatch > 4.0.7 ships.
+  ['GHSA-fc5q-39xc-vjpf', 'picomatch (high, no fix) — build/dev tooling only, repo-owned globs; SQEM-701'],
 ]);
 
 let report;

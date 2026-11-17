@@ -139,8 +139,9 @@ What gets generated:
 | `JWT_SECRET` | random, 64 hex chars |
 | `ANON_KEY`, `SERVICE_ROLE_KEY` | HS256 JWTs signed with `JWT_SECRET` (`role` + `iss` + `iat` + `exp`) |
 
-Set your address (`SUPABASE_PUBLIC_URL`, `SITE_URL`, `API_EXTERNAL_URL`) via the Quickstart's `sed`
-lines, and `PROXY_DOMAIN` if you use the bundled Caddy TLS overlay.
+Your address (`SUPABASE_PUBLIC_URL`, `SITE_URL`, `API_EXTERNAL_URL`, and `PROXY_DOMAIN` for the
+bundled Caddy or Traefik overlay) is written by `setup.sh` from the answer you give it; to change it
+later, edit those lines in `.env` and restart.
 
 ---
 
@@ -233,9 +234,13 @@ Set at least the core + self-host secrets (see [`.env.example`](.env.example) fo
 supabase secrets set \
   API_KEY_ENCRYPTION_KEY="$(openssl rand -hex 32)" \
   APP_URL="https://app.yourdomain.com" \
+  ALLOWED_ORIGINS="https://app.yourdomain.com" \
   SELF_HOSTED="true" \
   --project-ref <your-project-ref>
 ```
+`ALLOWED_ORIGINS` is the comma-separated list of origins the edge functions answer from a browser.
+Without it they allow no origin at all, so every call from the web app fails with a CORS error. (The
+Docker bundle does not need it: its gateway answers CORS for the functions.)
 Then deploy the functions:
 ```bash
 supabase functions deploy
@@ -302,7 +307,14 @@ stored as a file.
 | `PUBLIC_API_URL` | MCP/OAuth advertise the raw Supabase project URL instead of a custom domain. |
 | `CRON_SECRET` | The abandoned-workspace cleanup cron is simply not scheduled. |
 | `MARKETPLACE_PUBLISHER_TOKEN` | Marketplace stays **read-only** — browse, vote and copy still work; submitting is unavailable (SQEM-183). Set it in the app instead: Settings → General → Marketplace Publisher. |
-| `VITE_MARKETPLACE_API_URL` **set to empty** | Marketplace disabled entirely and the nav item hides. Leaving it *unset* is the opposite — that reads the official Cloud marketplace. |
+| `VITE_MARKETPLACE_API_URL` **set to empty** (in the `.env` you build the frontend with, Path A) | Marketplace disabled entirely and the nav item hides. Leaving it *unset* is the opposite: that reads the official Cloud marketplace. On the Docker bundle this setting does not reach the app; see [Community marketplace](#community-marketplace-self-host). |
+
+**Mail sender.** Invites and the new-device mail go out through Resend as `RESEND_FROM_EMAIL`. On
+Path A set it as a secret, on the Docker bundle (Path B) in `selfhost/.env`, for example
+`RESEND_FROM_EMAIL="sqemes <noreply@yourdomain.com>"`. Use a domain you verified in your own Resend
+account: Resend normally refuses other senders. Left empty, the sender is `sqemes <noreply@sqemes.com>`,
+which only works with sqemes' own Resend account. The copyable invite link keeps working either way.
+(Until v1.11.44 the Docker bundle did not pass this value, so the sender could not be changed there.)
 
 ---
 
@@ -352,13 +364,18 @@ The global marketplace is **Cloud-hosted, self-host-readable**. Your instance ta
 public endpoint — there is no marketplace database of your own to run.
 
 **Browsing works out of the box.** Browse, vote, and copy a published playbook into your workspace;
-nothing to configure. Controlled by `VITE_MARKETPLACE_API_URL` in the bundle `.env`:
+nothing to configure. Which marketplace the app reads is set by `VITE_MARKETPLACE_API_URL`, and where
+that setting takes effect depends on the install path:
 
-| Value | Effect |
-|---|---|
-| unset (default) | Reads the official sqemes Cloud marketplace |
-| a URL | Reads that instance's marketplace instead |
-| **empty** | **Marketplace disabled** — the nav item hides entirely |
+- **Path A (you build the frontend yourself):** set it in the `.env` you run `npm run build` with,
+  because the value is compiled into the app. Unset reads the official sqemes Cloud marketplace, a URL
+  reads that marketplace instead, and an **empty** value disables the marketplace so the nav item
+  hides.
+- **Path B (Docker bundle):** the app image is not built with this value and does not read it at
+  start, so the app always reads the official sqemes Cloud marketplace; it cannot be repointed or
+  switched off from the bundle `.env`. The variable in the bundle `.env` reaches only the api sidecar,
+  which uses it as the address that **submissions** are sent to (`marketplace-submit` next to the given
+  `marketplace-public` URL). Unset or empty, submissions go to sqemes Cloud.
 
 **Submitting your own playbooks** needs a **publisher token** (submissions are reviewed, so the
 marketplace stays curated — it is invite-based today). Request one from sqemes, then set it in the
@@ -568,7 +585,7 @@ Track **tags**, not `main`, so upgrades are deliberate and reproducible:
 
 ```bash
 git fetch --tags
-git checkout v1.11.44       # pick a tag from github.com/NeoRebels/sqemes/releases
+git checkout v1.11.45       # pick a tag from github.com/NeoRebels/sqemes/releases
 ```
 
 ### ⛔ 3a. Before v1.11.9: count your workspace-wide MCP keys
@@ -606,8 +623,13 @@ Between versions the `.env.example` may gain new keys. Diff it and add anything 
 own `.env` **before** rebuilding:
 
 ```bash
-git diff <old-tag> <new-tag> -- selfhost/.env.example
+git diff <old-tag> <new-tag> -- selfhost/.env.example   # Docker bundle (Path B)
+git diff <old-tag> <new-tag> -- .env.example            # your own Supabase (Path A)
 ```
+
+**Where the rate limits below are set:** on Path A as edge-function secrets (`supabase secrets set`),
+on the Docker bundle in `selfhost/.env`, where they are listed empty. Empty means the default named
+below. (Until v1.11.44 the Docker bundle did not pass them, so there they had no effect.)
 
 **New in v1.11.9:** `MCP_READ_RPM` (default 600) and `MCP_WRITE_RPM` (default 120) — per-connection
 MCP budgets, per minute, read and write kept apart. ⚠️ They are **ceilings against a runaway client,
@@ -669,10 +691,9 @@ no subscription gate** (a fresh workspace would otherwise hit the plan screen). 
 migrations apply cleanly on a fresh DB and the self-host flag removes the paywall.
 
 For prompts/chat to actually run you still need (a) a **BYOK** provider key (Settings →
-Integrations) and (b) `SELF_HOSTED=true` reaching the edge functions — trivial on a real deploy
+AI providers) and (b) `SELF_HOSTED=true` reaching the edge functions — trivial on a real deploy
 (`supabase secrets set SELF_HOSTED=true`); for the local stack, export it before `supabase start`.
-A full end-to-end validation is simply following the **Setup** steps above against a throwaway
-Supabase project.
+A full end-to-end validation is simply following the **Path A** steps above against a throwaway Supabase project.
 
 ---
 
@@ -739,14 +760,14 @@ be a guess dressed as a fact.
 
 ## License
 
-**GNU Affero General Public License v3** from **v1.10.0** onward — see [`LICENSE`](LICENSE).
-Every earlier grant stands, permanently — **Apache-2.0 up to and including v1.9.5, AGPL-3.0 for
-v1.10.0 through v1.10.12.** Those grants are irrevocable, so a change can only apply going forward,
-and the releases are still published and are not being removed. Running an old version, you keep the
-licence it shipped with.
+sqemes is fair-code under the **Sustainable Use License** from **v1.11.0** onward; see
+[`LICENSE`](LICENSE) and [LICENSING.md](LICENSING.md). Every earlier grant stands, permanently:
+**Apache-2.0 up to and including v1.9.5, AGPL-3.0 for v1.10.0 through v1.10.12.** Those grants are
+irrevocable, so a change can only apply going forward, and the releases are still published and are
+not being removed. Running an old version, you keep the licence it shipped with.
 
-**What it asks of you, concretely.** Running an instance — for your team, your company, your client
-work, commercially or not — triggers nothing. What the licence reserves is **providing the software
+**What it asks of you, concretely.** Running an instance for your team, your company, your client
+work, commercially or not, triggers nothing. What the licence reserves is **providing the software
 to third parties**: operating an instance that somebody else's users sign in to, offering it as a
 service, white-labelling or reselling it. For that there is no self-host licence at any price; the
 answer is a Cloud contract for the customer. That is the one case it was chosen for.
@@ -772,14 +793,7 @@ If you would rather it did not, block `/#/library/` at your reverse proxy — bu
 reaches the server, so the block has to happen in the browser or not at all. Removing the route in a
 fork is the reliable way.
 
-*Last updated: 2026-11-15 (version pin v1.11.44 — Devices in the profile and a mail on a sign-in from a new device) · 2026-11-14 (SQEM-692 — a mail on a sign-in from a new device, with `RESEND_API_KEY`) · 2026-11-14 (SQEM-691 — Devices in the profile; the place of a session is Cloud only) · 2026-11-13 (version pin v1.11.43 — an answer interrupted on the server picks up from its last finished step, held in the browser; the library instruction is shorter; when two personas fit, the AI takes the closer one, says which and may name the other, and between playbooks it still asks; a named playbook is searched before it is called missing) · 2026-11-10 (version pin v1.11.42 — the persona picker says "Automatic" and a chosen persona stays the role; the playbook editor opens on its Versions tab; a playbook named in Chat is found even when spelled differently, and a missing one is said) · 2026-11-10 (version pin v1.11.41 — Routines: a person's own task at a set time, set up by the installer; a cut-off answer says it was stopped on the server instead of "took too long") · 2026-11-10 (SQEM-679: Routines on self-host — set up by the installer on every start, nothing to do on the Docker bundle; two Vault entries and one secret on your own Supabase) · 2026-11-09 (version pin v1.11.40 — pictures inside Word, Excel and PowerPoint files reach the model: in Chat as attachments of their own for the providers that take them, over MCP as images after the text; a picture that is not sent is never guessed at) · 2026-11-09 (version pin v1.11.39 — Word, Excel and PowerPoint files also give Excel formulas next to their values, the numbers behind charts, SmartArt as a list and a note where a picture sits; MCP list and search return the playbook library again after v1.11.38) · 2026-11-08 (version pin v1.11.38 — the MCP tools take and return a playbook tag, with its creator and last change; the Personas list filters by connector, and access and editing show as icons in both lists; admins filter API & MCP keys by person, linked from Team Members) · 2026-11-07 (version pin v1.11.37 — connector lists as tables for the analysis, Excel files written by the analysis program) · 2026-11-07 (SQEM-662: Excel files written by the analysis program; the build also fetches openpyxl from PyPI) · 2026-11-07 (SQEM-661: lists from connectors are tables for the analysis too) · 2026-11-07 (SQEM-658, SQEM-660: version pin v1.11.36 — Word, Excel and PowerPoint files are read as text in Chat and over MCP, files up to 15 MB, and Chat calculates with attached tables in the browser; the image carries the ~21 MB Python runtime) · 2026-11-04 (SQEM-656: version pin v1.11.35 — Chat answers keep working on long tasks, the AI fetches connectors when a question needs them, large connector results are shortened, personas can name the connector services they work with, prompt caching) · 2026-11-02 (SQEM-618: AI provider and web search keys moved to Settings → AI providers) · 2026-10-27 (SQEM-614: version pin v1.11.34 — sqemes in German: every person chooses English or German under My Profile, admins set a workspace default under Settings → General, and without a choice everything stays in English; messages from the server follow the same language; legal texts, e-mails, the browser extension and MCP stay in English. Before that, SQEM-598: version pin v1.11.33 — web search in Chat with your own Linkup or Brave key, files from Chat (Word, PDF, Excel, PowerPoint, Markdown, text) with a preview beside the chat, and a document style under Settings → Brand. Before that, SQEM-597: document style for files from Chat, also on self-host. Before that, SQEM-594: web search in Chat with a workspace's own Linkup or Brave key; "Settings → Integrations" corrected to API & MCP. Before that, SQEM-593: version pin v1.11.32 — fonts, logos and other binary files uploaded over MCP keep their folder in the file name, so a downloaded skill finds them again. Before that, SQEM-591: version pin v1.11.31 — connectors work with every text model, a Stop button that really stops an answer, no two-minute cut-off for models that think long, custom connectors show their logo, the playbook editor opens on Test. SQEM-589: one-click connector apps are part of sqemes Cloud — the Connectors section now describes custom connectors only. Before that, SQEM-580: version pin v1.11.30 — OpenRouter shows only the models you add and its image models work; a connector OpenAI cannot reach is left out instead of failing the answer, and errors inside an OpenAI stream are reported; the Start card shows your pinned chats; History deletes several chats at once; one default AI model for chats and writing; mobile polish. Before that, SQEM-566: version pin v1.11.29 — every MCP tool in sqemes Chat by role, with a card for what an answer changed; a History page with delete; bulk tag and access actions; the Files filter Media/Documents; a refreshed model list with image models routed again. Before that, SQEM-559: version pin v1.11.28 — a new design (new typefaces served from the image, Work | Manage navigation, an Overview page), playbook versions with restore, “Who can edit” with a workspace default, a Security tab, and the playbook card in Chat. Before that, SQEM-531: v1.11.27 — the file list checks access once per query, an MCP call carries at most 5 MB (larger files go through create_upload_url), a failed import removes what it created, and sqemes is described as the AI Management OS.)*
-`/playbooks` and every old link redirects. Nothing changes for an operator. Earlier the same day
-(SQEM-390) — the assistant template kind is gone: on upgrade the migration
-turns every assistant into a skill with the same text, and a role is a persona. Earlier: 2026-08-19
-(SQEM-258) — one page now renders without signing in: a marketplace
-listing. Written down because it changes what your instance answers without a session, even though
-nothing of yours is exposed by it — the data comes from the Cloud marketplace's own public endpoint,
-which your instance already reads.*
+*Last updated: 2026-11-17 (version pin v1.11.45 — Excel files from Chat compute their formulas; a reloaded chat says an attachment is gone; the model menu fits a phone; the Docker bundle passes the mail sender and the rate limits; licence section corrected) · 2026-11-16 (SQEM-695: the Docker bundle passes `RESEND_FROM_EMAIL` and the rate limits) · 2026-11-16 (SQEM-694 (doc audit): licence section, `ALLOWED_ORIGINS` on Path A, rate limits and the mail sender on Path B, what `VITE_MARKETPLACE_API_URL` does on each path) · 2026-11-15 (version pin v1.11.44 — Devices in the profile and a mail on a sign-in from a new device) · 2026-11-14 (SQEM-692 — a mail on a sign-in from a new device, with `RESEND_API_KEY`) · 2026-11-14 (SQEM-691 — Devices in the profile; the place of a session is Cloud only) · 2026-11-13 (version pin v1.11.43 — an answer interrupted on the server picks up from its last finished step, held in the browser; the library instruction is shorter; when two personas fit, the AI takes the closer one, says which and may name the other, and between playbooks it still asks; a named playbook is searched before it is called missing) · 2026-11-10 (version pin v1.11.42 — the persona picker says "Automatic" and a chosen persona stays the role; the playbook editor opens on its Versions tab; a playbook named in Chat is found even when spelled differently, and a missing one is said) · 2026-11-10 (version pin v1.11.41 — Routines: a person's own task at a set time, set up by the installer; a cut-off answer says it was stopped on the server instead of "took too long") · 2026-11-10 (SQEM-679: Routines on self-host — set up by the installer on every start, nothing to do on the Docker bundle; two Vault entries and one secret on your own Supabase) · 2026-11-09 (version pin v1.11.40 — pictures inside Word, Excel and PowerPoint files reach the model: in Chat as attachments of their own for the providers that take them, over MCP as images after the text; a picture that is not sent is never guessed at) · 2026-11-09 (version pin v1.11.39 — Word, Excel and PowerPoint files also give Excel formulas next to their values, the numbers behind charts, SmartArt as a list and a note where a picture sits; MCP list and search return the playbook library again after v1.11.38) · 2026-11-08 (version pin v1.11.38 — the MCP tools take and return a playbook tag, with its creator and last change; the Personas list filters by connector, and access and editing show as icons in both lists; admins filter API & MCP keys by person, linked from Team Members) · 2026-11-07 (version pin v1.11.37 — connector lists as tables for the analysis, Excel files written by the analysis program) · 2026-11-07 (SQEM-662: Excel files written by the analysis program; the build also fetches openpyxl from PyPI) · 2026-11-07 (SQEM-661: lists from connectors are tables for the analysis too) · 2026-11-07 (SQEM-658, SQEM-660: version pin v1.11.36 — Word, Excel and PowerPoint files are read as text in Chat and over MCP, files up to 15 MB, and Chat calculates with attached tables in the browser; the image carries the ~21 MB Python runtime) · 2026-11-04 (SQEM-656: version pin v1.11.35 — Chat answers keep working on long tasks, the AI fetches connectors when a question needs them, large connector results are shortened, personas can name the connector services they work with, prompt caching) · 2026-11-02 (SQEM-618: AI provider and web search keys moved to Settings → AI providers) · 2026-10-27 (SQEM-614: version pin v1.11.34 — sqemes in German: every person chooses English or German under My Profile, admins set a workspace default under Settings → General, and without a choice everything stays in English; messages from the server follow the same language; legal texts, e-mails, the browser extension and MCP stay in English. Before that, SQEM-598: version pin v1.11.33 — web search in Chat with your own Linkup or Brave key, files from Chat (Word, PDF, Excel, PowerPoint, Markdown, text) with a preview beside the chat, and a document style under Settings → Brand. Before that, SQEM-597: document style for files from Chat, also on self-host. Before that, SQEM-594: web search in Chat with a workspace's own Linkup or Brave key; "Settings → Integrations" corrected to API & MCP. Before that, SQEM-593: version pin v1.11.32 — fonts, logos and other binary files uploaded over MCP keep their folder in the file name, so a downloaded skill finds them again. Before that, SQEM-591: version pin v1.11.31 — connectors work with every text model, a Stop button that really stops an answer, no two-minute cut-off for models that think long, custom connectors show their logo, the playbook editor opens on Test. SQEM-589: one-click connector apps are part of sqemes Cloud — the Connectors section now describes custom connectors only. Before that, SQEM-580: version pin v1.11.30 — OpenRouter shows only the models you add and its image models work; a connector OpenAI cannot reach is left out instead of failing the answer, and errors inside an OpenAI stream are reported; the Start card shows your pinned chats; History deletes several chats at once; one default AI model for chats and writing; mobile polish. Before that, SQEM-566: version pin v1.11.29 — every MCP tool in sqemes Chat by role, with a card for what an answer changed; a History page with delete; bulk tag and access actions; the Files filter Media/Documents; a refreshed model list with image models routed again. Before that, SQEM-559: version pin v1.11.28 — a new design (new typefaces served from the image, Work | Manage navigation, an Overview page), playbook versions with restore, “Who can edit” with a workspace default, a Security tab, and the playbook card in Chat. Before that, SQEM-531: v1.11.27 — the file list checks access once per query, an MCP call carries at most 5 MB (larger files go through create_upload_url), a failed import removes what it created, and sqemes is described as the AI Management OS.)*
 
 *2026-08-26 (SQEM-273/274) — connector failures now name the provider's error code, and this guide
 says what each one means, including the Google Testing-mode wall that every operator hits.*

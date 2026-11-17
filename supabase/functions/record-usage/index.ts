@@ -17,7 +17,8 @@ import { checkRateLimit } from '../_shared/rateLimit.ts';
 import { uuidFromSeed } from '../_shared/chatBudget.ts';
 import { countUsage, isClientReportable } from '../_shared/usageCounts.ts';
 
-const USAGE_RPM_PER_USER = Number(Deno.env.get('USAGE_RPM_PER_USER') ?? '60');
+// SQEM-695 — `||`, not `??`: the Docker bundle passes an unset value as '', and Number('') is 0.
+const USAGE_RPM_PER_USER = Number(Deno.env.get('USAGE_RPM_PER_USER') || '60');
 
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);

@@ -288,6 +288,8 @@
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Attach_TruncatedInputs */
 /** @typedef {{ name: NonNullable<unknown> }} Chat_Attach_Truncated_TableInputs */
 /** @typedef {{}} Chat_Attachment_AltInputs */
+/** @typedef {{}} Chat_Attachment_GoneInputs */
+/** @typedef {{}} Chat_Attachment_Gone_HintInputs */
 /** @typedef {{}} Chat_Back_To_StartInputs */
 /** @typedef {{}} Chat_CancelInputs */
 /** @typedef {{}} Chat_Choose_WorkspaceInputs */
@@ -408,6 +410,7 @@
 /** @typedef {{}} Chatfile_Create_FailedInputs */
 /** @typedef {{}} Chatfile_DownloadInputs */
 /** @typedef {{ font: NonNullable<unknown> }} Chatfile_Font_FallbackInputs */
+/** @typedef {{}} Chatfile_Formula_HintInputs */
 /** @typedef {{}} Chatfile_From_AnalysisInputs */
 /** @typedef {{}} Chatfile_LogoInputs */
 /** @typedef {{}} Chatfile_No_SlidesInputs */
@@ -3409,6 +3412,14 @@ export const chat_attachment_alt = /** @type {(inputs: Chat_Attachment_AltInputs
 	return /** @type {LocalizedString} */ (`Attachment`)
 };
 
+export const chat_attachment_gone = /** @type {(inputs: Chat_Attachment_GoneInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`not available any more`)
+};
+
+export const chat_attachment_gone_hint = /** @type {(inputs: Chat_Attachment_Gone_HintInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`This attachment was not kept after the reload. To ask about it again, attach it again.`)
+};
+
 export const chat_back_to_start = /** @type {(inputs: Chat_Back_To_StartInputs) => LocalizedString} */ () => {
 	return /** @type {LocalizedString} */ (`Back to Start`)
 };
@@ -3890,6 +3901,10 @@ export const chatfile_download = /** @type {(inputs: Chatfile_DownloadInputs) =>
 
 export const chatfile_font_fallback = /** @type {(inputs: Chatfile_Font_FallbackInputs) => LocalizedString} */ (i) => {
 	return /** @type {LocalizedString} */ (`${i?.font} → Roboto in PDF`)
+};
+
+export const chatfile_formula_hint = /** @type {(inputs: Chatfile_Formula_HintInputs) => LocalizedString} */ () => {
+	return /** @type {LocalizedString} */ (`Formulas are computed by Excel when the file is opened.`)
 };
 
 export const chatfile_from_analysis = /** @type {(inputs: Chatfile_From_AnalysisInputs) => LocalizedString} */ () => {

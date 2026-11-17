@@ -4,6 +4,7 @@ import { ChevronDown, Info, Plug } from 'lucide-react';
 import { ProviderIcon } from './ProviderIcon';
 import { m as txt } from '../lib/i18n'; // `m` is a callback name in this file
 import { modelDescription } from '../lib/labels';
+import { modelMenuWidth } from '../lib/enabledModels';
 
 interface ModelSpecs {
   description: string;
@@ -86,7 +87,7 @@ export function ModelSelect({
     if (!open) { setHoveredId(null); return; }
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const dropdownWidth = 384; // w-96
+    const dropdownWidth = modelMenuWidth(window.innerWidth); // SQEM-698 — was a fixed 384 px, wider than a 320 px phone
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
     const openUpward = spaceBelow < 320 && spaceAbove > spaceBelow;

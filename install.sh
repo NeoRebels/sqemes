@@ -71,4 +71,4 @@ docker compose up --build -d
 SITE=$(grep -E '^SITE_URL=' .env | cut -d= -f2- || true)
 say "Done. Open:  ${SITE:-your instance}"
 say "Sign up (the first account creates your workspace), then add an AI provider key under"
-say "Settings -> Integrations. Secrets, updating, and other setups: see the repo's SELF_HOSTING.md."
+say "Settings -> AI providers. Secrets, updating, and other setups: see the repo's SELF_HOSTING.md."

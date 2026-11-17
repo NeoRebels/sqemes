@@ -137,6 +137,15 @@ services:
       MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
       # Optional transactional email (falls back to copyable invite links when unset):
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      # SQEM-695 — the sender; empty falls back to the code's default.
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      # SQEM-695 — rate limits per minute; empty means the code's default (every reader treats '' as unset).
+      MCP_READ_RPM: ${MCP_READ_RPM:-}
+      MCP_WRITE_RPM: ${MCP_WRITE_RPM:-}
+      CHAT_RPM_PER_USER: ${CHAT_RPM_PER_USER:-}
+      CHAT_RPM_PER_WORKSPACE: ${CHAT_RPM_PER_WORKSPACE:-}
+      USAGE_RPM_PER_USER: ${USAGE_RPM_PER_USER:-}
+      RATE_LIMIT_RPM: ${RATE_LIMIT_RPM:-}
 
   # -------------------------------------------------------------------------
   # storage — the vendored healthcheck (start_period 10s + 3×5s ≈ 25s) is too

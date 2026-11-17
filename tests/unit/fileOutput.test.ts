@@ -6,7 +6,7 @@ import {
   validateFileRequest, withFileTool, normalizeGeneratedFiles, fileNameFor, hasMarkdownTable,
   CREATE_FILE_DEFINITION, MAX_FILES_PER_ANSWER, MAX_FILE_CHARS, type GeneratedFile,
 } from '../../supabase/functions/_shared/fileOutput';
-import { sheetsFromMarkdown, cellValue, plainTextFromMarkdown, pdfDefinition, buildFile, slidesFromMarkdown, MAX_BULLETS_PER_SLIDE } from '../../lib/fileExport';
+import { sheetsFromMarkdown, cellValue, safeFormula, plainTextFromMarkdown, pdfDefinition, buildFile, slidesFromMarkdown, MAX_BULLETS_PER_SLIDE } from '../../lib/fileExport';
 import type { ToolRuntime } from '../../supabase/functions/_shared/libraryTools';
 
 /**
@@ -171,6 +171,34 @@ describe('lib/fileExport', () => {
     const all = (await Promise.all(Object.keys(zip.files).filter(n => /^xl\/(sharedStrings|worksheets\/sheet\d+)\.xml$/.test(n)).map(n => zip.file(n)!.async('string')))).join('');
     expect(all).toMatch(/Müller GmbH/);
     expect(all).toMatch(/999\.99/);
+  });
+
+  it('SQEM-697: formulas Excel should compute, and only those', () => {
+    expect(safeFormula('=B2*C2')).toBe('=B2*C2');
+    expect(safeFormula('=sum(D2:D4)')).toBe('=SUM(D2:D4)');
+    expect(safeFormula('=ROUND(AVERAGE($B$2:B9), 2)')).toBe('=ROUND(AVERAGE($B$2:B9), 2)');
+    expect(safeFormula('=IF(D5>100,D5*0.9,D5)')).toBe('=IF(D5>100,D5*0.9,D5)');
+    // ⛔ formula injection: a function outside the list, a string, a sheet reference stay text
+    expect(safeFormula('=HYPERLINK("https://evil.example","Klick")')).toBeNull();
+    expect(safeFormula('=WEBSERVICE(A1)')).toBeNull();
+    expect(safeFormula('=Sheet2!A1')).toBeNull();
+    expect(safeFormula('=cmd|calc')).toBeNull();
+    // German notation, plain text and broken formulas stay text, as before
+    expect(safeFormula('=SUMME(A1;A2)')).toBeNull();
+    expect(safeFormula('== heading')).toBeNull();
+    expect(safeFormula('=SUM(A1')).toBeNull();
+    expect(safeFormula('Summe')).toBeNull();
+    expect(safeFormula('=PROFIT')).toBeNull();
+  });
+
+  it('SQEM-697: an xlsx carries the formula as a formula, the header and text as text', async () => {
+    const md = '| Pos | Menge | Preis | Summe |\n|---|---|---|---|\n| A | 2 | 3 | =B2*C2 |\n| Gesamt | | | =SUM(D2:D2) |\n| X | | | =HYPERLINK("x") |\n';
+    const blob = await buildFile({ name: 'R.xlsx', format: 'xlsx', content: md });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const sheet = await zip.file('xl/worksheets/sheet1.xml')!.async('string');
+    expect(sheet).toMatch(/<f>B2\*C2<\/f>/);
+    expect(sheet).toMatch(/<f>SUM\(D2:D2\)<\/f>/);
+    expect(sheet).not.toMatch(/<f>HYPERLINK/);
   });
 
   it('pptx: title slide, one slide per ##, tables kept, long slides continue', () => {
