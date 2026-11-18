@@ -9,7 +9,7 @@ import { composePersona } from '../../supabase/functions/_shared/libraryQueries'
  */
 describe('SQEM-623 improvement hint', () => {
   it('stays short — every loaded playbook and persona pays for it', () => {
-    expect(IMPROVEMENT_HINT.length).toBeLessThanOrEqual(400);
+    expect(IMPROVEMENT_HINT.length).toBeLessThanOrEqual(480); // SQEM-705 — 400 until the "overrides return only" clause
   });
 
   it('⛔ asks before changing, offers once, never offers deletion', () => {
@@ -39,5 +39,10 @@ describe('SQEM-623 improvement hint', () => {
     const src = readFileSync('supabase/functions/_shared/libraryQueries.ts', 'utf8');
     expect(src).toContain("import { IMPROVEMENT_HINT } from './libraryPrompt.ts'");
     expect(src).not.toContain('Never offer to delete');
+  });
+
+  // SQEM-705 — a playbook that asks for the output only must not switch the loop off.
+  it('the question overrides an instruction to return only the result', () => {
+    expect(IMPROVEMENT_HINT).toContain('this question overrides any instruction to return only the result');
   });
 });

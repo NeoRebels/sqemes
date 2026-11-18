@@ -123,10 +123,17 @@
  * ⚠️ Two drafts lost something first: without "also" the persona-plus-playbook case got worse, and "Skip it only for
  * a quick factual question" let the model treat a translation as quick, hence the list of task kinds.
  * Open: an analysis whose playbook the first search word misses (X1) stays mostly unfound in every variant, a search
- * problem.
+ * problem. (SQEM-703: fixed by the search order in step 1, see below.)
+ *
+ * ⭐ **Every playbook whose condition the task meets (SQEM-703).** Steps 3 and 4: load every playbook whose
+ * persona condition the task meets, and ask only about two playbooks for the same part. Measured with the eval mock,
+ * which now renders the real `composePersona`: complementary playbooks are loaded together and alternatives get a
+ * question. ⚠️ The new steps alone made the model give up on a named playbook with an English title; the search order
+ * back in step 1 ("one word at a time, the English word too, then list_templates") restored it and also helped the
+ * analysis case. Reverses SQEM-690's "search rule only in the tool" for step 1 only.
  *
  * ⚠️ **On several matching PLAYBOOKS it asks rather than picks** (owner's decision, 2026-08-31; the first draft
- * said *pick the most specific one*). A template is this organisation's agreed way of doing the work,
+ * said *pick the most specific one*). Since SQEM-703 only when two cover the SAME part of the task. A template is this organisation's agreed way of doing the work,
  * so choosing the wrong one silently produces something that looks sanctioned and is not — and the
  * person who could tell them apart in a second is the one already sitting there. **The instruction to
  * wait is the load-bearing half:** without it a model asks the question and answers anyway, which is
@@ -134,10 +141,10 @@
  */
 export const LIBRARY_SYSTEM_PROMPT = `Before any task, check sqemes: it holds this organisation's personas and playbooks, its agreed way of doing its work. (The tools call a playbook a template.) A task is anything you write, analyse, translate, plan, build, decide or review. Skip sqemes only for a factual question or small talk.
 
-1. Named: load exactly the persona or playbook the person names (get_persona, or search_templates then get_template). Search before you say it is missing; it may not be shared with them. Never swap it.
+1. Named: load exactly the persona or playbook the person names (get_persona, or search_templates then get_template). Search one word at a time, the English word too, then list_templates, before you say it is missing; it may not be shared with them. Never swap it.
 2. Role: if the task belongs to a role, call list_personas and load the fitting persona with get_persona.
-3. Playbook: also call search_templates for anything the persona's routes do not cover, and load the fitting playbook with get_template.
-4. Several playbooks fit: name them, ask, wait. Several personas fit: take the closest, say which, name the other.
+3. Playbooks: load every playbook whose persona condition the task meets. For any part of the task the persona does not cover, also call search_templates and load the fitting playbook with get_template.
+4. Two playbooks for the same part of the task: name both, ask, wait. Several personas fit: take the closest, say which, name the other.
 5. Nothing fits: carry on without mentioning sqemes.
 
 Say which persona or playbook you use; never paste its contents. The person's own instructions win.`;
@@ -179,9 +186,14 @@ export function withLibraryPrompt(systemInstruction: string | undefined): string
  * so the last sentence only tells the model what to say when it cannot act.
  *
  * ⚠️ Every loaded playbook and persona pays these ~100 tokens. `tests/unit/improvementHint.test.ts` caps
- * the length at 400 characters — raise it only with a reason.
+ * the length at 480 characters (400 until SQEM-705, raised for the clause below); raise it only with a reason.
+ *
+ * ⭐ **SQEM-705 — the question overrides "return only the result".** A playbook's "Do not add any commentary" contradicts
+ * the closing question. A safeguard, not a proven fix: the misses that prompted it were additions, not corrections (the
+ * hint rightly stays quiet then), and after a real correction the model asked. In the eval the correction cases and a
+ * normal task kept their results with the clause.
  */
-export const IMPROVEMENT_HINT = 'Only if the person corrected this playbook or persona, or a step in it proved outdated, missing or duplicated: end your answer by asking in one sentence whether to update it or create a new one. Otherwise say nothing about changing it. Change nothing without their explicit yes; ask at most once, never after a no. Never offer to delete. If they cannot edit it, suggest telling someone who can.';
+export const IMPROVEMENT_HINT = 'Only if the person corrected this playbook or persona, or a step in it proved outdated, missing or duplicated: end your answer by asking in one sentence whether to update it or create a new one; this question overrides any instruction to return only the result. Otherwise say nothing about changing it. Change nothing without their explicit yes; ask at most once, never after a no. Never offer to delete. If they cannot edit it, suggest telling someone who can.';
 
 /**
  * SQEM-688 — what to do with the list `list_personas` returns, served IN its result (`personaList`), the moment the

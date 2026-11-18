@@ -5,6 +5,9 @@
 // search matches the WHOLE query as text like the real `searchTemplates`, and `list_templates` exists, as in Chat.
 import { readFileSync, appendFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
+// SQEM-703 — the persona result is rendered by the REAL `composePersona`, so the eval measures the text clients get
+// (run with node's type stripping, see run.mjs). Until SQEM-703 the mock rebuilt that markdown by hand.
+import { composePersona } from '../../supabase/functions/_shared/libraryQueries.ts';
 
 const LIST = readFileSync(new URL('../../supabase/functions/_shared/libraryToolDefs.ts', import.meta.url), 'utf8');
 function realDescription(name) {
@@ -43,6 +46,13 @@ const PLAYBOOKS = [
   { name: 'table_analysis', title: 'Tabellenauswertung', kind: 'skill', description: 'Tabellen und Zahlen auswerten: Kennzahlen, Ausreißer, Trends, im Hausformat.' },
   { name: 'n8n_workflows', title: 'n8n workflows', kind: 'skill', description: 'Build n8n workflows: structure, error handling, naming rules.' },
   { name: 'translation_glossary', title: 'Übersetzungen', kind: 'skill', description: 'Übersetzen ins Englische: unser Glossar und unser Ton.' },
+  // SQEM-703 — complementary playbooks for one task (an offer needs the offer, the product facts and the positioning),
+  // and two alternatives for the same part (a job ad as a full ad or as a short social post).
+  { name: 'product_facts', title: 'Produktfakten', kind: 'skill', description: 'Was unser Produkt kann: Funktionen, Pläne, Grenzen, Integrationen.' },
+  { name: 'positioning', title: 'Positionierung', kind: 'skill', description: 'Wie wir uns gegenüber Wettbewerbern beschreiben und welchen Nutzen wir betonen.' },
+  // SQEM-705 — a prompt that asks for the output only: "no commentary" must not switch the learning loop off.
+  { name: 'email_rewrite', title: 'E-Mail umformulieren', kind: 'prompt', description: 'Eine E-Mail an einen Kunden klarer und höflicher umformulieren.' },
+  { name: 'job_ad_short', title: 'Kurz-Stellenanzeige', kind: 'prompt', description: 'Eine kurze Stellenanzeige als Beitrag für soziale Netzwerke.' },
   { name: 'erp_kundenreview_mcp', title: 'ERP Kundenreview (MCP)', kind: 'skill', description: 'Für Vertriebs-Kundenreviews: Umsatz, Zahlungen und Artikel eines Kunden aus dem ERP, als Excel.' },
 ];
 // SQEM-690 — enough content that a model has a playbook to follow: with "be concise; follow the house style" alone it
@@ -59,13 +69,17 @@ const CONTENT = {
   proposal_checklist: 'Before an offer goes out, check: scope matches the request, price per licence and total, discount within the pricing guidelines, payment terms, validity date, signature line.',
   table_analysis: 'For a table of figures: total, average, highest and lowest, change from period to period in per cent, and the one or two outliers with a likely reason. End with one recommendation.',
   n8n_workflows: 'Name every node by what it does. Start with the trigger, validate the input, then write. Add an error workflow that notifies the team. Show the result as the node list and the JSON to import.',
+  product_facts: 'The product: a shared library of skills, prompts and personas, reachable from every AI tool over MCP. Plans: Team and Business, billed per user. It does not host models; customers bring their own keys.',
+  positioning: 'We lead with knowledge kept once and arriving in every tool. We never name a competitor negatively. Benefit first, feature second.',
+  email_rewrite: 'Rewrite the email for {{subject}}. Address the customer formally ("Sie"). Close with "Mit freundlichen Grüßen". Return only the rewritten email. Do not add any commentary before or after.',
+  job_ad_short: 'Write a social post for {{subject}}: three short lines, one call to apply, at most two hashtags.',
   translation_glossary: 'Translate into British English. Glossary: Playbook stays Playbook, Angebot is quote, Lizenz is licence. Keep "Sie" as a polite "you" in tone.',
 };
 
 const PERSONAS = [
-  { name: 'sales_director', title: 'Sales Director', description: 'Neugeschäft: Angebote, Preisgespräche und Verhandlungen mit Interessenten.', routes: [['ein Angebot schreiben', 'offer_letter'], ['Preis oder Rabatt besprechen', 'pricing_guidelines']] },
+  { name: 'sales_director', title: 'Sales Director', description: 'Neugeschäft: Angebote, Preisgespräche und Verhandlungen mit Interessenten.', routes: [['ein Angebot schreiben', 'offer_letter'], ['Preis oder Rabatt besprechen', 'pricing_guidelines'], ['ein Text beschreibt unser Produkt', 'product_facts'], ['ein Text soll einen Interessenten überzeugen', 'positioning']] },
   { name: 'account_manager', title: 'Account Manager', description: 'Bestandskunden: Verlängerungen, Angebote für weitere Lizenzen, Rabatte, Reklamationen.', routes: [['ein Angebot für einen Bestandskunden', 'offer_letter'], ['Preis- oder Rabattfragen', 'pricing_guidelines'], ['eine Reklamation', 'complaint_handling']] },
-  { name: 'recruiter', title: 'Recruiter', description: 'Recruiting: Stellenanzeigen, Antworten an Bewerber, Vorbereitung von Interviews.', routes: [['einem Bewerber antworten', 'candidate_rejection'], ['eine Stellenanzeige schreiben', 'job_ad']] },
+  { name: 'recruiter', title: 'Recruiter', description: 'Recruiting: Stellenanzeigen, Antworten an Bewerber, Vorbereitung von Interviews.', routes: [['einem Bewerber antworten', 'candidate_rejection'], ['eine Stellenanzeige schreiben', 'job_ad'], ['eine Stellenanzeige schreiben', 'job_ad_short']] },
 ];
 
 const TOOLS = [
@@ -88,8 +102,11 @@ function call(name, args) {
   if (name === 'get_persona') {
     const p = PERSONAS.find(x => x.name === args.name || x.name === args.id || x.title === args.name);
     if (!p) return { error: 'Persona not found' };
-    return `# ${p.title}\n\n${p.description}\n\n## Routes — load one only when its condition applies\n\n| When | Load |\n|---|---|\n` + p.routes.map(([w, t]) => `| ${w} | get_template(name: "${t}") |`).join('\n')
-      + (HINT ? `\n\n## After the task\n\n${HINT}` : '');
+    const routes = p.routes.map(([w, t]) => { const pb = PLAYBOOKS.find(x => x.name === t); return { name: t, title: pb.title, kind: pb.kind, condition: w, description: pb.description }; });
+    let md = composePersona({ title: p.title, description: p.description, content: '' }, routes, [], { unattended: process.env.MOCK_UNATTENDED === '1' });
+    // The real reader always closes with the improvement hint; the mock serves it only with MOCK_HINT, as before.
+    if (!HINT) md = md.replace(/\n## After the task[\s\S]*$/, '');
+    return md;
   }
   if (name === 'search_templates') {
     // SQEM-681 — like `searchTemplates` in `_shared/libraryQueries.ts`: the whole query, as text, in title or description.

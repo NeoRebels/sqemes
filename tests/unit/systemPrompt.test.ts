@@ -43,7 +43,8 @@ describe('LIBRARY_SYSTEM_PROMPT', () => {
   // anyway — worse than not asking, because the choice now looks confirmed.
   it('asks on an ambiguous match instead of choosing', () => {
     // SQEM-687 — shorter wording, the same two halves: ask, and wait. SQEM-689 — for playbooks.
-    expect(LIBRARY_SYSTEM_PROMPT).toContain('Several playbooks fit: name them, ask, wait.'); // SQEM-690 — imperative
+    // SQEM-703 — only two playbooks for the SAME part are asked about; complementary ones are loaded together.
+    expect(LIBRARY_SYSTEM_PROMPT).toContain('Two playbooks for the same part of the task: name both, ask, wait.');
     expect(LIBRARY_SYSTEM_PROMPT).not.toMatch(/pick the most specific/i);
   });
 
@@ -103,7 +104,7 @@ describe('LIBRARY_SYSTEM_PROMPT', () => {
     // SQEM-682 — a NAMED one comes before both; the role step still precedes the playbook search.
     expect(LIBRARY_SYSTEM_PROMPT).toMatch(/1\. Named:/);
     expect(LIBRARY_SYSTEM_PROMPT.indexOf('2. Role:')).toBeGreaterThan(-1);
-    expect(LIBRARY_SYSTEM_PROMPT.indexOf('2. Role:')).toBeLessThan(LIBRARY_SYSTEM_PROMPT.indexOf('3. Playbook:'));
+    expect(LIBRARY_SYSTEM_PROMPT.indexOf('2. Role:')).toBeLessThan(LIBRARY_SYSTEM_PROMPT.indexOf('3. Playbooks:'));
   });
 
   it('stays short and precise (SQEM-487: 2,258 → 1,297; SQEM-681: under 1,600; SQEM-682: 1,850; SQEM-683: 1,950; SQEM-685: 2,000; SQEM-690: ~1,000, cap 1,200)', () => {
@@ -111,10 +112,12 @@ describe('LIBRARY_SYSTEM_PROMPT', () => {
     expect(LIBRARY_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1200);
   });
 
-  it('names only tools every surface that carries the instruction offers (SQEM-681; SQEM-690: list_templates now only in the search tool)', () => {
+  it('names only tools every surface that carries the instruction offers (SQEM-681, SQEM-703)', () => {
     // SQEM-373 kept it out of Chat; SQEM-561 gave Chat every read tool, SQEM-681 gave routines the read actions too.
     // A prompt naming a tool a surface lacks is how a model ends up calling something that is not there.
-    expect(LIBRARY_SYSTEM_PROMPT).not.toContain('list_templates');
+    // SQEM-703 — list_templates is back in step 1, so it must stay a lookup tool everywhere the instruction goes.
+    const tools = readFileSync('supabase/functions/_shared/libraryTools.ts', 'utf8');
+    expect(tools).toMatch(/LIBRARY_LOOKUP_TOOLS[\s\S]{0,600}'list_templates'/);
     const chat = readFileSync('supabase/functions/chat-message/index.ts', 'utf8');
     expect(chat).toMatch(/definitions: chatActionDefinitions\(routine \? 'member' : role,/);
     expect(chat).not.toMatch(/actions: routine \? undefined/);

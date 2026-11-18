@@ -114,7 +114,7 @@ function initializeResult() {
     // declared with it; omitting = "usable at any size".
     serverInfo: {
       name: 'sqemes',
-      title: 'Sqemes',
+      title: 'sqemes',
       version: '2.0.0',
       websiteUrl: 'https://app.sqemes.com',
       icons: [

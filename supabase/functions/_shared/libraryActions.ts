@@ -587,8 +587,8 @@ export async function runLibraryTool(
       id:    inserted.id,
       title: inserted.title,
       note:  inReview
-        ? `Created. ${MODERATION_NOTE} It has no routes yet — attach templates to it in the app.`
-        : 'Created, and visible to the whole workspace. It has no routes yet — attach templates to it in the app.',
+        ? `Created. ${MODERATION_NOTE} It has no playbooks yet; add them with attach_template.`
+        : 'Created, and visible to the whole workspace. It has no playbooks yet; add them with attach_template.',
     }, null, 2) }] });
   }
 
@@ -653,7 +653,7 @@ export async function runLibraryTool(
       deleted: true,
       id:      target.row.id,
       title:   target.row.title,
-      note:    'The persona and its routes are gone. The templates it pointed at are untouched.',
+      note:    'The persona is gone. The playbooks it used are untouched.',
     }, null, 2) }] });
   }
 
@@ -666,7 +666,7 @@ export async function runLibraryTool(
     // route that says nothing about what this template means *in this persona*. A tool that
     // accepts the empty case invites it; the schema and this check both refuse.
     if (!condition?.trim())
-      return rpcError(id, -32602, 'condition is required — say when this route applies, in the persona\'s own terms. It is what a route is for.');
+      return rpcError(id, -32602, 'condition is required: say when this playbook is needed, in the persona\'s own terms. The condition decides when it is loaded.');
 
     const target = await findPersonaForWrite(persona_id);
     if (!target.ok) return rpcError(id, -32602, target.message);
@@ -733,8 +733,8 @@ export async function runLibraryTool(
       condition:   condition.trim(),
       sort_order:  order,
       reach: restricted
-        ? 'RESTRICTED — this template has access rules. Colleagues those rules exclude receive the persona WITHOUT this route, and nothing tells them why. Attaching granted nobody access. Say this to whoever asked for the attachment.'
-        : 'Open to the whole workspace — everyone who uses this persona gets this route.',
+        ? 'RESTRICTED: this playbook has access rules. Colleagues those rules exclude receive the persona WITHOUT this playbook, and nothing tells them why. Attaching granted nobody access. Say this to whoever asked for the attachment.'
+        : 'Open to the whole workspace: everyone who uses this persona gets this playbook.',
     }, null, 2) }] });
   }
 
@@ -777,7 +777,7 @@ export async function runLibraryTool(
     return rpcResult(id, { content: [{ type: 'text', text: JSON.stringify({
       detached: true,
       persona:  target.row.title,
-      note:     'The route is gone. The template itself is untouched and still available on its own.',
+      note:     'The playbook is removed from the persona. The playbook itself is untouched and still available on its own.',
     }, null, 2) }] });
   }
 

@@ -30,6 +30,7 @@ import {
 import { runLibraryTool } from '../_shared/libraryActions.ts';
 import { m, m as txt, requestLocale, type Locale } from '../_shared/locale.ts';
 import { addChange, type LibraryChange } from '../_shared/libraryChanges.ts';
+import { learningCounts } from '../_shared/learningLoop.ts';
 import {
   toResponsesInput, responsesDelta,
   createResponsesItemCollector, readResponsesText, readResponsesToolCalls, responsesToolResults,
@@ -1137,6 +1138,8 @@ async function runAndBroadcast({
         // SQEM-660 step C — analyses run, failed, and never started (Python did not load): the monitor's counts.
         ...(analyses.length ? analysisLogCounts(analyses) : {}), // the whole chain (SQEM-661)
         ...(connectorTablesCarried + (connectorTables?.built ?? 0) ? { connectorTables: connectorTablesCarried + (connectorTables?.built ?? 0) } : {}), // SQEM-661
+        // SQEM-704 — the learning loop: did this answer offer to change a loaded playbook or persona, and how many did it change.
+        ...learningCounts(result, loadedTemplateIds.length > 0 || (tools.stats.byTool.get_persona ?? 0) > 0, libraryChanges),
       }));
     }
     // SQEM-668 — every answer to a message with pictures, with its tokens: the cost of a picture is

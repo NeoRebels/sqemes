@@ -81,7 +81,7 @@ describe('SQEM-639/641 — the persona text names the services, over MCP and in 
     const src = readFileSync('supabase/functions/_shared/libraryQueries.ts', 'utf8');
     expect(src).toMatch(/\.select\('id, title, description, content, connectors'\)/);
     expect(src).toMatch(/const connectors = parsePersonaConnectors\(persona\.connectors\);/);
-    expect(src).toMatch(/composePersona\(persona, routes, connectors\.map\(c => c\.name\)\)/);
+    expect(src).toMatch(/composePersona\(persona, routes, connectors\.map\(c => c\.name\), \{ unattended \}\)/);
     expect(src).not.toMatch(/from\('workspace_connectors'\)/);
   });
 

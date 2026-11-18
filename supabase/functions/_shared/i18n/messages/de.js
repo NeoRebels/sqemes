@@ -7318,7 +7318,7 @@ export const pe_restricted_route = /** @type {(inputs: Pe_Restricted_RouteInputs
 };
 
 export const pe_role_hint = /** @type {(inputs: Pe_Role_HintInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Nur die Rolle selbst. Die Routing-Tabelle wird aus den Routen gebaut und automatisch ergänzt.`)
+	return /** @type {LocalizedString} */ (`Nur die Rolle selbst. Die Liste der Playbooks mit ihren Bedingungen wird automatisch ergänzt.`)
 };
 
 export const pe_role_label = /** @type {(inputs: Pe_Role_LabelInputs) => LocalizedString} */ () => {
@@ -7333,11 +7333,11 @@ Nenn nie einen Preis, der nicht im angehängten Material steht.`)
 };
 
 export const pe_route_hint_1 = /** @type {(inputs: Pe_Route_Hint_1Inputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Eine Route sagt,`)
+	return /** @type {LocalizedString} */ (`Eine Bedingung sagt,`)
 };
 
 export const pe_route_hint_2 = /** @type {(inputs: Pe_Route_Hint_2Inputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`ein Playbook geladen wird – der Client holt es erst, wenn seine Bedingung zutrifft; das hält eine Persona günstig. Lässt du die Bedingung leer, wird die eigene Beschreibung des Playbooks genutzt.`)
+	return /** @type {LocalizedString} */ (`ein Playbook gebraucht wird. Für jede Aufgabe lädt die KI jedes Playbook, dessen Bedingung die Aufgabe erfüllt, und kein anderes. Lässt du die Bedingung leer, wird die eigene Beschreibung des Playbooks genutzt.`)
 };
 
 export const pe_route_hint_when = /** @type {(inputs: Pe_Route_Hint_WhenInputs) => LocalizedString} */ () => {
@@ -7377,7 +7377,7 @@ export const pe_untitled_playbook = /** @type {(inputs: Pe_Untitled_PlaybookInpu
 };
 
 export const pe_who_can_edit_hint = /** @type {(inputs: Pe_Who_Can_Edit_HintInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Wer diese Persona und ihre Routen ändern darf. Alle, die sie sehen, können sie weiter nutzen.`)
+	return /** @type {LocalizedString} */ (`Wer diese Persona und ihre Playbooks ändern darf. Alle, die sie sehen, können sie weiter nutzen.`)
 };
 
 export const pe_who_can_edit_readonly = /** @type {(inputs: Pe_Who_Can_Edit_ReadonlyInputs) => LocalizedString} */ () => {
@@ -7672,7 +7672,7 @@ export const ps_import_bundle_title = /** @type {(inputs: Ps_Import_Bundle_Title
 };
 
 export const ps_import_note = /** @type {(inputs: Ps_Import_NoteInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Die Playbooks werden als Kopien angelegt – die Routen einer Persona müssen auf etwas zeigen, deshalb kommen sie mit. Zugriffsregeln kommen nicht mit: Eine importierte Persona startet mit der Regel dieses Workspace.`)
+	return /** @type {LocalizedString} */ (`Die Playbooks werden als Kopien angelegt, weil die Playbooks einer Persona in diesem Workspace vorhanden sein müssen. Zugriffsregeln kommen nicht mit: Eine importierte Persona startet mit der Regel dieses Workspace.`)
 };
 
 export const ps_import_title = /** @type {(inputs: Ps_Import_TitleInputs) => LocalizedString} */ () => {
@@ -7855,7 +7855,7 @@ export const pwiz_no_content = /** @type {(inputs: Pwiz_No_ContentInputs) => Loc
 };
 
 export const pwiz_no_playbooks = /** @type {(inputs: Pwiz_No_PlaybooksInputs) => LocalizedString} */ () => {
-	return /** @type {LocalizedString} */ (`Dieser Workspace hat noch keine Playbooks. Eine Persona ohne Routen ist nur eine Rollenbeschreibung – du kannst sie trotzdem erstellen und Playbooks später anhängen.`)
+	return /** @type {LocalizedString} */ (`Dieser Workspace hat noch keine Playbooks. Eine Persona ohne Playbooks ist nur eine Rollenbeschreibung. Du kannst sie trotzdem erstellen und Playbooks später hinzufügen.`)
 };
 
 export const pwiz_none_warning = /** @type {(inputs: Pwiz_None_WarningInputs) => LocalizedString} */ () => {

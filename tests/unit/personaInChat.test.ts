@@ -36,7 +36,7 @@ describe('SQEM-389 — personaInstruction (lib/personaChat.ts)', () => {
   it('is the MCP composition: role prose plus a routing table of get_template calls', () => {
     expect(text).toMatch(/^---\npersona: Sales\n/);
     expect(text).toContain('You are the sales role.');
-    expect(text).toContain('## Routes');
+    expect(text).toContain('## Playbooks — load every one whose condition this task meets'); // SQEM-703
     // `toSlug` joins with underscores — the name every surface addresses a template by.
     expect(text).toContain('`get_template(name: "workshop_offer")`');
     expect(text).toContain('`get_template(name: "offer_layout")`');

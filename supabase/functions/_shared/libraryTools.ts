@@ -666,6 +666,7 @@ export function createLibraryToolRuntime(
             const { text, connectors } = await lib.getPersona({
               id: typeof args.id === 'string' ? args.id : undefined,
               name: typeof args.name === 'string' ? args.name : undefined,
+              unattended, // SQEM-703 — a routine picks between two playbooks for the same part instead of asking
             });
             // SQEM-651 — a failure to fetch never costs the persona.
             let fetched = '';

@@ -447,7 +447,7 @@ describe('createLibraryReader — personas (SQEM-324/326)', () => {
     const lib = await build({ personas: [persona], routes: [] });
     const listed = await lib.listPersonas();
     expect(listed).toEqual([{ id: 'p-open', name: 'open_role', title: 'Open Role', description: 'r', routeCount: 0 }]);
-    expect((await lib.getPersona({ id: 'p-open' })).text).toContain('no routes available to you');
+    expect((await lib.getPersona({ id: 'p-open' })).text).toContain('no playbooks available to you');
   });
 
   it('an inaccessible persona is not found', async () => {

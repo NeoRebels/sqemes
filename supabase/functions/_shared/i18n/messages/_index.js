@@ -19575,7 +19575,7 @@ export const pe_restricted_route = /** @type {((inputs?: Pe_Restricted_RouteInpu
 /**
 * | output |
 * | --- |
-* | "Only the role itself. The routing table is built from the routes and added automatically." |
+* | "Only the role itself. The list of playbooks with their conditions is added automatically." |
 *
 * @param {Pe_Role_HintInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -19617,7 +19617,7 @@ export const pe_role_placeholder = /** @type {((inputs?: Pe_Role_PlaceholderInpu
 /**
 * | output |
 * | --- |
-* | "A route says" |
+* | "A condition says" |
 *
 * @param {Pe_Route_Hint_1Inputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -19631,7 +19631,7 @@ export const pe_route_hint_1 = /** @type {((inputs?: Pe_Route_Hint_1Inputs, opti
 /**
 * | output |
 * | --- |
-* | "to load a playbook — the client fetches one only once its condition applies, which is what keeps a persona cheap. Leave the condition empty and the playbook'..." |
+* | "a playbook is needed. For each task the AI loads every playbook whose condition the task meets, and no other. Leave the condition empty and the playbook's ow..." |
 *
 * @param {Pe_Route_Hint_2Inputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -19771,7 +19771,7 @@ export const pe_untitled_playbook = /** @type {((inputs?: Pe_Untitled_PlaybookIn
 /**
 * | output |
 * | --- |
-* | "Who may change this persona and its routes. Everyone who can see it can still use it." |
+* | "Who may change this persona and its playbooks. Everyone who can see it can still use it." |
 *
 * @param {Pe_Who_Can_Edit_HintInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -20794,7 +20794,7 @@ export const ps_import_bundle_title = /** @type {((inputs?: Ps_Import_Bundle_Tit
 /**
 * | output |
 * | --- |
-* | "The playbooks are created as copies — a persona's routes must point at something, so they travel with it. Access rules do not: an imported persona starts und..." |
+* | "The playbooks are created as copies, because a persona's playbooks must exist in this workspace. Access rules do not travel: an imported persona starts under..." |
 *
 * @param {Ps_Import_NoteInputs} inputs
 * @param {{ locale?: "en" | "de" }} options
@@ -21425,7 +21425,7 @@ export const pwiz_no_content = /** @type {((inputs?: Pwiz_No_ContentInputs, opti
 /**
 * | output |
 * | --- |
-* | "This workspace has no playbooks yet. A persona without routes is only a role description — you can still create one and attach playbooks later." |
+* | "This workspace has no playbooks yet. A persona without playbooks is only a role description. You can still create one and add playbooks later." |
 *
 * @param {Pwiz_No_PlaybooksInputs} inputs
 * @param {{ locale?: "en" | "de" }} options

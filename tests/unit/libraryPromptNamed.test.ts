@@ -8,7 +8,9 @@ describe('the library instruction', () => {
   it('step 1 loads a named one exactly, says when it is missing and never swaps it', () => {
     // SQEM-687 — the same rule, shorter; SQEM-690 — imperative.
     expect(LIBRARY_SYSTEM_PROMPT).toMatch(/1\. Named: load exactly the persona or playbook the person names/);
-    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/Search before you say it is missing; it may not be shared with them\. Never swap it\./);
+    // SQEM-703 — the search order is back in step 1: with the new steps 3/4 a named playbook with an English title
+    // was given up after two searches; this sentence restored it.
+    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/Search one word at a time, the English word too, then list_templates, before you say it is missing; it may not be shared with them\. Never swap it\./);
   });
 
   // SQEM-685 — without its own search, step 1 made one get_template on a guessed name and said "not found".
@@ -21,7 +23,8 @@ describe('the library instruction', () => {
   it('step 3 searches a playbook with or without a persona', () => {
     // ⛔ "also" is SQEM-682's: a role's task that needs one more playbook gets the persona AND the playbook.
     // SQEM-690 — measured: without "also" the persona-plus-playbook case got worse.
-    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/3\. Playbook: also call search_templates for anything the persona's routes do not cover/);
+    // SQEM-703 — every playbook whose condition the task meets, then the search for a part the persona does not cover.
+    expect(LIBRARY_SYSTEM_PROMPT).toMatch(/3\. Playbooks: load every playbook whose persona condition the task meets\. For any part of the task the persona does not cover, also call search_templates/);
     expect(LIBRARY_SYSTEM_PROMPT).toMatch(/5\. Nothing fits: carry on without mentioning sqemes\./);
   });
 
@@ -31,11 +34,12 @@ describe('the library instruction', () => {
     expect(LIBRARY_SYSTEM_PROMPT).not.toMatch(/nobody can answer/);
   });
 
-  it('the search rule lives in the search tool, not in the instruction (SQEM-690)', () => {
-    // It stood in both; the tool description is what every client reads when it searches. The English word moved there.
-    expect(LIBRARY_SYSTEM_PROMPT).not.toMatch(/one word at a time|a single word/);
+  it('the search rule stands in the search tool, and in step 1 for a named one (SQEM-690, SQEM-703)', () => {
+    // SQEM-690 moved it into the tool description; SQEM-703 measured that a named playbook needs it in step 1 too.
+    // The tool description carries no example since SQEM-703 (measured without loss).
     const search = (LIBRARY_TOOL_DEFS as Array<{ name: string; description: string }>).find(t => t.name === 'search_templates')!;
-    expect(search.description).toMatch(/Many titles are English: also search the English word \(Diagramm: diagram\)\./);
+    expect(search.description).toMatch(/so search ONE word of the request, never a phrase; with no match, try another word or list_templates\. Many titles are English: also search the English word for it\./);
+    expect(search.description).not.toMatch(/Diagramm|protokoll/);
   });
 
   it('Chat\'s own search tool says the same', async () => {

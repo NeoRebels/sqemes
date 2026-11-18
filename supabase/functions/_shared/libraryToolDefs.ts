@@ -77,14 +77,14 @@ export const LIBRARY_TOOL_DEFS = [
           enum: ['prompt', 'skill', 'all'],
           description: 'Filter by template kind. Defaults to all.',
         },
-        tag: { type: 'string', description: 'Only templates carrying this workspace tag (e.g. "review").' },
+        tag: { type: 'string', description: 'Only templates carrying this workspace tag.' },
       },
     },
   },
   {
     name: 'search_templates',
     title: 'Search playbooks',
-    description: 'Find a workspace template by keyword. The query is matched as text in titles and descriptions, so search ONE word ("protokoll", not "Meeting Protokoll Vorlage"); with no match, try another word or list_templates. Many titles are English: also search the English word (Diagramm: diagram). Useful when the user wants to use, find or check one of their team\'s playbooks, or when the task is one their team keeps a playbook for — a matching prompt or skill can then be used instead of composing from scratch. Returns matching templates with their id and name — pass one to get_template to load its full content. Optionally filter by kind.\n\nMatches with attached context files also report "contextFileCount" and "contextBytes" (absent when there are none). Use them to decide HOW to load the template: when a template has several files or a large total, call get_template with include_files: "list" — you then get each file\'s name, size and a preview instead of its full text, and read only the ones you need via resources/read. For one small file, the default is fine.\n\nEach entry also carries its tag (when it has one), who created it (createdBy) and when it last changed (updatedAt).',
+    description: 'Find a workspace template by keyword. The query is matched as text in titles and descriptions, so search ONE word of the request, never a phrase; with no match, try another word or list_templates. Many titles are English: also search the English word for it. Useful when the user wants to use, find or check one of their team\'s playbooks, or when the task is one their team keeps a playbook for — a matching prompt or skill can then be used instead of composing from scratch. Returns matching templates with their id and name — pass one to get_template to load its full content. Optionally filter by kind.\n\nMatches with attached context files also report "contextFileCount" and "contextBytes" (absent when there are none). Use them to decide HOW to load the template: when a template has several files or a large total, call get_template with include_files: "list" — you then get each file\'s name, size and a preview instead of its full text, and read only the ones you need via resources/read. For one small file, the default is fine.\n\nEach entry also carries its tag (when it has one), who created it (createdBy) and when it last changed (updatedAt).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -102,13 +102,13 @@ export const LIBRARY_TOOL_DEFS = [
   {
     name: 'list_personas',
     title: 'List personas',
-    description: 'List the workspace\'s personas. A PERSONA is a working role — a general instruction plus conditions saying which template to load when. Use it when the user names a persona ("use the Sales persona from sqemes", "load persona X"), or when a task clearly belongs to a role the workspace has defined. Returns id, name, description and how many routes each one currently offers you.\n\nA persona is not a template and cannot be fetched with get_template; call get_persona.',
+    description: 'List the workspace\'s personas. A PERSONA is a working role: a general instruction plus playbooks, each with a condition saying when it applies. Use it when the user names a persona, or when a task clearly belongs to a role the workspace has defined. Returns id, name, description and how many playbooks each one currently offers you.\n\nA persona is not a template and cannot be fetched with get_template; call get_persona.',
     inputSchema: { type: 'object', properties: {} },
   },
   {
     name: 'get_persona',
     title: 'Load persona',
-    description: 'Load a persona by name or id — a working role with its rules and its routes. Returns markdown: the role and its rules, plus a table of ROUTES — each a condition and the exact get_template call to make when that condition applies.\n\n⚠️ Load a route only when its condition actually applies, and only that one. The routes are deliberately NOT included up front: the persona is small, the templates behind it are not, and fetching them all defeats the purpose.\n\nRoutes you cannot access are already omitted — what you receive is what you may load. If the persona lists no routes, work from the role description and say so if asked for more.',
+    description: 'Load a persona by name or id: a working role with its rules and its playbooks. Returns markdown: the role, its rules and a table of playbooks, each with the condition under which it applies and the exact get_template call that loads it (the tools call a playbook a template).\n\nLoad every playbook whose condition the current task meets, and no other. A task can meet several conditions; those playbooks are loaded together. Check the conditions again for every new task. The playbooks are not included up front so that a task loads only what it needs.\n\nPlaybooks you cannot access are already omitted. If the persona lists none, work from the role.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -120,13 +120,13 @@ export const LIBRARY_TOOL_DEFS = [
   {
     name: 'create_persona',
     title: 'Create persona',
-    description: 'Create a persona — a standing working role the workspace can adopt: who this role is, how it works, what it refuses.\n\nWRITE THE ROLE, NOT THE ROUTING. A persona holds prose only; which template applies when lives in its routes, attached separately. Do not list templates in the content — a routing table written into the prose goes stale the moment a template is renamed, and nothing corrects it.\n\nA persona is not a template: it has no {{variables}}, no context files, and its text is never sent to a model as a task. Use create_template for those.\n\nNew personas are visible to the whole workspace. That is deliberate and not a gap: a caller only ever receives the routes they already have access to, so an open persona grants nothing.',
+    description: 'Create a persona: a standing working role the workspace can adopt, saying who this role is, how it works and what it refuses.\n\nWRITE THE ROLE, NOT ITS PLAYBOOKS. A persona holds prose only; which playbook applies when is attached separately with attach_template. Do not list playbooks in the content: a list written into the prose goes stale when a playbook is renamed, and nothing corrects it.\n\nA persona is not a template: it has no {{variables}}, no context files, and its text is never sent to a model as a task. Use create_template for those.\n\nNew personas are visible to the whole workspace. That is deliberate: a caller only ever receives the playbooks they already have access to, so an open persona grants nothing.',
     inputSchema: {
       type: 'object',
       properties: {
-        title:       { type: 'string', description: 'Name of the role, e.g. "Sales Engineer"' },
+        title:       { type: 'string', description: 'Name of the role' },
         description: { type: 'string', description: 'One line on when to reach for this persona — this is what list_personas shows' },
-        content:     { type: 'string', description: 'The role itself: instructions, working style, rules. Markdown. No routing table.' },
+        content:     { type: 'string', description: 'The role itself: instructions, working style, rules. Markdown. No list of playbooks.' },
         tags:        { type: 'array', items: { type: 'string' }, description: 'Optional tags' },
       },
       required: ['title'],
@@ -135,14 +135,14 @@ export const LIBRARY_TOOL_DEFS = [
   {
     name: 'update_persona',
     title: 'Update persona',
-    description: 'Change a persona\'s title, description, content or tags. Only the fields you pass are touched; the rest stay as they are, and its routes are never affected.\n\nCall get_persona first if you are editing text you did not just write — this overwrites, it does not merge.\n\nRequires that you created the persona, or that you are an editor or admin: a persona is a shared role, so rewriting it changes it for everyone who uses it.',
+    description: 'Change a persona\'s title, description, content or tags. Only the fields you pass are touched; the rest stay as they are, and its playbooks are never affected.\n\nCall get_persona first if you are editing text you did not just write: this overwrites, it does not merge.\n\nRequires that you created the persona, or that you are an editor or admin: a persona is a shared role, so rewriting it changes it for everyone who uses it.',
     inputSchema: {
       type: 'object',
       properties: {
         id:          { type: 'string', description: 'UUID of the persona (from list_personas)' },
         title:       { type: 'string' },
         description: { type: 'string' },
-        content:     { type: 'string', description: 'Replaces the role text entirely. No routing table.' },
+        content:     { type: 'string', description: 'Replaces the role text entirely. No list of playbooks.' },
         tags:        { type: 'array', items: { type: 'string' } },
       },
       required: ['id'],
@@ -151,7 +151,7 @@ export const LIBRARY_TOOL_DEFS = [
   {
     name: 'delete_persona',
     title: 'Delete persona',
-    description: 'Delete a persona and its routes. The templates it pointed at are NOT deleted — only the role and its routing.\n\nRequires that you created the persona, or that you are an editor or admin of the workspace.',
+    description: 'Delete a persona and its list of playbooks. The playbooks themselves are NOT deleted; only the role and its conditions go.\n\nRequires that you created the persona, or that you are an editor or admin of the workspace.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -163,13 +163,13 @@ export const LIBRARY_TOOL_DEFS = [
   {
     name: 'attach_template',
     title: 'Attach playbook to persona',
-    description: 'Add a route to a persona: which template to load, and the condition that says when.\n\nTHE CONDITION IS THE POINT, which is why it is required. It answers what this template means IN THIS persona — the same template plays different parts in different roles, and its own description cannot say that. Write the situation ("the customer asks for a written quote"), not a restatement of the title.\n\nAttaching grants nobody any access. A colleague only ever receives routes they could already open, so attaching a restricted template gives a persona that is quietly smaller for them. The reply tells you when that is the case — pass it on.\n\nRe-attaching a template already on the persona updates its condition rather than failing.',
+    description: 'Add a playbook to a persona, with the condition under which it applies.\n\nTHE CONDITION IS THE POINT, which is why it is required. It says when this playbook is needed in this persona; the same playbook can serve different purposes in different roles, and its own description cannot say that. A task can meet several conditions, and every playbook whose condition it meets is loaded, so describe when this playbook is needed, not when it is the only one needed. Write the situation, not a restatement of the title.\n\nAttaching grants nobody any access. A colleague only ever receives playbooks they could already open, so attaching a restricted playbook gives a persona that is quietly smaller for them. The reply says when that is the case; pass it on.\n\nAttaching a playbook that is already on the persona updates its condition.',
     inputSchema: {
       type: 'object',
       properties: {
         persona_id:  { type: 'string', description: 'UUID of the persona (from list_personas)' },
         template_id: { type: 'string', description: 'UUID of the template (from list_templates or search_templates)' },
-        condition:   { type: 'string', description: 'When this route applies, in the persona\'s own terms. Required.' },
+        condition:   { type: 'string', description: 'The situation in which this playbook is needed, in the persona\'s own terms. Required.' },
         sort_order:  { type: 'number', description: 'Optional position; appended to the end when omitted' },
       },
       required: ['persona_id', 'template_id', 'condition'],
@@ -178,12 +178,12 @@ export const LIBRARY_TOOL_DEFS = [
   {
     name: 'detach_template',
     title: 'Detach playbook from persona',
-    description: 'Remove a route from a persona. The template itself is untouched — only the route disappears.\n\nRequires that you created the persona, or that you are an editor or admin of the workspace.',
+    description: 'Remove a playbook from a persona. The playbook itself is untouched.\n\nRequires that you created the persona, or that you are an editor or admin of the workspace.',
     inputSchema: {
       type: 'object',
       properties: {
         persona_id:  { type: 'string', description: 'UUID of the persona (from list_personas)' },
-        template_id: { type: 'string', description: 'UUID of the template whose route should be removed' },
+        template_id: { type: 'string', description: 'UUID of the template to remove from the persona' },
       },
       required: ['persona_id', 'template_id'],
     },
@@ -240,7 +240,7 @@ export const LIBRARY_TOOL_DEFS = [
   {
     name: 'create_template',
     title: 'Create playbook',
-    description: 'Create a new template (prompt or skill) in the workspace. A prompt is a task with {{variables}}; a skill is a block of knowledge applied when it fits. For a ROLE — who to be, and which template to load when — create a persona instead (create_persona).\n\nVariables (kind=prompt only): pass a "variables" array of {name, label?, type?} objects. Alternatively, write {{variable_name}} placeholders in content and they are auto-extracted. "type" can be "text" (default) or "textarea" for longer inputs.\nExample: [{"name":"draft","label":"Email Draft","type":"textarea"},{"name":"tone","type":"text"}]\n\nContext files: pass "file_ids" (array of UUIDs from list_files) to attach workspace files as context.\n\nAgent Skills (kind=skill): a skill is a FOLDER, and sqemes holds it whole. Put the SKILL.md body in "content", its frontmatter title/description in "title"/"description", and upload EVERY other file in the folder via upload_file under its relative path (references/…, scripts/…, assets/…), then attach them all through file_ids. Uploading only the SKILL.md leaves a skill that describes files nobody has.\n\nWho can see it: the new template follows the workspace default — open to everyone, or restricted to you if the workspace starts new templates restricted. Change it per template in the sqemes app.',
+    description: 'Create a new template (prompt or skill) in the workspace. A prompt is a task with {{variables}}; a skill is a block of knowledge applied when it fits. For a ROLE — who to be, and which template to load when — create a persona instead (create_persona).\n\nVariables (kind=prompt only): pass a "variables" array of {name, label?, type?} objects. Alternatively, write {{variable_name}} placeholders in content and they are auto-extracted. "type" can be "text" (default) or "textarea" for longer inputs.\nExample: [{"name":"draft","label":"Email Draft","type":"textarea"},{"name":"tone","type":"text"}]\n\nContext files: pass "file_ids" (array of UUIDs from list_files) to attach workspace files as context.\n\nAgent Skills (kind=skill): a skill is a FOLDER, and sqemes holds it whole. Put the SKILL.md body in "content", its frontmatter title/description in "title"/"description", and upload EVERY other file in the folder via upload_file under its relative path (references/…, scripts/…, assets/…), then attach them all through file_ids. Uploading only the SKILL.md leaves a skill that describes files nobody has.\n\nWho can see it: the new template follows the workspace default, open to everyone or restricted to you. Change it with set_access, or in the sqemes app.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -258,7 +258,7 @@ export const LIBRARY_TOOL_DEFS = [
           description: 'UUIDs of workspace files to attach as context (from list_files). Works for all kinds.',
           items: { type: 'string' },
         },
-        tag: { type: 'string', description: 'Optional workspace tag, e.g. "review". A template carries one tag; a tag the workspace does not have yet is added to its tag list.' },
+        tag: { type: 'string', description: 'Optional workspace tag. A template carries one tag; a tag the workspace does not have yet is added to its tag list.' },
       },
       required: ['kind', 'title', 'content'],
     },

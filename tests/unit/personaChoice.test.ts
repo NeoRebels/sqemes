@@ -50,6 +50,6 @@ describe('wiring', () => {
     const mock = read('scripts/prompt-eval/mock-mcp.mjs');
     expect(mock).toMatch(/PERSONA_CHOICE_NOTE = '\(\[\^'\]\*\)'/);
     expect(mock).toMatch(/return \{ personas: PERSONAS\.map[\s\S]*choose: process\.env\.MOCK_UNATTENDED === '1' \? CHOOSE_UNATTENDED : CHOOSE \}/);
-    expect(read('scripts/prompt-eval/run.mjs')).toMatch(/MOCK_UNATTENDED: c\.type === 'routine' \? '1' : ''/);
+    expect(read('scripts/prompt-eval/run.mjs')).toMatch(/MOCK_UNATTENDED: \(c\.type === 'routine' \|\| c\.type === 'altroutine'\) \? '1' : ''/);
   });
 });

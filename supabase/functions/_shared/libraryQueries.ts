@@ -209,6 +209,12 @@ export function renderContextBlocks(
 // ⚠️ `routes` arrives ALREADY FILTERED to what this caller may open. Routes they cannot reach are
 // omitted, never listed as unavailable: a model that sees a route it cannot fetch does not skip it,
 // it invents the contents. Saying less is the safe direction here; saying "restricted" is not.
+/** SQEM-703 — how a persona's playbooks are loaded, in Chat and over MCP. Precise, without scenario examples. */
+export const PERSONA_RULES = 'Check each condition against the current task and load every playbook whose condition the task meets. A task can meet several conditions; those playbooks cover different parts of it and are loaded together. Load no playbook whose condition the task does not meet. If two playbooks would cover the same part of the task, name both and ask which to use. If two loaded playbooks give conflicting instructions, follow the more specific one; if neither is more specific, ask. If the task meets no condition, work from the role and search the library for a playbook. Check the conditions again for every new task. These rules replace any instruction to load only one playbook.';
+
+/** SQEM-703 — the same for a scheduled routine, which cannot ask and has one task per run. */
+export const PERSONA_RULES_UNATTENDED = 'Check each condition against the current task and load every playbook whose condition the task meets. A task can meet several conditions; those playbooks cover different parts of it and are loaded together. Load no playbook whose condition the task does not meet. If two playbooks would cover the same part of the task, use the more specific one and say in the result why. If two loaded playbooks give conflicting instructions, follow the more specific one; if neither is more specific, follow the role and say in the result which instruction you followed. If the task meets no condition, work from the role and search the library for a playbook. These rules replace any instruction to load only one playbook.';
+
 export function composePersona(
   persona: { title: string; description: string; content: string },
   routes: { name: string; title: string; kind: string; condition: string; description: string }[],
@@ -218,6 +224,8 @@ export function composePersona(
    * section, so the model says so when the person has not connected one of them.
    */
   connectors: string[] = [],
+  /** SQEM-703 — a scheduled routine: nobody can answer, so the rules pick instead of asking. */
+  { unattended = false }: { unattended?: boolean } = {},
 ): string {
   const lines: string[] = [];
   lines.push('---');
@@ -231,7 +239,7 @@ export function composePersona(
   }
 
   if (routes.length) {
-    lines.push('## Routes — load one only when its condition applies');
+    lines.push('## Playbooks — load every one whose condition this task meets');
     lines.push('');
     lines.push('| When | Load |');
     lines.push('|---|---|');
@@ -252,13 +260,14 @@ export function composePersona(
       lines.push(`| ${when} | \`get_template(name: "${r.name}")\` — ${r.kind} “${r.title}” |`);
     }
     lines.push('');
-    lines.push('**Load nothing until a condition applies, and load only the one that does.** Loading');
-    lines.push('every route defeats the purpose of this document: it exists so the knowledge arrives');
-    lines.push('when it is needed rather than all at once. If nothing fits, ask instead of guessing.');
+    // SQEM-703 — every playbook whose condition the task meets, not only one: a task can need several that cover
+    // different parts of it. Asking is kept for two playbooks covering the SAME part (decided 2026-08-31). The last
+    // sentence outranks the cached `get_persona` description an older client may still hold ("only that one").
+    lines.push(unattended ? PERSONA_RULES_UNATTENDED : PERSONA_RULES);
   } else {
     // A persona whose routes are all invisible to this caller. It still has a role and rules, and
     // those are worth having — but it must not imply that anything is loadable.
-    lines.push('_This persona currently has no routes available to you._');
+    lines.push('_This persona currently has no playbooks available to you._');
   }
 
   if (connectors.length) {
@@ -380,9 +389,9 @@ export interface LibraryReader {
 
   listPersonas(): Promise<PersonaSummary[]>;
   /** SQEM-651 — `connectors`: the persona's services, so Chat can fetch them. MCP ignores the field. */
-  getPersona(args: { id?: string; name?: string }): Promise<{ text: string; routeCount: number; connectors: PersonaConnector[] }>;
+  getPersona(args: { id?: string; name?: string; unattended?: boolean }): Promise<{ text: string; routeCount: number; connectors: PersonaConnector[] }>;
   /** Render an already-fetched persona row. Used by `prompts/get`, which resolves the row itself. */
-  renderPersona(persona: PersonaRow): Promise<{ text: string; routeCount: number; connectors: PersonaConnector[] }>;
+  renderPersona(persona: PersonaRow, opts?: { unattended?: boolean }): Promise<{ text: string; routeCount: number; connectors: PersonaConnector[] }>;
   routeVisibility(personaIds: string[]): Promise<Map<string, { total: number; visible: number }>>;
 
   /** Accepts a bare file id or a `sqemes://files/<id>` uri. */
@@ -678,7 +687,7 @@ export async function createLibraryReader(
   // with everyone may attach a template restricted to its author; the colleague gets the persona
   // without that route, and the template stays shut. Filtering on the persona instead would hand out
   // its author's reach along with it — a permission grant by attachment.
-  const renderPersona = async (persona: PersonaRow) => {
+  const renderPersona = async (persona: PersonaRow, { unattended = false }: { unattended?: boolean } = {}) => {
     const { data: routeRows } = await client
       .from('persona_templates')
       .select('template_id, condition, sort_order, prompts(title, kind, description)')
@@ -700,7 +709,7 @@ export async function createLibraryReader(
     // Chat the runtime fetches them (`onPersonaLoaded`, `_shared/connectorPool.ts`).
     const connectors = parsePersonaConnectors(persona.connectors);
 
-    return { text: composePersona(persona, routes, connectors.map(c => c.name)), routeCount: routes.length, connectors };
+    return { text: composePersona(persona, routes, connectors.map(c => c.name), { unattended }), routeCount: routes.length, connectors };
   };
 
   // SQEM-663 — member names for `createdBy`, loaded once per reader and only when a list is asked for.
@@ -902,7 +911,7 @@ export async function createLibraryReader(
         }));
     },
 
-    async getPersona({ id: personaId, name: personaName }) {
+    async getPersona({ id: personaId, name: personaName, unattended = false }) {
       if (!personaId && !personaName) throw new LibraryBadRequest('Provide either id or name');
 
       const { data: personaRows } = await client
@@ -922,7 +931,7 @@ export async function createLibraryReader(
         throw new LibraryNotFound('Persona not found');
       }
 
-      return renderPersona(persona as PersonaRow);
+      return renderPersona(persona as PersonaRow, { unattended });
     },
 
     async readContextFileByPath(args) {

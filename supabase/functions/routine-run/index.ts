@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
   let unavailable = 0;
   if (r.persona_id) {
     try {
-      const p = await reader.getPersona({ id: r.persona_id });
+      const p = await reader.getPersona({ id: r.persona_id, unattended: true }); // SQEM-703 — nobody can answer
       personaText = p.text;
       personaServices = p.connectors;
     } catch (e) {
